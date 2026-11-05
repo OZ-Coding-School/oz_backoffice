@@ -1,6 +1,6 @@
 # 05. P1-2 academy 모델
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-05 병합)
 - 관련 PR: #8
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P1 (P1-2)
 - 이전 기록: [03. P1-1 identity·audit 모델과 첫 마이그레이션](03_p1_1_identity_audit_models.md)
@@ -49,7 +49,9 @@
   - `aerich downgrade -v 1` → `upgrade` 성공
   - check 제약 19개 적용 확인
 - DBML 파서 검증(테이블 41개)
-- GitHub Actions: PR에서 확인 후 기록
+- 커밋 5개를 각각 워크트리로 꺼내 확인: 모든 커밋에서 ruff·format·mypy·lint-imports·pytest 통과. 처음에는 커밋을 잘못 나눠 중간 커밋이 깨져 있었다(이동한 파일이 다른 커밋에 섞이고, 모델과 마이그레이션이 서로 다른 커밋에 들어감). PR 전에 다시 나눴다.
+- GitHub Actions (PR #8, run 41991426806): backend 잡 통과, pytest 70개 통과
+- 사용자 확인: P1 진행 지시에 따라 CI 통과 후 병합
 
 ## 남은 작업
 - P1-3 organization (부서, 직위, 직원, 과정·기수 담당자)
