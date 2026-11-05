@@ -19,6 +19,9 @@ Table departments {
   indexes {
     (parent_id, name) [unique, note: "같은 부모 아래 부서명 중복 방지 (NULLS NOT DISTINCT)"]
   }
+  checks {
+    `parent_id IS NULL OR parent_id <> id` [name: "check_departments_parent_not_self"]
+  }
 }
 
 Table employee_positions {
@@ -159,6 +162,7 @@ Table bootcamp_staffs {
 
   indexes {
     (employee_id, bootcamp_id, role) [unique]
+    bootcamp_id [note: "과정별 담당자 조회"]
   }
 }
 
