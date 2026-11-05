@@ -1,6 +1,6 @@
 # 02. docker compose 로컬 개발 환경과 S3 에뮬레이터
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-05 병합)
 - 관련 PR: #4
 - 이전 기록: [01. 백엔드 프로젝트 세팅과 CI](01_backend_project_setup.md)
 
@@ -61,7 +61,8 @@
     - 서명 없는 GET 403
   - 컨테이너 내부 경로(`http://s3:4566`)에서 같은 객체를 `head-object`로 확인 (크기, Content-Type)
   - `s3` 재시작 후 객체 유지 확인, `s3-init` 재실행 시 "버킷 존재"로 멱등 확인
-- GitHub Actions 실행 결과: PR에서 확인 후 기록
+- GitHub Actions (PR #4, run 41987010762): backend 잡 통과. ruff, mypy, lint-imports(계약 10개), pytest 22개 통과(통합 테스트 포함). docker compose 자체는 CI에서 실행하지 않는다(로컬 검증만)
+- 사용자 확인: 병합 승인(작업 지시에 "CI 통과 검증 후 병합" 포함)
 
 ## 남은 작업
 - S3 어댑터(`integrations/s3.py`, aioboto3) 구현 시(P6):
