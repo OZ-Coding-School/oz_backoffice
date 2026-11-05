@@ -2,4 +2,4 @@
 
 | 번호 | 작업 | 상태 |
 | --- | --- | --- |
-| 01 | [백엔드 프로젝트 세팅과 CI](01_backend_project_setup.md) | PR 진행 중 |
+| 01 | [백엔드 프로젝트 세팅과 CI](01_backend_project_setup.md) | 완료 (#3) |

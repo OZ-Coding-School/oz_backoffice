@@ -1,6 +1,6 @@
 # 01. 백엔드 프로젝트 세팅과 CI
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-05 병합)
 - 관련 PR: #3
 - 관련 계획: `docs/implement_plans/backend_architecture.md`
 - 다음 기록: [02. docker compose 로컬 개발 환경과 S3 에뮬레이터](02_local_docker_compose_and_s3.md)
@@ -58,7 +58,12 @@
 - import-linter가 세 종류의 위반을 잡아내는지 임시 위반 파일로 확인했다: 도메인의 tortoise import, 다른 컨텍스트 infrastructure import, 계층 역방향 import
 - 실제 PostgreSQL에서 pytest 22개 통과 (통합 테스트 3개 포함, docker compose 환경). 자세한 내용은 기록 02
 - `actionlint .github/workflows/ci.yml`: 통과
-- GitHub Actions 실행 결과: PR에서 확인 후 기록
+- GitHub Actions (PR #3, run 41985980321): backend 잡 통과 (37초)
+  - ruff, mypy, lint-imports(계약 10개) 통과
+  - `btree_gist` 확장 생성 단계 성공
+  - **pytest 22개 통과 (통합 테스트 포함)**, coverage 85%
+  - frontend 잡은 `package.json`이 없어 설계대로 건너뜀
+- 사용자 확인: 병합 승인(작업 지시에 "CI 통과 검증 후 병합" 포함)
 
 ## 남은 작업
 - P1: 멘토링 범위 Tortoise 모델 → `aerich init-db`, raw SQL 제약(EXCLUDE, 부분 유니크, 복합 FK) 마이그레이션 → 통합 테스트 픽스처를 `generate_schemas`에서 마이그레이션 적용으로 교체 (`tests/conftest.py` TODO)
