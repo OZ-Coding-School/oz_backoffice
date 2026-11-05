@@ -1,6 +1,6 @@
 # 03. P1-1 identity·audit 모델과 첫 마이그레이션
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-05 병합)
 - 관련 PR: #6
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P1 (P1-1)
 
@@ -42,7 +42,8 @@
 ## 검증
 - 컨테이너(`docker compose exec api`): ruff, ruff format, mypy(src strict, tests), lint-imports(계약 10개) 통과
 - pytest **49개 통과**. 통합 테스트는 aerich 마이그레이션을 적용한 실제 PostgreSQL에서 돌았다. raw SQL check 제약 4종이 위반 시 실패하는 것과 DB 기본값도 확인했다
-- GitHub Actions: PR에서 확인 후 기록
+- GitHub Actions (PR #6, run 41989606614): backend 잡 통과. CI의 PostgreSQL에서도 마이그레이션 적용 후 pytest 49개 통과
+- 사용자 확인: P1 진행 지시에 따라 CI 통과 후 병합
 
 ## 남은 작업
 - P1-2 organization, P1-3 academy (각각 `aerich migrate`로 새 마이그레이션)
