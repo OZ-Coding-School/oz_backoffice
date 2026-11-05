@@ -21,14 +21,22 @@
 | `infra/postgres/init/01-extensions-and-test-db.sql` | `btree_gist` 확장, 통합 테스트 DB `oz_backoffice_test` 생성 |
 | `apps/backend/Dockerfile`, `.dockerignore` | uv 기반 멀티 스테이지 이미지. `dev`(dev 의존성 + tests 포함, reload) / `prod`(런타임 의존성만, non-editable 설치). API / 워커 / 스케줄러 공용 |
 | `apps/backend/.env.example` | 로컬 설정 예시 (compose가 덮어쓰는 값 안내, S3 변수) |
-| `docs/research/local_s3_emulator.md` (+ 실측 스크립트) | LocalStack·MinIO 대안으로 floci vs MiniStack 비교. S3 시나리오 16개 실측 |
 
 ## 주요 결정
 - 로컬 개발 기본 실행은 docker compose, 호스트 uv 실행은 IDE·디버거용 대안 (사용자 결정, R6)
 - 객체 저장소 AWS S3: 비공개 버킷 1개 + prefix, presigned POST 업로드, presigned GET 다운로드, 엔드포인트는 서버용·브라우저용 두 개 (사용자 결정, C5~C7). 클라이언트는 aioboto3 (B8, 어댑터 구현 시 추가)
 - 로컬·CI 에뮬레이터 floci 2.4.0, 인증 강제 (사용자 결정, R7)
   - LocalStack 최신(2026.10)은 인증 토큰 없이 실행되지 않았다(실측). 그래서 사용자가 제시한 floci와 MiniStack을 실측 비교했다.
-  - 두 도구 모두 인증 옵션을 켜면 16/16을 통과한다. 커뮤니티·테스트 규모, 릴리스 주기, 데이터 유지 설정이 단순한 점에서 floci를 골랐다
+  - 백오피스가 쓸 S3 시나리오 16개를 두 이미지에서 실측했다. presigned POST 크기·타입 정책, presigned GET·만료, CORS preflight, 서명 검증, 비공개 버킷, aioboto3, 멀티파트, Range가 포함된다.
+  - 두 도구 모두 인증 옵션을 켜면 16/16을 통과했다. 기본값에서는 서명을 검증하지 않았다.
+
+    | | floci 2.4.0 | MiniStack 1.5.37 | LocalStack 4.14 (기준) |
+    | --- | --- | --- | --- |
+    | 인증 옵션 켬 | 16/16 | 16/16 | 11/16 (옵션 없음) |
+    | 이미지 / 유휴 메모리 / 첫 응답 | 93MB / 23MiB / 0.5초 | 68MB / 37MiB / 1.1초 | 456MB / 115MiB / 2.2초 |
+    | 재시작 후 데이터 유지 | 옵션 1개로 객체·버킷 설정 유지 | 옵션 2개 필요 | — |
+
+  - 커뮤니티·호환성 테스트 규모, 고정 릴리스 주기, 단순한 데이터 유지 설정에서 floci를 골랐다. 실측 스크립트와 비교 문서는 저장소에 두지 않는다(사용자 결정).
 - 버킷·CORS 초기화는 에뮬레이터 init 훅이 아니라 `aws-cli` 원샷 컨테이너로 한다 (사용자 결정, R8)
 
 ## 발견한 문제와 해결
@@ -57,6 +65,6 @@
 
 ## 남은 작업
 - S3 어댑터(`integrations/s3.py`, aioboto3) 구현 시(P6):
-  - `docs/research/local_s3_emulator/s3_compat.py`의 시나리오를 `tests/integration`으로 옮긴다
+  - 위 S3 시나리오(presigned POST 정책·GET·만료, CORS, 서명 검증, 비공개 버킷, 멀티파트, Range)를 `tests/integration`의 호환성 테스트로 작성한다
   - CI에 floci 서비스 컨테이너와 버킷 초기화 단계를 추가한다
 - 운영 배포 전 실제 AWS S3 스테이징 버킷에서 presigned POST/GET 스모크 테스트

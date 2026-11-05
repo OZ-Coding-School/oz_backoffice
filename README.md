@@ -8,7 +8,6 @@
 | `docs/database_schema_v2.dbml` | 현재 DB 스키마 |
 | `docs/implement_plans/` | 구현 계획 (멘토링 1단계: `mentoring_phase1_backend.md`) |
 | `docs/implement_descriptions/` | 구현 기록 |
-| `docs/research/` | 기술 조사·비교 (실측 스크립트 포함) |
 | `docs/analysis/` | 기존 5개 서비스 분석 (로컬 전용, `.gitignore`) |
 | `apps/*/CLAUDE.md` | 앱별 기술 스택·명령어·구조 규칙 |
 

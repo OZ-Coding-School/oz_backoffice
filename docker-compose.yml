@@ -71,7 +71,7 @@ services:
       timeout: 3s
       retries: 10
 
-  # 로컬 S3 에뮬레이터 (선정 근거: docs/research/local_s3_emulator.md)
+  # 로컬 S3 에뮬레이터 (선정 근거: docs/decisions.md R7)
   # 인증 강제를 켜야 presigned URL 서명 검증·비공개 버킷 동작이 AWS와 같아진다 (기본값은 꺼짐)
   s3:
     image: floci/floci:2.4.0
