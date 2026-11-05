@@ -3,7 +3,9 @@
 from fastapi import APIRouter
 
 from app.contexts.identity.presentation.router import auth_router, me_router
+from app.contexts.organization.presentation.router import router as staff_registration_router
 
 router = APIRouter()
 router.include_router(auth_router)
 router.include_router(me_router)
+router.include_router(staff_registration_router)
