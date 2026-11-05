@@ -147,6 +147,10 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
 
 ### P1. 마스터 데이터 모델과 첫 마이그레이션
 - **목표:** 공통 마스터 테이블을 만들고 마이그레이션 체계를 가동한다.
+- **PR 분할 (하네스 규칙: PR 600줄 안팎, PR당 마이그레이션 1개):**
+  - P1-1: identity(`users`, `oauth_accounts`) + audit(`audit_logs`) + 첫 마이그레이션 + 통합 테스트 픽스처를 마이그레이션 적용으로 전환
+  - P1-2: organization
+  - P1-3: academy
 - **테이블:**
   - identity: `users`, `oauth_accounts`
   - organization: `departments`, `employee_positions`, `employees`, `bootcamp_staffs`, `cohort_staffs`
@@ -417,6 +421,9 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
 ## 7. 진행 체크리스트
 
 - [ ] P1 마스터 데이터 모델과 첫 마이그레이션
+  - [x] P1-1 identity·audit 모델과 첫 마이그레이션 (구현 기록 03)
+  - [ ] P1-2 organization 모델
+  - [ ] P1-3 academy 모델
 - [ ] P2 인증 기반과 운영진 로그인
 - [ ] P3 권한
 - [ ] P4 조직·과정·기수 관리 API

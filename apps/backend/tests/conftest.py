@@ -8,8 +8,10 @@
 
 import os
 from collections.abc import AsyncIterator, Iterator
+from pathlib import Path
 
 import pytest
+from aerich import Command
 from fakeredis import FakeAsyncRedis
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
@@ -17,11 +19,12 @@ from tortoise import Tortoise
 
 from app.api.health import get_database_probe
 from app.core.config import Settings
-from app.core.database import build_tortoise_config
+from app.core.database import MODEL_APP, build_tortoise_config
 from app.core.redis import get_redis
 from app.main import create_app
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
+MIGRATIONS_DIR = Path(__file__).resolve().parents[1] / "migrations"
 
 
 @pytest.fixture(scope="session")
@@ -67,16 +70,49 @@ async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
 # ----------------------------------------------
 # Integration (PostgreSQL)
 # ----------------------------------------------
+async def _reset_schema_and_migrate(database_url: str) -> None:
+    """테스트 DB를 비우고 aerich 마이그레이션을 처음부터 적용한다 (raw SQL 제약 포함)."""
+    config = build_tortoise_config(database_url)
+    # aerich는 Tortoise가 이미 초기화돼 있으면 그 연결을 쓴다.
+    # Tortoise 1.x 기본값(전역 연결 없음)으로 aerich가 직접 초기화하면 연결을 찾지 못하므로,
+    # 전역 연결 모드로 먼저 초기화해 둔다.
+    await Tortoise.init(config=config, _enable_global_fallback=True)
+    try:
+        await Tortoise.get_connection("default").execute_script(
+            "DROP SCHEMA public CASCADE; CREATE SCHEMA public; "
+            "CREATE EXTENSION IF NOT EXISTS btree_gist;"
+        )
+        command = Command(tortoise_config=config, app=MODEL_APP, location=str(MIGRATIONS_DIR))
+        await command.init()
+        await command.upgrade(run_in_transaction=True)
+    finally:
+        await Tortoise.close_connections()
+
+
 @pytest.fixture(scope="session")
 async def database() -> AsyncIterator[None]:
     if not TEST_DATABASE_URL:
         pytest.skip("TEST_DATABASE_URL이 설정되지 않아 통합 테스트를 건너뜁니다.")
+    await _reset_schema_and_migrate(TEST_DATABASE_URL)
     await Tortoise.init(
         config=build_tortoise_config(TEST_DATABASE_URL, with_aerich=False),
-        _create_db=False,
         _enable_global_fallback=True,
     )
-    # TODO: 모델이 생기면 aerich 마이그레이션 적용으로 교체 (EXCLUDE 등 raw SQL 제약 포함)
-    await Tortoise.generate_schemas(safe=True)
     yield
     await Tortoise.close_connections()
+
+
+@pytest.fixture
+async def db(database: None) -> AsyncIterator[None]:
+    """테스트마다 모델 테이블을 비워 격리한다 (aerich 이력 테이블 제외)."""
+    yield
+    tables = sorted(
+        model._meta.db_table
+        for model in Tortoise.apps[MODEL_APP].values()
+        if model._meta.db_table != "aerich"
+    )
+    if tables:
+        quoted = ", ".join(f'"{table}"' for table in tables)
+        await Tortoise.get_connection("default").execute_script(
+            f"TRUNCATE {quoted} RESTART IDENTITY CASCADE"
+        )

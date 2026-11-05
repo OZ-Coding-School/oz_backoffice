@@ -120,7 +120,9 @@ src/app/
 - 트랜잭션은 서비스에서 `UnitOfWork`로 연다. 외부 API 호출은 `uow.on_commit(...)`으로 커밋 후에 실행한다.
 - 도메인은 시각을 직접 읽지 않고 `now`를 인자로 받는다. 서비스가 `Clock`에서 꺼내 넘긴다.
 - 예외는 `app.shared.errors`의 `AppError` 하위 클래스로 던진다. HTTP 매핑은 `app.core.errors`가 한다 (`{"error": {"code", "message"}}`).
-- Tortoise 모델은 컨텍스트별 app으로 등록된다 (`app.core.database.MODEL_MODULES`). 다른 컨텍스트 FK는 `"academy.Cohort"`처럼 app 이름을 붙인다. enum은 `CharEnumField`(varchar).
+- Tortoise 모델은 7개 컨텍스트 모듈을 **단일 app `models`** 에 등록한다 (`app.core.database.MODEL_MODULES`, decisions B9). 모델 클래스 이름은 `<이름>Model`, 테이블 이름은 `Meta.table`로 DBML과 같게 지정한다. FK는 `"models.UserModel"`처럼 참조한다.
+- enum은 `CharEnumField`(varchar)로 저장하고, 허용 값은 마이그레이션에 CHECK로 건다. DB 기본값(`now()`, `false` 등)과 DBML check 제약도 마이그레이션 raw SQL로 추가한다. aerich 생성 파일(`migrations/`)은 ruff 대상에서 제외한다.
+- 통합 테스트 픽스처(`database`)는 테스트 DB 스키마를 비우고 **aerich 마이그레이션을 처음부터 적용**한다. DB를 쓰는 테스트는 `db` 픽스처(테스트마다 TRUNCATE)를 사용한다.
 - 테스트: `tests/unit`(DB 없음, `tests/fakes` 인메모리 리포지토리), `tests/integration`(실제 PostgreSQL), `tests/api`(AsyncClient + 의존성 오버라이드). 마커 `unit` / `integration` / `api`.
 
 ---
