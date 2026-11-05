@@ -1,7 +1,7 @@
 # 07. 수강생 명단(student_rosters)을 students에 합침
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 예정)
+- 관련 PR: #10
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P1(스키마), P5, P7
 - 이전 기록: [05. P1-2 academy 모델](05_p1_2_academy_models.md) (명단 테이블을 처음 만든 기록)
 
