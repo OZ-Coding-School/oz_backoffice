@@ -33,3 +33,9 @@ class AuthenticationError(AppError):
 
 class PermissionDeniedError(AppError):
     default_code = "permission_denied"
+
+
+class ServiceUnavailableError(AppError):
+    """설정되지 않았거나 일시적으로 쓸 수 없는 기능 (예: Google OAuth 클라이언트 미설정)."""
+
+    default_code = "service_unavailable"

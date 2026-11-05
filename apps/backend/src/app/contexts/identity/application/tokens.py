@@ -30,6 +30,11 @@ def _subject_to_user_id(subject: str) -> uuid.UUID:
         raise AuthenticationError("유효하지 않은 토큰입니다.", code="token_invalid") from exc
 
 
+def read_access_token(jwt: JWTService, access_token: str) -> uuid.UUID:
+    """access 토큰을 검증하고 사용자 ID를 꺼낸다 (저장소 없이 서명·만료만 확인)."""
+    return _subject_to_user_id(jwt.decode(access_token, "access").subject)
+
+
 class TokenService:
     def __init__(self, jwt: JWTService, store: RefreshTokenStore, clock: Clock) -> None:
         self._jwt = jwt
@@ -49,7 +54,7 @@ class TokenService:
         )
 
     def read_access(self, access_token: str) -> uuid.UUID:
-        return _subject_to_user_id(self._jwt.decode(access_token, "access").subject)
+        return read_access_token(self._jwt, access_token)
 
     async def consume_refresh(self, refresh_token: str) -> uuid.UUID:
         """refresh를 한 번 쓰고 폐기한다.

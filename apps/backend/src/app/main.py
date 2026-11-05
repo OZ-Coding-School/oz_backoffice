@@ -3,11 +3,15 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from tortoise.contrib.fastapi import RegisterTortoise
 
 from app.api import health, v1
+from app.contexts.identity.application.auth_service import UserQueries
+from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
+from app.core.clock import SystemClock
 from app.core.config import Settings, get_settings
 from app.core.database import build_tortoise_config
 from app.core.errors import register_exception_handlers
@@ -22,6 +26,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.redis = create_redis(settings.redis_url)
+        app.state.http_client = httpx.AsyncClient(timeout=httpx.Timeout(10.0))
         try:
             async with RegisterTortoise(
                 app,
@@ -29,6 +34,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             ):
                 yield
         finally:
+            await app.state.http_client.aclose()
             await app.state.redis.aclose()
 
     app = FastAPI(
@@ -37,6 +43,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     app.state.settings = settings
+    app.state.clock = SystemClock()
+    # 컨텍스트 간 공개 서비스 연결 (composition root). 다른 컨텍스트의 presentation 의존성이
+    # 이 서비스를 쓰되 identity.infrastructure를 직접 import하지 않게 한다.
+    app.state.user_queries = UserQueries(TortoiseUserRepository())
 
     app.add_middleware(
         CORSMiddleware,

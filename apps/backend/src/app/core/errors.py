@@ -16,6 +16,7 @@ from app.shared.errors import (
     ConflictError,
     NotFoundError,
     PermissionDeniedError,
+    ServiceUnavailableError,
 )
 
 logger = logging.getLogger(__name__)
@@ -26,6 +27,7 @@ _STATUS_BY_ERROR: dict[type[AppError], int] = {
     BusinessRuleViolation: status.HTTP_422_UNPROCESSABLE_CONTENT,
     AuthenticationError: status.HTTP_401_UNAUTHORIZED,
     PermissionDeniedError: status.HTTP_403_FORBIDDEN,
+    ServiceUnavailableError: status.HTTP_503_SERVICE_UNAVAILABLE,
 }
 
 
