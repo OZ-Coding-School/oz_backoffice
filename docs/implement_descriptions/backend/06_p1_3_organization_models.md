@@ -1,7 +1,7 @@
 # 06. P1-3 organization 모델
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #9
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P1 (P1-3)
 - 이전 기록: [05. P1-2 academy 모델](05_p1_2_academy_models.md)
 
