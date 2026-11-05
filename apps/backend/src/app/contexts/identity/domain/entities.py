@@ -5,9 +5,9 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 
 from app.contexts.identity.domain.enums import SocialLoginProvider, UserApprovalStatus
-from app.contexts.identity.domain.values import normalize_name, normalize_phone
 from app.shared.domain import AggregateRoot, Entity
 from app.shared.errors import BusinessRuleViolation
+from app.shared.normalization import normalize_name, normalize_phone
 from app.shared.value_objects import Email
 
 
