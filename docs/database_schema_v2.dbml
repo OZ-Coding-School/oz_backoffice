@@ -1,0 +1,1024 @@
+// ==============================================================
+// OZ 통합 백오피스 DB 스키마
+// ==============================================================
+
+// ----------------------------------------------
+// 사내 부서 및 직위 (조직도 용도)
+// ----------------------------------------------
+Table departments {
+  note: "넥스트러너스 내 부서 정보 관리 테이블 (조직도 용도, 데이터 소유 범위 아님)"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  parent_id uuid [null, ref: > departments.id, note: "상위 부서, 최상위 부서는 null"]
+  name varchar(20) [not null, note: "부서명(교육 1팀)"]
+  description varchar(500) [not null, note: "부서 설명"]
+  rules text [null, note: "부서별 규칙 명시"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (parent_id, name) [unique, note: "같은 부모 아래 부서명 중복 방지 (NULLS NOT DISTINCT)"]
+  }
+}
+
+Table employee_positions {
+  note: "사내 직위 정보 관리 테이블"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  name varchar(20) [not null, unique]
+  priority smallint [not null, note: "직급 우선순위"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+// ----------------------------------------------
+// 회원 / 인증
+// ----------------------------------------------
+Table users {
+  note: "전체 회원 관리 테이블 (직원, 멘토, 강사, 수강생 모두)"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  email varchar(255) [not null, unique, note: "소문자로 정규화해 저장. 운영진은 nextrunners.co.kr(Google OAuth), 수강생·멘토는 @gmail.com만 허용(앱 레벨 검증)"]
+  hashed_password varchar(255) [null, note: "OAuth 전용 계정(운영진)은 null. argon2"]
+  name varchar(50) [not null, note: "이름"]
+  phone_number varchar(11) [null, unique, note: "휴대폰 번호(한국으로 한정, 숫자만). 수강생·멘토는 SMS 인증 후 저장(필수). 명단·계약 자동 매칭 기준"]
+  birth_date date [null, note: "생일"]
+  approval_status UserApprovalStatus [not null, default: 'PENDING', note: "가입 승인 상태. 명단/계약과 이름+휴대폰이 일치하면 가입 즉시 APPROVED, 아니면 PENDING(운영진 승인 대기)"]
+  approved_at timestamptz [null, note: "승인 시각 (승인자는 audit_logs)"]
+  email_verified_at timestamptz [null, note: "이메일 인증코드 확인 시각"]
+  phone_verified_at timestamptz [null, note: "SMS 인증 확인 시각"]
+  is_active bool [not null, default: false, note: "계정 활성화 여부 (비활성화·정지 시 false)"]
+  last_login_at timestamptz [null]
+  deleted_at timestamptz [null, note: "탈퇴(soft delete)"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  checks {
+    `email = lower(email)` [name: "check_users_email_lowercase"]
+    `(approval_status = 'APPROVED') = (approved_at IS NOT NULL)` [name: "check_users_approved_at"]
+  }
+}
+
+Table oauth_accounts {
+  note: "회원 OAuth2 소셜 로그인 정보 관리 테이블"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  user_id uuid [not null, ref: > users.id]
+  provider SocialLoginProvider [not null, note: "소셜 로그인 제공업체"]
+  oauth_provider_id varchar(255) [not null, note: "Provider 제공 고유 ID"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (provider, oauth_provider_id) [unique]
+    (user_id, provider) [unique]
+  }
+}
+
+
+// ----------------------------------------------
+// 권한 (RBAC + 범위)  — *_staffs 담당자 테이블과 병행
+//  - 권한 판정: user_roles
+//  - 담당자 목록 표시: bootcamp_staffs, cohort_staffs, cohort_mentors
+//  - 담당자 배정 시 대응하는 user_roles를 같은 트랜잭션에서 생성/회수 (앱 레벨 동기화)
+// ----------------------------------------------
+Table roles {
+  note: "역할 정의 (SUPER_ADMIN, ADMIN, COHORT_MANAGER, COHORT_ASSISTANT, MENTOR, INSTRUCTOR, STUDENT ...)"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  code varchar(50) [not null, unique]
+  name varchar(50) [not null]
+  description text [null]
+  created_at timestamptz [not null, default: `now()`]
+}
+
+Table permissions {
+  note: "권한 정의 (mentoring.request.approve, mentoring.settlement.close ...)"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  code varchar(100) [not null, unique]
+  description text [null]
+}
+
+Table role_permissions {
+  note: "역할-권한 매핑. 역할은 계층이 아닌 권한 집합"
+
+  role_id uuid [not null, ref: > roles.id]
+  permission_id uuid [not null, ref: > permissions.id]
+
+  indexes {
+    (role_id, permission_id) [pk]
+  }
+}
+
+Table user_roles {
+  note: "사용자 역할 부여 + 적용 범위"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  role_id uuid [not null, ref: > roles.id]
+  user_id uuid [not null, ref: > users.id]
+  scope_type RoleScopeType [not null]
+  scope_id uuid [null, note: "GLOBAL이면 null, BOOTCAMP=bootcamps.id, COHORT=cohorts.id"]
+  expires_at timestamptz [null, note: "미리보기(대리 로그인) 등 임시 권한"]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (user_id, role_id, scope_type, scope_id) [unique, note: "NULLS NOT DISTINCT"]
+    (scope_type, scope_id)
+  }
+  checks {
+    `(scope_type = 'GLOBAL') = (scope_id IS NULL)` [name: "check_user_role_scope"]
+  }
+}
+
+
+// ----------------------------------------------
+// 사내 직원 및 담당 정보 (조교/운영매니저 = 내부 직원)
+// ----------------------------------------------
+Table employees {
+  note: "사내 직원 정보 관리용 테이블"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  department_id uuid [not null, ref: > departments.id]
+  position_id uuid [not null, ref: > employee_positions.id]
+  user_id uuid [not null, unique, ref: - users.id]
+  employment_type EmploymentType [not null, note: "고용 형태"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table bootcamp_staffs {
+  note: "담당 과정별 운영진 (담당자 표시용, 권한은 user_roles와 동기화)"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  employee_id uuid [not null, ref: > employees.id]
+  bootcamp_id uuid [not null, ref: > bootcamps.id]
+  role StaffRole [not null, note: "담당 역할"]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (employee_id, bootcamp_id, role) [unique]
+  }
+}
+
+Table cohort_staffs {
+  note: "기수별 담당 운영진 (담당자 표시용, 권한은 user_roles와 동기화)"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  employee_id uuid [not null, ref: > employees.id]
+  cohort_id uuid [not null, ref: > cohorts.id]
+  role StaffRole [not null, note: "MANAGER(운영 매니저) / ASSISTANT(조교)"]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (employee_id, cohort_id, role) [unique]
+    cohort_id
+  }
+}
+
+
+// ----------------------------------------------
+// 외부 교육 인력 (멘토/강사 = 외부 채용)
+// ----------------------------------------------
+Table mentors {
+  note: "멘토 정보 테이블"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  user_id uuid [not null, unique, ref: - users.id]
+  nickname varchar(30) [null, note: "수강생에게 노출되는 이름"]
+  introduction text [null, note: "소개"]
+  expertise varchar(200) [null, note: "전문 분야"]
+  profile_image_key varchar(1024) [null, note: "멘토 프로필 사진 S3 객체 키 (profiles/ prefix, 조회 시 presigned GET URL 발급)"]
+  is_active bool [not null, default: true, note: "멘토 활성화 여부"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table instructors {
+  note: "강사 등록 정보 테이블"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  user_id uuid [not null, unique, ref: - users.id]
+  nickname varchar(30) [null, note: "수강생에게 노출되는 이름"]
+  introduction text [null, note: "소개"]
+  expertise varchar(200) [null, note: "전문 분야"]
+  profile_image_key varchar(1024) [null, note: "강사 프로필 사진 S3 객체 키 (profiles/ prefix, 조회 시 presigned GET URL 발급)"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table educator_contracts {
+  note: "강사 및 멘토 계약 체결 여부 관리 테이블 (가입 전 계약 가능 → 상대방 정보 기록, 가입 후 user_id 연결). 단가/정산 기준은 cohort_mentors에서 관리"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  manager_employee_id uuid [not null, ref: > employees.id, note: "계약 진행 담당 내부 직원"]
+  mentor_id uuid [null, ref: > mentors.id, note: "멘토 계약이면 가입 후 멘토 연결"]
+  instructor_id uuid [null, ref: > instructors.id, note: "강사 계약이면 가입 후 강사 연결"]
+  contract_file_id uuid [not null, unique, ref: - contract_files.id, note: "계약서 파일"]
+  educator_type EducatorType [not null, note: "계약자 유형 (멘토, 강사)"]
+  contractor_name varchar(50) [not null, note: "계약 상대방 이름"]
+  contractor_email varchar(255) [null, note: "계약 상대방 이메일 (참고용, 소문자 정규화)"]
+  contractor_phone varchar(11) [not null, note: "계약 상대방 휴대폰(숫자만). 가입 시 이름 + SMS 인증 휴대폰이 일치하면 mentors/instructors 생성 후 자동 연결·승인"]
+  title varchar(100) [not null, note: "계약 진행 기억용 제목"]
+  start_date date [not null, note: "계약 시작일"]
+  end_date date [not null, note: "계약 종료일"]
+  status ContractStatus [not null, default: 'DRAFT', note: "계약 진행 상태"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (contractor_name, contractor_phone) [note: "가입 자동 매칭 조회"]
+    mentor_id
+    instructor_id
+  }
+  checks {
+    `start_date <= end_date` [name: "check_contract_period"]
+    `contractor_email IS NULL OR contractor_email = lower(contractor_email)` [name: "check_contract_email_lowercase"]
+    `(educator_type = 'MENTOR' OR mentor_id IS NULL) AND (educator_type = 'INSTRUCTOR' OR instructor_id IS NULL)` [name: "check_contract_educator_type"]
+  }
+}
+
+Table contract_files {
+  note: "강사 및 멘토 계약서 저장 관리 테이블"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  file_name varchar(100) [not null, note: "원본 파일이름"]
+  file_ext varchar(10) [not null, note: "파일 확장자"]
+  file_size bigint [not null, note: "파일 사이즈(bytes)"]
+  storage_key varchar(1024) [not null, unique, note: "S3 객체 키 (contracts/ prefix, 비공개 버킷), presigned GET URL 발급용"]
+  created_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz [null]
+}
+
+// ----------------------------------------------
+// HRD-Net 과정 및 운영회차 (HRD 과정 1 : 운영과정 N)
+// ----------------------------------------------
+Table hrd_net_bootcamps {
+  note: "HRD-Net 상에 등록된 과정 정보"
+
+  id uuid [pk, note: "default=uuid7 사용, 고유 ID"]
+  name varchar(100) [not null, note: "HRD-Net 등록 과정 명칭"]
+  hrd_net_id varchar(100) [null, unique, note: "HRD-Net 과정 고유 ID"]
+  train_type HRDNetTrainType [null, note: "HRD-Net에 등록된 훈련 유형(KDT)"]
+  ncs1_se varchar(10) [null, note: "NCS 직종 1차분류 코드"]
+  ncs2_se varchar(10) [null, note: "NCS 직종 2차분류 코드"]
+  ncs3_se varchar(10) [null, note: "NCS 직종 3차분류 코드"]
+  weekend_se WeekendSeType [not null, default: 'WEEKDAY', note: "주말 훈련 여부 구분"]
+  day_night_se DayNightSeType [not null, default: 'DAY', note: "주야 구분"]
+  total_train_fee integer [null, note: "총 훈련비 (원)"]
+  train_fee_per_hour integer [null, note: "시간당 훈련 단가 (원)"]
+  total_train_hours smallint [null, note: "총 훈련 시수"]
+  total_train_days smallint [null, note: "총 훈련 일수"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table hrd_net_bootcamp_cohorts {
+  note: "HRD-Net 상에 등록된 과정의 운영회차 정보"
+
+  id uuid [pk, note: "default=uuid7 사용, 고유 ID"]
+  hrd_net_bootcamp_id uuid [not null, ref: > hrd_net_bootcamps.id]
+  cohort_number smallint [not null, note: "HRD 회차 번호"]
+  train_start_date date [null, note: "HRD 등록 훈련 시작일"]
+  train_end_date date [null, note: "HRD 등록 훈련 종료일"]
+  self_pay_amount integer [null, note: "자비부담 총액(원)"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (hrd_net_bootcamp_id, cohort_number) [unique]
+  }
+}
+
+
+// ----------------------------------------------
+// 사내 운영용 부트캠프
+// ----------------------------------------------
+Table bootcamps {
+  note: "부트캠프 운영과정 정보 (하나의 HRD 과정에서 파생된 여러 운영과정 가능 → N:1)"
+
+  id uuid [pk, note: "default=uuid7 사용, 고유 ID"]
+  hrd_net_bootcamp_id uuid [not null, ref: > hrd_net_bootcamps.id, note: "실제 과정 정보 매핑용 FK (N:1)"]
+  name varchar(50) [not null, unique, note: "운영상 사용되는 과정 명칭"]
+  code varchar(20) [not null, unique, note: "AH, AL, GM, PD, ..."]
+  is_active bool [not null, default: true, note: "과정 활성화 여부"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    hrd_net_bootcamp_id
+  }
+}
+
+// ----------------------------------------------
+// 기수 운영
+// ----------------------------------------------
+Table cohorts {
+  note: "부트캠프 기수 관리 테이블"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  hrd_net_cohort_id uuid [not null, ref: > hrd_net_bootcamp_cohorts.id, note: "hrd-net 운영회차 매핑용 FK. 앱 레벨 검증: bootcamp.hrd_net_bootcamp_id = hrd_net_cohort.hrd_net_bootcamp_id"]
+  bootcamp_id uuid [not null, ref: > bootcamps.id]
+  cohort_number smallint [not null, note: "기수 번호"]
+  start_date date [not null, note: "기수 시작일"]
+  end_date date [not null, note: "기수 종료일"]
+  status CohortStatus [not null, default: 'PLANNED', note: "기수 운영 상태"]
+  discord_guild_id varchar(32) [null, unique, note: "디스코드 길드 ID (snowflake, JS 정밀도 문제로 문자열)"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (bootcamp_id, cohort_number) [unique]
+    hrd_net_cohort_id
+  }
+  checks {
+    `start_date <= end_date` [name: "check_cohort_period"]
+  }
+}
+
+// ----------------------------------------------
+// 수강생 (수강 등록 단위)
+// ----------------------------------------------
+Table students {
+  note: "수강생 수강 등록 테이블 (사람 1 : 등록 N, 재수강/타 과정 수강 가능)"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  user_id uuid [not null, ref: > users.id]
+  cohort_id uuid [not null, ref: > cohorts.id]
+  status EnrollmentStatus [not null, default: 'ENROLLED', note: "운영상 수강 상태"]
+  hrd_net_status StudentStatus [not null, note: "수강생 hrd-net 상태"]
+  enrolled_at date [not null, note: "등록일"]
+  ended_at date [null, note: "수료/중도포기 등 종료일"]
+  end_reason varchar(200) [null, note: "종료 사유"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (user_id, cohort_id) [unique]
+    (cohort_id, status)
+  }
+}
+
+// ----------------------------------------------
+// 수강생 명단 (Airtable 원천, 주기 동기화)
+// ----------------------------------------------
+Table student_rosters {
+  note: "Airtable 수강생 명단 사본 (읽기 전용 원천 데이터). 가입 시 이름 + 휴대폰으로 대조해 students를 만들고 자동 승인"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  airtable_record_id varchar(32) [not null, unique, note: "Airtable 레코드 ID (upsert 키)"]
+  cohort_id uuid [null, ref: > cohorts.id, note: "Airtable의 과정·기수 값을 매핑한 기수. 매핑 실패 시 null (운영진 확인 대상)"]
+  name varchar(50) [not null, note: "이름 (앞뒤 공백 제거)"]
+  phone_number varchar(11) [null, note: "휴대폰 (숫자만으로 정규화)"]
+  email varchar(255) [null, note: "참고용 이메일 (소문자)"]
+  hrd_net_status StudentStatus [null, note: "Airtable의 HRD 상태를 매핑한 값"]
+  source_fields jsonb [not null, note: "동기화 시점 Airtable 원본 필드 (매핑 디버깅용)"]
+  is_removed_in_source bool [not null, default: false, note: "Airtable에서 삭제됨 (동기화 시 미존재)"]
+  matched_student_id uuid [null, unique, ref: - students.id, note: "가입 대조로 연결된 수강 등록"]
+  synced_at timestamptz [not null, note: "마지막 동기화 시각"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (name, phone_number) [note: "가입 자동 매칭 조회"]
+    cohort_id
+  }
+}
+
+Table roster_sync_runs {
+  note: "Airtable 명단 동기화 실행 이력"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  trigger RosterSyncTrigger [not null, note: "SCHEDULED(주기) / MANUAL(운영진 실행, 실행자는 audit_logs)"]
+  scope_type RosterSyncScope [not null, note: "ALL(전체) / BOOTCAMP(특정 과정) / COHORT(특정 기수). Airtable filterByFormula로 해당 범위만 조회"]
+  bootcamp_id uuid [null, ref: > bootcamps.id, note: "BOOTCAMP·COHORT 범위의 과정"]
+  cohort_id uuid [null, ref: > cohorts.id, note: "COHORT 범위의 기수"]
+  status RosterSyncStatus [not null, default: 'RUNNING']
+  started_at timestamptz [not null, default: `now()`]
+  finished_at timestamptz [null]
+  fetched_count integer [not null, default: 0, note: "Airtable에서 읽은 레코드 수"]
+  upserted_count integer [not null, default: 0, note: "생성·변경된 명단 수"]
+  removed_count integer [not null, default: 0, note: "이번 범위 안에서 원천에서 사라져 is_removed_in_source로 표시한 수"]
+  unmapped_count integer [not null, default: 0, note: "기수 매핑 실패 수 (ALL 범위에서만 발생 가능)"]
+  error_message text [null]
+
+  indexes {
+    started_at
+    (cohort_id, started_at)
+  }
+  checks {
+    `(scope_type = 'ALL' AND bootcamp_id IS NULL AND cohort_id IS NULL) OR (scope_type = 'BOOTCAMP' AND bootcamp_id IS NOT NULL AND cohort_id IS NULL) OR (scope_type = 'COHORT' AND bootcamp_id IS NOT NULL AND cohort_id IS NOT NULL)` [name: "check_roster_sync_scope"]
+  }
+}
+
+// ==============================================
+// 멘토링 관리용 테이블
+// ==============================================
+Table cohort_mentoring_settings {
+  note: "기수별 멘토링 설정"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  cohort_id uuid [not null, unique, ref: - cohorts.id]
+  allow_team_mentoring bool [not null, default: false, note: "팀 멘토링 허용 여부"]
+  allow_1_on_1 bool [not null, default: false, note: "1대1 멘토링 허용 여부"]
+  default_1on1_minutes integer [not null, default: 0, note: "수강생 계좌 생성 시 자동 지급 시간(분) → STAFF_GRANT"]
+  default_team_minutes integer [not null, default: 0, note: "팀 계좌 생성 시 자동 지급 시간(분) → STAFF_GRANT"]
+  min_lead_hours smallint [not null, default: 24, note: "희망 일시 N시간 전까지만 신청 가능"]
+  allowed_duration smallint [not null, default: 30, note: "멘토링 진행 시간 단위(분). 신청 시간은 이 값의 배수만 허용, 상한은 잔여 시간"]
+  max_pending_requests smallint [not null, default: 1, note: "수강생(또는 팀)당 대기 중 신청 최대 개수"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  checks {
+    `default_1on1_minutes >= 0 AND default_team_minutes >= 0` [name: "check_settings_default_minutes"]
+    `min_lead_hours >= 0 AND max_pending_requests > 0 AND allowed_duration > 0` [name: "check_settings_rules"]
+  }
+}
+
+Table cohort_mentoring_block_times {
+  note: "기수별 멘토링 금지 시간대 설정"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  cohort_id uuid [not null, ref: > cohorts.id]
+  period_start date [not null, note: "설정 적용 시작일"]
+  period_end date [not null, note: "설정 적용 종료일"]
+  start_time time [not null, note: "멘토링 금지 시작 시간대"]
+  end_time time [not null, note: "멘토링 금지 종료 시간대"]
+  reason varchar(200) [null, note: "금지 사유 (수강생에게 신청 불가 이유로 표시)"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (cohort_id, period_start)
+  }
+  checks {
+    `period_start <= period_end` [name: "check_block_period"]
+    `start_time < end_time` [name: "check_block_time"]
+  }
+}
+
+Table cohort_mentors {
+  note: "멘토가 멘토링을 진행해야하는 기수 관리 테이블. 배정/활성화 조건: 배정 기간이 해당 멘토의 ACTIVE 계약(educator_contracts) 기간 안에 있어야 함 (앱 레벨 검증)"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  cohort_id uuid [not null, ref: > cohorts.id]
+  mentor_id uuid [not null, ref: > mentors.id]
+  period_type MentoringPeriodType [not null, note: "멘토링 진행 유형 (평시, 프로젝트)"]
+  start_date date [not null, note: "멘토링 시작일"]
+  end_date date [not null, note: "멘토링 종료일"]
+  cost_settlement_policy MentoringSettlementPolicy [not null, note: "멘토링 비용 정산 기준"]
+  pay_unit PayUnit [not null, note: "단가 기준 (HOURLY / PER_SESSION만, 정산 시 명세에 스냅샷)"]
+  pay_rate integer [not null, note: "단가 (원)"]
+  no_show_pay_amount integer [not null, default: 0, note: "노쇼 세션 1건당 정산 고정 금액 (원)"]
+  is_active bool [not null, default: true, note: "해당 기수 진행 권한 활성화 여부, 기록 보존용"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (mentor_id, cohort_id, period_type) [note: "기간 겹침 방지: EXCLUDE USING gist (mentor_id WITH =, cohort_id WITH =, period_type WITH =, daterange(start_date, end_date, '[]') WITH &&) WHERE (is_active) — raw SQL"]
+    (cohort_id, is_active)
+  }
+  checks {
+    `start_date <= end_date` [name: "check_cohort_mentor_period"]
+    `pay_rate >= 0 AND no_show_pay_amount >= 0` [name: "check_cohort_mentor_pay_rate"]
+    `pay_unit IN ('HOURLY', 'PER_SESSION')` [name: "check_cohort_mentor_pay_unit"]
+  }
+}
+
+Table mentor_availabilities {
+  note: "멘토 멘토링 가능 시간 (요일별 반복). 수강생은 이 시간 안에서만 희망 일시 선택"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  mentor_id uuid [not null, ref: > mentors.id]
+  weekday smallint [not null, note: "1=월 ... 7=일"]
+  start_time time [not null, note: "가능 시작 시각"]
+  end_time time [not null, note: "가능 종료 시각"]
+  effective_from date [not null, note: "적용 시작일"]
+  effective_to date [null, note: "적용 종료일, null이면 무기한"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (mentor_id, weekday)
+  }
+  checks {
+    `weekday BETWEEN 1 AND 7` [name: "check_availability_weekday"]
+    `start_time < end_time` [name: "check_availability_time"]
+    `effective_to IS NULL OR effective_from <= effective_to` [name: "check_availability_period"]
+  }
+}
+
+Table mentor_unavailable_periods {
+  note: "멘토 예외 불가 일정 (휴가, 개인 일정 등). 반복 가능 시간보다 우선"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  mentor_id uuid [not null, ref: > mentors.id]
+  starts_at timestamptz [not null]
+  ends_at timestamptz [not null]
+  reason varchar(200) [null]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (mentor_id, starts_at)
+  }
+  checks {
+    `starts_at < ends_at` [name: "check_unavailable_range"]
+  }
+}
+
+Table mentoring_balance_accounts {
+  note: "멘토링 잔여 시간 계좌 (소유자 x 기간 유형별). 차감/지급 시 계좌 행 SELECT ... FOR UPDATE 후 원장과 같은 트랜잭션으로 갱신"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  student_id uuid [null, ref: > students.id, note: "1:1 멘토링 계좌 소유 수강생"]
+  team_id uuid [null, ref: > mentoring_teams.id, note: "팀 멘토링 계좌 소유 팀"]
+  period_type MentoringPeriodType [not null, note: "기간 유형 (평시, 프로젝트)"]
+  valid_from date [not null, note: "사용 가능 시작일"]
+  valid_until date [not null, note: "사용 가능 종료일, 이후 신청 불가(만료)"]
+  total_minutes integer [not null, default: 0, note: "누적 지급 시간 (분단위)"]
+  held_minutes integer [not null, default: 0, note: "신청 대기 중 보류 시간 (분단위)"]
+  used_minutes integer [not null, default: 0, note: "누적 사용 총량 (분단위)"]
+  remaining_minutes integer [not null, default: 0, note: "신청 가능 잔여 시간 (분단위) = total - held - used"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (student_id, period_type) [unique, note: "student_id IS NOT NULL 부분 유니크"]
+    (team_id, period_type) [unique, note: "team_id IS NOT NULL 부분 유니크"]
+  }
+  checks {
+    `num_nonnulls(student_id, team_id) = 1` [name: "check_balance_owner_exists"]
+    `remaining_minutes = total_minutes - held_minutes - used_minutes` [name: "check_balance_consistency"]
+    `remaining_minutes >= 0 AND held_minutes >= 0 AND used_minutes >= 0` [name: "check_balance_non_negative"]
+    `valid_from <= valid_until` [name: "check_balance_validity"]
+  }
+}
+
+Table mentoring_balance_transactions {
+  note: '''
+  멘토링 시간 증감 이력 (원장, append-only)
+  유형별 계좌 반영 (d = amount):
+  - STAFF_GRANT  : total += d, remaining += d
+  - STAFF_ADJUST : total += d(±), remaining += d  (remaining >= 0 유지)
+  - HOLD         : 신청 시. held += d, remaining -= d
+  - RELEASE      : 승인 전 반려/취소 시. held -= d, remaining += d
+  - USING        : 승인 + 세션 생성 시. held -= d, used += d  (remaining 변화 없음)
+  - REFUND       : 승인 후 취소 시. used -= d, remaining += d
+  '''
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  account_id uuid [not null, ref: > mentoring_balance_accounts.id]
+  request_id uuid [null, ref: > mentoring_requests.id, note: "HOLD/RELEASE/USING/REFUND의 원인 신청 (운영진 지급/조정은 null)"]
+  type MentoringBalanceTransactionType [not null, note: "변경 유형"]
+  amount integer [not null, note: "대상 시간(분단위). STAFF_ADJUST만 음수 허용, 나머지는 양수"]
+  after_remaining integer [not null, note: "변경 후 신청 가능 잔여 시간 (분단위)"]
+  after_held integer [not null, note: "변경 후 보류 시간 (분단위)"]
+  reason varchar(100) [not null, note: "변동 사유 (처리자는 audit_logs로 추적)"]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (account_id, created_at)
+    (request_id, type) [unique, note: "request_id IS NOT NULL 부분 유니크 — 같은 신청의 중복 HOLD/USING/RELEASE/REFUND 방지"]
+  }
+  checks {
+    `type = 'STAFF_ADJUST' OR amount > 0` [name: "check_transaction_amount"]
+    `(type IN ('STAFF_GRANT', 'STAFF_ADJUST')) = (request_id IS NULL)` [name: "check_transaction_request"]
+  }
+}
+
+Table mentoring_teams {
+  note: "멘토링 팀 구성 관리 테이블"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  cohort_id uuid [not null, ref: > cohorts.id]
+  mentor_id uuid [not null, ref: > mentors.id, note: "담당 멘토 (팀 신청은 담당 멘토에게만, 해당 기수/유형의 활성 cohort_mentors여야 함 — 앱 레벨 검증)"]
+  team_number smallint [not null, note: "팀 번호, 기수 x 유형별 자동 부여"]
+  period_type MentoringPeriodType [not null, note: "멘토링 진행 유형 (평시, 프로젝트)"]
+  name varchar(50) [null, note: "멘토링 팀명"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (cohort_id, period_type, team_number) [unique]
+    (id, period_type) [unique, note: "team_members 복합 FK 대상"]
+    mentor_id
+  }
+}
+
+Table mentoring_team_members {
+  note: "멘토링 팀 멤버 구성 관리 테이블"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  student_id uuid [not null, ref: > students.id]
+  team_id uuid [not null, ref: > mentoring_teams.id]
+  period_type MentoringPeriodType [not null, note: "비정규화: 같은 유형 팀 중복 소속 방지. 복합 FK (team_id, period_type) → mentoring_teams(id, period_type)로 일치 보장 — raw SQL"]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (team_id, student_id) [unique]
+    (student_id, period_type) [unique, note: "수강생은 유형별로 한 팀에만 소속"]
+  }
+}
+
+Table mentoring_requests {
+  note: "멘토링 신청 관리 테이블. 변경 = 기존 신청 취소(RELEASE/REFUND) + 새 신청 생성(replaced_request_id). 수강생 본인만 신청 (대리 신청 없음)"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  replaced_request_id uuid [null, unique, ref: - mentoring_requests.id, note: "변경으로 대체된 이전 신청"]
+  team_id uuid [null, ref: > mentoring_teams.id, note: "null 이면 1대1 멘토링 신청 (팀 신청은 팀 담당 멘토에게만)"]
+  requester_id uuid [not null, ref: > students.id]
+  mentor_id uuid [not null, ref: > mentors.id]
+  topic varchar(300) [not null, note: "멘토링 신청 주제"]
+  detail text [not null, note: "멘토링 신청 내용 상세"]
+  desired_at_1 timestamptz [not null, note: "1순위 희망일시 (멘토 가능 시간 안에서만 선택, 앱 레벨 검증)"]
+  desired_at_2 timestamptz [null, note: "2순위 희망일시"]
+  desired_at_3 timestamptz [null, note: "3순위 희망일시"]
+  duration smallint [not null, note: "희망하는 멘토링 진행 시간(분), HOLD 시간과 동일. 기수 설정 allowed_duration의 배수인지는 앱 레벨 검증"]
+  status MentoringRequestStatus [not null, default: "PENDING", note: "요청 상태 (채택 일시는 mentoring_sessions.starts_at/ends_at)"]
+  rejected_at timestamptz [null, note: "반려 시각"]
+  reject_reason varchar(300) [null, note: "반려 사유(멘토작성)"]
+  canceled_at timestamptz [null, note: "취소 시각"]
+  cancel_reason varchar(300) [null, note: "취소 사유"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (mentor_id, status)
+    (requester_id, created_at)
+    team_id
+  }
+  checks {
+    `duration > 0` [name: "check_request_duration"]
+    `(status = 'REJECTED') = (rejected_at IS NOT NULL)` [name: "check_request_rejected"]
+    `(status = 'CANCELED') = (canceled_at IS NOT NULL)` [name: "check_request_canceled"]
+  }
+}
+
+Table mentoring_sessions {
+  note: "멘토링 진행 세션 기록 관리 테이블. 멘토 일정 겹침 방지: EXCLUDE USING gist (mentor_id WITH =, tstzrange(starts_at, ends_at) WITH &&) WHERE (status <> 'CANCELED') — raw SQL 마이그레이션"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  mentor_id uuid [not null, ref: > mentors.id, note: "비정규화 (멘토별 일정 조회, 정산, 겹침 방지)"]
+  request_id uuid [not null, unique, ref: - mentoring_requests.id]
+  status MentoringSessionStatus [not null, default: 'SCHEDULED', note: "개인별 출석은 저장하지 않음. 대상자 = 팀원(팀) 또는 신청자(1:1), 진행 여부는 COMPLETED/NO_SHOW로만 판단"]
+  starts_at timestamptz [not null, note: "시작 일시"]
+  ends_at timestamptz [not null, note: "종료 일시"]
+  title varchar(100) [not null, note: "회차 제목, 미기재시 자동입력"]
+  topic varchar(100) [not null, note: "진행 주제"]
+  body text [null, note: "진행 내용 기록(공유 요약). 기록 전에는 null"]
+  record_duration_minutes smallint [null, note: "실제 진행 시간"]
+  recorded_at timestamptz [null, note: "기록 제출 시각"]
+  // Google Meet연동
+  google_space_name varchar(255) [null, unique, note: "Google Meet Space 이름 (spaces/xxx)"]
+  google_meet_url varchar(255) [null, note: "Google Meet Space URL"]
+  google_conference_record_name varchar(255) [null, note: "Meet 회의 기록 이름 (conferenceRecords/xxx), 회의 시작 이벤트로 채움"]
+  actual_started_at timestamptz [null, note: "Meet 회의 시작 이벤트 시각 → status IN_PROGRESS"]
+  actual_ended_at timestamptz [null, note: "Meet 회의 종료 이벤트 시각"]
+  recording_status RecordingStatus [not null, default: "PENDING", note: "자동 녹화 상태 (Workspace Events로 갱신). 보완 폴링 대상: recording_status <> FILE_GENERATED AND ends_at > now() - 7일"]
+  recording_started_at timestamptz [null, note: "녹화 시작 시간"]
+  recording_ended_at timestamptz [null, note: "녹화 종료 시간"]
+
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (mentor_id, starts_at)
+    (recording_status, ends_at) [note: "녹화 보완 폴링 대상 조회"]
+  }
+  checks {
+    `starts_at < ends_at` [name: "check_session_range"]
+  }
+}
+
+Table mentoring_artifacts {
+  note: "멘토링 자동 아티팩트 (Meet 녹화/전사/요약). 원본은 회사 계정 Google Drive에 두고, 멘토/운영진에게 Drive 권한을 주지 않고 백엔드가 서비스 계정으로 스트리밍 중계 (영상은 Range 요청 지원)"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  session_id uuid [not null, ref: > mentoring_sessions.id]
+  drive_file_id varchar(255) [not null, note: "Google Drive 파일 ID"]
+  artifact_type MentoringArtifactType [not null, note: "VIDEO, TRANSCRIPT, SUMMARY"]
+  file_name varchar(255) [null, note: "파일명"]
+  mime_type varchar(100) [null, note: "MIME 타입 (중계 시 Content-Type)"]
+  file_size bigint [null, note: "파일 용량(bytes)"]
+  status MentoringArtifactStatus [not null, default: "PENDING"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (session_id, drive_file_id) [unique, note: "이벤트 중복 수신/보완 폴링 재실행 시 중복 행 방지"]
+  }
+}
+Table mentoring_session_notes {
+  note: "멘토 전용 내부 메모, 세션당 1개 (수강생 응답 스키마에서 제외, 작성/수정자는 audit_logs로 추적)"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  session_id uuid [not null, unique, ref: - mentoring_sessions.id]
+  body text [not null, note: "메모 내용"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+// ----------------------------------------------
+// 멘토링 정산
+// ----------------------------------------------
+Table mentoring_settlements {
+  note: "멘토별 월 정산 (DRAFT에서 집계, CLOSED로 마감 확정)"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  mentor_id uuid [not null, ref: > mentors.id]
+  settlement_month date [not null, note: "정산 대상 월 (해당 월 1일)"]
+  status MentoringSettlementStatus [not null, default: 'DRAFT']
+  session_count integer [not null, default: 0, note: "정산 대상 세션 수"]
+  total_minutes integer [not null, default: 0, note: "정산 대상 총 시간 (분)"]
+  total_amount integer [not null, default: 0, note: "정산 총액 (원)"]
+  closed_at timestamptz [null, note: "마감 시각 (마감 처리자는 audit_logs로 추적)"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (mentor_id, settlement_month) [unique]
+  }
+  checks {
+    `(status = 'CLOSED') = (closed_at IS NOT NULL)` [name: "check_settlement_closed"]
+  }
+}
+
+Table mentoring_settlement_items {
+  note: "정산 명세 (세션 단위 스냅샷). 세션은 한 번만 정산"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  session_id uuid [not null, unique, ref: - mentoring_sessions.id, note: "중복 정산 방지"]
+  settlement_id uuid [not null, ref: > mentoring_settlements.id]
+  cohort_id uuid [not null, ref: > cohorts.id]
+  item_type SettlementItemType [not null, note: "SESSION(진행) / NO_SHOW(노쇼, 고정 금액)"]
+  settlement_policy MentoringSettlementPolicy [not null, note: "적용된 정산 기준 (마감 시점 스냅샷)"]
+  billable_minutes integer [not null, note: "정산 기준 시간 (분). NO_SHOW는 0"]
+  pay_unit PayUnit [not null, note: "적용 단가 기준 (스냅샷)"]
+  pay_rate integer [not null, note: "적용 단가 (원, 스냅샷). NO_SHOW는 노쇼 고정 금액"]
+  amount integer [not null, note: "정산 금액 (원). HOURLY = floor(단가 × 분 / 60), PER_SESSION = 단가, NO_SHOW = 고정 금액"]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    settlement_id
+  }
+}
+
+// ----------------------------------------------
+// 수강생-멘토 채팅
+// ----------------------------------------------
+Table mentoring_chat_threads {
+  note: "멘토링 채팅방 (1:1 = 수강생-멘토, 팀 = 팀원 전체-담당 멘토)"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  student_id uuid [null, ref: > students.id, note: "1:1 채팅방이면 수강생"]
+  team_id uuid [null, ref: > mentoring_teams.id, note: "팀 채팅방이면 팀 (참여자 = 팀원 + 담당 멘토)"]
+  mentor_id uuid [not null, ref: > mentors.id]
+  last_message_at timestamptz [null, note: "목록 정렬용"]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (student_id, mentor_id) [unique, note: "student_id IS NOT NULL 부분 유니크"]
+    (team_id, mentor_id) [unique, note: "team_id IS NOT NULL 부분 유니크"]
+    (mentor_id, last_message_at)
+    (student_id, last_message_at)
+    (team_id, last_message_at)
+  }
+  checks {
+    `num_nonnulls(student_id, team_id) = 1` [name: "check_chat_thread_owner"]
+  }
+}
+
+Table mentoring_chat_messages {
+  note: "채팅 메시지 (실시간 전달은 WebSocket/SSE + Redis Pub/Sub)"
+
+  id uuid [pk, note: "default=uuid7 사용 (시간순 정렬)"]
+  thread_id uuid [not null, ref: > mentoring_chat_threads.id]
+  sender_id uuid [null, ref: > users.id, note: "null이면 시스템 안내 메시지"]
+  body text [not null]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (thread_id, created_at)
+  }
+}
+
+Table mentoring_chat_reads {
+  note: "채팅방 참여자별 읽음 위치 (안 읽은 메시지 수 = last_read_at 이후 메시지 수)"
+
+  thread_id uuid [not null, ref: > mentoring_chat_threads.id]
+  user_id uuid [not null, ref: > users.id]
+  last_read_message_id uuid [null, ref: > mentoring_chat_messages.id, note: "마지막으로 읽은 메시지"]
+  last_read_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (thread_id, user_id) [pk]
+  }
+}
+
+// TODO(보류): 신청/승인/반려/취소 알림 — 알림 방식 확정 후 발송 아웃박스(중복 방지) 테이블 추가
+
+// ==============================================
+// 감사 로그
+// ==============================================
+Table audit_logs {
+  note: "공통 감사 로그. 필수 기록 대상: 권한 변경, 시간 지급/조정(mentoring_balance_transactions STAFF_*), 정산 마감(mentoring_settlements), 내부 메모 작성/수정(mentoring_session_notes), 설정 변경"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  actor_user_id uuid [null, ref: > users.id, note: "시스템 작업이면 null"]
+  action varchar(100) [not null]
+  target_type varchar(50) [not null]
+  target_id uuid [null]
+  before jsonb [null]
+  after jsonb [null]
+  ip inet [null]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (target_type, target_id, created_at)
+    (actor_user_id, created_at)
+  }
+}
+
+
+// ----------------------------------------------
+// Enum Definitions
+// ----------------------------------------------
+Enum EmploymentType {
+  REGULAR [note: "정규직"]
+  CONTRACT [note: "사내 계약직"]
+  INTERN [note: "인턴"]
+  PART_TIME_JOB [note: "아르바이트"]
+  FREELANCER [note: "프리랜서 계약직"]
+  DAILY [note: "일용 계약직"]
+}
+
+Enum HRDNetTrainType {
+  KDT [note: "K-Digital Training"]
+  KDC [note: "K-Digital 기초 역량 훈련"]
+}
+
+Enum WeekendSeType {
+  WEEKEND [note: "주말에만 진행되는 경우"]
+  WEEKDAY [note: "주중에만 진행되는 경우"]
+  HYBRID [note: "구분없이 진행되는 경우"]
+}
+
+Enum DayNightSeType {
+  DAY [note: "주간 훈련"]
+  NIGHT [note: "야간 훈련"]
+  HYBRID [note: "혼합(주간, 야간 시간대 둘다 포함)"]
+}
+
+Enum UserApprovalStatus {
+  PENDING [note: "승인 대기"]
+  APPROVED [note: "승인됨 (자동 또는 운영진)"]
+  REJECTED [note: "반려"]
+}
+
+Enum RosterSyncTrigger {
+  SCHEDULED [note: "주기 동기화"]
+  MANUAL [note: "운영진 수동 실행"]
+}
+
+Enum RosterSyncScope {
+  ALL [note: "전체 동기화"]
+  BOOTCAMP [note: "특정 과정만"]
+  COHORT [note: "특정 기수만"]
+}
+
+Enum RosterSyncStatus {
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+Enum SettlementItemType {
+  SESSION [note: "진행된 세션"]
+  NO_SHOW [note: "노쇼 세션 (고정 금액)"]
+}
+
+Enum SocialLoginProvider {
+  KAKAO
+  GOOGLE
+  NAVER
+}
+
+Enum RoleScopeType {
+  GLOBAL
+  BOOTCAMP
+  COHORT
+}
+
+Enum StaffRole {
+  MANAGER [note: "운영 매니저"]
+  ASSISTANT [note: "조교"]
+}
+
+Enum PayUnit {
+  HOURLY [note: "시급"]
+  PER_SESSION [note: "회당"]
+  MONTHLY [note: "월정액"]
+  LUMP_SUM [note: "총액"]
+}
+
+Enum EducatorType {
+  MENTOR [note: "멘토"]
+  INSTRUCTOR [note: "강사"]
+}
+
+Enum ContractStatus {
+  DRAFT
+  ACTIVE
+  ENDED
+  TERMINATED
+}
+
+Enum CohortStatus {
+  PLANNED [note: "모집/준비"]
+  ONGOING [note: "진행 중"]
+  ENDED [note: "종료"]
+  INACTIVE [note: "비활성"]
+  ARCHIVED [note: "보관 (목록에서 숨김)"]
+}
+
+Enum EnrollmentStatus {
+  ENROLLED [note: "수강 중"]
+  COMPLETED [note: "수료"]
+  DROPPED [note: "중도포기"]
+  EARLY_EMPLOYED [note: "조기취업"]
+  TRANSFERRED [note: "기수 이동"]
+}
+
+Enum StudentStatus {
+  // (확인 필요) HRD-Net 실제 상태 코드에 맞춰 조정
+  REGISTERED [note: "훈련 전"]
+  TRAINING [note: "훈련 중"]
+  COMPLETED [note: "수료"]
+  COMPLETED_80_PERCENT [note: "80퍼 수료"]
+  COMPLETED_AND_EMPLOYED [note: "수료 후 취업"]
+  EARLY_EMPLOYED [note: "조기취업"]
+  WITHDRAWAL [note: "수강철회"]
+  DROPPED_OUT [note: "중도탈락"]
+  LEAVE [note: "하차"]
+  EXPELLED [note: "제적"]
+}
+
+Enum MentoringSettlementPolicy {
+  STUDENT_REQUEST [note: "수강생 요청 시간 기준"]
+  ACTUAL_DURATION [note: "실제 멘토링 진행 시간 기준"]
+}
+
+Enum MentoringSettlementStatus {
+  DRAFT [note: "집계 중"]
+  CLOSED [note: "마감 확정"]
+}
+
+Enum MentoringRequestStatus {
+  PENDING [note: "대기중"]
+  APPROVED [note: "멘토 승인됨"]
+  REJECTED [note: "멘토 반려"]
+  CANCELED [note: "취소됨 (변경 시에도 취소 후 새 신청)"]
+}
+
+Enum MentoringBalanceTransactionType {
+  STAFF_GRANT [note: "운영진 부여"]
+  STAFF_ADJUST [note: "운영진 수동 조정 (±)"]
+  HOLD [note: "신청 시 필요 시간 보류"]
+  RELEASE [note: "승인 전 반려/취소로 보류 해제"]
+  USING [note: "멘토 승인 + 세션 생성으로 보류분 사용 확정"]
+  REFUND [note: "승인 이후 취소로 인한 환불"]
+}
+
+Enum MentoringSessionStatus {
+  SCHEDULED [note: "예정됨"]
+  IN_PROGRESS [note: "진행중"]
+  COMPLETED [note: "완료"]
+  NO_SHOW [note: "노쇼 불참"]
+  CANCELED [note: "취소됨"]
+}
+
+Enum RecordingStatus {
+  PENDING [note: "대기중"]
+  STARTED [note: "녹화 시작됨"]
+  ENDED   [note: "녹화 종료됨"]
+  FILE_GENERATED [note: "파일 생성됨"]
+  FAILED [note: "녹화 실패"]
+}
+
+Enum MentoringArtifactType {
+  VIDEO [note: "녹화영상"]
+  TRANSCRIPT [note: "전사문"]
+  SUMMARY [note: "스마트노트 요약"]
+}
+
+Enum MentoringArtifactStatus {
+  PENDING [note: "대기중"]
+  PROCESSING [note: "처리중"]
+  COMPLETED [note: "완료됨"]
+  FAILED [note: "실패"]
+}
+
+Enum MentoringPeriodType {
+  PROJECT_MENTORING [note: "프로젝트 기간 멘토링"]
+  REGULAR_MENTORING [note: "정기 멘토링"]
+}
