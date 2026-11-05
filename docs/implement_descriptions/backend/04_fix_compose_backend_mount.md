@@ -1,6 +1,6 @@
 # 04. docker compose 백엔드 마운트 수정
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-05 병합)
 - 관련 PR: #7
 - 이전 기록: [02. docker compose 로컬 개발 환경과 S3 에뮬레이터](02_local_docker_compose_and_s3.md)
 
@@ -22,7 +22,9 @@ P1-1 작업 중 호스트에서 `apps/backend/pyproject.toml`을 고쳤다. 그�
 ## 검증
 - 컨테이너를 다시 만든 뒤 호스트에서 `pyproject.toml`을 고치고 바로 컨테이너에서 같은 내용이 보이는지 확인
 - `docker compose exec api` 안에서 ruff, mypy, lint-imports, pytest 통과
-- GitHub Actions: PR에서 확인 후 기록
+- `prod` 타깃 빌드: `/opt/venv/bin/uvicorn`, `app.main` import 성공
+- GitHub Actions (PR #7, run 41990132144): backend 잡 통과
+- 사용자 확인: P1 진행 지시에 따라 CI 통과 후 병합
 
 ## 남은 작업
 - 없음
