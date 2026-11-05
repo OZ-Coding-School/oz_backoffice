@@ -28,7 +28,6 @@ Git 브랜치·커밋·PR·구현 기록 규칙은 README를 따른다.
 | `docs/database_schema_v2_mentoring_review.md` | 멘토링 스키마 리뷰와 결정 과정 | 결정 결과는 `decisions.md`에 정리 |
 | `docs/database_schema.dbml`, `docs/database_schema_review.md` | 사용자가 작성한 최초 스키마 초안과 그 리뷰 | 이력 보존용. 작업 기준 아님 |
 | `docs/implement_descriptions/` | 구현 기록 | 작업 완료 시 README 규칙대로 추가 |
-| `docs/research/` | 기술 조사·비교 (예: 로컬 S3 에뮬레이터 floci vs MiniStack) | 실측 스크립트 포함 |
 
 ## 작업 방식 (사용자 선호)
 

@@ -126,7 +126,7 @@
 | R4 | 프론트엔드는 Vercel로 배포한다 |
 | R5 | CI는 변경된 앱만 검사한다. 백엔드 CI는 PostgreSQL 서비스 컨테이너로 통합 테스트까지 실행한다 |
 | R6 | 로컬 개발의 기본 실행 방식은 docker compose다. 루트 `docker-compose.yml`이 PostgreSQL, Redis, 백엔드 api / worker / scheduler를 띄운다. 백엔드 이미지는 `Dockerfile`의 `dev`(소스 마운트 + reload) / `prod` 타깃으로 나눈다. 호스트 uv 실행은 IDE·디버거용 대안으로 유지한다 (2026-11-05) |
-| R7 | 로컬·CI용 S3 에뮬레이터는 **floci**(`floci/floci:2.4.0` 고정, `FLOCI_SERVICES_S3_ENFORCE_AUTH=true`, 로컬은 persistent + 볼륨). LocalStack은 최신 버전이 인증 토큰을 요구하고, MinIO는 커뮤니티 배포가 중단돼 제외했다. MiniStack은 예비 후보다. 근거: `docs/research/local_s3_emulator.md` (2026-11-05) |
+| R7 | 로컬·CI용 S3 에뮬레이터는 **floci**(`floci/floci:2.4.0` 고정, `FLOCI_SERVICES_S3_ENFORCE_AUTH=true`, 로컬은 persistent + 볼륨). LocalStack은 최신 버전이 인증 토큰을 요구하고, MinIO는 커뮤니티 배포가 중단돼 제외했다. MiniStack은 예비 후보다. 근거(2026-11-05 실측): 백오피스가 쓸 S3 시나리오 16개(presigned POST 크기·타입 정책, presigned GET·만료, CORS, 서명 검증, 비공개 버킷, aioboto3, 멀티파트, Range)에서 floci·MiniStack 모두 인증 옵션을 켜면 16/16 통과, 기본값에서는 서명 미검증. floci는 이미지 93MB·유휴 23MiB·첫 응답 0.5초, 옵션 하나로 버킷 설정까지 데이터 유지, 커뮤니티·호환성 테스트 규모와 고정 릴리스 주기(매월 15일·말일)에서 우세 (2026-11-05) |
 | R8 | 버킷·CORS 초기화는 에뮬레이터 전용 init 훅이 아니라 compose의 `s3-init`(`amazon/aws-cli`) 원샷 컨테이너가 S3 API로 수행한다 (`infra/s3/`). 에뮬레이터를 바꿔도 그대로 쓴다 (2026-11-05) |
 
 ## 5. 프론트엔드 기술 (2026-11-03)

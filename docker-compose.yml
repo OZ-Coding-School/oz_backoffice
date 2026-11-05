@@ -1,0 +1,126 @@
+# 로컬 개발 환경 (PostgreSQL, Redis, S3 에뮬레이터 floci, 백엔드 API / 워커 / 스케줄러)
+#
+#   docker compose up -d --build        # 전체 실행 (API: http://localhost:8000/docs)
+#   docker compose logs -f api          # 로그
+#   docker compose exec api pytest      # 컨테이너 안에서 테스트 (통합 테스트 포함)
+#
+# 백엔드 소스(apps/backend/src, tests, migrations)는 마운트되어 API는 코드 변경 시 자동 재시작된다.
+# 워커/스케줄러는 자동 재시작하지 않으므로 태스크 코드를 바꾸면 `docker compose restart worker scheduler`.
+# 의존성(pyproject.toml, uv.lock)을 바꾸면 `docker compose up -d --build`로 이미지를 다시 만든다.
+# 자세한 명령은 apps/backend/CLAUDE.md 참고.
+
+# 이미지는 api 서비스만 빌드하고 worker / scheduler는 같은 이미지를 재사용한다
+# (세 서비스가 같은 태그를 동시에 빌드하면 충돌한다)
+x-backend: &backend
+  image: oz-backoffice-backend:dev
+  pull_policy: never
+  env_file:
+    - path: ./apps/backend/.env
+      required: false
+  environment:
+    # .env 값보다 우선한다 (컨테이너 네트워크의 서비스 이름으로 접속)
+    DATABASE_URL: postgres://oz:oz@postgres:5432/oz_backoffice
+    REDIS_URL: redis://redis:6379/0
+    TASKIQ_REDIS_URL: redis://redis:6379/1
+    TEST_DATABASE_URL: postgres://oz:oz@postgres:5432/oz_backoffice_test
+    # S3 (floci). 서버 간 호출은 내부 주소, 브라우저에 주는 presigned URL은 호스트 주소로 서명한다
+    AWS_REGION: &aws-region ap-northeast-2
+    AWS_ACCESS_KEY_ID: &aws-key test
+    AWS_SECRET_ACCESS_KEY: &aws-secret test
+    S3_BUCKET: &s3-bucket oz-backoffice-local
+    S3_ENDPOINT_URL: http://s3:4566
+    S3_PUBLIC_ENDPOINT_URL: http://localhost:4566
+  volumes:
+    - ./apps/backend/src:/app/src
+    - ./apps/backend/tests:/app/tests
+    - ./apps/backend/migrations:/app/migrations
+    - ./apps/backend/pyproject.toml:/app/pyproject.toml
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+    s3-init:
+      condition: service_completed_successfully
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: oz
+      POSTGRES_PASSWORD: oz
+      POSTGRES_DB: oz_backoffice
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oz -d oz_backoffice"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # 로컬 S3 에뮬레이터 (선정 근거: docs/decisions.md R7)
+  # 인증 강제를 켜야 presigned URL 서명 검증·비공개 버킷 동작이 AWS와 같아진다 (기본값은 꺼짐)
+  s3:
+    image: floci/floci:2.4.0
+    environment:
+      FLOCI_SERVICES_S3_ENFORCE_AUTH: "true"
+      FLOCI_STORAGE_MODE: persistent
+      FLOCI_STORAGE_PERSISTENT_PATH: /app/data
+    ports:
+      - "4566:4566"
+    volumes:
+      - s3-data:/app/data
+
+  # 버킷 생성 + CORS 설정 (한 번 실행 후 종료, 멱등). 에뮬레이터 전용 init 훅 대신 S3 API만 사용
+  s3-init:
+    image: amazon/aws-cli:2.31.0
+    entrypoint: ["sh", "/init/init.sh"]
+    environment:
+      AWS_REGION: *aws-region
+      AWS_ACCESS_KEY_ID: *aws-key
+      AWS_SECRET_ACCESS_KEY: *aws-secret
+      S3_BUCKET: *s3-bucket
+      S3_ENDPOINT_URL: http://s3:4566
+    volumes:
+      - ./infra/s3:/init:ro
+    depends_on:
+      - s3
+
+  api:
+    <<: *backend
+    build:
+      context: ./apps/backend
+      target: dev
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  worker:
+    <<: *backend
+    command: ["taskiq", "worker", "app.workers.broker:broker"]
+
+  scheduler:
+    <<: *backend
+    command: ["taskiq", "scheduler", "app.workers.broker:scheduler"]
+
+volumes:
+  postgres-data:
+  s3-data:
