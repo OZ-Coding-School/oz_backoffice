@@ -10,4 +10,4 @@
 | 06 | [P1-3 organization 모델](06_p1_3_organization_models.md) | 완료 (#9) |
 | 07 | [수강생 명단(student_rosters)을 students에 합침](07_merge_student_rosters_into_students.md) | 완료 (#10) |
 | 08 | [P2-1 인증 기반과 운영진 Google 로그인](08_p2_1_auth_google_login.md) | 완료 (#11) |
-| 09 | [P2-2 운영진 최초 정보 입력](09_p2_2_staff_registration.md) | PR 진행 중 (#12) |
+| 09 | [P2-2 운영진 최초 정보 입력](09_p2_2_staff_registration.md) | 완료 (#12) |

@@ -1,6 +1,6 @@
 # 09. P2-2 운영진 최초 정보 입력
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-05 병합)
 - 관련 PR: #12
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P2 (P2-2)
 - 이전 기록: [08. P2-1 인증 기반과 운영진 Google 로그인](08_p2_1_auth_google_login.md)
@@ -41,6 +41,9 @@ P2-1에서는 운영진이 처음 Google 로그인하면 승인 대기(PENDING) 
   - `aerich migrate` → "No changes detected"
   - `aerich downgrade -v 3` → `upgrade` 성공
 - DBML 파서 검증(테이블 42개)
+- 코드 커밋 5개를 각각 워크트리로 꺼내 ruff·format·mypy·lint-imports·pytest 통과 확인
+- GitHub Actions (PR #12, run 42000499096): backend 잡 통과
+- 사용자 확인: P2 진행 지시에 따라 CI 통과 후 병합
 - 실행 중인 api + 개발 DB로 신청 흐름 전체 확인(임시 데이터 생성 후 삭제):
   - `/me` → PENDING
   - 선택지 조회
