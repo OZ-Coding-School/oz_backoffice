@@ -186,9 +186,17 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
 - **테스트:** respx로 Google 토큰 응답 고정. 도메인 외 계정 거부, ID 토큰 클레임 검증, refresh 회전, 재사용 탐지, 만료, PENDING 게이트.
 
 #### P2-2. 운영진 최초 정보 입력
-- **테이블:** 운영진 가입 신청(신청자, 부서, 직위, 고용 형태, 상태, 검토 시각, 반려 사유)과 신청 담당(역할 MANAGER/ASSISTANT + 과정 또는 기수). 상세 스키마는 PR에서 DBML로 확정
-- **작업:** 최초 로그인한 PENDING 운영진이 부서·직위·고용 형태·담당을 입력해 신청한다. 대기 중이면 수정할 수 있고, 반려되면 다시 신청한다. 입력 폼용 선택지(부서·직위·과정·기수) 조회
-- **API:** `GET /api/v1/me/staff-registration/options`, `GET·PUT /api/v1/me/staff-registration` (PENDING도 호출 가능, §2.2의 `/me` 범위)
+- **테이블:** `employee_registrations`(신청자, 부서, 직위, 고용 형태, 상태, 검토 시각, 반려 사유. 회원당 PENDING 하나), `employee_registration_assignments`(역할 MANAGER/ASSISTANT + 과정 또는 기수, 중복 불가)
+- **작업:**
+  - 최초 로그인한 운영진(도메인 이메일)이 부서·직위·고용 형태·담당(0~20개)을 입력해 신청한다. 대기 중이면 같은 신청을 고치고, 반려됐으면 새 신청을 만든다(이력 보존). 이미 승인된 계정은 409
+  - 담당으로 고를 수 있는 것: 활성 과정, 준비·진행 중 기수(활성 과정 소속). academy 공개 서비스 `AcademyCatalog`로 조회·검증
+- **API:**
+  | 메서드 | 경로 | 설명 |
+  | --- | --- | --- |
+  | GET | `/api/v1/me/staff-registration/options` | 부서·직위·고용 형태·담당 역할·과정·기수 선택지 |
+  | GET | `/api/v1/me/staff-registration` | 내 최근 신청 (없으면 null) |
+  | PUT | `/api/v1/me/staff-registration` | 신청·수정 |
+  - PENDING도 호출 가능(§2.2의 `/me` 범위). 운영진 도메인 계정이 아니면 403 `not_staff_account`
 - **승인·반려는 P3**(A12)
 
 ### P3. 권한
