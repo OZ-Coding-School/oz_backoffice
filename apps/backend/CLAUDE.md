@@ -51,7 +51,7 @@ docker compose down -v                    # 중지 + DB 데이터 삭제 (init S
 
 | 서비스 | 내용 |
 | --- | --- |
-| `api` | `Dockerfile`의 `dev` 타깃. `src`, `tests`, `migrations`, `pyproject.toml`을 마운트하고 `uvicorn --reload`로 실행 → 코드 변경 시 자동 재시작 |
+| `api` | `Dockerfile`의 `dev` 타깃. `apps/backend` 디렉터리 전체를 `/app`에 마운트하고 `uvicorn --reload`로 실행 → 코드 변경 시 자동 재시작. 가상환경은 이미지의 `/opt/venv`(마운트에 가려지지 않음) |
 | `worker` / `scheduler` | `api`가 빌드한 이미지를 재사용해 taskiq 실행 (빌드는 `api`만 한다 — 같은 태그 동시 빌드 충돌 방지). **자동 재시작하지 않는다** → 태스크 코드 변경 후 `docker compose restart worker scheduler` |
 | `postgres` / `redis` | 호스트에도 5432 / 6379로 노출 (DB 클라이언트, 로컬 uv 실행용) |
 | `s3` | S3 에뮬레이터 floci 2.4.0 (`localhost:4566`). 인증 강제(`FLOCI_SERVICES_S3_ENFORCE_AUTH=true`)라 서명 없는 요청·위조 서명은 403. 데이터는 `s3-data` 볼륨에 유지. 선정 근거: `docs/decisions.md` R7 |
