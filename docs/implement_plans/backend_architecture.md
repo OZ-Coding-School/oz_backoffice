@@ -260,14 +260,16 @@ apps/backend/
   TORTOISE_ORM = {
       "connections": {"default": settings.database_url},
       "apps": {
-          "identity":  {"models": ["app.contexts.identity.infrastructure.models"]},
-          "mentoring": {"models": ["app.contexts.mentoring.infrastructure.models"]},
-          # ...
-          "aerich":    {"models": ["aerich.models"]},
+          # (변경 2026-11-05, decisions B9) 컨텍스트별 app 대신 단일 app에 모든 컨텍스트 모듈을 등록
+          "models": {"models": [
+              "app.contexts.identity.infrastructure.models",
+              # ... 7개 컨텍스트
+              "aerich.models",
+          ]},
       },
   }
   ```
-  컨텍스트 간 FK는 `fields.ForeignKeyField("academy.Cohort")`처럼 앱 이름을 붙여 참조한다.
+  컨텍스트 간 FK는 `fields.ForeignKeyField("models.UserModel")`처럼 참조한다. 마이그레이션 이력은 하나다.
 - 잠금이 필요한 조회는 `select_for_update()`를 쓴다. 예: 시간 계좌, 정산 마감.
 - 도메인 enum은 `CharEnumField`로 저장한다. Tortoise는 PostgreSQL 네이티브 enum을 만들지 않으므로 DB 값은 varchar다. 값 제약이 필요하면 마이그레이션에서 CHECK를 추가한다.
 - DBML로 표현하지 못한 제약(EXCLUDE, 부분 유니크, 복합 FK)은 aerich 마이그레이션 파일에 raw SQL로 넣는다. 그리고 `tests/integration`에서 **제약이 실제로 동작하는지** 검증한다.
