@@ -830,7 +830,7 @@ Table audit_logs {
   target_id uuid [null]
   before jsonb [null]
   after jsonb [null]
-  ip inet [null]
+  ip varchar(45) [null, note: "IPv4/IPv6 문자열 (Tortoise에 inet 타입이 없어 varchar)"]
   created_at timestamptz [not null, default: `now()`]
 
   indexes {
