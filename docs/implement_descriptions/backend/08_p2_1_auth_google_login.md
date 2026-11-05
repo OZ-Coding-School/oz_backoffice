@@ -1,7 +1,7 @@
 # 08. P2-1 인증 기반과 운영진 Google 로그인
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 예정)
+- 관련 PR: #11
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P2 (P2-1)
 - 이전 기록: [07. 수강생 명단을 students에 합침](07_merge_student_rosters_into_students.md)
 
