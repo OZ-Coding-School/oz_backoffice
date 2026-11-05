@@ -10,6 +10,7 @@ from app.contexts.organization.domain.entities import (
     Employee,
     EmployeePosition,
 )
+from app.contexts.organization.domain.registration import EmployeeRegistration
 
 
 class DepartmentRepository(Protocol):
@@ -47,3 +48,15 @@ class CohortStaffRepository(Protocol):
     async def remove(self, staff_id: uuid.UUID) -> None: ...
     async def list_by_cohort(self, cohort_id: uuid.UUID) -> list[CohortStaff]: ...
     async def list_by_employee(self, employee_id: uuid.UUID) -> list[CohortStaff]: ...
+
+
+class EmployeeRegistrationRepository(Protocol):
+    async def add(self, registration: EmployeeRegistration) -> None: ...
+    async def save(self, registration: EmployeeRegistration) -> None:
+        """담당 목록까지 함께 저장한다 (애그리거트 단위)."""
+        ...
+
+    async def get(self, entity_id: uuid.UUID) -> EmployeeRegistration | None: ...
+    async def get_latest_by_user(self, user_id: uuid.UUID) -> EmployeeRegistration | None:
+        """회원의 가장 최근 신청 (대기·승인·반려 무관)."""
+        ...
