@@ -4,7 +4,7 @@
 #   docker compose logs -f api          # 로그
 #   docker compose exec api pytest      # 컨테이너 안에서 테스트 (통합 테스트 포함)
 #
-# 백엔드 소스(apps/backend/src, tests, migrations)는 마운트되어 API는 코드 변경 시 자동 재시작된다.
+# 백엔드 디렉터리(apps/backend)가 /app에 마운트되어 API는 코드 변경 시 자동 재시작된다.
 # 워커/스케줄러는 자동 재시작하지 않으므로 태스크 코드를 바꾸면 `docker compose restart worker scheduler`.
 # 의존성(pyproject.toml, uv.lock)을 바꾸면 `docker compose up -d --build`로 이미지를 다시 만든다.
 # 자세한 명령은 apps/backend/CLAUDE.md 참고.
@@ -30,11 +30,10 @@ x-backend: &backend
     S3_BUCKET: &s3-bucket oz-backoffice-local
     S3_ENDPOINT_URL: http://s3:4566
     S3_PUBLIC_ENDPOINT_URL: http://localhost:4566
+  # apps/backend 디렉터리 전체를 마운트한다. 단일 파일(pyproject.toml) 마운트는 호스트에서 파일
+  # 크기가 바뀌면 컨테이너에 잘린 내용이 보이는 문제가 있었다. 가상환경은 이미지의 /opt/venv.
   volumes:
-    - ./apps/backend/src:/app/src
-    - ./apps/backend/tests:/app/tests
-    - ./apps/backend/migrations:/app/migrations
-    - ./apps/backend/pyproject.toml:/app/pyproject.toml
+    - ./apps/backend:/app
   depends_on:
     postgres:
       condition: service_healthy
