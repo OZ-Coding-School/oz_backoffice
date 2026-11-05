@@ -35,7 +35,7 @@
 | 수강생·멘토 로그인 | @gmail.com 이메일 + 비밀번호 | A2 |
 | 가입 인증 | 이메일 인증코드 + SMS 인증. 비밀번호 재설정은 이메일 인증코드 | A3 |
 | 발송 | 이메일은 Gmail API(회사 Workspace). **SMS 업체 미정** | A4 |
-| 수강생 명단 | Airtable 원천, taskiq 주기 동기화 + 수동 실행, 필드명은 설정 매핑 | A5 |
+| 수강생 명단 | Airtable 원천, taskiq 주기 동기화 + 수동 실행, 필드명은 설정 매핑. 명단 레코드 = `students` 행(가입 전 `user_id` NULL) | A5, A10 |
 | 자동 승인 | 수강생은 명단, 멘토는 계약과 **이름 + 휴대폰**이 일치하면 자동 승인. 아니면 승인 대기 → 담당 매니저 이상이 승인 | A6 |
 | 토큰 | access는 응답 본문, refresh는 HttpOnly 쿠키 + 회전(Redis) | A7 |
 | Google API | 서비스 계정 + 도메인 전체 위임 | A8 |
@@ -119,8 +119,7 @@
 | 대상 | 변경 | 근거 |
 | --- | --- | --- |
 | `users` | `approval_status`(PENDING / APPROVED / REJECTED), `approved_at`, `email_verified_at`, `phone_verified_at` 추가, `phone_number` unique | A3, A6 |
-| `student_rosters` (신규) | Airtable 명단 사본. `airtable_record_id` upsert 키, 기수 매핑, 이름·휴대폰 매칭 인덱스, `matched_student_id` | A5, A6 |
-| `roster_sync_runs` (신규) | 동기화 실행 이력 | A5 |
+| `roster_sync_runs` (신규) | 동기화 실행 이력. 기수 매핑 실패 레코드는 `unmapped_records`(jsonb) | A5, A10 |
 | `educator_contracts` | `contractor_phone` 필수, `contractor_email` 선택, (이름, 휴대폰) 인덱스 | A6, M14 변경 |
 | `cohort_mentors` | `no_show_pay_amount` 추가, `pay_unit`은 HOURLY / PER_SESSION만 (check) | M29, M30 |
 | `mentoring_settlement_items` | `item_type`(SESSION / NO_SHOW) 추가 | M29 |
@@ -154,7 +153,7 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
 - **테이블:**
   - identity: `users`, `oauth_accounts`
   - organization: `departments`, `employee_positions`, `employees`, `bootcamp_staffs`, `cohort_staffs`
-  - academy: `hrd_net_bootcamps`, `hrd_net_bootcamp_cohorts`, `bootcamps`, `cohorts`, `students`, `student_rosters`, `roster_sync_runs`
+  - academy: `hrd_net_bootcamps`, `hrd_net_bootcamp_cohorts`, `bootcamps`, `cohorts`, `students`, `roster_sync_runs` (명단은 `students`에 합침, A10)
   - audit: `audit_logs`
 - **작업:**
   - 컨텍스트별 Tortoise 모델, 매퍼, 리포지토리(애그리거트 루트 단위)
@@ -206,23 +205,24 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
 
 ### P5. Airtable 수강생 명단 동기화 🔒
 - **선행 준비:** Airtable PAT(읽기 권한), 베이스·테이블 ID, **실제 필드 구조 확인 → `AIRTABLE_FIELD_MAP` 확정**
-- **목표:** Airtable을 원천으로 `student_rosters`를 최신으로 유지한다.
+- **목표:** Airtable을 원천으로 `students`(수강 등록 = 명단 레코드, A10)를 최신으로 유지한다.
 - **작업:**
   - `AirtableClient`(httpx): 페이지네이션(offset), 429 응답 시 재시도(백오프), 초당 5요청 제한 준수
   - 필드 매핑(설정): 이름, 휴대폰, 이메일, 과정 코드, 기수 번호, HRD 상태, 레코드 ID
   - 정규화: 이름은 공백 제거, 휴대폰은 숫자만(`010xxxxxxxx`), 이메일은 소문자
-  - 기수 매핑: (과정 코드 → `bootcamps.code`, 기수 번호) → `cohorts`. 실패하면 `cohort_id=null`로 두고 `unmapped_count`에 집계
+  - 기수 매핑: (과정 코드 → `bootcamps.code`, 기수 번호) → `cohorts`. 실패하면 `students`로 만들지 않고 `roster_sync_runs.unmapped_records`(레코드 ID·이름·Airtable 기수 값)에 남긴다(`unmapped_count` = 목록 길이)
   - **동기화 범위 (ALL / BOOTCAMP / COHORT):** Airtable `filterByFormula`로 과정·기수 필드를 걸어 해당 범위의 레코드만 조회한다.
     - 과정: `{과정필드}='<bootcamps.code>'`
     - 기수: `AND({과정필드}='<code>', {기수필드}=<cohort_number>)`
     - 필드명은 `AIRTABLE_FIELD_MAP`에서 가져온다
     - 값은 수식 문자열로 이스케이프(작은따옴표·역슬래시)해서 넣는다. 사용자 입력이 아니라 DB 값만 쓴다
     - Airtable의 과정 값이 `bootcamps.code`와 다르면, 설정의 과정 값 매핑(`AIRTABLE_BOOTCAMP_VALUE_MAP`)으로 변환한다
-  - upsert(`airtable_record_id`)
+  - upsert(`airtable_record_id`): 새 레코드는 `students`(`user_id` NULL, `enrolled_at`은 기수 시작일)로 만들고, 기존 레코드는 `Student.apply_source()`로 Airtable 원천 필드만 갱신한다. 백오피스가 관리하는 `status`·종료일·사유는 덮어쓰지 않는다
+  - 같은 레코드의 기수가 Airtable에서 바뀌면 자동으로 옮기지 않고 실패 목록(unmapped_records)에 남겨 운영진이 기수 이동으로 처리한다 (P5에서 확정)
   - **원천 삭제 판정은 이번 범위 안에서만 한다.** 범위에 속하는 기존 명단 중 이번 조회에 없는 것만 `is_removed_in_source=true`로 표시한다(삭제하지 않음). COHORT 동기화가 다른 기수 명단을 건드리면 안 된다.
-    - 범위 판정은 저장된 `cohort_id`(BOOTCAMP면 해당 과정의 기수들) 기준이다. 매핑되지 않은(`cohort_id=null`) 명단은 ALL 동기화에서만 판정한다
+    - 범위 판정은 저장된 `cohort_id`(BOOTCAMP면 해당 과정의 기수들) 기준이다. `airtable_record_id`가 없는(운영진이 직접 등록한) 수강생은 판정 대상이 아니다
     - 다시 나타난 레코드는 `false`로 되돌린다
-  - 이미 가입 매칭된 명단의 이름·휴대폰이 바뀌면 연결은 유지하고 감사 로그를 남긴다
+  - 이미 가입한(`user_id` 있음) 수강생의 이름·휴대폰이 바뀌면 연결은 유지하고 감사 로그를 남긴다
   - 주기 동기화(taskiq cron 1시간)는 ALL. 수동 실행은 범위를 지정한다
   - 동시 실행 제어(Redis 락):
     - ALL 실행 중에는 다른 모든 동기화를 막는다
@@ -236,13 +236,13 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
   | POST | `/api/v1/admin/bootcamps/{id}/rosters/sync` | 과정 동기화. `roster.sync` (해당 과정 범위) |
   | POST | `/api/v1/admin/cohorts/{id}/rosters/sync` | 기수 동기화. `roster.sync` (해당 기수 또는 상위 과정 범위) |
   | GET | `/api/v1/admin/rosters/sync-runs` | `roster.sync` (담당 범위의 실행만, SUPER_ADMIN은 전체) |
-  | GET | `/api/v1/admin/cohorts/{id}/rosters` | `roster.sync` (매칭 여부 필터) |
-  | GET | `/api/v1/admin/rosters/unmapped` | `roster.sync` + GLOBAL 범위 (SUPER_ADMIN) |
+  | GET | `/api/v1/admin/cohorts/{id}/rosters` | `roster.sync` (기수의 `students`, 가입 여부 필터) |
+  | GET | `/api/v1/admin/rosters/unmapped` | `roster.sync` + GLOBAL 범위 (SUPER_ADMIN). 최근 실행의 `unmapped_records` |
   - 수동 동기화 요청은 즉시 `roster_sync_runs`(RUNNING)를 만들어 202 + 실행 ID를 돌려주고, 실제 동기화는 taskiq로 처리한다. 상태는 실행 이력 API로 확인한다.
 - **테스트:**
   - respx로 여러 페이지·429·필드 누락 응답 고정, 정규화 경계값
   - 멱등: 같은 데이터로 2회 동기화하면 변경 0
-  - **범위:** 범위별 `filterByFormula`가 올바르게 만들어지는지(이스케이프 포함). COHORT 동기화 후 다른 기수 명단의 `is_removed_in_source`가 바뀌지 않는지. 매핑되지 않은 명단은 ALL에서만 삭제 판정되는지
+  - **범위:** 범위별 `filterByFormula`가 올바르게 만들어지는지(이스케이프 포함). COHORT 동기화 후 다른 기수 명단의 `is_removed_in_source`가 바뀌지 않는지. 기수 매핑 실패 레코드가 `students`에 생기지 않고 실행 이력에 남는지. 재동기화가 백오피스 수강 상태를 덮어쓰지 않는지
   - 동시 실행: ALL과 다른 동기화, 같은 과정의 두 동기화는 409. 서로 다른 과정은 동시 실행 가능
   - 권한: 조교가 담당 기수 외 기수, 또는 ALL을 동기화하면 403
 
@@ -276,7 +276,7 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
   2. **SMS 인증:** 가입 토큰 + 휴대폰 → 6자리 코드(같은 제한). 이미 다른 계정에 등록된 번호는 거부한다
   3. **가입 완료:** 가입 토큰 + 이름 + 비밀번호 + 유형(수강생 / 멘토) → `users` 생성(argon2, `email_verified_at`, `phone_verified_at`)
   4. **자동 매칭 (A6):**
-     - 수강생: `student_rosters`에서 (이름, 휴대폰) 일치 + 기수 매핑됨 + 원천 존재 → 일치한 명단마다 `students` 생성, 명단 `matched_student_id` 연결, `STUDENT` 역할(COHORT 범위) 부여 → APPROVED
+     - 수강생: `students`에서 (이름, 휴대폰) 일치 + 수강 중 + 원천 존재 + 미가입(`user_id` NULL) (`find_claimable_by_name_and_phone`) → 일치한 등록마다 `Student.claim(user_id)`, `STUDENT` 역할(COHORT 범위) 부여 → APPROVED
      - 멘토: `educator_contracts`에서 (이름, 휴대폰) 일치 + 유형 MENTOR → `mentors` 생성, 계약 `mentor_id` 연결, `MENTOR` 역할 부여 → APPROVED
      - 일치 없음 또는 여러 사람과 애매하게 일치하면 PENDING으로 두고 감사 로그를 남긴다
   5. 승인 여부와 관계없이 로그인할 수 있다. PENDING이면 §2.2 게이트로 상태 조회만 가능하다
@@ -285,7 +285,7 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
   - 로그인 실패 5회 시 15분 잠금(이메일 기준)
   - 존재하는 이메일인지 드러내지 않는 응답 (비밀번호 재설정 요청 등)
   - 인증코드는 해시로 저장하고, 비교는 상수 시간으로 한다
-- **승인 관리(운영진):** 대기 목록, 승인(수강생은 기수·명단 선택, 멘토는 계약 선택 후 연결), 반려(사유 → 감사 로그)
+- **승인 관리(운영진):** 대기 목록, 승인(수강생은 미가입 `students` 선택, 멘토는 계약 선택 후 연결), 반려(사유 → 감사 로그)
 - **API:**
   | 메서드 | 경로 | 설명 / 권한 |
   | --- | --- | --- |
@@ -297,7 +297,7 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
   | GET | `/api/v1/admin/approvals` | 대기 목록 (`user.approve`, 범위: 수강생은 매니저·조교의 담당 기수, 멘토는 `contract.manage`) |
   | POST | `/api/v1/admin/approvals/{user_id}/approve` · `/reject` | 위와 같음 |
 - **테스트:**
-  - 단위: 매칭 규칙(동명이인, 한 사람이 여러 기수, 원천에서 삭제된 명단, 매핑되지 않은 기수)
+  - 단위: 매칭 규칙(동명이인, 한 사람이 여러 기수, 원천에서 삭제된 명단, 이미 가입한 등록, 종료된 등록)
   - API: gmail 외 도메인 거부, 코드 만료·시도 초과·재발송 간격, 중복 휴대폰, PENDING 게이트, 레이트 리밋
   - 발송은 메모리 드라이버로 수집해 검증한다
 

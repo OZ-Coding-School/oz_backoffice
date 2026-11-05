@@ -9,7 +9,6 @@ from app.contexts.academy.domain.entities import (
     HrdNetBootcampCohort,
     RosterSyncRun,
     Student,
-    StudentRoster,
 )
 from app.contexts.academy.domain.enums import (
     EnrollmentStatus,
@@ -59,7 +58,7 @@ def test_cohort_period_must_be_ordered() -> None:
 
 def test_student_end_transitions() -> None:
     student = Student(
-        user_id=new_id(), cohort_id=new_id(), hrd_net_status=StudentStatus.TRAINING, enrolled_at=D1
+        cohort_id=new_id(), name="김오즈", hrd_net_status=StudentStatus.TRAINING, enrolled_at=D1
     )
     assert student.is_enrolled
     with pytest.raises(BusinessRuleViolation):
@@ -78,25 +77,77 @@ def test_student_end_transitions() -> None:
     assert exc.value.code == "student_not_enrolled"
 
 
-def test_roster_normalizes_and_matches_once() -> None:
-    roster = StudentRoster(
+def test_student_normalizes_source_fields() -> None:
+    student = Student(
+        cohort_id=new_id(),
         airtable_record_id="rec00000000000001",
         name=" 김오즈 ",
         phone_number="010-1234-5678",
         email=" Kim@Gmail.com ",
-        synced_at=NOW,
+        hrd_net_status=StudentStatus.TRAINING,
+        enrolled_at=D1,
     )
-    assert (roster.name, roster.phone_number, roster.email) == (
+    assert (student.name, student.phone_number, student.email) == (
         "김오즈",
         "01012345678",
         "kim@gmail.com",
     )
-    student_id = new_id()
-    roster.match(student_id)
-    assert roster.is_matched
+    with pytest.raises(BusinessRuleViolation):
+        Student(
+            cohort_id=new_id(),
+            airtable_record_id=" ",
+            name="김오즈",
+            hrd_net_status=StudentStatus.TRAINING,
+            enrolled_at=D1,
+        )
+    with pytest.raises(BusinessRuleViolation):
+        Student(
+            cohort_id=new_id(),
+            name="김오즈",
+            hrd_net_status=StudentStatus.TRAINING,
+            enrolled_at=D2,
+            ended_at=D1,
+        )
+
+
+def test_student_is_claimed_once() -> None:
+    student = Student(
+        cohort_id=new_id(), name="김오즈", hrd_net_status=StudentStatus.TRAINING, enrolled_at=D1
+    )
+    assert not student.is_claimed
+    user_id = new_id()
+    student.claim(user_id)
+    assert student.is_claimed
+    assert student.user_id == user_id
     with pytest.raises(BusinessRuleViolation) as exc:
-        roster.match(new_id())
-    assert exc.value.code == "roster_already_matched"
+        student.claim(new_id())
+    assert exc.value.code == "student_already_claimed"
+
+
+def test_student_apply_source_keeps_backoffice_status() -> None:
+    student = Student(
+        cohort_id=new_id(), name="김오즈", hrd_net_status=StudentStatus.TRAINING, enrolled_at=D1
+    )
+    student.end(EnrollmentStatus.DROPPED, on=D2)
+    student.mark_removed_in_source()
+    assert student.is_removed_in_source
+
+    student.apply_source(
+        name=" 김오즈2 ",
+        phone_number="010 9876 5432",
+        email=None,
+        hrd_net_status=StudentStatus.COMPLETED,
+        source_fields={"기수": "AH3"},
+        synced_at=NOW,
+    )
+    assert (student.name, student.phone_number, student.hrd_net_status) == (
+        "김오즈2",
+        "01098765432",
+        StudentStatus.COMPLETED,
+    )
+    assert (student.source_fields, student.synced_at) == ({"기수": "AH3"}, NOW)
+    assert not student.is_removed_in_source
+    assert student.status is EnrollmentStatus.DROPPED  # 백오피스 상태는 유지
 
 
 @pytest.mark.parametrize(
@@ -133,7 +184,13 @@ def test_roster_sync_run_finishes_once() -> None:
     run = RosterSyncRun(
         trigger=RosterSyncTrigger.SCHEDULED, scope_type=RosterSyncScope.ALL, started_at=NOW
     )
-    run.succeed(now=NOW, fetched=10, upserted=3, removed=1, unmapped=2)
+    run.succeed(
+        now=NOW,
+        fetched=10,
+        upserted=3,
+        removed=1,
+        unmapped_records=[{"id": "rec1"}, {"id": "rec2"}],
+    )
     assert run.status is RosterSyncStatus.SUCCEEDED
     assert (run.fetched_count, run.upserted_count, run.removed_count, run.unmapped_count) == (
         10,

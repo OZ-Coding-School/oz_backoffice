@@ -9,8 +9,8 @@ from app.contexts.academy.domain.entities import (
     HrdNetBootcampCohort,
     RosterSyncRun,
     Student,
-    StudentRoster,
 )
+from app.contexts.academy.domain.enums import EnrollmentStatus
 from app.contexts.academy.infrastructure.models import (
     BootcampModel,
     CohortModel,
@@ -18,7 +18,6 @@ from app.contexts.academy.infrastructure.models import (
     HrdNetBootcampModel,
     RosterSyncRunModel,
     StudentModel,
-    StudentRosterModel,
 )
 from app.core.persistence import TortoiseRepository
 
@@ -94,8 +93,15 @@ class TortoiseStudentRepository(TortoiseRepository[Student, StudentModel]):
     fields = (
         "user_id",
         "cohort_id",
-        "status",
+        "airtable_record_id",
+        "name",
+        "phone_number",
+        "email",
         "hrd_net_status",
+        "source_fields",
+        "synced_at",
+        "is_removed_in_source",
+        "status",
         "enrolled_at",
         "ended_at",
         "end_reason",
@@ -111,36 +117,17 @@ class TortoiseStudentRepository(TortoiseRepository[Student, StudentModel]):
         rows = await StudentModel.filter(user_id=user_id).order_by("enrolled_at")
         return [self.to_entity(row) for row in rows]
 
-
-class TortoiseStudentRosterRepository(TortoiseRepository[StudentRoster, StudentRosterModel]):
-    model = StudentRosterModel
-    entity = StudentRoster
-    fields = (
-        "airtable_record_id",
-        "cohort_id",
-        "name",
-        "phone_number",
-        "email",
-        "hrd_net_status",
-        "source_fields",
-        "is_removed_in_source",
-        "matched_student_id",
-        "synced_at",
-    )
-
-    async def get_by_record_id(self, airtable_record_id: str) -> StudentRoster | None:
-        row = await StudentRosterModel.get_or_none(airtable_record_id=airtable_record_id)
+    async def get_by_record_id(self, airtable_record_id: str) -> Student | None:
+        row = await StudentModel.get_or_none(airtable_record_id=airtable_record_id)
         return self.to_entity(row) if row else None
 
-    async def find_unmatched_by_name_and_phone(
-        self, name: str, phone_number: str
-    ) -> list[StudentRoster]:
-        rows = await StudentRosterModel.filter(
+    async def find_claimable_by_name_and_phone(self, name: str, phone_number: str) -> list[Student]:
+        rows = await StudentModel.filter(
             name=name,
             phone_number=phone_number,
-            cohort_id__isnull=False,
+            status=EnrollmentStatus.ENROLLED,
             is_removed_in_source=False,
-            matched_student_id__isnull=True,
+            user_id__isnull=True,
         ).order_by("id")
         return [self.to_entity(row) for row in rows]
 
@@ -160,5 +147,6 @@ class TortoiseRosterSyncRunRepository(TortoiseRepository[RosterSyncRun, RosterSy
         "upserted_count",
         "removed_count",
         "unmapped_count",
+        "unmapped_records",
         "error_message",
     )

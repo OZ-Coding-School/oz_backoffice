@@ -141,17 +141,44 @@ class Cohort(AggregateRoot):
 
 @dataclass(kw_only=True, eq=False)
 class Student(AggregateRoot):
-    """수강 등록 (회원 1 : 등록 N). (회원, 기수)는 유일하다."""
+    """수강 등록. Airtable 수강생 명단 레코드 1건 = 기수 등록 1건 (decisions A10).
 
-    user_id: uuid.UUID
+    - 가입 전에는 `user_id`가 None이다.
+      가입 시 이름 + 휴대폰으로 매칭되면 `claim()`으로 회원을 연결한다.
+    - 필드 원천:
+      - Airtable: name, phone_number, email, hrd_net_status, source_fields
+        → `apply_source()`로만 갱신한다.
+      - 백오피스: status, ended_at, end_reason → 동기화가 덮어쓰지 않는다.
+    - Airtable 없이 운영진이 직접 등록한 수강생은 `airtable_record_id`가 None이다.
+    - (회원, 기수)는 유일하다. 회원 1명이 여러 기수를 들을 수 있다 (재수강).
+    """
+
     cohort_id: uuid.UUID
+    name: str
     hrd_net_status: StudentStatus
     enrolled_at: date
+    user_id: uuid.UUID | None = None
+    airtable_record_id: str | None = None
+    phone_number: str | None = None
+    email: str | None = None
+    source_fields: dict[str, Any] | None = None
+    synced_at: datetime | None = None
+    is_removed_in_source: bool = False
     status: EnrollmentStatus = EnrollmentStatus.ENROLLED
     ended_at: date | None = None
     end_reason: str | None = None
 
     def __post_init__(self) -> None:
+        self.name = normalize_name(self.name)
+        if self.phone_number is not None:
+            self.phone_number = normalize_phone(self.phone_number)
+        if self.email is not None:
+            self.email = self.email.strip().lower() or None
+        _require(
+            self.airtable_record_id is None or bool(self.airtable_record_id.strip()),
+            "Airtable 레코드 ID가 비어 있습니다.",
+            "invalid_student",
+        )
         _require(
             self.ended_at is None or self.enrolled_at <= self.ended_at,
             "종료일이 등록일보다 빠릅니다.",
@@ -161,6 +188,39 @@ class Student(AggregateRoot):
     @property
     def is_enrolled(self) -> bool:
         return self.status is EnrollmentStatus.ENROLLED
+
+    @property
+    def is_claimed(self) -> bool:
+        """회원 계정과 연결됐는지 (가입한 수강생인지)."""
+        return self.user_id is not None
+
+    def claim(self, user_id: uuid.UUID) -> None:
+        """가입한 회원을 이 수강 등록에 연결한다."""
+        _require(not self.is_claimed, "이미 회원과 연결된 수강생입니다.", "student_already_claimed")
+        self.user_id = user_id
+
+    def apply_source(
+        self,
+        *,
+        name: str,
+        phone_number: str | None,
+        email: str | None,
+        hrd_net_status: StudentStatus,
+        source_fields: dict[str, Any],
+        synced_at: datetime,
+    ) -> None:
+        """Airtable 동기화 값을 반영한다. 백오피스가 관리하는 수강 상태는 바꾸지 않는다."""
+        self.name = normalize_name(name)
+        self.phone_number = normalize_phone(phone_number) if phone_number else None
+        self.email = (email.strip().lower() or None) if email else None
+        self.hrd_net_status = hrd_net_status
+        self.source_fields = source_fields
+        self.synced_at = synced_at
+        self.is_removed_in_source = False
+
+    def mark_removed_in_source(self) -> None:
+        """Airtable에서 사라진 레코드. 멘토링 데이터가 참조하므로 행은 지우지 않는다."""
+        self.is_removed_in_source = True
 
     def end(self, status: EnrollmentStatus, *, on: date, reason: str | None = None) -> None:
         """수료·중도포기·조기취업·기수 이동으로 수강을 종료한다."""
@@ -174,38 +234,6 @@ class Student(AggregateRoot):
         self.status = status
         self.ended_at = on
         self.end_reason = reason
-
-
-@dataclass(kw_only=True, eq=False)
-class StudentRoster(AggregateRoot):
-    """Airtable 수강생 명단 사본 (원천은 Airtable, decisions A5)."""
-
-    airtable_record_id: str
-    name: str
-    synced_at: datetime
-    cohort_id: uuid.UUID | None = None
-    phone_number: str | None = None
-    email: str | None = None
-    hrd_net_status: StudentStatus | None = None
-    source_fields: dict[str, Any] = field(default_factory=dict)
-    is_removed_in_source: bool = False
-    matched_student_id: uuid.UUID | None = None
-
-    def __post_init__(self) -> None:
-        _require(bool(self.airtable_record_id), "Airtable 레코드 ID가 없습니다.", "invalid_roster")
-        self.name = normalize_name(self.name)
-        if self.phone_number is not None:
-            self.phone_number = normalize_phone(self.phone_number)
-        if self.email is not None:
-            self.email = self.email.strip().lower() or None
-
-    @property
-    def is_matched(self) -> bool:
-        return self.matched_student_id is not None
-
-    def match(self, student_id: uuid.UUID) -> None:
-        _require(not self.is_matched, "이미 연결된 명단입니다.", "roster_already_matched")
-        self.matched_student_id = student_id
 
 
 @dataclass(kw_only=True, eq=False)
@@ -223,6 +251,8 @@ class RosterSyncRun(AggregateRoot):
     upserted_count: int = 0
     removed_count: int = 0
     unmapped_count: int = 0
+    # 기수를 매핑하지 못한 Airtable 레코드 (students로 만들 수 없어 실행 이력에 남긴다)
+    unmapped_records: list[dict[str, Any]] = field(default_factory=list)
     error_message: str | None = None
 
     def __post_init__(self) -> None:
@@ -238,14 +268,21 @@ class RosterSyncRun(AggregateRoot):
         )
 
     def succeed(
-        self, *, now: datetime, fetched: int, upserted: int, removed: int, unmapped: int
+        self,
+        *,
+        now: datetime,
+        fetched: int,
+        upserted: int,
+        removed: int,
+        unmapped_records: list[dict[str, Any]],
     ) -> None:
         self._finish(now)
         self.status = RosterSyncStatus.SUCCEEDED
         self.fetched_count = fetched
         self.upserted_count = upserted
         self.removed_count = removed
-        self.unmapped_count = unmapped
+        self.unmapped_records = unmapped_records
+        self.unmapped_count = len(unmapped_records)
 
     def fail(self, *, now: datetime, error_message: str) -> None:
         self._finish(now)

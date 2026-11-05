@@ -9,8 +9,9 @@ from app.contexts.academy.domain.entities import (
     Cohort,
     HrdNetBootcamp,
     HrdNetBootcampCohort,
-    StudentRoster,
+    Student,
 )
+from app.contexts.academy.domain.enums import StudentStatus
 from app.contexts.academy.infrastructure.repositories import (
     TortoiseBootcampRepository,
     TortoiseCohortRepository,
@@ -23,16 +24,21 @@ _seq = count(1)
 SYNCED_AT = datetime(2026, 11, 5, 9, 0, tzinfo=UTC)
 
 
-def make_roster(**overrides: Any) -> StudentRoster:
+def make_student(**overrides: Any) -> Student:
+    """Airtable에서 동기화된(아직 가입하지 않은) 수강생. cohort_id는 overrides로 넘긴다."""
     n = next(_seq)
     values: dict[str, Any] = {
+        "cohort_id": new_id(),
         "airtable_record_id": f"rec{n:014d}",
         "name": f"수강생{n}",
         "phone_number": f"010{n:08d}",
+        "hrd_net_status": StudentStatus.TRAINING,
+        "enrolled_at": date(2026, 11, 1),
+        "source_fields": {},
         "synced_at": SYNCED_AT,
     }
     values.update(overrides)
-    return StudentRoster(**values)
+    return Student(**values)
 
 
 async def create_cohort(code: str | None = None, cohort_number: int = 1) -> Cohort:

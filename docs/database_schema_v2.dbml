@@ -345,16 +345,23 @@ Table cohorts {
 }
 
 // ----------------------------------------------
-// 수강생 (수강 등록 단위)
+// 수강생 (수강 등록 단위 = Airtable 명단 레코드, decisions A10)
 // ----------------------------------------------
 Table students {
-  note: "수강생 수강 등록 테이블 (사람 1 : 등록 N, 재수강/타 과정 수강 가능)"
+  note: "수강 등록 테이블 (사람 1 : 등록 N, 재수강/타 과정 수강 가능). Airtable 명단 레코드 1건 = 등록 1건으로 동기화가 upsert한다. 가입 전에는 user_id가 null이고, 가입 시 이름 + 휴대폰으로 대조해 user_id를 채운다(자동 승인). 멘토링 등 기능은 user_id가 있는(가입한) 수강생만 대상으로 한다"
 
   id uuid [pk, note: "default=uuid7 사용"]
-  user_id uuid [not null, ref: > users.id]
-  cohort_id uuid [not null, ref: > cohorts.id]
-  status EnrollmentStatus [not null, default: 'ENROLLED', note: "운영상 수강 상태"]
-  hrd_net_status StudentStatus [not null, note: "수강생 hrd-net 상태"]
+  user_id uuid [null, ref: > users.id, note: "가입한 회원. 가입 전 null"]
+  cohort_id uuid [not null, ref: > cohorts.id, note: "Airtable의 과정·기수 값을 매핑한 기수. 매핑 실패 레코드는 students로 만들지 않고 roster_sync_runs.unmapped_records에 남긴다"]
+  airtable_record_id varchar(32) [null, unique, note: "Airtable 레코드 ID (upsert 키). 운영진이 직접 등록한 수강생은 null"]
+  name varchar(50) [not null, note: "이름 (앞뒤 공백 제거). Airtable 원천"]
+  phone_number varchar(11) [null, note: "휴대폰 (숫자만으로 정규화). Airtable 원천"]
+  email varchar(255) [null, note: "참고용 이메일 (소문자). Airtable 원천"]
+  hrd_net_status StudentStatus [not null, note: "수강생 hrd-net 상태. Airtable 원천"]
+  source_fields jsonb [null, note: "동기화 시점 Airtable 원본 필드 (매핑 디버깅용)"]
+  synced_at timestamptz [null, note: "마지막 동기화 시각"]
+  is_removed_in_source bool [not null, default: false, note: "Airtable에서 삭제됨 (동기화 범위 안에서 미존재). 멘토링 데이터가 참조하므로 행은 지우지 않는다"]
+  status EnrollmentStatus [not null, default: 'ENROLLED', note: "운영상 수강 상태 (백오피스 관리, 동기화가 덮어쓰지 않음)"]
   enrolled_at date [not null, note: "등록일"]
   ended_at date [null, note: "수료/중도포기 등 종료일"]
   end_reason varchar(200) [null, note: "종료 사유"]
@@ -364,38 +371,11 @@ Table students {
   indexes {
     (user_id, cohort_id) [unique]
     (cohort_id, status)
+    (name, phone_number) [note: "가입 자동 매칭 조회"]
   }
   checks {
     `ended_at IS NULL OR enrolled_at <= ended_at` [name: "check_students_period"]
-  }
-}
-
-// ----------------------------------------------
-// 수강생 명단 (Airtable 원천, 주기 동기화)
-// ----------------------------------------------
-Table student_rosters {
-  note: "Airtable 수강생 명단 사본 (읽기 전용 원천 데이터). 가입 시 이름 + 휴대폰으로 대조해 students를 만들고 자동 승인"
-
-  id uuid [pk, note: "default=uuid7 사용"]
-  airtable_record_id varchar(32) [not null, unique, note: "Airtable 레코드 ID (upsert 키)"]
-  cohort_id uuid [null, ref: > cohorts.id, note: "Airtable의 과정·기수 값을 매핑한 기수. 매핑 실패 시 null (운영진 확인 대상)"]
-  name varchar(50) [not null, note: "이름 (앞뒤 공백 제거)"]
-  phone_number varchar(11) [null, note: "휴대폰 (숫자만으로 정규화)"]
-  email varchar(255) [null, note: "참고용 이메일 (소문자)"]
-  hrd_net_status StudentStatus [null, note: "Airtable의 HRD 상태를 매핑한 값"]
-  source_fields jsonb [not null, note: "동기화 시점 Airtable 원본 필드 (매핑 디버깅용)"]
-  is_removed_in_source bool [not null, default: false, note: "Airtable에서 삭제됨 (동기화 시 미존재)"]
-  matched_student_id uuid [null, unique, ref: - students.id, note: "가입 대조로 연결된 수강 등록"]
-  synced_at timestamptz [not null, note: "마지막 동기화 시각"]
-  created_at timestamptz [not null, default: `now()`]
-  updated_at timestamptz [not null, default: `now()`]
-
-  indexes {
-    (name, phone_number) [note: "가입 자동 매칭 조회"]
-    cohort_id
-  }
-  checks {
-    `phone_number IS NULL OR phone_number ~ '^01[0-9]{8,9}$'` [name: "check_student_rosters_phone_number"]
+    `phone_number IS NULL OR phone_number ~ '^01[0-9]{8,9}$'` [name: "check_students_phone_number"]
   }
 }
 
@@ -411,9 +391,10 @@ Table roster_sync_runs {
   started_at timestamptz [not null, default: `now()`]
   finished_at timestamptz [null]
   fetched_count integer [not null, default: 0, note: "Airtable에서 읽은 레코드 수"]
-  upserted_count integer [not null, default: 0, note: "생성·변경된 명단 수"]
+  upserted_count integer [not null, default: 0, note: "생성·변경된 수강생(students) 수"]
   removed_count integer [not null, default: 0, note: "이번 범위 안에서 원천에서 사라져 is_removed_in_source로 표시한 수"]
   unmapped_count integer [not null, default: 0, note: "기수 매핑 실패 수 (ALL 범위에서만 발생 가능)"]
+  unmapped_records jsonb [not null, default: `'[]'::jsonb`, note: "기수를 매핑하지 못한 레코드 목록 (레코드 ID·이름·Airtable 기수 값). students로 만들 수 없어 운영진 확인용으로 남긴다"]
   error_message text [null]
 
   indexes {
