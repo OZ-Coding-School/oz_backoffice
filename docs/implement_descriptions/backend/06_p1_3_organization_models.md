@@ -1,6 +1,6 @@
 # 06. P1-3 organization 모델
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-05 병합)
 - 관련 PR: #9
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P1 (P1-3)
 - 이전 기록: [05. P1-2 academy 모델](05_p1_2_academy_models.md)
@@ -37,7 +37,9 @@ P1의 마지막 PR이다. 부서·직위·직원과 과정·기수 담당자(운
   - `aerich downgrade -v 2` → `upgrade` 성공
   - `uid_departments_parent_name` 인덱스가 `NULLS NOT DISTINCT`로 생성됐는지 확인
 - DBML 파서 검증(테이블 41개)
-- GitHub Actions: PR에서 확인 후 기록
+- 커밋 3개를 각각 워크트리로 꺼내 확인: 모든 커밋에서 ruff·format·mypy·lint-imports·pytest 통과
+- GitHub Actions (PR #9, run 41992158001): backend 잡 통과, pytest 81개 통과
+- 사용자 확인: P1 진행 지시에 따라 CI 통과 후 병합
 
 ## 남은 작업
 - P2: 인증 기반과 운영진 Google 로그인
