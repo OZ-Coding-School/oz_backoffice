@@ -1,6 +1,6 @@
 # 08. P2-1 인증 기반과 운영진 Google 로그인
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-05 병합)
 - 관련 PR: #11
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P2 (P2-1)
 - 이전 기록: [07. 수강생 명단을 students에 합침](07_merge_student_rosters_into_students.md)
@@ -44,7 +44,10 @@ P2는 첫 API다. 운영진이 Google 계정으로 로그인하고 토큰을 발
   - `/me`(토큰 없음) → 401
   - `/auth/refresh`(쿠키 없음) → 401
   - OpenAPI에 경로 5개 노출
-- 실제 Google 계정 로그인은 OAuth 클라이언트 ID·시크릿을 받은 뒤 확인한다
+- 실제 Google 계정 로그인은 OAuth 클라이언트 ID·시크릿을 받은 뒤 확인한다 (미확인)
+- 코드 커밋 4개를 각각 워크트리로 꺼내 ruff·format·mypy·lint-imports·pytest 통과 확인
+- GitHub Actions (PR #11, run 41999125872): backend 잡 통과
+- 사용자 확인: P2 진행 지시("필요한 리소스나 결정사항은 요청")에 따라 CI 통과 후 병합
 
 ## 남은 작업
 - P2-2: 운영진 최초 정보 입력(신청 테이블·API)
