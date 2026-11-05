@@ -10,7 +10,6 @@ from app.contexts.academy.domain.entities import (
     HrdNetBootcampCohort,
     RosterSyncRun,
     Student,
-    StudentRoster,
 )
 
 
@@ -49,17 +48,12 @@ class StudentRepository(Protocol):
         self, user_id: uuid.UUID, cohort_id: uuid.UUID
     ) -> Student | None: ...
     async def list_by_user(self, user_id: uuid.UUID) -> list[Student]: ...
+    async def get_by_record_id(self, airtable_record_id: str) -> Student | None: ...
+    async def find_claimable_by_name_and_phone(self, name: str, phone_number: str) -> list[Student]:
+        """가입 자동 매칭 후보.
 
-
-class StudentRosterRepository(Protocol):
-    async def add(self, roster: StudentRoster) -> None: ...
-    async def save(self, roster: StudentRoster) -> None: ...
-    async def get(self, entity_id: uuid.UUID) -> StudentRoster | None: ...
-    async def get_by_record_id(self, airtable_record_id: str) -> StudentRoster | None: ...
-    async def find_unmatched_by_name_and_phone(
-        self, name: str, phone_number: str
-    ) -> list[StudentRoster]:
-        """가입 자동 매칭 후보: 기수가 매핑되고 원천에 존재하며 아직 연결되지 않은 명단."""
+        수강 중이고, 원천(Airtable)에 존재하며, 아직 회원과 연결되지 않은 수강생.
+        """
         ...
 
 

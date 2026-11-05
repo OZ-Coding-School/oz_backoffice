@@ -1,7 +1,7 @@
 """academy 컨텍스트 Tortoise 모델 (단일 app `models`).
 
 DBML: hrd_net_bootcamps, hrd_net_bootcamp_cohorts, bootcamps, cohorts, students,
-student_rosters, roster_sync_runs. check 제약·enum 값·DB 기본값은 마이그레이션 raw SQL로 추가한다.
+roster_sync_runs. check 제약·enum 값·DB 기본값은 마이그레이션 raw SQL로 추가한다.
 마스터 데이터 FK는 이력 보존을 위해 RESTRICT(삭제 대신 비활성·보관)로 둔다.
 """
 
@@ -100,17 +100,28 @@ class CohortModel(models.Model):
 
 
 class StudentModel(models.Model):
+    """수강 등록 = Airtable 명단 레코드 (decisions A10). 가입 전에는 user가 NULL."""
+
     id = fields.UUIDField(primary_key=True, default=new_id)
-    user: fields.ForeignKeyRelation[Any] = fields.ForeignKeyField(
-        "models.UserModel", related_name=False, on_delete=fields.RESTRICT
+    user: fields.ForeignKeyNullableRelation[Any] = fields.ForeignKeyField(
+        "models.UserModel", related_name=False, null=True, on_delete=fields.RESTRICT
     )
     cohort: fields.ForeignKeyRelation[CohortModel] = fields.ForeignKeyField(
         "models.CohortModel", related_name="students", on_delete=fields.RESTRICT
     )
+    # Airtable이 원천인 필드
+    airtable_record_id = fields.CharField(max_length=32, null=True, unique=True)
+    name = fields.CharField(max_length=50)
+    phone_number = fields.CharField(max_length=11, null=True)
+    email = fields.CharField(max_length=255, null=True)
+    hrd_net_status = fields.CharEnumField(StudentStatus, max_length=30)
+    source_fields = fields.JSONField[dict[str, Any] | None](null=True)
+    synced_at = fields.DatetimeField(null=True)
+    is_removed_in_source = fields.BooleanField(default=False)
+    # 백오피스가 관리하는 필드
     status = fields.CharEnumField(
         EnrollmentStatus, max_length=20, default=EnrollmentStatus.ENROLLED
     )
-    hrd_net_status = fields.CharEnumField(StudentStatus, max_length=30)
     enrolled_at = fields.DateField()
     ended_at = fields.DateField(null=True)
     end_reason = fields.CharField(max_length=200, null=True)
@@ -120,31 +131,7 @@ class StudentModel(models.Model):
     class Meta:
         table = "students"
         unique_together = (("user", "cohort"),)
-        indexes = (("cohort", "status"),)
-
-
-class StudentRosterModel(models.Model):
-    id = fields.UUIDField(primary_key=True, default=new_id)
-    airtable_record_id = fields.CharField(max_length=32, unique=True)
-    cohort: fields.ForeignKeyNullableRelation[CohortModel] = fields.ForeignKeyField(
-        "models.CohortModel", related_name="rosters", null=True, on_delete=fields.RESTRICT
-    )
-    name = fields.CharField(max_length=50)
-    phone_number = fields.CharField(max_length=11, null=True)
-    email = fields.CharField(max_length=255, null=True)
-    hrd_net_status = fields.CharEnumField(StudentStatus, max_length=30, null=True)
-    source_fields = fields.JSONField[dict[str, Any]]()
-    is_removed_in_source = fields.BooleanField(default=False)
-    matched_student: fields.OneToOneNullableRelation[StudentModel] = fields.OneToOneField(
-        "models.StudentModel", related_name="roster", null=True, on_delete=fields.SET_NULL
-    )
-    synced_at = fields.DatetimeField()
-    created_at = fields.DatetimeField(auto_now_add=True)
-    updated_at = fields.DatetimeField(auto_now=True)
-
-    class Meta:
-        table = "student_rosters"
-        indexes = (("name", "phone_number"), ("cohort",))
+        indexes = (("cohort", "status"), ("name", "phone_number"))
 
 
 class RosterSyncRunModel(models.Model):
@@ -164,6 +151,7 @@ class RosterSyncRunModel(models.Model):
     upserted_count = fields.IntField(default=0)
     removed_count = fields.IntField(default=0)
     unmapped_count = fields.IntField(default=0)
+    unmapped_records = fields.JSONField[list[dict[str, Any]]](default=list)
     error_message = fields.TextField(null=True)
 
     class Meta:

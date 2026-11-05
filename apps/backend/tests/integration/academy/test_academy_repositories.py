@@ -1,3 +1,4 @@
+import uuid
 from datetime import UTC, date, datetime
 
 import pytest
@@ -11,17 +12,15 @@ from app.contexts.academy.domain.enums import (
     RosterSyncScope,
     RosterSyncStatus,
     RosterSyncTrigger,
-    StudentStatus,
 )
 from app.contexts.academy.infrastructure.repositories import (
     TortoiseBootcampRepository,
     TortoiseCohortRepository,
     TortoiseRosterSyncRunRepository,
     TortoiseStudentRepository,
-    TortoiseStudentRosterRepository,
 )
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
-from tests.factories.academy import create_cohort, make_roster
+from tests.factories.academy import create_cohort, make_student
 from tests.factories.identity import make_user
 
 pytestmark = [pytest.mark.integration, pytest.mark.usefixtures("db")]
@@ -61,13 +60,8 @@ async def test_student_enrollment_is_unique_per_user_and_cohort() -> None:
     first, second = await create_cohort(), await create_cohort()
     students = TortoiseStudentRepository()
 
-    def enroll(cohort_id: object) -> Student:
-        return Student(
-            user_id=user.id,
-            cohort_id=cohort_id,  # type: ignore[arg-type]
-            hrd_net_status=StudentStatus.TRAINING,
-            enrolled_at=date(2026, 11, 1),
-        )
+    def enroll(cohort_id: uuid.UUID) -> Student:
+        return make_student(user_id=user.id, cohort_id=cohort_id)
 
     await students.add(enroll(first.id))
     await students.add(enroll(second.id))  # 다른 기수 재수강은 허용
@@ -84,39 +78,46 @@ async def test_student_enrollment_is_unique_per_user_and_cohort() -> None:
     assert saved.status is EnrollmentStatus.COMPLETED
 
 
-async def test_roster_matching_candidates_exclude_unmapped_removed_and_matched() -> None:
+async def test_unclaimed_students_round_trip_and_unique_record_id() -> None:
     cohort = await create_cohort()
-    rosters = TortoiseStudentRosterRepository()
-    target = make_roster(name="김오즈", phone_number="01012345678", cohort_id=cohort.id)
-    await rosters.add(target)
-    await rosters.add(make_roster(name="김오즈", phone_number="01012345678", cohort_id=None))
-    await rosters.add(
-        make_roster(
-            name="김오즈",
-            phone_number="01012345678",
-            cohort_id=cohort.id,
-            is_removed_in_source=True,
-        )
-    )
+    students = TortoiseStudentRepository()
+    # 가입 전 수강생 여러 명이 같은 기수에 있어도 (user, cohort) 유니크에 걸리지 않는다
+    first = make_student(cohort_id=cohort.id, source_fields={"기수": "AH1"})
+    await students.add(first)
+    await students.add(make_student(cohort_id=cohort.id))
 
-    candidates = await rosters.find_unmatched_by_name_and_phone("김오즈", "01012345678")
-    assert [r.id for r in candidates] == [target.id]
+    loaded = await students.get_by_record_id(first.airtable_record_id or "")
+    assert loaded is not None
+    assert (loaded.user_id, loaded.source_fields) == (None, {"기수": "AH1"})
+    assert await students.get_by_record_id("recUnknown") is None
+
+    with pytest.raises(IntegrityError):
+        await students.add(
+            make_student(cohort_id=cohort.id, airtable_record_id=first.airtable_record_id)
+        )
+
+
+async def test_claimable_candidates_exclude_removed_ended_and_claimed() -> None:
+    cohort, other = await create_cohort(), await create_cohort()
+    students = TortoiseStudentRepository()
+    same = {"name": "김오즈", "phone_number": "01012345678"}
+    target = make_student(cohort_id=cohort.id, **same)
+    await students.add(target)
+    await students.add(make_student(cohort_id=cohort.id, is_removed_in_source=True, **same))
+    ended = make_student(cohort_id=other.id, **same)
+    ended.end(EnrollmentStatus.DROPPED, on=date(2026, 12, 1))
+    await students.add(ended)
+    await students.add(make_student(cohort_id=cohort.id, name="김오즈", phone_number="01000000000"))
+
+    candidates = await students.find_claimable_by_name_and_phone("김오즈", "01012345678")
+    assert [s.id for s in candidates] == [target.id]
 
     user = make_user()
     await TortoiseUserRepository().add(user)
-    student = Student(
-        user_id=user.id,
-        cohort_id=cohort.id,
-        hrd_net_status=StudentStatus.TRAINING,
-        enrolled_at=date(2026, 11, 1),
-    )
-    await TortoiseStudentRepository().add(student)
-    target.match(student.id)
-    await rosters.save(target)
-    assert await rosters.find_unmatched_by_name_and_phone("김오즈", "01012345678") == []
-    loaded = await rosters.get_by_record_id(target.airtable_record_id)
-    assert loaded is not None
-    assert loaded.matched_student_id == student.id
+    target.claim(user.id)
+    await students.save(target)
+    assert await students.find_claimable_by_name_and_phone("김오즈", "01012345678") == []
+    assert await students.get_by_user_and_cohort(user.id, cohort.id) is not None
 
 
 async def test_roster_sync_run_round_trip() -> None:
@@ -130,12 +131,14 @@ async def test_roster_sync_run_round_trip() -> None:
         started_at=NOW,
     )
     await runs.add(run)
-    run.succeed(now=NOW, fetched=5, upserted=5, removed=0, unmapped=0)
+    unmapped = [{"airtable_record_id": "recX", "name": "김오즈", "cohort": "AH99"}]
+    run.succeed(now=NOW, fetched=5, upserted=4, removed=0, unmapped_records=unmapped)
     await runs.save(run)
     loaded = await runs.get(run.id)
     assert loaded is not None
     assert loaded.status is RosterSyncStatus.SUCCEEDED
-    assert loaded.upserted_count == 5
+    assert (loaded.upserted_count, loaded.unmapped_count) == (4, 1)
+    assert loaded.unmapped_records == unmapped
 
 
 @pytest.mark.parametrize(
@@ -149,10 +152,10 @@ async def test_roster_sync_run_round_trip() -> None:
             "check_roster_sync_scope",
         ),
         (
-            "INSERT INTO student_rosters (id, airtable_record_id, name, phone_number, "
-            "source_fields, synced_at) VALUES (gen_random_uuid(), 'recX', '김', '0212345678', "
-            "'{}', now())",
-            "check_student_rosters_phone_number",
+            "INSERT INTO students (id, cohort_id, name, phone_number, hrd_net_status, "
+            "enrolled_at) VALUES (gen_random_uuid(), (SELECT id FROM cohorts LIMIT 1), '김', "
+            "'0212345678', 'TRAINING', '2026-11-01')",
+            "check_students_phone_number",
         ),
     ],
 )
