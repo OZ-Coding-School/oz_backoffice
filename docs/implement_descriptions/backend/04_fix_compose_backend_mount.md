@@ -1,7 +1,7 @@
 # 04. docker compose 백엔드 마운트 수정
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #7
 - 이전 기록: [02. docker compose 로컬 개발 환경과 S3 에뮬레이터](02_local_docker_compose_and_s3.md)
 
 ## 배경
