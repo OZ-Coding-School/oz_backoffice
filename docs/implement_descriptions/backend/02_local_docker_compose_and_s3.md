@@ -1,7 +1,7 @@
 # 02. docker compose 로컬 개발 환경과 S3 에뮬레이터
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #4
 - 이전 기록: [01. 백엔드 프로젝트 세팅과 CI](01_backend_project_setup.md)
 
 ## 배경
