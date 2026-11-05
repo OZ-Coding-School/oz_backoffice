@@ -1,0 +1,172 @@
+name: CI Checks
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+# 같은 브랜치·PR에서 새 커밋이 올라오면 이전 실행은 취소
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  changes:
+    name: Detect Changed Files
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      frontend_ready: ${{ steps.frontend.outputs.ready }}
+    steps:
+      - uses: actions/checkout@v4
+      # 프론트엔드는 아직 세팅 전이다. package.json이 생기기 전에는 프론트엔드 작업을 건너뛴다.
+      - id: frontend
+        run: |
+          if [ -f apps/frontend/package.json ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            backend:
+              - 'apps/backend/**'
+              - 'infra/postgres/**'
+              - '.github/workflows/ci.yml'
+            frontend:
+              - 'apps/frontend/**'
+              - '.github/workflows/ci.yml'
+
+  backend-checks:
+    name: Backend Lint & TypeCheck & ImportRules & Test
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    services:
+      # 로컬 docker-compose.yml과 같은 계정. 통합 테스트는 TEST_DATABASE_URL의 DB를 사용한다.
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: oz
+          POSTGRES_PASSWORD: oz
+          POSTGRES_DB: oz_backoffice_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U oz -d oz_backoffice_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://oz:oz@localhost:5432/oz_backoffice_test
+    defaults:
+      run:
+        working-directory: apps/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.13"
+          enable-cache: true
+          cache-dependency-glob: apps/backend/uv.lock
+      - run: uv sync --frozen --group dev
+      - name: Ruff lint
+        run: uv run ruff check .
+      - name: Ruff format
+        run: uv run ruff format --check .
+      - name: Mypy (src, strict)
+        run: uv run mypy
+      - name: Mypy (tests)
+        run: uv run mypy tests
+      - name: Import rules (import-linter)
+        run: uv run lint-imports
+      # 서비스 컨테이너에는 init 스크립트를 마운트할 수 없어 확장을 직접 만든다
+      # (로컬은 infra/postgres/init/01-extensions-and-test-db.sql이 처리)
+      - name: Prepare database extensions
+        run: psql "$TEST_DATABASE_URL" -c "CREATE EXTENSION IF NOT EXISTS btree_gist"
+      - name: Pytest (unit + api + integration) with coverage
+        run: uv run coverage run -m pytest -q
+      - name: Coverage report
+        run: uv run coverage report
+
+  frontend-checks:
+    name: Frontend Lint & TypeCheck & Test & Build
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true' && needs.changes.outputs.frontend_ready == 'true'
+    runs-on: ubuntu-latest
+    env:
+      # 빌드에 필요한 백엔드 주소 (E2E는 preview 주소로 API를 모킹한다 — playwright.config.ts)
+      VITE_BACKEND_URL: http://localhost:4173
+    defaults:
+      run:
+        working-directory: apps/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: apps/frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: apps/frontend/package-lock.json
+      - run: npm ci
+      - name: Lint (oxlint)
+        run: npm run lint
+      - name: TypeCheck
+        run: npm run typecheck
+      - name: Unit test (vitest)
+        run: npm test
+      - name: Build
+        run: npm run build
+
+  # E2E는 정적 검사와 따로, 샤드로 나눠 병렬 실행한다 (비공개 저장소 러너는 2코어라 워커가 1개뿐이다)
+  frontend-e2e:
+    name: Frontend E2E (${{ matrix.shard }}/3)
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true' && needs.changes.outputs.frontend_ready == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    env:
+      VITE_BACKEND_URL: http://localhost:4173
+    defaults:
+      run:
+        working-directory: apps/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: apps/frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: apps/frontend/package-lock.json
+      - run: npm ci
+      - name: Playwright version
+        id: playwright
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browser
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-chromium
+      - name: Install Playwright browser
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+      # 브라우저는 캐시에서 받았으니 시스템 의존성만 설치한다
+      - name: Install Playwright system deps
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+      # 한 번만 빌드한다 — CI에서 webServer는 빌드 없이 preview만 띄운다 (playwright.config.ts)
+      - name: Build
+        run: npm run build
+      # 빌드 결과를 vite preview로 띄워 확인한다 (백엔드 API는 테스트에서 모킹)
+      - name: E2E (playwright)
+        run: npm run e2e -- --shard=${{ matrix.shard }}/3
