@@ -1,7 +1,7 @@
 # 03. P1-1 identity·audit 모델과 첫 마이그레이션
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #6
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P1 (P1-1)
 
 ## 배경
