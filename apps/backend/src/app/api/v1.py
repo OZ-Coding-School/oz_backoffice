@@ -2,7 +2,8 @@
 
 from fastapi import APIRouter
 
-router = APIRouter()
+from app.contexts.identity.presentation.router import auth_router, me_router
 
-# 예) from app.contexts.mentoring.presentation.routers import router as mentoring_router
-#     router.include_router(mentoring_router, prefix="/mentoring")
+router = APIRouter()
+router.include_router(auth_router)
+router.include_router(me_router)

@@ -166,21 +166,30 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
 - **API:** 없음 (공통 기반 PR로 예외 허용)
 
 ### P2. 인증 기반과 운영진 로그인
-- **목표:** 토큰 발급·갱신·폐기와 운영진 Google OAuth 로그인.
+- **목표:** 토큰 발급·갱신·폐기, 운영진 Google OAuth 로그인, 운영진 최초 정보 입력(신청). 흐름은 decisions A11·A12.
+- PR을 둘로 나눈다.
+
+#### P2-1. 인증 기반과 Google 로그인
 - **작업:**
-  - refresh 토큰 저장소(Redis): `oz:refresh:<jti>` → user_id, TTL 14일. 갱신할 때 기존 jti를 폐기하고 새로 발급(회전). 폐기된 jti가 다시 쓰이면 해당 사용자의 refresh를 전부 폐기(탈취 감지)
-  - Google OAuth(Authorization Code + PKCE, state는 Redis): 콜백에서 ID 토큰 검증 → `hd`/이메일 도메인이 `nextrunners.co.kr`인지 확인 → `oauth_accounts`로 사용자 찾기 또는 생성(직원 등록 여부 확인: `employees`에 없으면 로그인 거부)
-  - 의존성: `get_current_user`, `require_approved_user`
-  - 운영진 계정은 생성 시 `approval_status=APPROVED`
+  - refresh 토큰 저장소(Redis): `oz:identity:refresh:<jti>` → user_id, TTL 14일. 갱신할 때 기존 jti를 폐기하고 새로 발급(회전). 폐기된 jti가 다시 쓰이면(`oz:identity:refresh-used:<jti>`) 해당 사용자의 refresh를 전부 폐기(탈취 감지)
+  - Google OAuth(Authorization Code + PKCE, state는 Redis 10분·1회용): 콜백에서 ID 토큰 클레임 검증(A13) → `hd`·이메일 도메인이 `nextrunners.co.kr`인지 확인 → `oauth_accounts`로 사용자 찾기, 없으면 같은 이메일 회원에 연결하거나 **PENDING 회원 생성**(A11)
+  - 탈퇴·정지(승인 후 비활성) 계정은 로그인·갱신 거부(`account_disabled`)
+  - 의존성: `get_current_user`, `require_approved_user` (`access.presentation.dependencies`, B10)
 - **API:**
   | 메서드 | 경로 | 설명 |
   | --- | --- | --- |
-  | GET | `/api/v1/auth/google/authorize` | 인가 URL 발급 (state, PKCE) |
-  | POST | `/api/v1/auth/google/callback` | code 교환 → access(본문) + refresh(쿠키) |
+  | GET | `/api/v1/auth/google/authorize` | 인가 URL 발급 (state, PKCE). 클라이언트 미설정이면 503 |
+  | POST | `/api/v1/auth/google/callback` | code·state → access(본문) + refresh(쿠키) |
   | POST | `/api/v1/auth/refresh` | refresh 쿠키로 회전 갱신 |
-  | POST | `/api/v1/auth/logout` | refresh 폐기 |
-  | GET | `/api/v1/me` | 내 정보, 승인 상태, 역할 |
-- **테스트:** respx로 Google 토큰·키 응답 고정. 도메인 외 계정 거부, 미등록 직원 거부, refresh 회전, 재사용 탐지, 만료.
+  | POST | `/api/v1/auth/logout` | refresh 폐기, 쿠키 삭제 |
+  | GET | `/api/v1/me` | 내 정보, 승인 상태 (역할은 P3에서 추가) |
+- **테스트:** respx로 Google 토큰 응답 고정. 도메인 외 계정 거부, ID 토큰 클레임 검증, refresh 회전, 재사용 탐지, 만료, PENDING 게이트.
+
+#### P2-2. 운영진 최초 정보 입력
+- **테이블:** 운영진 가입 신청(신청자, 부서, 직위, 고용 형태, 상태, 검토 시각, 반려 사유)과 신청 담당(역할 MANAGER/ASSISTANT + 과정 또는 기수). 상세 스키마는 PR에서 DBML로 확정
+- **작업:** 최초 로그인한 PENDING 운영진이 부서·직위·고용 형태·담당을 입력해 신청한다. 대기 중이면 수정할 수 있고, 반려되면 다시 신청한다. 입력 폼용 선택지(부서·직위·과정·기수) 조회
+- **API:** `GET /api/v1/me/staff-registration/options`, `GET·PUT /api/v1/me/staff-registration` (PENDING도 호출 가능, §2.2의 `/me` 범위)
+- **승인·반려는 P3**(A12)
 
 ### P3. 권한
 - **목표:** RBAC와 범위 검사, 담당자 배정 동기화.
@@ -190,12 +199,16 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
   - 권한 판정 결과는 요청 단위로 캐시한다(사용자 역할 1회 조회)
   - 담당자 배정(`bootcamp_staffs`, `cohort_staffs`)과 `user_roles`를 같은 트랜잭션에서 동기화 (D4)
   - `scripts/seed_roles.py`: §2.3 권한표를 시드 (멱등). 최초 SUPER_ADMIN 지정 명령 포함
+  - **운영진 가입 승인·반려(A11·A12):** 어드민이 신청 항목(부서·직위·고용 형태·담당)을 조정해 승인하면 `employees`·`bootcamp_staffs`·`cohort_staffs`·`user_roles`를 만들고 회원을 APPROVED로 바꾼다. 반려 사유는 감사 로그
+  - **최초 어드민 CLI:** 먼저 Google로 로그인·신청한 사람의 신청을 승인하고 SUPER_ADMIN을 부여한다. 부서·직위 초기 데이터 시드 CLI 포함
 - **API:**
   | 메서드 | 경로 | 권한 |
   | --- | --- | --- |
   | GET/POST/DELETE | `/api/v1/admin/cohorts/{id}/staffs` | `role.assign` |
   | GET/POST/DELETE | `/api/v1/admin/bootcamps/{id}/staffs` | `role.assign` |
   | GET/POST/DELETE | `/api/v1/admin/users/{id}/roles` | `role.assign` |
+  | GET | `/api/v1/admin/staff-registrations` | 운영진 가입 신청 목록. `role.assign` (SUPER_ADMIN) |
+  | POST | `/api/v1/admin/staff-registrations/{id}/approve` · `/reject` | 항목 조정 후 승인 / 반려 사유. `role.assign` (SUPER_ADMIN) |
 - **테스트:** 권한표 전 항목을 매개변수화 테스트(역할 × 권한 × 범위: 허용 / 403). 범위 밖 기수 접근 403.
 
 ### P4. 조직·과정·기수 관리 API
@@ -425,6 +438,8 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
   - [x] P1-2 academy 모델 (구현 기록 05)
   - [x] P1-3 organization 모델 (구현 기록 06)
 - [ ] P2 인증 기반과 운영진 로그인
+  - [x] P2-1 인증 기반과 Google 로그인 (구현 기록 08)
+  - [ ] P2-2 운영진 최초 정보 입력
 - [ ] P3 권한
 - [ ] P4 조직·과정·기수 관리 API
 - [ ] P5 Airtable 수강생 명단 동기화

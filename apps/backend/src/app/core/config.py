@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_ttl_seconds: int = 15 * 60
     refresh_token_ttl_seconds: int = 14 * 24 * 60 * 60
+    # refresh 쿠키 Secure 속성.
+    # 브라우저는 http://localhost도 보안 출처로 보므로 로컬에서도 true로 둔다
+    refresh_cookie_secure: bool = True
 
     # Google OAuth2 (운영진 로그인)
     google_client_id: str = ""

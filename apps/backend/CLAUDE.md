@@ -117,6 +117,8 @@ src/app/
 
 - 의존 방향: `presentation → (application | infrastructure) → domain`. 도메인은 `fastapi`, `tortoise`, `redis`, `httpx`, `app.core`를 import하지 않는다.
 - 다른 컨텍스트는 `application`(공개 서비스)으로만 호출한다. 다른 컨텍스트의 `infrastructure`/`presentation` import 금지. 예외로 `access.presentation`의 권한 의존성은 공개한다.
+- 다른 컨텍스트의 공개 서비스에 리포지토리 구현을 넣어야 하면, composition root `app.main`이 만들어 `app.state`에 연결하고 presentation 의존성이 `request.app.state`에서 꺼낸다 (decisions B10, 예: `app.state.user_queries`). 인증 의존성은 `access.presentation.dependencies`의 `CurrentUser`(로그인) / `ApprovedUser`(승인된 회원)를 쓴다.
+- 앱 공통 의존성(설정·시계·JWT·외부 HTTP 클라이언트)은 `app.core.dependencies`에서 가져온다. 시각은 `get_clock`(테스트는 `app.state.clock`을 `FixedClock`으로 교체)을 쓴다.
 - 트랜잭션은 서비스에서 `UnitOfWork`로 연다. 외부 API 호출은 `uow.on_commit(...)`으로 커밋 후에 실행한다.
 - 도메인은 시각을 직접 읽지 않고 `now`를 인자로 받는다. 서비스가 `Clock`에서 꺼내 넘긴다.
 - 예외는 `app.shared.errors`의 `AppError` 하위 클래스로 던진다. HTTP 매핑은 `app.core.errors`가 한다 (`{"error": {"code", "message"}}`).

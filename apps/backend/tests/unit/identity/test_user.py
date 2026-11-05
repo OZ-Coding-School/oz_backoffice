@@ -83,3 +83,17 @@ def test_verify_phone_normalizes_and_records_time() -> None:
 def test_oauth_account_requires_provider_user_id() -> None:
     with pytest.raises(BusinessRuleViolation):
         OAuthAccount(user_id=new_id(), provider=SocialLoginProvider.GOOGLE, provider_user_id="")
+
+
+def test_can_login_depends_on_deletion_and_suspension() -> None:
+    pending = make_user()
+    assert pending.can_login  # 승인 전에는 비활성이어도 상태 확인을 위해 로그인할 수 있다
+
+    approved = make_user()
+    approved.approve(now=NOW)
+    assert approved.can_login
+    approved.deactivate()
+    assert not approved.can_login
+
+    deleted = make_user(deleted_at=NOW)
+    assert not deleted.can_login

@@ -51,6 +51,17 @@ class User(AggregateRoot):
     def is_approved(self) -> bool:
         return self.approval_status is UserApprovalStatus.APPROVED
 
+    @property
+    def can_login(self) -> bool:
+        """탈퇴했거나, 승인 후 비활성화(정지)된 계정은 로그인할 수 없다.
+
+        승인 전(PENDING·REJECTED)에는 is_active가 false여도 로그인해
+        상태를 볼 수 있다 (§2.2 게이트).
+        """
+        if self.deleted_at is not None:
+            return False
+        return self.is_active or not self.is_approved
+
     def approve(self, *, now: datetime) -> None:
         if self.approval_status is UserApprovalStatus.APPROVED:
             raise BusinessRuleViolation("이미 승인된 회원입니다.", code="user_already_approved")
