@@ -56,6 +56,7 @@ Table users {
   checks {
     `email = lower(email)` [name: "check_users_email_lowercase"]
     `(approval_status = 'APPROVED') = (approved_at IS NOT NULL)` [name: "check_users_approved_at"]
+    `phone_number IS NULL OR phone_number ~ '^01[0-9]{8,9}$'` [name: "check_users_phone_number"]
   }
 }
 
@@ -288,6 +289,9 @@ Table hrd_net_bootcamp_cohorts {
   indexes {
     (hrd_net_bootcamp_id, cohort_number) [unique]
   }
+  checks {
+    `train_start_date IS NULL OR train_end_date IS NULL OR train_start_date <= train_end_date` [name: "check_hrd_net_cohort_period"]
+  }
 }
 
 
@@ -357,6 +361,9 @@ Table students {
     (user_id, cohort_id) [unique]
     (cohort_id, status)
   }
+  checks {
+    `ended_at IS NULL OR enrolled_at <= ended_at` [name: "check_students_period"]
+  }
 }
 
 // ----------------------------------------------
@@ -382,6 +389,9 @@ Table student_rosters {
   indexes {
     (name, phone_number) [note: "가입 자동 매칭 조회"]
     cohort_id
+  }
+  checks {
+    `phone_number IS NULL OR phone_number ~ '^01[0-9]{8,9}$'` [name: "check_student_rosters_phone_number"]
   }
 }
 
