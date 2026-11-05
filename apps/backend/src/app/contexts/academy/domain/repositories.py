@@ -1,6 +1,7 @@
 """academy 리포지토리 인터페이스 (애그리거트 루트 단위)."""
 
 import uuid
+from collections.abc import Collection
 from typing import Protocol
 
 from app.contexts.academy.domain.entities import (
@@ -11,6 +12,7 @@ from app.contexts.academy.domain.entities import (
     RosterSyncRun,
     Student,
 )
+from app.contexts.academy.domain.enums import CohortStatus
 
 
 class HrdNetBootcampRepository(Protocol):
@@ -30,6 +32,7 @@ class BootcampRepository(Protocol):
     async def save(self, bootcamp: Bootcamp) -> None: ...
     async def get(self, entity_id: uuid.UUID) -> Bootcamp | None: ...
     async def get_by_code(self, code: str) -> Bootcamp | None: ...
+    async def list_active(self) -> list[Bootcamp]: ...
 
 
 class CohortRepository(Protocol):
@@ -38,6 +41,7 @@ class CohortRepository(Protocol):
     async def get(self, entity_id: uuid.UUID) -> Cohort | None: ...
     async def get_by_number(self, bootcamp_id: uuid.UUID, cohort_number: int) -> Cohort | None: ...
     async def list_by_bootcamp(self, bootcamp_id: uuid.UUID) -> list[Cohort]: ...
+    async def list_by_statuses(self, statuses: Collection[CohortStatus]) -> list[Cohort]: ...
 
 
 class StudentRepository(Protocol):

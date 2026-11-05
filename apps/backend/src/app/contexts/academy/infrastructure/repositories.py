@@ -1,6 +1,7 @@
 """academy 리포지토리 구현 (Tortoise)."""
 
 import uuid
+from collections.abc import Collection
 
 from app.contexts.academy.domain.entities import (
     Bootcamp,
@@ -10,7 +11,7 @@ from app.contexts.academy.domain.entities import (
     RosterSyncRun,
     Student,
 )
-from app.contexts.academy.domain.enums import EnrollmentStatus
+from app.contexts.academy.domain.enums import CohortStatus, EnrollmentStatus
 from app.contexts.academy.infrastructure.models import (
     BootcampModel,
     CohortModel,
@@ -64,6 +65,10 @@ class TortoiseBootcampRepository(TortoiseRepository[Bootcamp, BootcampModel]):
         row = await BootcampModel.get_or_none(code=code.strip().upper())
         return self.to_entity(row) if row else None
 
+    async def list_active(self) -> list[Bootcamp]:
+        rows = await BootcampModel.filter(is_active=True).order_by("name")
+        return [self.to_entity(row) for row in rows]
+
 
 class TortoiseCohortRepository(TortoiseRepository[Cohort, CohortModel]):
     model = CohortModel
@@ -84,6 +89,12 @@ class TortoiseCohortRepository(TortoiseRepository[Cohort, CohortModel]):
 
     async def list_by_bootcamp(self, bootcamp_id: uuid.UUID) -> list[Cohort]:
         rows = await CohortModel.filter(bootcamp_id=bootcamp_id).order_by("cohort_number")
+        return [self.to_entity(row) for row in rows]
+
+    async def list_by_statuses(self, statuses: Collection[CohortStatus]) -> list[Cohort]:
+        rows = await CohortModel.filter(status__in=list(statuses)).order_by(
+            "bootcamp_id", "cohort_number"
+        )
         return [self.to_entity(row) for row in rows]
 
 

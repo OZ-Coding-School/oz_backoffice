@@ -9,6 +9,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from tortoise.contrib.fastapi import RegisterTortoise
 
 from app.api import health, v1
+from app.contexts.academy.application.catalog import AcademyCatalog
+from app.contexts.academy.infrastructure.repositories import (
+    TortoiseBootcampRepository,
+    TortoiseCohortRepository,
+)
 from app.contexts.identity.application.auth_service import UserQueries
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
 from app.core.clock import SystemClock
@@ -47,6 +52,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # 컨텍스트 간 공개 서비스 연결 (composition root). 다른 컨텍스트의 presentation 의존성이
     # 이 서비스를 쓰되 identity.infrastructure를 직접 import하지 않게 한다.
     app.state.user_queries = UserQueries(TortoiseUserRepository())
+    app.state.academy_catalog = AcademyCatalog(
+        TortoiseBootcampRepository(), TortoiseCohortRepository()
+    )
 
     app.add_middleware(
         CORSMiddleware,

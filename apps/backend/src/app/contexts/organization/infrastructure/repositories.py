@@ -9,12 +9,18 @@ from app.contexts.organization.domain.entities import (
     Employee,
     EmployeePosition,
 )
+from app.contexts.organization.domain.registration import (
+    EmployeeRegistration,
+    RequestedAssignment,
+)
 from app.contexts.organization.infrastructure.models import (
     BootcampStaffModel,
     CohortStaffModel,
     DepartmentModel,
     EmployeeModel,
     EmployeePositionModel,
+    EmployeeRegistrationAssignmentModel,
+    EmployeeRegistrationModel,
 )
 from app.core.persistence import TortoiseRepository
 
@@ -95,3 +101,72 @@ class TortoiseCohortStaffRepository(TortoiseRepository[CohortStaff, CohortStaffM
     async def list_by_employee(self, employee_id: uuid.UUID) -> list[CohortStaff]:
         rows = await CohortStaffModel.filter(employee_id=employee_id).order_by("id")
         return [self.to_entity(row) for row in rows]
+
+
+class TortoiseEmployeeRegistrationRepository(
+    TortoiseRepository[EmployeeRegistration, EmployeeRegistrationModel]
+):
+    """신청과 담당 목록을 함께 저장·조회한다. 담당 목록은 저장할 때마다 통째로 바꾼다."""
+
+    model = EmployeeRegistrationModel
+    entity = EmployeeRegistration
+    fields = (
+        "user_id",
+        "department_id",
+        "position_id",
+        "employment_type",
+        "status",
+        "reviewed_at",
+        "reject_reason",
+    )
+
+    async def add(self, entity: EmployeeRegistration) -> None:
+        row = await EmployeeRegistrationModel.create(id=entity.id, **self.to_values(entity))
+        entity.created_at = row.created_at
+        await self._replace_assignments(entity)
+
+    async def save(self, entity: EmployeeRegistration) -> None:
+        await super().save(entity)
+        await self._replace_assignments(entity)
+
+    async def get(self, entity_id: uuid.UUID) -> EmployeeRegistration | None:
+        row = await EmployeeRegistrationModel.get_or_none(id=entity_id).prefetch_related(
+            "assignments"
+        )
+        return self._to_aggregate(row) if row else None
+
+    async def get_latest_by_user(self, user_id: uuid.UUID) -> EmployeeRegistration | None:
+        row = (
+            await EmployeeRegistrationModel.filter(user_id=user_id)
+            .order_by("-created_at", "-id")
+            .prefetch_related("assignments")
+            .first()
+        )
+        return self._to_aggregate(row) if row else None
+
+    def _to_aggregate(self, row: EmployeeRegistrationModel) -> EmployeeRegistration:
+        registration = self.to_entity(row)
+        registration.created_at = row.created_at
+        registration.assignments = [
+            RequestedAssignment(
+                role=a.role,
+                bootcamp_id=a.bootcamp_id,  # type: ignore[attr-defined]  # Tortoise FK 컬럼 속성
+                cohort_id=a.cohort_id,  # type: ignore[attr-defined]
+            )
+            for a in sorted(row.assignments, key=lambda a: a.id)  # uuid7 = 저장 순서
+        ]
+        return registration
+
+    async def _replace_assignments(self, entity: EmployeeRegistration) -> None:
+        await EmployeeRegistrationAssignmentModel.filter(registration_id=entity.id).delete()
+        await EmployeeRegistrationAssignmentModel.bulk_create(
+            [
+                EmployeeRegistrationAssignmentModel(
+                    registration_id=entity.id,
+                    role=a.role,
+                    bootcamp_id=a.bootcamp_id,
+                    cohort_id=a.cohort_id,
+                )
+                for a in entity.assignments
+            ]
+        )
