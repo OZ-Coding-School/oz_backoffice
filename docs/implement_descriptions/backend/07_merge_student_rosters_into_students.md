@@ -1,6 +1,6 @@
 # 07. 수강생 명단(student_rosters)을 students에 합침
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-05 병합)
 - 관련 PR: #10
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P1(스키마), P5, P7
 - 이전 기록: [05. P1-2 academy 모델](05_p1_2_academy_models.md) (명단 테이블을 처음 만든 기록)
@@ -37,6 +37,9 @@ P1-2에서 Airtable 명단 사본(`student_rosters`)과 수강 등록(`students`
   - `aerich migrate` → "No changes detected"
   - `aerich downgrade -v 2` → `upgrade` 성공
 - DBML 파서 검증(테이블 40개)
+- 코드 커밋을 워크트리로 꺼내 ruff·format·mypy·lint-imports·pytest 통과 확인
+- GitHub Actions (PR #10, run 41994900163): backend 잡 통과
+- 사용자 확인: 합치는 안("합침")을 선택했고, 작업 지시에 따라 CI 통과 후 병합
 
 ## 남은 작업
 - P2: 인증 기반과 운영진 Google 로그인
