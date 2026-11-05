@@ -87,6 +87,9 @@
 | A5 | 수강생 명단은 **Airtable이 원천**이다. taskiq 주기 동기화(+ 운영진 수동 실행)로 백오피스 `students`에 upsert한다(A10, 처음에는 별도 명단 테이블이었음). 필드명은 설정으로 매핑한다 |
 | A9 | 명단 동기화는 범위를 나눠 실행할 수 있다: **전체 / 특정 과정 / 특정 기수** (Airtable `filterByFormula`). 주기 동기화와 전체 동기화는 SUPER_ADMIN 범위이고, 매니저·조교는 담당 과정·기수만 동기화한다. 원천 삭제 판정은 실행한 범위 안에서만 한다 (2026-11-05) |
 | A10 | 별도 명단 테이블(`student_rosters`)을 두지 않고 **`students`에 합친다**. Airtable 명단 레코드 1건 = 수강 등록 1건이며, 동기화가 `students`에 upsert한다(`airtable_record_id` 유일). 가입 전에는 `students.user_id`가 NULL이고, 가입 시 이름 + 휴대폰으로 대조해 회원을 연결한다(A6). 이름·휴대폰·이메일·HRD 상태는 Airtable이 원천이고, 수강 상태(`status`·종료일·사유)는 백오피스가 관리해 동기화가 덮어쓰지 않는다. 기수를 매핑하지 못한 레코드는 `students`로 만들지 않고 `roster_sync_runs.unmapped_records`(jsonb)에 남긴다. 멘토링 등 기능은 `user_id`가 있는(가입한) 수강생만 대상으로 한다 (2026-11-05) |
+| A11 | 운영진 가입 흐름: ① Google 로그인 시 도메인(`nextrunners.co.kr`)만 확인하고 처음이면 **승인 대기(PENDING)** 회원을 만든다(`employees` 등록 여부로 거부하지 않음) → ② 최초 로그인 후 **부서·직위·고용 형태·담당(역할 MANAGER/ASSISTANT + 과정 또는 기수, 여러 개)** 을 입력해 신청한다. 담당 역할과 과정·기수는 **신청자가 직접 고른다**(직위와 연결하지 않음) → ③ 어드민이 입력 항목을 조정해 승인하면 `employees`·`bootcamp_staffs`·`cohort_staffs`가 만들어지고 APPROVED가 된다. 승인 후 새로고침·재로그인하면 이용할 수 있다 (2026-11-05) |
+| A12 | 운영진 승인 순서: P2에서 로그인·토큰과 신청 입력을, P3에서 권한과 함께 **승인·반려 API(SUPER_ADMIN, 항목 조정 가능)** 와 **최초 어드민 CLI**(먼저 Google로 로그인·신청한 사람을 CLI로 승인하고 SUPER_ADMIN 부여)를 만든다. 부서·직위 초기 데이터는 시드 CLI로 넣는다 (2026-11-05) |
+| A13 | Google ID 토큰은 토큰 엔드포인트에서 client secret으로 인증한 HTTPS 응답으로 직접 받으므로 **서명(JWKS)은 검증하지 않고** 클레임(`aud`, `iss`, `exp`, `email_verified`, `hd`·이메일 도메인)만 검증한다. Google 문서가 허용하는 방식이고, RS256 검증용 `cryptography` 의존성을 늘리지 않는다 (2026-11-05) |
 | A6 | 자동 승인 기준: 수강생은 명단과 **이름 + 휴대폰**(SMS 인증된 번호)이 일치하면, 멘토는 계약과 **이름 + 휴대폰**이 일치하면 자동 승인한다. 일치하지 않으면 **승인 대기**로 두고, 담당 매니저 이상이 승인한다. 대기 중에는 로그인해도 상태 화면만 볼 수 있다 |
 | A7 | 토큰: access는 응답 본문(프론트 메모리, `Authorization` 헤더), refresh는 HttpOnly·Secure·SameSite 쿠키. 갱신할 때 refresh를 회전한다 (Redis 저장) |
 | A8 | Google API(Meet, Drive, Gmail, Workspace Events)는 **서비스 계정 + 도메인 전체 위임**으로 회사 계정을 대신해 호출한다 |
@@ -117,6 +120,7 @@
 | B7 | 채팅 실시간 전송 방식(WebSocket / SSE)은 채팅 구현 시점에 결정한다 |
 | B8 | S3 클라이언트는 **aioboto3**(asyncio 네이티브). 의존성은 S3 어댑터를 구현할 때 추가한다 (2026-11-05) |
 | B9 | Tortoise 모델은 7개 컨텍스트 모듈을 **단일 app `models`** 에 등록한다. 마이그레이션 이력이 하나라 `aerich upgrade` 한 번으로 적용되고, FK는 `"models.UserModel"`처럼 참조한다. 컨텍스트별 app은 이력이 7개로 나뉘고 다른 app 테이블 정의가 마이그레이션에 중복돼 제외했다(실험 확인). 코드 경계는 import-linter가 강제한다 (2026-11-05) |
+| B10 | 다른 컨텍스트가 쓰는 공개 서비스(예: identity `UserQueries`)는 composition root인 `app.main`이 `app.state`에 연결하고, presentation 의존성이 `request.app.state`에서 꺼낸다. 다른 컨텍스트의 infrastructure를 import하지 않는 import-linter 계약을 유지하기 위해서다. 인증 의존성 `get_current_user`·`require_approved_user`는 공개 영역인 `access.presentation.dependencies`에 둔다 (2026-11-05) |
 
 ## 4-1. 저장소 운영 (2026-11-05)
 
