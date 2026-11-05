@@ -9,7 +9,7 @@ Git 브랜치·커밋·PR·구현 기록 규칙은 README를 따른다.
 ## 현재 상태 (2026-11-05)
 
 - **1단계: 멘토링 기능 이전.** DB 스키마(`docs/database_schema_v2.dbml`)는 멘토링 범위로 확정됐다.
-- 백엔드: 프로젝트 뼈대·CI(구현 기록 01, PR #3), docker compose 로컬 환경·floci S3(구현 기록 02, PR #4) 완료. 아직 도메인 모델과 API는 없다. 상세 구현계획(P1~P15) 확정, 다음 작업은 **P1 마스터 데이터 모델**.
+- 백엔드: 프로젝트 뼈대·CI(#3), docker compose·floci S3(#4), compose 마운트 수정(#7) 완료. **P1 마스터 데이터 모델 완료**(identity·audit #6, academy #8, organization #9, 구현 기록 03·05·06). 아직 API는 없다. 다음 작업은 **P2 인증 기반과 운영진 Google 로그인**.
 - 프론트엔드: 기술 스택만 정리됨 (`apps/frontend/CLAUDE.md`). 코드 없음.
 - 원격 저장소: `OZ-Coding-School/oz_backoffice` (private). 모든 변경은 README 규칙대로 `develop`에서 작업 브랜치를 만들어 PR로 병합한다.
 

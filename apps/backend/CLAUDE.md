@@ -122,6 +122,10 @@ src/app/
 - 예외는 `app.shared.errors`의 `AppError` 하위 클래스로 던진다. HTTP 매핑은 `app.core.errors`가 한다 (`{"error": {"code", "message"}}`).
 - Tortoise 모델은 7개 컨텍스트 모듈을 **단일 app `models`** 에 등록한다 (`app.core.database.MODEL_MODULES`, decisions B9). 모델 클래스 이름은 `<이름>Model`, 테이블 이름은 `Meta.table`로 DBML과 같게 지정한다. FK는 `"models.UserModel"`처럼 참조한다.
 - enum은 `CharEnumField`(varchar)로 저장하고, 허용 값은 마이그레이션에 CHECK로 건다. DB 기본값(`now()`, `false` 등)과 DBML check 제약도 마이그레이션 raw SQL로 추가한다. aerich 생성 파일(`migrations/`)은 ruff 대상에서 제외한다.
+- aerich 생성물에서 직접 고쳐야 하는 것 (aerich 0.10 한계):
+  - **downgrade의 테이블 삭제 순서가 FK 의존을 고려하지 않는다.** 참조하는 쪽부터 지우도록 고친다.
+  - **자기 참조 FK는 "cyclic fk references"로 생성을 거부한다.** 모델에는 `UUIDField`로 두고 FK 제약은 raw SQL로 건다(예: `departments.parent_id`).
+  - 마이그레이션을 만든 뒤 개발 DB에서 `aerich upgrade` → `aerich migrate`("No changes detected" 확인) → `aerich downgrade -v <n>` → `aerich upgrade`로 검증한다.
 - 통합 테스트 픽스처(`database`)는 테스트 DB 스키마를 비우고 **aerich 마이그레이션을 처음부터 적용**한다. DB를 쓰는 테스트는 `db` 픽스처(테스트마다 TRUNCATE)를 사용한다.
 - 테스트: `tests/unit`(DB 없음, `tests/fakes` 인메모리 리포지토리), `tests/integration`(실제 PostgreSQL), `tests/api`(AsyncClient + 의존성 오버라이드). 마커 `unit` / `integration` / `api`.
 

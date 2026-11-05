@@ -7,3 +7,4 @@
 | 03 | [P1-1 identity·audit 모델과 첫 마이그레이션](03_p1_1_identity_audit_models.md) | 완료 (#6) |
 | 04 | [docker compose 백엔드 마운트 수정](04_fix_compose_backend_mount.md) | 완료 (#7) |
 | 05 | [P1-2 academy 모델](05_p1_2_academy_models.md) | 완료 (#8) |
+| 06 | [P1-3 organization 모델](06_p1_3_organization_models.md) | 완료 (#9) |
