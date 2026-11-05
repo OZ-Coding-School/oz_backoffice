@@ -1,0 +1,525 @@
+// ----------------------------------------------
+// 사내 부서 및 부서 별 운영사업 관리 테이블
+// ----------------------------------------------
+Table departments {
+  note: "넥스트러너스 내 부서 정보 관리 테이블"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  parent_id uuid [not null, ref: > departments.id, note: "조직관계를 나타내기 위한 참조키"]
+  name varchar(20) [not null, note: "부서명(교육 1팀)"]
+  description text(500) [not null, note: "부서 설명"]
+  rules text [null, note: "부서별 규칙 명시"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [null]
+}
+
+Table employee_positions {
+  note: "사내 직위 정보 관리 테이블"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  name varchar(20) [not null]
+  priority smallint [not null, note: "직급 우선순위"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [null]
+}
+
+// ----------------------------------------------
+// 회원 정보 관련 테이블들
+// ----------------------------------------------
+Table users {
+  note: "전체 회원 관리 테이블"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  email varchar(255) [not null, unique, note: "nextrunners.co.kr 도메인 사용 시 Oauth로 이동"]
+  hashed_password varchar(255) [not null, note: "argon2 해시화 적용"]
+  name varchar(10) [not null, note: "성함"]
+  phone_number varchar(11) [not null, note: "한국으로 한정"]
+  birth_date date [not null, note: "생년월일"]
+  is_admin bool [not null, default: false, note: "어드민 계정 여부"]
+  is_active bool [not null, default: false, note: "계정 활성화 여부"]
+  last_login_at timestamptz [null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [null]
+}
+
+Table oauth_accounts {
+  note: "회원 Oauth2 소셜 로그인 정보 관리 테이블"
+
+  user_id uuid [not null, ref: > users.id]
+  provider SocialLoginProvider [not null, note: "소셜 로그인 제공업체"]
+  oauth_provider_id varchar(255) [not null, note: "Provider 제공 고유 ID"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [null]
+}
+
+// ----------------------------------------------
+// 회원 권한 관리 테이블
+// ----------------------------------------------
+Table employees {
+  note: "사내 직원 정보 관리용 테이블"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  department_id uuid [not null, ref: > departments.id]
+  position_id uuid [not null, ref: > employee_positions.id]
+  user_id uuid [not null, unique, ref: - users.id]
+  employment_type EmploymentType [not null, note: "고용 형태"]
+  slack_user_id bigint [null, unique, note: "슬랙 유저 고유 ID"]
+  discord_user_id bigint [null, unique, note: "디스코드 유저 고유 ID"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [null]
+}
+
+// 운영진의 담당 부트캠프 및 기수 정보 관리 테이블
+Table bootcamp_staffs {
+  note: "담당 과정별 운영진"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  bootcamp_id uuid [not null, ref: > bootcamps.id]
+  employee_id uuid [not null, ref: > employees.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (employee_id, bootcamp_id) [unique]
+  }
+}
+
+Table cohort_staffs {
+  note: "기수별 담당 운영진"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  employee_id uuid [not null, ref: > employees.id]
+  cohort_id uuid [not null, ref: > cohorts.id]
+  created_at timestamptz [not null, default: `now()`]
+  indexes {
+    (employee_id, cohort_id) [unique]
+  }
+}
+
+Table mentors {
+  note: "멘토 정보 테이블"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  user_id uuid [not null, unique, ref: - users.id]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [null]
+}
+
+Table instructors {
+  note: "강사 등록 정보 테이블"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  user_id uuid [not null , unique, ref: - users.id]
+  resume_url varchar(500) [not null, note: "강사 이력서"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [null]
+}
+
+Table educator_contracts {
+  note: "강사 및 멘토 계약 정보 관리 테이블"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  managed_staff_id uuid [not null, ref: > employees.id]
+  educator_type EducatorType [not null, note: "계약자 유형(멘토, 강사 등)"]
+  s3_key varchar(255) [not null, note: "s3 저장소 실제 계약서 확인용 key"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [null]
+
+  checks {
+    `mentor_id IS NULL OR instructor_id IS NULL` [name: "check_educator_exists"]
+  }
+}
+
+// ----------------------------------------------
+// HRD-Net 과정 및 운영회차 등록 정보 테이블
+// ----------------------------------------------
+Table hrd_net_bootcamps {
+  note: "HRD-Net 상에 등록된 과정 정보"
+
+  id uuid [pk, note: "default=uuid7 사용, 고유 ID"]
+  // hrd net 등록정보
+  name varchar(100) [not null]
+  hrd_net_id varchar(100) [null, note: 'HRD-Net에 등록된 과정 고유 ID']
+  train_type HRDNetTrainType [null, note: "HRD-Net에 등록된 훈련 유형(KDT)"]
+  // ncs 직종 분류 코드
+  ncs1_se varchar [null, note: "NCS 직종 1차분류 코드"]
+  ncs2_se varchar [null, note: "NCS 직종 2차분류 코드"]
+  ncs3_se varchar [null, note: "NCS 직종 3차분류 코드"]
+  // 주중/주말, 주간/야간 훈련 구분
+  weekend_se WeekendSeType [not null, default: 9, note: "주말/주중/혼합 훈련 구분"]
+  day_night_se DayNigthSeType [not null, default: False, note: "주간/야간/혼합 훈련 구분"]
+  // 훈련 비용, 단가 정보
+  total_train_fee smallint [null, note: "총 훈련비"]
+  train_fee_per_hour smallint [null, note: "훈련 단가"]
+  // 훈련 시수, 일수 정보
+  total_train_hours smallint [null, note: "총 훈련 시수"]
+  total_train_days smallint [null, note: "총 훈련 일수"]
+
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [null]
+}
+
+Table hrd_net_bootcamp_cohorts {
+  note: "HRD-Net 상에 등록된 과정의 운영회차 정보"
+
+  id uuid [pk, note: "default=uuid7 사용, 고유 ID"]
+  hrd_net_bootcamp_id uuid [not null, ref: > hrd_net_bootcamps.id]
+  cohort_num smallint [not null, note: "회차번호"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [null]
+}
+
+// ----------------------------------------------
+// 사내 운영용 부트캠프 관련 정보 테이블들
+// ----------------------------------------------
+Table bootcamps {
+  note: "부트캠프 과정 정보"
+
+  id uuid [pk, note: "default=uuid7 사용, 고유 ID"]
+  hrd_net_bootcamp_id uuid [not null, ref: > hrd_net_bootcamps.id, note: "실제 과정 정보 매핑용 FK"]
+  name varchar(50) [not null, unique, note: '운영상 사용되는 과정 명칭']
+  code varchar(20) [not null, unique, note: 'AH, AL, GM, PD, ...']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [null]
+}
+
+Table subjects {
+  note: "부트캠프 학습과목 관리 테이블"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  chapter_id uuid [not null, ref: > chapters.id]
+  bootcamp_id uuid [not null, ref: > bootcamps.id]
+  name varchar(50) [not null, note: "과목명"]
+  description text [not null, note: "과목 설명(안내문구)"]
+  total_days smallint [not null, note: "과목 진행 일수"]
+  total_hours smallint [not null, note: "총 시수"]
+  version smallint [not null, note: "버전관리, 변경신청 시 +1"]
+  is_active bool [not null, default: true, note: "과목 활성화 여부"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [null]
+}
+
+// ----------------------------------------------
+// 기수 운영과 관련된 정보 테이블들
+// ----------------------------------------------
+Table cohorts {
+  note: "부트캠프 기수 관리 테이블"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  parent_id uuid [null, unique, ref: - cohorts.id, note: "본 과정-기수, 애플리케이션 레벨에서 동시생성"]
+  hrd_net_cohort_id uuid [not null, ref: > hrd_net_bootcamp_cohorts.id, note: "hrd-net 운영회차 매핑용 FK"]
+  bootcamp_id uuid [not null, ref: > bootcamps.id]
+  cohort_number int [not null, note: '기수']
+  start_date date [not null, note: "기수 시작일"]
+  end_date date [not null, note: "기수 종료일"]
+  discord_guild_id bigint [null, unique, note: "디스코드 길드 고유 ID"]
+  is_derived bool [not null, default: False, note: "파생과정의 기수인지 여부(파생 과정의 부모 기수는 비활성화)"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [null]
+
+  Indexes {
+    (bootcamp_id, cohort_number) [unique]
+  }
+}
+
+Table cohort_subjects {
+  note: "기수별 적용 과목 관리 테이블"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  subject_id uuid [not null, ref: > subjects.id]
+  instructor_id uuid [not null, ref: > instructors.id]
+  cohort_id uuid [not null, ref: > cohorts.id]
+  start_date date [not null, note: "과목 수강 시작일"]
+  end_date date [not null, note: "과목 수강 종료일"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [null]
+
+  Indexes {
+    (cohort_id, subject_id) [unique]
+  }
+}
+
+Table chapters {
+  note: "챕터(동질의 과목을 묶어 부르는 단위 == 트랙) 구성"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  bootcamp_id uuid [not null, ref: > bootcamps.id]
+  title varchar(50) [not null, note: "챕터 제목"]
+  ordering smallint [not null, note: "순서"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [null]
+}
+
+Table cohort_schedules {
+  note: "기수별 일정 관리 테이블"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  cohort_id uuid [not null, ref: > cohorts.id]
+  title varchar(50) [not null, note: "일정명"]
+  schedule_type ScheduleType [not null, note: "일정 유형(종일, 특정 시간대)"]
+  description text [null, note: "일정 설명"]
+  start_date date [not null, note: "일정 시작일"]
+  end_date date [not null, note: "일정 종료일"]
+  start_time time [not null, note: "스케 줄 시작 시간"]
+  end_time time [not null, note: "스케줄 종료 시간"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [null]
+}
+
+// ----------------------------------------------
+// 수강생 정보 관리 테이블
+// ----------------------------------------------
+Table students {
+  note: "수강생 정보 관리 테이블"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  cohort_id uuid [not null, ref: > cohorts.id]
+  user_id uuid [not null, unique, ref: - users.id]
+  hrd_net_status StudentStatus [not null, note: "수강생 hrd-net 상태"]
+  discord_id bigint [not null, note: "디스코드 아이디, 숫자형태"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [null]
+}
+
+// ----------------------------------------------
+// 멘토링 관리 테이블
+// ----------------------------------------------
+Table mentoring_teams {
+  note: "멘토링 관리 테이블"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  cohort_id uuid [not null, ref: > cohorts.id]
+  mentor_id uuid [not null, ref: > mentors.id]
+  team_name varchar(30) [not null, note: "멘토링 팀 명칭"]
+  mentoring_type MentoringType [not null, note: "멘토링 유형(프로젝트, 정기)"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [null]
+}
+
+Table mentoring_mentees {
+  note: "멘토링 참여 수강생 관리 테이블"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  mentoring_team_id uuid [not null, ref: > mentoring_teams.id]
+  student_id uuid [not null, ref: > students.id]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [null]
+}
+
+Table mentoring_sessions {
+  note: "멘토링 회차별 진행 및 일지 관리 테이블"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  mentoring_team_id uuid [not null, ref: > mentoring_teams.id]
+  title varchar(100) [not null, note: "회차 제목, 미기재시 자동입력"]
+  topic varchar(100) [not null, note: "진행 주제"]
+  body text [not null, note: "진행 내용 본문 기록"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [null]
+}
+
+Table mentoring_recordings {
+  note: "멘토링 회차별 진행 녹화 제출 파일"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  session_id uuid [not null, ref: > mentoring_sessions.id]
+  // 업로드 파일 메타데이터
+  file_name varchar(100) [not null, note: "파일 이름"]
+  file_ext VideoFileExtension [not null, note: "파일 확장자"]
+  file_size bigint [not null, note: "파일 크기 (Bytes)"]
+  duration_seconds int [not null, note: "영상 길이(초, Seconds)"]
+
+  // S3 정보
+  s3_key varchar(1024) [not null, note: "Presigned URL 발급 시 사용할 파일 식별 키"]
+
+  // 업로드 상태관리 정보
+  upload_status RecordingUploadStatus [not null, default: 'PENDING']
+  upload_failure_reason text [null, note: "업로드 실패 사유"]
+  uploaded_at timestampz [null, note: "업로드 완료 시간"]
+
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [null]
+}
+
+// ----------------------------------------------
+// 수준별 수업 관리 테이블
+// ----------------------------------------------
+Table level_based_classes {
+  note: "수준별 수업 관리 테이블"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  cohort_id uuid [not null, ref: > cohorts.id]
+  instructor_id uuid [not null, ref: > instructors.id]
+  start_date uuid [not null, note: "수준별 반 수업 시작일"]
+  end_date uuid [not null, note: "수준별 반 수업 종료일"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [null]
+}
+
+Table level_based_class_students {
+  note: "수준별 수업 대상자"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  class_id uuid [not null, ref: > level_based_classes.id]
+  student_id uuid [not null, unique, ref: - students.id]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [null]
+}
+
+Table level_based_class_assignments {
+  note: "수준별 수업 과제"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  class_id uuid [not null, ref: > level_based_classes.id]
+  title varchar(50) [not null, note: "과제 제목"]
+  body text [not null, note: "과제 본문 내용, Markdown 형식 지원"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [null]
+}
+
+Table level_based_class_assignment_attachments {
+  note: "수준별 수업 과제 첨부파일 관리 테이블"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  assignment_id uuid [not null, ref: > level_based_class_assignments.id]
+  // 업로드 파일 메타데이터
+  file_name varchar(100) [not null, note: "파일 이름"]
+  file_ext varchar(10) [not null, note: "파일 확장자"]
+  file_size bigint [not null, note: "파일 크기 (Bytes)"]
+
+  // S3 정보
+  s3_key varchar(1024) [not null, note: "Presigned URL 발급 시 사용할 파일 식별 키"]
+
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [null]
+}
+
+Table level_based_class_assignment_submissions {
+  note: "수준별 수업 과제 제출 내역"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  assignment_id uuid [not null, ref: > level_based_class_assignments.id]
+  submitter_id uuid [not null, ref: > students.id]
+  title varchar(50) [not null, note: "과제 제출 제목"]
+  body text [not null, note: "과제 제출 본문 내용, Markdown 형식 지원"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [null]
+}
+
+Table level_based_class_assignment_submission_attachments {
+  note: "수준별 수업 과제 제출 파일"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  submission_id uuid [not null, ref: > level_based_class_assignment_submissions.id]
+  // 업로드 파일 메타데이터
+  file_name varchar(100) [not null, note: "파일 이름"]
+  file_ext varchar(10) [not null, note: "파일 확장자"]
+  file_size bigint [not null, note: "파일 크기 (Bytes)"]
+
+  // S3 정보
+  s3_key varchar(1024) [not null, note: "Presigned URL 발급 시 사용할 파일 식별 키"]
+
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [null]
+}
+
+// ----------------------------------------------
+// 기수별 프로젝트 관리 테이블
+// ---------------------------------------------
+Table projects {
+  note: "기수별 프로젝트 관리 테이블"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  cohort_id uuid [not null, ref: > cohorts.id]
+  title varchar(50) [not null, note: "프로젝트 제목"]
+  goal text [not null, note: "프로젝트 목표"]
+  body text [not null, note: "과제 제출 본문 내용, Markdown 형식 지원"]
+  notion_url varchar(500) [null, note: "프로젝트 관리 노션 url"]
+  ppt_s3_key varchar(1024) [null, note: "프로젝트 OT PPT"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [null]
+}
+
+Table project_teams {
+  note: "기수별 프로젝트 팀 관리 테이블"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  project_id uuid [not null, ref: > projects.id]
+  title varchar(50) [not null, note: "프로젝트 제목"]
+  goal text [not null, note: "프로젝트 목표"]
+  body text [not null, note: "과제 제출 본문 내용, Markdown 형식 지원"]
+  notion_url varchar(500) [null, note: "프로젝트 관리 노션 url"]
+  ppt_url varchar(1024) [null, note: "프로젝트 OT PPT"]
+  deliverables_drive_url varchar(1024) [null, note: "프로젝트 산출물 드라이브 url"]
+  evaluation_drive_url varchar(1024) [null, note: "프로젝트 평가지 url"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [null]
+}
+
+Table project_team_members {
+  note: "기수별 프로젝트 팀 관리 테이블"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  project_team_id uuid [not null, ref: > project_teams.id]
+  student_id uuiid [not null, ref: > students.id]
+  status ProjectMemberStatus [not null, note: "참여 상태"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [null]
+}
+
+// ----------------------------------------------
+// Emum Definitions
+// ----------------------------------------------
+Enum EmploymentType {
+  REGULAR [note: "정규직"]
+  CONTRACT [note: "사내 계약직"]
+  INTERN [note: "인턴"]
+  PART_TIME_JOB [note: "아르바이트"]
+  FREELANCER [note: "프리랜서 계약직"]
+  DAILY [note: "일용 계약직"]
+}
+
+Enum HRDNetTrainType {
+  KDT [note: "K-Digital Training"]
+  KDC [note: "K-Digital 기초 역량 훈련"]
+}
+
+Enum WeekendSeType {
+  WEEKEND [note: "주말에만 진행되는 경우"]
+  WEEKDAY [note: "주중에만 진행되는 경우"]
+  HYBRID [note: "구분없이 진행되는 경우"]
+}
+
+Enum DayNigthSeType {
+  DAY [note: "주간 훈련"]
+  NIGHT [note: "야간 훈련"]
+  HYBRID [note: "혼합(주간, 야간 시간대 둘다 포함)"]
+}
+
+Enum InstructorType {
+  MAIN_INSTRUCTOR [note: "주강사"]
+  SUBJECT_INSTRUCTOR [note: "과목 별 강사"]
+  LEVEL_BASED_TUTOR [note: "수준별 강사"]
+}
+
+Enum SocialLoginProvider {
+  KAKAO
+  GOOGLE
+  NAVER
+}
+
+Enum MentoringType {
+  PROJECT_MENTORING [note: "프로젝트 기간 멘토링"]
+  REGULAR_MENTORING [note: "정기 멘토링"]
+}
+
+Enum VideoFileExtension {
+  MP4
+  MOV
+  AVI
+  MKV
+  WMV
+  FLV
+  WEBM
+  MPEG
+  MPG
+}
