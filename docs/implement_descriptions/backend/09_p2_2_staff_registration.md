@@ -1,7 +1,7 @@
 # 09. P2-2 운영진 최초 정보 입력
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 예정)
+- 관련 PR: #12
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P2 (P2-2)
 - 이전 기록: [08. P2-1 인증 기반과 운영진 Google 로그인](08_p2_1_auth_google_login.md)
 
