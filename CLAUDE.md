@@ -9,7 +9,7 @@ Git 브랜치·커밋·PR·구현 기록 규칙은 README를 따른다.
 ## 현재 상태 (2026-11-05)
 
 - **1단계: 멘토링 기능 이전.** DB 스키마(`docs/database_schema_v2.dbml`)는 멘토링 범위로 확정됐다.
-- 백엔드: 프로젝트 뼈대·CI(#3), docker compose·floci S3(#4), compose 마운트 수정(#7) 완료. **P1 마스터 데이터 모델 완료**(identity·audit #6, academy #8, organization #9, 구현 기록 03·05·06). 수강생 명단은 `students`에 합쳤다(#10, decisions A10, 구현 기록 07). **P2 완료**: 인증 기반·운영진 Google 로그인(#11, 구현 기록 08), 운영진 최초 정보 입력(#12, 구현 기록 09). 운영진 가입 흐름은 decisions A11·A12. 다음 작업은 **P3 권한 + 운영진 가입 승인·최초 어드민 CLI**.
+- 백엔드: 프로젝트 뼈대·CI(#3), docker compose·floci S3(#4), compose 마운트 수정(#7) 완료. **P1 마스터 데이터 모델 완료**(identity·audit #6, academy #8, organization #9, 구현 기록 03·05·06). 수강생 명단은 `students`에 합쳤다(#10, decisions A10, 구현 기록 07). **P2 완료**: 인증 기반·운영진 Google 로그인(#11, 구현 기록 08), 운영진 최초 정보 입력(#12, 구현 기록 09). 운영진 가입 흐름은 decisions A11·A12. **P3-1 역할·권한 모델과 최고 관리자 CLI 완료**(#13, 구현 기록 10, decisions A14: `python -m app.cli create-super-admin <email>`). 다음 작업은 **P3-2 권한 의존성과 운영진 가입 승인·반려**.
 - 프론트엔드: 기술 스택만 정리됨 (`apps/frontend/CLAUDE.md`). 코드 없음.
 - 원격 저장소: `OZ-Coding-School/oz_backoffice` (private). 모든 변경은 README 규칙대로 `develop`에서 작업 브랜치를 만들어 PR로 병합한다.
 

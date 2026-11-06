@@ -7,6 +7,10 @@ from fakeredis import FakeAsyncRedis
 from fastapi import Depends, FastAPI
 from httpx import AsyncClient, Response
 
+from app.contexts.access.application.roles import RoleQueries
+from app.contexts.access.domain.catalog import SUPER_ADMIN
+from app.contexts.access.domain.entities import UserRole
+from app.contexts.access.domain.enums import RoleScopeType
 from app.contexts.access.presentation.dependencies import ApprovedUser
 from app.contexts.identity.application.auth_service import (
     SessionService,
@@ -22,6 +26,7 @@ from app.contexts.identity.presentation.dependencies import (
 )
 from app.core.clock import FixedClock
 from app.integrations.google.oauth import GoogleIdentity
+from tests.fakes.access import InMemoryUserRoleRepository
 from tests.fakes.identity import FakeGoogleAuthenticator, InMemoryUserRepository
 from tests.fakes.uow import FakeUnitOfWork
 
@@ -38,12 +43,23 @@ def users() -> InMemoryUserRepository:
 
 
 @pytest.fixture
-def auth_app(app: FastAPI, users: InMemoryUserRepository, fake_redis: FakeAsyncRedis) -> FastAPI:
+def user_roles() -> InMemoryUserRoleRepository:
+    return InMemoryUserRoleRepository()
+
+
+@pytest.fixture
+def auth_app(
+    app: FastAPI,
+    users: InMemoryUserRepository,
+    user_roles: InMemoryUserRoleRepository,
+    fake_redis: FakeAsyncRedis,
+) -> FastAPI:
     clock = FixedClock(datetime.now(UTC))
     google = FakeGoogleAuthenticator()
     google.identities["good-code"] = STAFF
     app.state.clock = clock
     app.state.user_queries = UserQueries(users)
+    app.state.role_queries = RoleQueries(user_roles, clock)
 
     def login_service(
         tokens: Annotated[TokenService, Depends(get_token_service)],
@@ -123,6 +139,7 @@ async def test_me_shows_pending_status_and_gate_blocks(auth_client: AsyncClient)
     assert me.status_code == 200
     assert me.json()["email"] == "kim@nextrunners.co.kr"
     assert me.json()["approval_status"] == "PENDING"
+    assert me.json()["roles"] == []
 
     gated = await auth_client.get("/_test/approved-only", headers=bearer(logged_in))
     assert gated.status_code == 403
@@ -203,3 +220,21 @@ async def test_google_login_not_configured(client: AsyncClient) -> None:
     response = await client.get("/api/v1/auth/google/authorize")
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "google_login_not_configured"
+
+
+async def test_me_lists_roles(
+    auth_client: AsyncClient,
+    users: InMemoryUserRepository,
+    user_roles: InMemoryUserRoleRepository,
+) -> None:
+    logged_in = await login(auth_client)
+    user_id = next(iter(users.users))
+    await user_roles.add(
+        UserRole(user_id=user_id, role_code=SUPER_ADMIN, scope_type=RoleScopeType.GLOBAL)
+    )
+
+    me = await auth_client.get("/api/v1/me", headers=bearer(logged_in))
+
+    assert me.json()["roles"] == [
+        {"role": "SUPER_ADMIN", "scope_type": "GLOBAL", "scope_id": None, "expires_at": None}
+    ]

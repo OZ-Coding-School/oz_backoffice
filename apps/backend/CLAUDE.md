@@ -77,6 +77,9 @@ docker compose exec api lint-imports
 docker compose exec api aerich init-db                 # 최초 1회 (첫 모델 추가 후)
 docker compose exec api aerich migrate --name <설명>    # 모델 변경 → migrations/에 생성 (호스트에 반영됨)
 docker compose exec api aerich upgrade                 # 적용
+
+docker compose exec api python -m app.cli create-super-admin <email> [--name 이름]  # 최고 관리자 등록 (멱등)
+docker compose exec api python -m app.cli seed-roles   # 역할·권한 정의(access/domain/catalog.py)를 DB에 반영 (멱등)
 ```
 
 포맷 자동 수정(`ruff format .`, `ruff check --fix .`)도 컨테이너에서 실행하면 마운트된 호스트 파일이 바뀐다.
