@@ -12,18 +12,16 @@ import uuid
 from dataclasses import dataclass
 from typing import Protocol
 
-from app.contexts.access.domain.catalog import COHORT_ASSISTANT, COHORT_MANAGER
-from app.contexts.access.domain.enums import RoleScopeType
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.identity.domain.entities import User
 from app.contexts.organization.application.registration_service import (
     RegistrationChoiceValidator,
 )
+from app.contexts.organization.application.staff_roles import StaffRoleGranter, role_scope
 from app.contexts.organization.domain.entities import BootcampStaff, CohortStaff, Employee
 from app.contexts.organization.domain.enums import (
     EmployeeRegistrationStatus,
     EmploymentType,
-    StaffRole,
 )
 from app.contexts.organization.domain.registration import (
     EmployeeRegistration,
@@ -39,26 +37,12 @@ from app.core.clock import Clock
 from app.core.uow import UnitOfWork
 from app.shared.errors import NotFoundError
 
-_ROLE_BY_STAFF_ROLE = {StaffRole.MANAGER: COHORT_MANAGER, StaffRole.ASSISTANT: COHORT_ASSISTANT}
-
 
 class StaffUserApprover(Protocol):
     """identity `UserAdministration`이 구현."""
 
     async def approve(self, user_id: uuid.UUID) -> User: ...
     async def mark_rejected(self, user_id: uuid.UUID) -> User: ...
-
-
-class StaffRoleGranter(Protocol):
-    """access `RoleAssignmentService`가 구현."""
-
-    async def grant(
-        self,
-        user_id: uuid.UUID,
-        role_code: str,
-        scope_type: RoleScopeType,
-        scope_id: uuid.UUID | None = None,
-    ) -> bool: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,7 +123,14 @@ class StaffRegistrationReviewService:
             employee = await self._upsert_employee(registration)
             await self._add_staff_assignments(employee, registration.assignments)
             for assignment in registration.assignments:
-                await self._roles.grant(registration.user_id, *_role_scope(assignment))
+                await self._roles.grant(
+                    registration.user_id,
+                    *role_scope(
+                        assignment.role,
+                        bootcamp_id=assignment.bootcamp_id,
+                        cohort_id=assignment.cohort_id,
+                    ),
+                )
             await self._users.approve(registration.user_id)
             await self._audit.record(
                 actor_user_id=actor_id,
@@ -211,15 +202,6 @@ class StaffRegistrationReviewService:
                 await self._cohort_staffs.add(
                     CohortStaff(employee_id=employee.id, cohort_id=a.cohort_id, role=a.role)
                 )
-
-
-def _role_scope(assignment: RequestedAssignment) -> tuple[str, RoleScopeType, uuid.UUID]:
-    role = _ROLE_BY_STAFF_ROLE[assignment.role]
-    if assignment.bootcamp_id is not None:
-        return role, RoleScopeType.BOOTCAMP, assignment.bootcamp_id
-    if assignment.cohort_id is None:  # RequestedAssignment가 둘 중 하나를 보장한다
-        raise ValueError("담당 대상이 없습니다.")
-    return role, RoleScopeType.COHORT, assignment.cohort_id
 
 
 def _snapshot(registration: EmployeeRegistration) -> dict[str, object]:

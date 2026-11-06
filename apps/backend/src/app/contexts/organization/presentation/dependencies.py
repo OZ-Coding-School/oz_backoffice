@@ -13,9 +13,9 @@ from app.contexts.organization.application.registration_service import (
 )
 from app.contexts.organization.application.review_service import (
     StaffRegistrationReviewService,
-    StaffRoleGranter,
     StaffUserApprover,
 )
+from app.contexts.organization.application.staff_roles import StaffRoleGranter
 from app.contexts.organization.infrastructure.repositories import (
     TortoiseBootcampStaffRepository,
     TortoiseCohortStaffRepository,
