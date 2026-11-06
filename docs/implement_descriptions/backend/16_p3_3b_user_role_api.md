@@ -1,6 +1,6 @@
 # 16. P3-3b 회원 역할 관리 API
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-06 병합)
 - 관련 PR: #19
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P3 (P3-3b)
 - 이전 기록: [15. P3-3a 과정·기수 담당자 관리 API](15_p3_3a_staff_assignment_api.md)
@@ -26,6 +26,9 @@ P3의 마지막 PR이다. 최고 관리자는 지금까지 CLI(구현 기록 10)
 
 ## 검증
 - 컨테이너: ruff, ruff format, mypy(src strict, tests), lint-imports, pytest **244개 통과**
+- 커밋 2개를 각각 워크트리로 꺼내 같은 검사 통과
+- GitHub Actions (PR #19, run 42159728325): backend 잡 통과
+- 사용자 확인: P3-3 진행 지시에 따라 CI 통과 후 병합
 
 ## 남은 작업
 - P4: 조직·과정·기수 관리 API (직원 목록 포함)
