@@ -1,7 +1,7 @@
 # 12. 테스트 DB를 격리된 TortoiseContext와 전용 DB로 관리
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 예정)
+- 관련 PR: #15
 - 관련 계획: 해당 없음 (테스트 기반 정리)
 - 이전 기록: [03. P1-1 identity·audit 모델과 첫 마이그레이션](03_p1_1_identity_audit_models.md) (기존 테스트 DB 픽스처를 만든 기록)
 
