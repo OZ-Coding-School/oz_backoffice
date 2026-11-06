@@ -1,7 +1,7 @@
 # 11. Google OAuth 콜백을 백엔드가 받도록 변경
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 예정)
+- 관련 PR: #14
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P2-1
 - 이전 기록: [08. P2-1 인증 기반과 운영진 Google 로그인](08_p2_1_auth_google_login.md) (이 기록의 콜백 방식을 바꾼다)
 
