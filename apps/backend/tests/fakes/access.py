@@ -44,3 +44,25 @@ class InMemoryUserRoleRepository:
             for r in self.items
             if r.user_id == user_id and r.is_effective(now)
         ]
+
+
+class FakeCohortDirectory:
+    """기수 → 과정 매핑 고정값. 조회 횟수를 센다."""
+
+    def __init__(self, mapping: dict[uuid.UUID, uuid.UUID] | None = None) -> None:
+        self.mapping = mapping or {}
+        self.lookups = 0
+
+    async def bootcamp_id_of(self, cohort_id: uuid.UUID) -> uuid.UUID | None:
+        self.lookups += 1
+        return self.mapping.get(cohort_id)
+
+
+class CountingUserRoleRepository(InMemoryUserRoleRepository):
+    def __init__(self) -> None:
+        super().__init__()
+        self.list_calls = 0
+
+    async def list_grants(self, user_id: uuid.UUID, *, now: datetime) -> list[RoleGrant]:
+        self.list_calls += 1
+        return await super().list_grants(user_id, now=now)
