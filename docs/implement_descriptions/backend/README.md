@@ -16,3 +16,4 @@
 | 12 | [테스트 DB를 격리된 TortoiseContext와 전용 DB로 관리](12_isolated_test_database.md) | 완료 (#15) |
 | 13 | [P3-2a 권한 판정과 require_permission 의존성](13_p3_2a_permission_checks.md) | 완료 (#16) |
 | 14 | [P3-2b 운영진 가입 신청 승인·반려](14_p3_2b_staff_registration_review.md) | 완료 (#17) |
+| 15 | [P3-3a 과정·기수 담당자 관리 API](15_p3_3a_staff_assignment_api.md) | 완료 (#18) |

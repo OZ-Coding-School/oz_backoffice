@@ -18,8 +18,10 @@ from app.contexts.organization.infrastructure.repositories import (
     TortoiseEmployeePositionRepository,
     TortoiseEmployeeRepository,
 )
+from app.shared.ids import new_id
 from tests.factories.academy import create_cohort
 from tests.factories.identity import make_user
+from tests.factories.organization import create_employee
 
 pytestmark = pytest.mark.integration
 
@@ -133,3 +135,10 @@ async def test_db_check_constraints(sql: str, constraint: str) -> None:
     await _create_employee()
     with pytest.raises(IntegrityError, match=constraint):
         await connections.get("default").execute_query(sql)
+
+
+async def test_list_employees_by_ids() -> None:
+    first, second = await create_employee(), await create_employee()
+    found = await TortoiseEmployeeRepository().list_by_ids([first.id, second.id, new_id()])
+    assert {e.id for e in found} == {first.id, second.id}
+    assert await TortoiseEmployeeRepository().list_by_ids([]) == []

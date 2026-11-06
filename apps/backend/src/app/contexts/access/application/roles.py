@@ -42,6 +42,16 @@ class RoleAssignmentService:
         await self._user_roles.add(user_role)
         return True
 
+    async def revoke(
+        self,
+        user_id: uuid.UUID,
+        role_code: str,
+        scope_type: RoleScopeType,
+        scope_id: uuid.UUID | None = None,
+    ) -> bool:
+        """역할을 회수한다. 없으면 False. 호출하는 쪽이 UnitOfWork를 연다."""
+        return await self._user_roles.remove(user_id, role_code, scope_type, scope_id)
+
 
 class RoleQueries:
     def __init__(self, user_roles: UserRoleRepository, clock: Clock) -> None:

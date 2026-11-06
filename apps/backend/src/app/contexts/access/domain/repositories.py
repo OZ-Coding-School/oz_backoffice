@@ -24,6 +24,16 @@ class UserRoleRepository(Protocol):
         scope_type: str,
         scope_id: uuid.UUID | None,
     ) -> bool: ...
+    async def remove(
+        self,
+        user_id: uuid.UUID,
+        role_code: str,
+        scope_type: str,
+        scope_id: uuid.UUID | None,
+    ) -> bool:
+        """해당 역할 부여를 지운다. 지운 것이 있으면 True."""
+        ...
+
     async def list_grants(self, user_id: uuid.UUID, *, now: datetime) -> list[RoleGrant]:
         """만료되지 않은 역할만."""
         ...

@@ -126,3 +126,26 @@ async def test_db_constraints(sql: str, constraint: str) -> None:
     await TortoiseUserRepository().add(make_user())
     with pytest.raises(IntegrityError, match=constraint):
         await connections.get("default").execute_query(sql)
+
+
+async def test_remove_user_role_by_scope() -> None:
+    await TortoiseRoleCatalogRepository().sync(ROLES, PERMISSIONS)
+    user = make_user()
+    await TortoiseUserRepository().add(user)
+    repo = TortoiseUserRoleRepository()
+    keep, drop = new_id(), new_id()
+    for cohort_id in (keep, drop):
+        await repo.add(
+            UserRole(
+                user_id=user.id,
+                role_code=COHORT_ASSISTANT,
+                scope_type=RoleScopeType.COHORT,
+                scope_id=cohort_id,
+            )
+        )
+
+    assert await repo.remove(user.id, COHORT_ASSISTANT, RoleScopeType.COHORT, drop)
+    assert not await repo.remove(user.id, COHORT_ASSISTANT, RoleScopeType.COHORT, drop)
+    assert not await repo.remove(user.id, "UNKNOWN", RoleScopeType.GLOBAL, None)
+    grants = await repo.list_grants(user.id, now=NOW)
+    assert [g.scope_id for g in grants] == [keep]

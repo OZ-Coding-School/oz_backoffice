@@ -38,6 +38,20 @@ class InMemoryUserRoleRepository:
             for r in self.items
         )
 
+    async def remove(
+        self,
+        user_id: uuid.UUID,
+        role_code: str,
+        scope_type: str,
+        scope_id: uuid.UUID | None,
+    ) -> bool:
+        key = (user_id, role_code, scope_type, scope_id)
+        before = len(self.items)
+        self.items = [
+            r for r in self.items if (r.user_id, r.role_code, r.scope_type, r.scope_id) != key
+        ]
+        return len(self.items) < before
+
     async def list_grants(self, user_id: uuid.UUID, *, now: datetime) -> list[RoleGrant]:
         return [
             RoleGrant(r.role_code, r.scope_type, r.scope_id, r.expires_at)
