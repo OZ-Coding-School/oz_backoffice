@@ -46,6 +46,11 @@ class TortoiseUserRepository:
         model = await UserModel.get_or_none(id=user_id)
         return _to_entity(model) if model else None
 
+    async def list_by_ids(self, user_ids: list[uuid.UUID]) -> list[User]:
+        if not user_ids:
+            return []
+        return [_to_entity(model) for model in await UserModel.filter(id__in=user_ids)]
+
     async def get_by_email(self, email: str) -> User | None:
         model = await UserModel.get_or_none(email=email.strip().lower())
         return _to_entity(model) if model else None

@@ -43,7 +43,7 @@ class World:
         scope: RoleScopeType = RoleScopeType.GLOBAL,
         scope_id: object = None,
     ) -> dict[str, str]:
-        user = make_user(email=f"u{new_id().hex[:8]}@nextrunners.co.kr")
+        user = make_user(email=f"u{new_id().hex[-12:]}@nextrunners.co.kr")
         if approved:
             user.approve(now=NOW)
         await self.users.add(user)

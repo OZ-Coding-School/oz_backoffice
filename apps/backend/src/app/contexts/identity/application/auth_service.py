@@ -147,3 +147,7 @@ class UserQueries:
         if not user.can_login:
             raise _account_disabled()
         return user
+
+    async def get_many(self, user_ids: list[uuid.UUID]) -> dict[uuid.UUID, User]:
+        """목록 화면용 일괄 조회 (N+1 방지)."""
+        return {user.id: user for user in await self._users.list_by_ids(list(set(user_ids)))}

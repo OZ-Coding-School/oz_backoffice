@@ -36,6 +36,37 @@ class StaffTargetCatalog(Protocol):
     ) -> None: ...
 
 
+class RegistrationChoiceValidator:
+    """부서·직위 존재와 담당 과정·기수 선택 가능 여부 검증 (신청·승인 공통)."""
+
+    def __init__(
+        self,
+        *,
+        departments: DepartmentRepository,
+        positions: EmployeePositionRepository,
+        catalog: StaffTargetCatalog,
+    ) -> None:
+        self._departments = departments
+        self._positions = positions
+        self._catalog = catalog
+
+    async def validate(
+        self,
+        *,
+        department_id: uuid.UUID,
+        position_id: uuid.UUID,
+        assignments: list[RequestedAssignment],
+    ) -> None:
+        if await self._departments.get(department_id) is None:
+            raise BusinessRuleViolation("존재하지 않는 부서입니다.", code="department_not_found")
+        if await self._positions.get(position_id) is None:
+            raise BusinessRuleViolation("존재하지 않는 직위입니다.", code="position_not_found")
+        await self._catalog.ensure_staffable(
+            bootcamp_ids=[a.bootcamp_id for a in assignments if a.bootcamp_id],
+            cohort_ids=[a.cohort_id for a in assignments if a.cohort_id],
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class RegistrationOptions:
     departments: list[Department]
@@ -87,14 +118,9 @@ class StaffRegistrationService:
         self._ensure_staff_account(applicant)
         if applicant.is_approved:
             raise ConflictError("이미 승인된 계정입니다.", code="user_already_approved")
-        if await self._departments.get(department_id) is None:
-            raise BusinessRuleViolation("존재하지 않는 부서입니다.", code="department_not_found")
-        if await self._positions.get(position_id) is None:
-            raise BusinessRuleViolation("존재하지 않는 직위입니다.", code="position_not_found")
-        await self._catalog.ensure_staffable(
-            bootcamp_ids=[a.bootcamp_id for a in assignments if a.bootcamp_id],
-            cohort_ids=[a.cohort_id for a in assignments if a.cohort_id],
-        )
+        await RegistrationChoiceValidator(
+            departments=self._departments, positions=self._positions, catalog=self._catalog
+        ).validate(department_id=department_id, position_id=position_id, assignments=assignments)
 
         async with self._uow:
             latest = await self._registrations.get_latest_by_user(applicant.id)
