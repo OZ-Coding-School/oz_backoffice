@@ -1,6 +1,6 @@
 # 13. P3-2a 권한 판정과 require_permission 의존성
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-06 병합)
 - 관련 PR: #16
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P3 (P3-2a)
 - 이전 기록: [10. P3-1 역할·권한 모델과 최고 관리자 CLI](10_p3_1_roles_super_admin_cli.md)
@@ -30,6 +30,9 @@ P3-1에서 역할·권한 테이블과 최고 관리자 CLI를 만들었다. 이
 
 ## 검증
 - 컨테이너: ruff, ruff format, mypy(src strict, tests), lint-imports, pytest **213개 통과**(통합 포함)
+- 커밋 2개를 각각 워크트리로 꺼내 같은 검사 통과
+- GitHub Actions (PR #16, run ): backend 잡 통과
+- 사용자 확인: P3-2 진행 지시에 따라 CI 통과 후 병합
 
 ## 남은 작업
 - P3-2b: 운영진 가입 승인·반려 API, 담당자 배정과 `user_roles` 동기화
