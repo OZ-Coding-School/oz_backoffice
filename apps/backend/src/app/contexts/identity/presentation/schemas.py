@@ -4,19 +4,10 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.contexts.access.domain.enums import RoleScopeType
 from app.contexts.identity.domain.enums import UserApprovalStatus
-
-
-class AuthorizationUrlResponse(BaseModel):
-    authorization_url: str
-
-
-class GoogleCallbackRequest(BaseModel):
-    code: str = Field(min_length=1, max_length=2048)
-    state: str = Field(min_length=1, max_length=256)
 
 
 class AccessTokenResponse(BaseModel):

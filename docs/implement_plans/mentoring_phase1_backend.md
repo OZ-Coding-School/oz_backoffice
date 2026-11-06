@@ -172,15 +172,15 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
 #### P2-1. 인증 기반과 Google 로그인
 - **작업:**
   - refresh 토큰 저장소(Redis): `oz:identity:refresh:<jti>` → user_id, TTL 14일. 갱신할 때 기존 jti를 폐기하고 새로 발급(회전). 폐기된 jti가 다시 쓰이면(`oz:identity:refresh-used:<jti>`) 해당 사용자의 refresh를 전부 폐기(탈취 감지)
-  - Google OAuth(Authorization Code + PKCE, state는 Redis 10분·1회용): 콜백에서 ID 토큰 클레임 검증(A13) → `hd`·이메일 도메인이 `nextrunners.co.kr`인지 확인 → `oauth_accounts`로 사용자 찾기, 없으면 같은 이메일 회원에 연결하거나 **PENDING 회원 생성**(A11)
+  - Google OAuth(Authorization Code + PKCE, state는 Redis 10분·1회용 + 브라우저 쿠키로 대조, **콜백은 백엔드가 받는다** A15): 콜백에서 ID 토큰 클레임 검증(A13) → `hd`·이메일 도메인이 `nextrunners.co.kr`인지 확인 → `oauth_accounts`로 사용자 찾기, 없으면 같은 이메일 회원에 연결하거나 **PENDING 회원 생성**(A11)
   - 탈퇴·정지(승인 후 비활성) 계정은 로그인·갱신 거부(`account_disabled`)
   - 의존성: `get_current_user`, `require_approved_user` (`access.presentation.dependencies`, B10)
 - **API:**
   | 메서드 | 경로 | 설명 |
   | --- | --- | --- |
-  | GET | `/api/v1/auth/google/authorize` | 인가 URL 발급 (state, PKCE). 클라이언트 미설정이면 503 |
-  | POST | `/api/v1/auth/google/callback` | code·state → access(본문) + refresh(쿠키) |
-  | POST | `/api/v1/auth/refresh` | refresh 쿠키로 회전 갱신 |
+  | GET | `/api/v1/auth/google/login` | 브라우저 이동용. state 쿠키 설정 후 Google로 302. 클라이언트 미설정이면 503 |
+  | GET | `/api/v1/auth/google/callback` | Google이 돌려보내는 곳. state 대조 → code 교환 → refresh 쿠키 → 프론트로 302 (실패 시 `/login?error=<code>`) |
+  | POST | `/api/v1/auth/refresh` | refresh 쿠키로 회전 갱신 → access(본문). 로그인 직후와 페이지 로드 시에도 이걸로 access를 받는다 |
   | POST | `/api/v1/auth/logout` | refresh 폐기, 쿠키 삭제 |
   | GET | `/api/v1/me` | 내 정보, 승인 상태 (역할은 P3에서 추가) |
 - **테스트:** respx로 Google 토큰 응답 고정. 도메인 외 계정 거부, ID 토큰 클레임 검증, refresh 회전, 재사용 탐지, 만료, PENDING 게이트.

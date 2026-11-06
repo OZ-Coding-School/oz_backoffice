@@ -30,6 +30,12 @@ def _display_name(identity: GoogleIdentity) -> str:
 
 
 @dataclass(frozen=True, slots=True)
+class LoginStart:
+    authorization_url: str
+    state: str  # 브라우저 쿠키에 담아 콜백에서 대조한다 (로그인 CSRF 방지)
+
+
+@dataclass(frozen=True, slots=True)
 class LoginResult:
     user: User
     tokens: IssuedTokens
@@ -59,14 +65,23 @@ class StaffGoogleLoginService:
         self._uow = uow
         self._clock = clock
 
-    async def start(self) -> str:
-        """인가 URL을 만든다. state와 PKCE verifier는 콜백에서 한 번만 쓸 수 있게 저장한다."""
+    async def start(self) -> LoginStart:
+        """인가 URL을 만든다. state와 PKCE verifier는 콜백에서 한 번만 쓸 수 있게 저장한다.
+
+        state는 호출한 쪽이 브라우저 쿠키로도 내려보내, 콜백에서 같은 브라우저인지 확인한다.
+        """
         state = secrets.token_urlsafe(32)
         pkce = new_pkce_pair()
         await self._states.save(state, pkce.verifier)
-        return self._google.authorization_url(state=state, code_challenge=pkce.challenge)
+        url = self._google.authorization_url(state=state, code_challenge=pkce.challenge)
+        return LoginStart(authorization_url=url, state=state)
 
-    async def complete(self, *, code: str, state: str) -> LoginResult:
+    async def complete(self, *, code: str, state: str, browser_state: str | None) -> LoginResult:
+        """Google 콜백 처리. state는 로그인을 시작한 브라우저의 쿠키 값과 같아야 한다."""
+        if not browser_state or not secrets.compare_digest(state.encode(), browser_state.encode()):
+            raise AuthenticationError(
+                "로그인 요청이 만료되었습니다. 다시 시도해 주세요.", code="oauth_state_invalid"
+            )
         verifier = await self._states.pop(state)
         if verifier is None:
             raise AuthenticationError(

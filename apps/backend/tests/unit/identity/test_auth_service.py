@@ -5,6 +5,7 @@ import pytest
 from fakeredis import FakeAsyncRedis
 
 from app.contexts.identity.application.auth_service import (
+    LoginResult,
     SessionService,
     StaffGoogleLoginService,
     UserQueries,
@@ -52,8 +53,13 @@ class Harness:
         self.queries = UserQueries(self.users)
 
     async def state(self) -> str:
-        url = await self.login.start()
-        return parse_qs(urlparse(url).query)["state"][0]
+        started = await self.login.start()
+        assert parse_qs(urlparse(started.authorization_url).query)["state"] == [started.state]
+        return started.state
+
+    async def complete(self, code: str = "good-code", state: str | None = None) -> LoginResult:
+        state = state or await self.state()
+        return await self.login.complete(code=code, state=state, browser_state=state)
 
 
 @pytest.fixture
@@ -62,7 +68,7 @@ def h(settings: Settings, fake_redis: FakeAsyncRedis) -> Harness:
 
 
 async def test_first_login_creates_pending_staff_user(h: Harness) -> None:
-    result = await h.login.complete(code="good-code", state=await h.state())
+    result = await h.complete()
 
     user = result.user
     assert (user.email, user.name) == ("kim@nextrunners.co.kr", "김오즈")
@@ -76,8 +82,8 @@ async def test_first_login_creates_pending_staff_user(h: Harness) -> None:
 
 
 async def test_second_login_reuses_linked_account(h: Harness) -> None:
-    first = await h.login.complete(code="good-code", state=await h.state())
-    second = await h.login.complete(code="good-code", state=await h.state())
+    first = await h.complete()
+    second = await h.complete()
     assert second.user.id == first.user.id
     assert len(h.users.users) == 1
     assert len(h.users.oauth_accounts) == 1
@@ -87,7 +93,7 @@ async def test_login_links_existing_user_with_same_email(h: Harness) -> None:
     existing = make_user(email="kim@nextrunners.co.kr")
     await h.users.add(existing)
 
-    result = await h.login.complete(code="good-code", state=await h.state())
+    result = await h.complete()
 
     assert result.user.id == existing.id
     linked = await h.users.get_by_oauth(SocialLoginProvider.GOOGLE, "google-sub-1")
@@ -97,16 +103,26 @@ async def test_login_links_existing_user_with_same_email(h: Harness) -> None:
 
 async def test_state_is_single_use_and_must_exist(h: Harness) -> None:
     state = await h.state()
-    await h.login.complete(code="good-code", state=state)
+    await h.complete(state=state)
     for bad_state in (state, "unknown"):
         with pytest.raises(AuthenticationError) as exc:
-            await h.login.complete(code="good-code", state=bad_state)
+            await h.complete(state=bad_state)
         assert exc.value.code == "oauth_state_invalid"
+
+
+@pytest.mark.parametrize("browser_state", [None, "", "other-browser-state"])
+async def test_state_must_match_browser_cookie(h: Harness, browser_state: str | None) -> None:
+    """로그인 CSRF: 다른 브라우저에서 시작한 state로는 콜백을 완료할 수 없다."""
+    state = await h.state()
+    with pytest.raises(AuthenticationError) as exc:
+        await h.login.complete(code="good-code", state=state, browser_state=browser_state)
+    assert exc.value.code == "oauth_state_invalid"
+    assert h.google.exchanged == []  # code 교환 전에 막는다
 
 
 async def test_google_failure_is_propagated(h: Harness) -> None:
     with pytest.raises(AuthenticationError) as exc:
-        await h.login.complete(code="bad-code", state=await h.state())
+        await h.complete("bad-code")
     assert exc.value.code == "google_auth_failed"
     assert h.users.users == {}
 
@@ -118,13 +134,13 @@ async def test_suspended_user_cannot_login(h: Harness) -> None:
     await h.users.add(user)
 
     with pytest.raises(AuthenticationError) as exc:
-        await h.login.complete(code="good-code", state=await h.state())
+        await h.complete()
     assert exc.value.code == "account_disabled"
     assert h.uow.rollbacks == 1
 
 
 async def test_refresh_rotates_and_blocks_suspended_user(h: Harness) -> None:
-    login = await h.login.complete(code="good-code", state=await h.state())
+    login = await h.complete()
     renewed = await h.sessions.refresh(login.tokens.refresh_token)
     assert h.tokens.read_access(renewed.access_token) == login.user.id
 
@@ -139,14 +155,14 @@ async def test_refresh_rotates_and_blocks_suspended_user(h: Harness) -> None:
 
 
 async def test_logout_revokes_refresh(h: Harness) -> None:
-    login = await h.login.complete(code="good-code", state=await h.state())
+    login = await h.complete()
     await h.sessions.logout(login.tokens.refresh_token)
     with pytest.raises(AuthenticationError):
         await h.sessions.refresh(login.tokens.refresh_token)
 
 
 async def test_get_authenticated_user(h: Harness) -> None:
-    login = await h.login.complete(code="good-code", state=await h.state())
+    login = await h.complete()
     assert (await h.queries.get_authenticated(login.user.id)).id == login.user.id
 
     with pytest.raises(AuthenticationError) as exc:
