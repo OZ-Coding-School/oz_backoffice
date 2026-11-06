@@ -1,6 +1,6 @@
 # 10. P3-1 역할·권한 모델과 최고 관리자 CLI
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-06 병합)
 - 관련 PR: #13
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P3 (P3-1)
 - 이전 기록: [09. P2-2 운영진 최초 정보 입력](09_p2_2_staff_registration.md)
@@ -48,6 +48,9 @@ P2가 끝나서 운영진이 로그인하고 신청할 수 있게 됐다. 하지
   - 재실행 → 변경 없음
   - gmail 이메일 → `not_staff_email`로 실패(종료 코드 1)
   - 역할 5개와 역할별 권한 수 확인: SUPER_ADMIN 12, 매니저 10, 조교 6, 멘토·수강생 0
+- 커밋 5개를 각각 워크트리로 꺼내 ruff·format·mypy·lint-imports·pytest 통과 확인
+- GitHub Actions (PR #13, run 42140558004): backend 잡 통과
+- 사용자 확인: CLI 작성 지시에 따라 CI 통과 후 병합
 - 실행 중인 api: CLI로 등록한 회원의 토큰으로 `/me` → APPROVED, `roles=[SUPER_ADMIN/GLOBAL]`
 
 ## 남은 작업
