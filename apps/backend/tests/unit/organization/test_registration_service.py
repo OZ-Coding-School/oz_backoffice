@@ -67,7 +67,7 @@ class Harness:
 
 
 def staff(**overrides: object) -> User:
-    return make_user(email=f"staff{new_id().hex[:8]}@nextrunners.co.kr", **overrides)
+    return make_user(email=f"staff{new_id().hex[-12:]}@nextrunners.co.kr", **overrides)
 
 
 @pytest.fixture

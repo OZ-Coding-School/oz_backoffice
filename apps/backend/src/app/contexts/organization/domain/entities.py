@@ -78,6 +78,9 @@ class Employee(AggregateRoot):
         self.department_id = department_id
         self.position_id = position_id
 
+    def change_employment_type(self, employment_type: EmploymentType) -> None:
+        self.employment_type = employment_type
+
 
 @dataclass(kw_only=True, eq=False)
 class BootcampStaff(AggregateRoot):

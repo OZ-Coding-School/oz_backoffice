@@ -24,6 +24,9 @@ class InMemoryUserRepository:
         user = self.users.get(user_id)
         return replace(user) if user else None
 
+    async def list_by_ids(self, user_ids: list[uuid.UUID]) -> list[User]:
+        return [replace(self.users[i]) for i in user_ids if i in self.users]
+
     async def get_by_email(self, email: str) -> User | None:
         email = email.strip().lower()
         return next((replace(u) for u in self.users.values() if u.email == email), None)

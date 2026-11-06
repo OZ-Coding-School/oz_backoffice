@@ -1,9 +1,12 @@
 """회원 관리 유스케이스 (CLI·관리 기능용 공개 서비스)."""
 
+import uuid
+
 from app.contexts.identity.domain.entities import User
+from app.contexts.identity.domain.enums import UserApprovalStatus
 from app.contexts.identity.domain.repositories import UserRepository
 from app.core.clock import Clock
-from app.shared.errors import BusinessRuleViolation
+from app.shared.errors import BusinessRuleViolation, NotFoundError
 
 
 class UserAdministration:
@@ -35,3 +38,25 @@ class UserAdministration:
             user.approve(now=self._clock.now())
             await self._users.save(user)
         return user, created
+
+    async def approve(self, user_id: uuid.UUID) -> User:
+        """가입을 승인한다. 이미 승인된 회원이면 그대로 둔다. 호출하는 쪽이 UnitOfWork를 연다."""
+        user = await self._get(user_id)
+        if not user.is_approved:
+            user.approve(now=self._clock.now())
+            await self._users.save(user)
+        return user
+
+    async def mark_rejected(self, user_id: uuid.UUID) -> User:
+        """승인 대기 회원을 반려 상태로 바꾼다. 이미 승인된 회원(예: 최고 관리자)은 그대로 둔다."""
+        user = await self._get(user_id)
+        if user.approval_status is UserApprovalStatus.PENDING:
+            user.reject()
+            await self._users.save(user)
+        return user
+
+    async def _get(self, user_id: uuid.UUID) -> User:
+        user = await self._users.get(user_id)
+        if user is None:
+            raise NotFoundError("회원을 찾을 수 없습니다.", code="user_not_found")
+        return user

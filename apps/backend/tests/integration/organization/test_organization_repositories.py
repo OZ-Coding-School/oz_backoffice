@@ -29,9 +29,9 @@ async def _create_employee(department: Department | None = None) -> Employee:
     if department is None:
         department = Department(name="교육 1팀", description="부트캠프 운영")
         await departments.add(department)
-    position = EmployeePosition(name=f"매니저{department.id.hex[:6]}", priority=3)
+    position = EmployeePosition(name=f"매니저{department.id.hex[-6:]}", priority=3)
     await TortoiseEmployeePositionRepository().add(position)
-    user = make_user(email=f"{department.id.hex[:8]}@nextrunners.co.kr")
+    user = make_user(email=f"{department.id.hex[-12:]}@nextrunners.co.kr")
     await TortoiseUserRepository().add(user)
     employee = Employee(
         user_id=user.id,

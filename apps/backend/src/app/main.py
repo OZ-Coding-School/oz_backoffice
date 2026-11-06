@@ -14,9 +14,12 @@ from app.contexts.academy.infrastructure.repositories import (
     TortoiseBootcampRepository,
     TortoiseCohortRepository,
 )
-from app.contexts.access.application.roles import RoleQueries
+from app.contexts.access.application.roles import RoleAssignmentService, RoleQueries
 from app.contexts.access.infrastructure.repositories import TortoiseUserRoleRepository
+from app.contexts.audit.application.recorder import AuditRecorder
+from app.contexts.audit.infrastructure.repositories import TortoiseAuditLogRepository
 from app.contexts.identity.application.auth_service import UserQueries
+from app.contexts.identity.application.user_admin import UserAdministration
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
 from app.core.clock import SystemClock
 from app.core.config import Settings, get_settings
@@ -55,6 +58,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # 이 서비스를 쓰되 identity.infrastructure를 직접 import하지 않게 한다.
     app.state.user_queries = UserQueries(TortoiseUserRepository())
     app.state.role_queries = RoleQueries(TortoiseUserRoleRepository(), clock)
+    app.state.role_assignments = RoleAssignmentService(TortoiseUserRoleRepository())
+    app.state.user_admin = UserAdministration(TortoiseUserRepository(), clock)
+    app.state.audit_recorder = AuditRecorder(TortoiseAuditLogRepository(), clock)
     app.state.academy_catalog = AcademyCatalog(
         TortoiseBootcampRepository(), TortoiseCohortRepository()
     )

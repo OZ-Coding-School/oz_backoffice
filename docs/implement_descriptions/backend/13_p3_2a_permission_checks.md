@@ -31,7 +31,8 @@ P3-1에서 역할·권한 테이블과 최고 관리자 CLI를 만들었다. 이
 ## 검증
 - 컨테이너: ruff, ruff format, mypy(src strict, tests), lint-imports, pytest **213개 통과**(통합 포함)
 - 커밋 2개를 각각 워크트리로 꺼내 같은 검사 통과
-- GitHub Actions (PR #16, run ): backend 잡 통과
+- GitHub Actions (PR #16, run 42155154590 — 최종 PR 커밋 a71aff2): backend 잡 통과. 병합 직후 develop(run 42155173677)도 통과
+- 주의: CI 체크가 등록되기 전에 조회해 CI 완료 전에 병합했다. 병합 뒤 두 run 모두 통과를 확인했다 (이 줄은 구현 기록 14 PR에서 run 번호와 함께 보완)
 - 사용자 확인: P3-2 진행 지시에 따라 CI 통과 후 병합
 
 ## 남은 작업

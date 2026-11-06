@@ -9,6 +9,7 @@ from app.contexts.organization.domain.entities import (
     Employee,
     EmployeePosition,
 )
+from app.contexts.organization.domain.enums import EmployeeRegistrationStatus
 from app.contexts.organization.domain.registration import (
     EmployeeRegistration,
     RequestedAssignment,
@@ -143,6 +144,18 @@ class TortoiseEmployeeRegistrationRepository(
             .first()
         )
         return self._to_aggregate(row) if row else None
+
+    async def list_by_status(
+        self, status: EmployeeRegistrationStatus, *, limit: int, offset: int
+    ) -> tuple[list[EmployeeRegistration], int]:
+        query = EmployeeRegistrationModel.filter(status=status)
+        rows = (
+            await query.order_by("created_at", "id")
+            .offset(offset)
+            .limit(limit)
+            .prefetch_related("assignments")
+        )
+        return [self._to_aggregate(row) for row in rows], await query.count()
 
     def _to_aggregate(self, row: EmployeeRegistrationModel) -> EmployeeRegistration:
         registration = self.to_entity(row)
