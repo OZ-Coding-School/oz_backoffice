@@ -1,6 +1,6 @@
 # 12. 테스트 DB를 격리된 TortoiseContext와 전용 DB로 관리
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-06 병합)
 - 관련 PR: #15
 - 관련 계획: 해당 없음 (테스트 기반 정리)
 - 이전 기록: [03. P1-1 identity·audit 모델과 첫 마이그레이션](03_p1_1_identity_audit_models.md) (기존 테스트 DB 픽스처를 만든 기록)
@@ -39,6 +39,8 @@
 - 컨테이너: ruff, ruff format, mypy(src strict, tests), lint-imports, pytest **188개 통과**(2.2초)
 - 세션이 끝난 뒤 `oz_backoffice_test` DB가 지워졌는지 확인했다
 - 파일 단위 실행(UnitOfWork, 역할, CLI·identity)도 통과했다
+- GitHub Actions (PR #15, run 42144511689): backend 잡 통과 (CI postgres 서비스에서 테스트 DB 삭제·생성 동작 확인)
+- 사용자 확인: conftest 수정 지시에 따라 CI 통과 후 병합
 - 호스트에서 `TEST_DATABASE_URL` 없이 `uv run pytest` 실행: 188개 통과(로컬 compose postgres 사용)
 
 ## 남은 작업
