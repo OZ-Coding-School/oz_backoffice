@@ -52,6 +52,18 @@ class InMemoryUserRoleRepository:
         ]
         return len(self.items) < before
 
+    async def get(self, user_role_id: uuid.UUID) -> UserRole | None:
+        return next((r for r in self.items if r.id == user_role_id), None)
+
+    async def delete(self, user_role_id: uuid.UUID) -> None:
+        self.items = [r for r in self.items if r.id != user_role_id]
+
+    async def list_by_user(self, user_id: uuid.UUID) -> list[UserRole]:
+        return [r for r in self.items if r.user_id == user_id]
+
+    async def lock_effective_holders(self, role_code: str, *, now: datetime) -> list[uuid.UUID]:
+        return [r.user_id for r in self.items if r.role_code == role_code and r.is_effective(now)]
+
     async def list_grants(self, user_id: uuid.UUID, *, now: datetime) -> list[RoleGrant]:
         return [
             RoleGrant(r.role_code, r.scope_type, r.scope_id, r.expires_at)

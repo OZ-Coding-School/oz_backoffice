@@ -40,6 +40,17 @@ class TortoiseRoleCatalogRepository:
                 await role.permissions.remove(*extra)
 
 
+def _to_user_role(row: UserRoleModel) -> UserRole:
+    return UserRole(
+        id=row.id,
+        user_id=row.user_id,  # type: ignore[attr-defined]  # Tortoise FK 컬럼 속성
+        role_code=row.role.code,
+        scope_type=RoleScopeType(row.scope_type),
+        scope_id=row.scope_id,
+        expires_at=row.expires_at,
+    )
+
+
 def _scope_filter(scope_id: uuid.UUID | None) -> Q:
     return Q(scope_id__isnull=True) if scope_id is None else Q(scope_id=scope_id)
 
@@ -88,6 +99,31 @@ class TortoiseUserRoleRepository:
             _scope_filter(scope_id), user_id=user_id, role=role, scope_type=scope_type
         ).delete()
         return deleted > 0
+
+    async def get(self, user_role_id: uuid.UUID) -> UserRole | None:
+        row = await UserRoleModel.get_or_none(id=user_role_id).select_related("role")
+        return _to_user_role(row) if row else None
+
+    async def delete(self, user_role_id: uuid.UUID) -> None:
+        await UserRoleModel.filter(id=user_role_id).delete()
+
+    async def list_by_user(self, user_id: uuid.UUID) -> list[UserRole]:
+        rows = (
+            await UserRoleModel.filter(user_id=user_id)
+            .select_related("role")
+            .order_by("created_at", "id")
+        )
+        return [_to_user_role(row) for row in rows]
+
+    async def lock_effective_holders(self, role_code: str, *, now: datetime) -> list[uuid.UUID]:
+        rows = (
+            await UserRoleModel.filter(
+                Q(expires_at__isnull=True) | Q(expires_at__gt=now), role__code=role_code
+            )
+            .select_for_update()
+            .values_list("user_id", flat=True)
+        )
+        return [uuid.UUID(str(user_id)) for user_id in rows]
 
     async def list_grants(self, user_id: uuid.UUID, *, now: datetime) -> list[RoleGrant]:
         rows = (
