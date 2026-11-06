@@ -1,6 +1,7 @@
 """과정·기수 선택지 조회 (다른 컨텍스트가 쓰는 공개 서비스).
 
-운영진 가입 신청(organization)에서 담당 과정·기수를 고를 때 쓴다.
+운영진 가입 신청(organization)에서 담당 과정·기수를 고를 때, 권한 판정(access)에서
+기수가 속한 과정을 찾을 때 쓴다.
 담당으로 고를 수 있는 것은 활성 과정과, 준비·진행 중인 기수다.
 """
 
@@ -19,6 +20,11 @@ class AcademyCatalog:
     def __init__(self, bootcamps: BootcampRepository, cohorts: CohortRepository) -> None:
         self._bootcamps = bootcamps
         self._cohorts = cohorts
+
+    async def bootcamp_id_of(self, cohort_id: uuid.UUID) -> uuid.UUID | None:
+        """기수가 속한 과정 (권한 범위 판정용). 없는 기수면 None."""
+        cohort = await self._cohorts.get(cohort_id)
+        return cohort.bootcamp_id if cohort else None
 
     async def staffable_bootcamps(self) -> list[Bootcamp]:
         return await self._bootcamps.list_active()

@@ -53,3 +53,9 @@ async def test_staffable_targets_exclude_inactive_bootcamps_and_ended_cohorts() 
         with pytest.raises(BusinessRuleViolation) as exc:
             await catalog().ensure_staffable(bootcamp_ids=bootcamp_ids, cohort_ids=cohort_ids)
         assert exc.value.code == "invalid_staff_target"
+
+
+async def test_bootcamp_id_of_cohort() -> None:
+    cohort = await create_cohort()
+    assert await catalog().bootcamp_id_of(cohort.id) == cohort.bootcamp_id
+    assert await catalog().bootcamp_id_of(new_id()) is None

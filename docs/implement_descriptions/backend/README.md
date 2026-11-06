@@ -14,3 +14,4 @@
 | 10 | [P3-1 역할·권한 모델과 최고 관리자 CLI](10_p3_1_roles_super_admin_cli.md) | 완료 (#13) |
 | 11 | [Google OAuth 콜백을 백엔드가 받도록 변경](11_oauth_backend_callback.md) | 완료 (#14) |
 | 12 | [테스트 DB를 격리된 TortoiseContext와 전용 DB로 관리](12_isolated_test_database.md) | 완료 (#15) |
+| 13 | [P3-2a 권한 판정과 require_permission 의존성](13_p3_2a_permission_checks.md) | 완료 (#16) |
