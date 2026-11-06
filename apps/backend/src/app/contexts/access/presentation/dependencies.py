@@ -5,6 +5,7 @@
 
 회원 조회 서비스(UserQueries)는 composition root(app.main)가 app.state.user_queries에 연결한다.
 다른 컨텍스트의 infrastructure를 import하지 않기 위해서다 (import-linter 계약).
+역할 조회 서비스(RoleQueries)도 같은 방식으로 app.state.role_queries에 연결한다.
 P3에서 require_permission(...)을 여기에 추가한다.
 """
 
@@ -13,6 +14,7 @@ from typing import Annotated, cast
 from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from app.contexts.access.application.roles import RoleQueries
 from app.contexts.identity.application.auth_service import UserQueries
 from app.contexts.identity.application.tokens import read_access_token
 from app.contexts.identity.domain.entities import User
@@ -25,6 +27,10 @@ _bearer = HTTPBearer(auto_error=False, description="access 토큰")
 
 def get_user_queries(request: Request) -> UserQueries:
     return cast("UserQueries", request.app.state.user_queries)
+
+
+def get_role_queries(request: Request) -> RoleQueries:
+    return cast("RoleQueries", request.app.state.role_queries)
 
 
 async def get_current_user(

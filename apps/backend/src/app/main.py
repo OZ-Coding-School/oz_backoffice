@@ -14,6 +14,8 @@ from app.contexts.academy.infrastructure.repositories import (
     TortoiseBootcampRepository,
     TortoiseCohortRepository,
 )
+from app.contexts.access.application.roles import RoleQueries
+from app.contexts.access.infrastructure.repositories import TortoiseUserRoleRepository
 from app.contexts.identity.application.auth_service import UserQueries
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
 from app.core.clock import SystemClock
@@ -48,10 +50,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     app.state.settings = settings
-    app.state.clock = SystemClock()
+    app.state.clock = clock = SystemClock()
     # 컨텍스트 간 공개 서비스 연결 (composition root). 다른 컨텍스트의 presentation 의존성이
     # 이 서비스를 쓰되 identity.infrastructure를 직접 import하지 않게 한다.
     app.state.user_queries = UserQueries(TortoiseUserRepository())
+    app.state.role_queries = RoleQueries(TortoiseUserRoleRepository(), clock)
     app.state.academy_catalog = AcademyCatalog(
         TortoiseBootcampRepository(), TortoiseCohortRepository()
     )
