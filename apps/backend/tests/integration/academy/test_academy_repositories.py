@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, date, datetime
 
 import pytest
-from tortoise import Tortoise
+from tortoise import connections
 from tortoise.exceptions import IntegrityError
 
 from app.contexts.academy.domain.entities import RosterSyncRun, Student
@@ -23,7 +23,7 @@ from app.contexts.identity.infrastructure.repositories import TortoiseUserReposi
 from tests.factories.academy import create_cohort, make_student
 from tests.factories.identity import make_user
 
-pytestmark = [pytest.mark.integration, pytest.mark.usefixtures("db")]
+pytestmark = pytest.mark.integration
 
 NOW = datetime(2026, 11, 5, 9, 0, tzinfo=UTC)
 
@@ -162,4 +162,4 @@ async def test_roster_sync_run_round_trip() -> None:
 async def test_db_check_constraints(sql: str, constraint: str) -> None:
     await create_cohort()
     with pytest.raises(IntegrityError, match=constraint):
-        await Tortoise.get_connection("default").execute_query(sql)
+        await connections.get("default").execute_query(sql)

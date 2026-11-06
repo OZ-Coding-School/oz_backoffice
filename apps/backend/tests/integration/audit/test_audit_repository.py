@@ -10,7 +10,7 @@ from app.core.uow import UnitOfWork
 from app.shared.ids import new_id
 from tests.factories.identity import make_user
 
-pytestmark = [pytest.mark.integration, pytest.mark.usefixtures("db")]
+pytestmark = pytest.mark.integration
 
 NOW = datetime(2026, 11, 5, 9, 0, tzinfo=UTC)
 

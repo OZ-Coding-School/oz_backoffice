@@ -8,7 +8,7 @@ from app.contexts.audit.infrastructure.models import AuditLogModel
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
 from app.core.config import Settings
 
-pytestmark = [pytest.mark.integration, pytest.mark.usefixtures("db")]
+pytestmark = pytest.mark.integration
 
 
 async def test_create_super_admin_on_real_db(settings: Settings) -> None:

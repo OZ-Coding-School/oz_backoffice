@@ -1,11 +1,11 @@
 from collections.abc import Awaitable, Callable
 
 import pytest
-from tortoise import Tortoise
+from tortoise import connections
 
 from app.core.uow import UnitOfWork
 
-pytestmark = [pytest.mark.integration, pytest.mark.usefixtures("database")]
+pytestmark = pytest.mark.integration
 
 
 class Rollback(Exception):
@@ -19,7 +19,7 @@ async def _fail_inside_uow(work: Callable[[UnitOfWork], Awaitable[None]]) -> Non
 
 
 async def test_database_connection() -> None:
-    _, rows = await Tortoise.get_connection("default").execute_query("SELECT 1 AS one")
+    _, rows = await connections.get("default").execute_query("SELECT 1 AS one")
     assert rows[0]["one"] == 1
 
 
@@ -43,14 +43,12 @@ async def test_on_commit_runs_only_after_successful_commit() -> None:
 
 
 async def test_rollback_discards_writes() -> None:
-    conn = Tortoise.get_connection("default")
+    conn = connections.get("default")
     await conn.execute_script("CREATE TABLE IF NOT EXISTS _uow_probe (id int primary key)")
     await conn.execute_script("TRUNCATE _uow_probe")
 
     async def insert(_: UnitOfWork) -> None:
-        await Tortoise.get_connection("default").execute_query(
-            "INSERT INTO _uow_probe (id) VALUES (1)"
-        )
+        await connections.get("default").execute_query("INSERT INTO _uow_probe (id) VALUES (1)")
 
     try:
         with pytest.raises(Rollback):
