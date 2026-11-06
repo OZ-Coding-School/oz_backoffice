@@ -1,6 +1,6 @@
 # 11. Google OAuth 콜백을 백엔드가 받도록 변경
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-06 병합)
 - 관련 PR: #14
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P2-1
 - 이전 기록: [08. P2-1 인증 기반과 운영진 Google 로그인](08_p2_1_auth_google_login.md) (이 기록의 콜백 방식을 바꾼다)
@@ -33,6 +33,8 @@
 
 ## 검증
 - 컨테이너: ruff, ruff format, mypy(src strict, tests), lint-imports, pytest **188개 통과**(통합 포함)
+- GitHub Actions (PR #14, run 42142316463): backend 잡 통과
+- 사용자 확인: "백엔드가 받음" 선택에 따라 CI 통과 후 병합
 - 실행 중인 api:
   - `/auth/google/login` → 302 Google 인가 URL, state 쿠키 속성 확인
   - `/auth/google/callback?error=access_denied` → 302 `/login?error=google_login_cancelled`
