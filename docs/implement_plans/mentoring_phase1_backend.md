@@ -211,12 +211,13 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
   - **P3-1 (구현 기록 10):** 역할·권한 테이블, §2.3 권한표 코드 정의(`access/domain/catalog.py`)와 시드(`python -m app.cli seed-roles`, 멱등), 최고 관리자 CLI(`python -m app.cli create-super-admin <email>`, A14), `/me` 역할 목록
   - **P3-2a (구현 기록 13):** `PermissionChecker`(범위 판정, A16)와 `require_permission(code, cohort_param= | bootcamp_param= | any_scope=)` 의존성
   - **P3-2b (구현 기록 14):** 운영진 가입 승인·반려 API. 승인은 한 트랜잭션에서 신청 승인(어드민 조정) → 직원 생성·갱신 → 담당자 추가 → 역할 부여(매니저 → COHORT_MANAGER, 조교 → COHORT_ASSISTANT, 범위 = 담당 과정·기수) → 회원 승인 → 감사 로그. 반려는 사유를 남기고 승인 대기 회원을 REJECTED로 바꾼다(재신청 가능)
-  - **P3-3:** 담당자·역할 관리 API (아래 표의 staffs·roles)
+  - **P3-3a (구현 기록 15):** 과정·기수 담당자 배정·해제 API. 배정하면 역할 부여, 해제하면 역할 회수(같은 트랜잭션, D4)
+  - **P3-3b:** 회원 역할 관리 API (`/admin/users/{id}/roles`)
 - **API:**
   | 메서드 | 경로 | 권한 |
   | --- | --- | --- |
-  | GET/POST/DELETE | `/api/v1/admin/cohorts/{id}/staffs` | `role.assign` |
-  | GET/POST/DELETE | `/api/v1/admin/bootcamps/{id}/staffs` | `role.assign` |
+  | GET/POST | `/api/v1/admin/cohorts/{id}/staffs` · DELETE `/{staff_id}` | `role.assign`. 배정 = 역할 부여, 해제 = 역할 회수 |
+  | GET/POST | `/api/v1/admin/bootcamps/{id}/staffs` · DELETE `/{staff_id}` | `role.assign`. 위와 같음 (과정 범위 역할) |
   | GET/POST/DELETE | `/api/v1/admin/users/{id}/roles` | `role.assign` |
   | GET | `/api/v1/admin/staff-registrations?status=&limit=&offset=` | 운영진 가입 신청 목록(신청자 포함). `role.assign` (SUPER_ADMIN) |
   | GET | `/api/v1/admin/staff-registrations/{id}` | 신청 상세. `role.assign` |
@@ -456,7 +457,8 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
   - [x] P3-1 역할·권한 모델, 역할 시드, 최고 관리자 CLI (구현 기록 10)
   - [x] P3-2a 권한 판정과 require_permission 의존성 (구현 기록 13)
   - [x] P3-2b 운영진 가입 승인·반려 (구현 기록 14)
-  - [ ] P3-3 담당자·역할 관리 API
+  - [ ] P3-3a 과정·기수 담당자 관리 API (구현 기록 15)
+  - [ ] P3-3b 회원 역할 관리 API
 - [ ] P4 조직·과정·기수 관리 API
 - [ ] P5 Airtable 수강생 명단 동기화
 - [ ] P6 S3 어댑터 + 교육 인력·계약
