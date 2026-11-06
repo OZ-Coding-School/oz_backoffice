@@ -31,7 +31,7 @@ router = APIRouter(prefix="/me/staff-registration", tags=["staff-registration"])
 ServiceDep = Annotated[StaffRegistrationService, Depends(get_staff_registration_service)]
 
 
-def _to_response(registration: EmployeeRegistration) -> StaffRegistrationResponse:
+def to_registration_response(registration: EmployeeRegistration) -> StaffRegistrationResponse:
     return StaffRegistrationResponse(
         id=registration.id,
         status=registration.status,
@@ -82,7 +82,7 @@ async def my_registration(
 ) -> StaffRegistrationResponse | None:
     """가장 최근 신청. 아직 신청하지 않았으면 null."""
     registration = await service.get_mine(user)
-    return _to_response(registration) if registration else None
+    return to_registration_response(registration) if registration else None
 
 
 @router.put("", response_model=StaffRegistrationResponse)
@@ -100,4 +100,4 @@ async def submit_registration(
             for a in body.assignments
         ],
     )
-    return _to_response(registration)
+    return to_registration_response(registration)
