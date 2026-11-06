@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     api_prefix: str = "/api/v1"
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
+    # 로그인 후 돌려보낼 프론트엔드 주소 (성공: /, 실패: /login?error=<code>)
+    frontend_base_url: str = "http://localhost:5173"
 
     # PostgreSQL (Tortoise 형식: postgres://user:pass@host:port/db)
     database_url: str = "postgres://oz:oz@localhost:5432/oz_backoffice"
@@ -40,7 +42,8 @@ class Settings(BaseSettings):
     # Google OAuth2 (운영진 로그인)
     google_client_id: str = ""
     google_client_secret: SecretStr = SecretStr("")
-    google_redirect_uri: str = "http://localhost:5173/auth/google/callback"
+    # Google이 인가 code를 돌려보낼 백엔드 콜백 (Google Cloud Console에 같은 값을 등록한다)
+    google_redirect_uri: str = "http://localhost:8000/api/v1/auth/google/callback"
     google_allowed_domain: str = "nextrunners.co.kr"
 
     # AWS S3 (비공개 버킷 1개 + prefix: contracts/, profiles/ ...)

@@ -93,43 +93,115 @@ async def auth_client(auth_app: FastAPI, client: AsyncClient) -> AsyncClient:
     return client
 
 
-async def login(client: AsyncClient) -> Response:
-    authorize = await client.get("/api/v1/auth/google/authorize")
-    assert authorize.status_code == 200
-    state = parse_qs(urlparse(authorize.json()["authorization_url"]).query)["state"][0]
-    return await client.post(
-        "/api/v1/auth/google/callback", json={"code": "good-code", "state": state}
-    )
+def set_cookie(response: Response, name: str) -> str:
+    """응답의 Set-Cookie 중 name 쿠키의 전체 헤더 값."""
+    return next(h for h in response.headers.get_list("set-cookie") if h.startswith(f"{name}="))
+
+
+def cookie_value(response: Response, name: str) -> str:
+    return set_cookie(response, name).split(";", 1)[0].split("=", 1)[1]
 
 
 def refresh_cookie(response: Response) -> str:
-    header = response.headers["set-cookie"]
-    return header.split(";", 1)[0].split("=", 1)[1]
+    return cookie_value(response, "oz_refresh")
+
+
+async def google_redirect(client: AsyncClient) -> tuple[str, str]:
+    """/google/login → (Google로 보낸 state, 브라우저에 내려준 state 쿠키)."""
+    start = await client.get("/api/v1/auth/google/login")
+    assert start.status_code == 302
+    state = parse_qs(urlparse(start.headers["location"]).query)["state"][0]
+    return state, cookie_value(start, "oz_oauth_state")
+
+
+async def callback(
+    client: AsyncClient, *, state: str, state_cookie: str | None, **params: str
+) -> Response:
+    headers = {"Cookie": f"oz_oauth_state={state_cookie}"} if state_cookie else {}
+    return await client.get(
+        "/api/v1/auth/google/callback",
+        params={"code": "good-code", "state": state, **params},
+        headers=headers,
+    )
+
+
+async def login(client: AsyncClient) -> Response:
+    """Google 로그인 → 프론트로 리디렉션 → /auth/refresh로 access 토큰을 받는 전체 흐름."""
+    state, state_cookie = await google_redirect(client)
+    done = await callback(client, state=state, state_cookie=state_cookie)
+    assert done.status_code == 302
+    assert done.headers["location"] == "http://localhost:5173/"
+    return await client.post(
+        "/api/v1/auth/refresh", headers={"Cookie": f"oz_refresh={refresh_cookie(done)}"}
+    )
 
 
 def bearer(response: Response) -> dict[str, str]:
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
 
-async def test_google_login_sets_refresh_cookie(auth_client: AsyncClient) -> None:
-    response = await login(auth_client)
+async def test_google_login_redirects_with_state_cookie(auth_client: AsyncClient) -> None:
+    start = await auth_client.get("/api/v1/auth/google/login")
 
-    assert response.status_code == 200
-    body = response.json()
-    assert body["token_type"] == "bearer"
-    assert body["access_token"]
-    cookie = response.headers["set-cookie"].lower()
-    for attribute in ("oz_refresh=", "httponly", "secure", "samesite=lax", "path=/api/v1/auth"):
+    assert start.status_code == 302
+    assert start.headers["location"].startswith("https://accounts.google.test/auth?")
+    cookie = set_cookie(start, "oz_oauth_state").lower()
+    for attribute in (
+        "httponly",
+        "secure",
+        "samesite=lax",
+        "path=/api/v1/auth/google",
+        "max-age=600",
+    ):
         assert attribute in cookie
-    assert response.headers["cache-control"] == "no-store"
 
 
-async def test_callback_rejects_unknown_state(auth_client: AsyncClient) -> None:
-    response = await auth_client.post(
-        "/api/v1/auth/google/callback", json={"code": "good-code", "state": "forged"}
+async def test_callback_sets_refresh_cookie_and_redirects(auth_client: AsyncClient) -> None:
+    state, state_cookie = await google_redirect(auth_client)
+
+    done = await callback(auth_client, state=state, state_cookie=state_cookie)
+
+    assert done.status_code == 302
+    assert done.headers["location"] == "http://localhost:5173/"
+    cookie = set_cookie(done, "oz_refresh").lower()
+    for attribute in ("httponly", "secure", "samesite=lax", "path=/api/v1/auth"):
+        assert attribute in cookie
+    assert 'oz_oauth_state=""' in set_cookie(done, "oz_oauth_state")  # state 쿠키 삭제
+
+    tokens = await auth_client.post(
+        "/api/v1/auth/refresh", headers={"Cookie": f"oz_refresh={refresh_cookie(done)}"}
     )
-    assert response.status_code == 401
-    assert response.json()["error"]["code"] == "oauth_state_invalid"
+    assert tokens.status_code == 200
+    assert tokens.json()["token_type"] == "bearer"
+    assert tokens.headers["cache-control"] == "no-store"
+
+
+@pytest.mark.parametrize(
+    ("use_cookie", "params", "code"),
+    [
+        (False, {}, "oauth_state_invalid"),  # 다른 브라우저 (로그인 CSRF)
+        (True, {"error": "access_denied"}, "google_login_cancelled"),
+        (True, {"code": "bad-code"}, "google_auth_failed"),
+    ],
+)
+async def test_callback_failure_redirects_to_login_page(
+    auth_client: AsyncClient, use_cookie: bool, params: dict[str, str], code: str
+) -> None:
+    state, state_cookie = await google_redirect(auth_client)
+
+    done = await callback(
+        auth_client, state=state, state_cookie=state_cookie if use_cookie else None, **params
+    )
+
+    assert done.status_code == 302
+    assert done.headers["location"] == f"http://localhost:5173/login?error={code}"
+    assert not any(h.startswith("oz_refresh=") for h in done.headers.get_list("set-cookie"))
+
+
+async def test_callback_with_forged_state_cookie(auth_client: AsyncClient) -> None:
+    await google_redirect(auth_client)
+    done = await callback(auth_client, state="forged", state_cookie="forged")
+    assert done.headers["location"] == "http://localhost:5173/login?error=oauth_state_invalid"
 
 
 async def test_me_shows_pending_status_and_gate_blocks(auth_client: AsyncClient) -> None:
@@ -217,7 +289,7 @@ async def test_logout_clears_cookie_and_revokes(auth_client: AsyncClient) -> Non
 
 
 async def test_google_login_not_configured(client: AsyncClient) -> None:
-    response = await client.get("/api/v1/auth/google/authorize")
+    response = await client.get("/api/v1/auth/google/login")
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "google_login_not_configured"
 
