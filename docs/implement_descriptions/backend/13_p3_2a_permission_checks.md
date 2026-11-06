@@ -1,7 +1,7 @@
 # 13. P3-2a 권한 판정과 require_permission 의존성
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 예정)
+- 관련 PR: #16
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P3 (P3-2a)
 - 이전 기록: [10. P3-1 역할·권한 모델과 최고 관리자 CLI](10_p3_1_roles_super_admin_cli.md)
 
