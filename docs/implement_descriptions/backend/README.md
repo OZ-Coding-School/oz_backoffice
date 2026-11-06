@@ -12,3 +12,4 @@
 | 08 | [P2-1 인증 기반과 운영진 Google 로그인](08_p2_1_auth_google_login.md) | 완료 (#11) |
 | 09 | [P2-2 운영진 최초 정보 입력](09_p2_2_staff_registration.md) | 완료 (#12) |
 | 10 | [P3-1 역할·권한 모델과 최고 관리자 CLI](10_p3_1_roles_super_admin_cli.md) | 완료 (#13) |
+| 11 | [Google OAuth 콜백을 백엔드가 받도록 변경](11_oauth_backend_callback.md) | PR 진행 중 |
