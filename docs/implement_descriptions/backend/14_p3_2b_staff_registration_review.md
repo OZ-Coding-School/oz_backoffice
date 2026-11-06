@@ -1,7 +1,7 @@
 # 14. P3-2b 운영진 가입 신청 승인·반려
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 예정)
+- 관련 PR: #17
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P3 (P3-2b)
 - 이전 기록: [13. P3-2a 권한 판정과 require_permission 의존성](13_p3_2a_permission_checks.md), [09. P2-2 운영진 최초 정보 입력](09_p2_2_staff_registration.md)
 
