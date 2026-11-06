@@ -1,4 +1,4 @@
-"""운영진 가입 신청 검토 테스트용 조립과 데이터 빌더 (실제 DB)."""
+"""운영진 가입 신청 검토·담당자 배정 테스트용 서비스 조립과 데이터 빌더 (실제 DB)."""
 
 from app.contexts.academy.application.catalog import AcademyCatalog
 from app.contexts.academy.infrastructure.repositories import (
@@ -19,6 +19,7 @@ from app.contexts.organization.application.registration_service import (
     RegistrationChoiceValidator,
 )
 from app.contexts.organization.application.review_service import StaffRegistrationReviewService
+from app.contexts.organization.application.staff_service import StaffAssignmentService
 from app.contexts.organization.domain.enums import EmploymentType
 from app.contexts.organization.domain.registration import (
     EmployeeRegistration,
@@ -81,3 +82,16 @@ async def create_registration(
     )
     await TortoiseEmployeeRegistrationRepository().add(registration)
     return registration
+
+
+def build_staff_service() -> StaffAssignmentService:
+    clock = SystemClock()
+    return StaffAssignmentService(
+        employees=TortoiseEmployeeRepository(),
+        bootcamp_staffs=TortoiseBootcampStaffRepository(),
+        cohort_staffs=TortoiseCohortStaffRepository(),
+        catalog=AcademyCatalog(TortoiseBootcampRepository(), TortoiseCohortRepository()),
+        roles=RoleAssignmentService(TortoiseUserRoleRepository()),
+        audit=AuditRecorder(TortoiseAuditLogRepository(), clock),
+        uow=UnitOfWork(),
+    )
