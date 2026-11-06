@@ -3,19 +3,28 @@
 - unit: 외부 의존 없음
 - api: create_app() + httpx ASGITransport.
   lifespan을 돌리지 않으므로 Redis/DB 의존성은 오버라이드한다.
-- integration: 실제 PostgreSQL 필요. TEST_DATABASE_URL이 없으면 skip.
+- integration: 실제 PostgreSQL 사용.
+
+DB는 모든 테스트에 autouse로 준비한다(세션당 1회 생성·마이그레이션, 테스트마다 TRUNCATE).
+테스트 DB 주소는 TEST_DATABASE_URL(compose·CI가 설정), 없으면 로컬 compose의 postgres를 쓴다.
 """
 
+import importlib.util
 import os
+import warnings
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
+from types import ModuleType
+from urllib.parse import unquote, urlsplit
 
+import asyncpg  # type: ignore[import-untyped]
 import pytest
-from aerich import Command
 from fakeredis import FakeAsyncRedis
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
-from tortoise import Tortoise
+from tortoise import connections
+from tortoise.context import TortoiseContext
+from tortoise.warnings import TortoiseLoopSwitchWarning
 
 from app.api.health import get_database_probe
 from app.core.config import Settings
@@ -23,7 +32,9 @@ from app.core.database import MODEL_APP, build_tortoise_config
 from app.core.redis import get_redis
 from app.main import create_app
 
-TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
+TEST_DATABASE_URL = os.environ.get(
+    "TEST_DATABASE_URL", "postgres://oz:oz@localhost:5432/oz_backoffice_test"
+)
 MIGRATIONS_DIR = Path(__file__).resolve().parents[1] / "migrations"
 
 
@@ -40,7 +51,7 @@ def settings() -> Settings:
         google_redirect_uri="http://localhost:5173/auth/google/callback",
         google_allowed_domain="nextrunners.co.kr",
         refresh_cookie_secure=True,
-        database_url=TEST_DATABASE_URL or "postgres://unused:unused@localhost:5432/unused",
+        database_url=TEST_DATABASE_URL,
         jwt_secret_key="test-secret-key-with-enough-length-0123456789",
     )
 
@@ -77,51 +88,99 @@ async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
 
 
 # ----------------------------------------------
-# Integration (PostgreSQL)
+# DB (PostgreSQL)
 # ----------------------------------------------
-async def _reset_schema_and_migrate(database_url: str) -> None:
-    """테스트 DB를 비우고 aerich 마이그레이션을 처음부터 적용한다 (raw SQL 제약 포함)."""
-    config = build_tortoise_config(database_url)
-    # aerich는 Tortoise가 이미 초기화돼 있으면 그 연결을 쓴다.
-    # Tortoise 1.x 기본값(전역 연결 없음)으로 aerich가 직접 초기화하면 연결을 찾지 못하므로,
-    # 전역 연결 모드로 먼저 초기화해 둔다.
-    await Tortoise.init(config=config, _enable_global_fallback=True)
+async def _admin_execute(sql: str) -> str:
+    """관리 DB(postgres)에 접속해 테스트 DB를 만들거나 지운다. 실행한 DB 이름을 돌려준다.
+
+    이름이 `_test`로 끝나지 않으면 거부한다 (개발·운영 DB 보호).
+    Tortoise의 _create_db는 사용자 이름과 같은 DB로 접속하므로 쓰지 않는다.
+    """
+    url = urlsplit(TEST_DATABASE_URL)
+    name = url.path.lstrip("/")
+    if not name.endswith("_test"):
+        raise RuntimeError(f"테스트 DB 이름은 _test로 끝나야 합니다: {name!r}")
+    conn = await asyncpg.connect(
+        host=url.hostname,
+        port=url.port or 5432,
+        user=unquote(url.username or ""),
+        password=unquote(url.password or ""),
+        database="postgres",
+    )
     try:
-        await Tortoise.get_connection("default").execute_script(
-            "DROP SCHEMA public CASCADE; CREATE SCHEMA public; "
-            "CREATE EXTENSION IF NOT EXISTS btree_gist;"
-        )
-        command = Command(tortoise_config=config, app=MODEL_APP, location=str(MIGRATIONS_DIR))
-        await command.init()
-        await command.upgrade(run_in_transaction=True)
+        await conn.execute(sql.format(name=name))
     finally:
-        await Tortoise.close_connections()
+        await conn.close()
+    return name
 
 
-@pytest.fixture(scope="session")
-async def database() -> AsyncIterator[None]:
-    if not TEST_DATABASE_URL:
-        pytest.skip("TEST_DATABASE_URL이 설정되지 않아 통합 테스트를 건너뜁니다.")
-    await _reset_schema_and_migrate(TEST_DATABASE_URL)
-    await Tortoise.init(
-        config=build_tortoise_config(TEST_DATABASE_URL, with_aerich=False),
-        _enable_global_fallback=True,
+async def _drop_test_database() -> None:
+    await _admin_execute('DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+
+
+async def _create_test_database() -> None:
+    await _admin_execute('CREATE DATABASE "{name}"')
+
+
+def _migration_modules() -> list[ModuleType]:
+    """aerich 마이그레이션 파일을 번호 순서대로 불러온다.
+
+    파일 이름이 숫자로 시작해 import 문으로는 불러올 수 없다.
+    """
+    paths = sorted(
+        (MIGRATIONS_DIR / MODEL_APP).glob("[0-9]*_*.py"),
+        key=lambda path: int(path.name.split("_", 1)[0]),
     )
-    yield
-    await Tortoise.close_connections()
+    modules = []
+    for path in paths:
+        spec = importlib.util.spec_from_file_location(f"_migration_{path.stem}", path)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        modules.append(module)
+    return modules
 
 
-@pytest.fixture
-async def db(database: None) -> AsyncIterator[None]:
-    """테스트마다 모델 테이블을 비워 격리한다 (aerich 이력 테이블 제외)."""
+async def _apply_migrations() -> None:
+    """generate_schemas() 대신 aerich 마이그레이션 SQL로 스키마를 만든다.
+
+    마이그레이션에만 있는 raw SQL(CHECK, 부분 유니크, NULLS NOT DISTINCT, 자기 참조 FK,
+    DB 기본값)까지 운영과 같은 스키마로 테스트하기 위해서다.
+    """
+    conn = connections.get("default")
+    await conn.execute_script("CREATE EXTENSION IF NOT EXISTS btree_gist;")
+    for module in _migration_modules():
+        await conn.execute_script(await module.upgrade(conn))
+
+
+@pytest.fixture(scope="session", autouse=True)
+async def tortoise_db() -> AsyncIterator[TortoiseContext]:
+    """세션 동안 쓰는 격리된 Tortoise 컨텍스트와 테스트 전용 DB.
+
+    tortoise_test_context(https://tortoise.github.io/contrib/unittest.html)와 같은 방식으로
+    격리된 TortoiseContext를 연다(전역 연결 없음). 다만 tortoise_test_context는
+    generate_schemas()를 강제하므로, 스키마는 마이그레이션으로 만든다.
+    테스트 DB는 세션 시작 때 지우고 새로 만들고, 끝나면 지운다
+    (이전 실행이 중단돼 남은 DB·스키마가 결과에 섞이지 않게 한다).
+    """
+    await _drop_test_database()
+    await _create_test_database()
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=TortoiseLoopSwitchWarning)
+        async with TortoiseContext() as ctx:
+            await ctx.init(config=build_tortoise_config(TEST_DATABASE_URL, with_aerich=False))
+            await _apply_migrations()
+            yield ctx
+    await _drop_test_database()
+
+
+@pytest.fixture(autouse=True)
+async def clean_tables(tortoise_db: TortoiseContext) -> AsyncIterator[None]:
+    """테스트마다 끝난 뒤 모든 모델 테이블을 비워 테스트 간 데이터가 섞이지 않게 한다."""
     yield
-    tables = sorted(
-        model._meta.db_table
-        for model in Tortoise.apps[MODEL_APP].values()
-        if model._meta.db_table != "aerich"
-    )
-    if tables:
-        quoted = ", ".join(f'"{table}"' for table in tables)
-        await Tortoise.get_connection("default").execute_script(
-            f"TRUNCATE {quoted} RESTART IDENTITY CASCADE"
-        )
+    apps = tortoise_db.apps
+    assert apps is not None
+    tables = sorted(model._meta.db_table for model in apps[MODEL_APP].values())
+    quoted = ", ".join(f'"{table}"' for table in tables)
+    await connections.get("default").execute_script(f"TRUNCATE {quoted} RESTART IDENTITY CASCADE")

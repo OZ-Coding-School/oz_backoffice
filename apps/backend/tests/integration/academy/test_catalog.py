@@ -10,7 +10,7 @@ from app.shared.errors import BusinessRuleViolation
 from app.shared.ids import new_id
 from tests.factories.academy import create_cohort
 
-pytestmark = [pytest.mark.integration, pytest.mark.usefixtures("db")]
+pytestmark = pytest.mark.integration
 
 
 def catalog() -> AcademyCatalog:

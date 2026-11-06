@@ -1,7 +1,7 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from tortoise import Tortoise
+from tortoise import connections
 from tortoise.exceptions import IntegrityError
 
 from app.contexts.access.domain.catalog import (
@@ -23,7 +23,7 @@ from app.shared.errors import ConflictError
 from app.shared.ids import new_id
 from tests.factories.identity import make_user
 
-pytestmark = [pytest.mark.integration, pytest.mark.usefixtures("db")]
+pytestmark = pytest.mark.integration
 
 NOW = datetime(2026, 11, 6, tzinfo=UTC)
 
@@ -125,4 +125,4 @@ async def test_db_constraints(sql: str, constraint: str) -> None:
     await TortoiseRoleCatalogRepository().sync(ROLES, PERMISSIONS)
     await TortoiseUserRepository().add(make_user())
     with pytest.raises(IntegrityError, match=constraint):
-        await Tortoise.get_connection("default").execute_query(sql)
+        await connections.get("default").execute_query(sql)

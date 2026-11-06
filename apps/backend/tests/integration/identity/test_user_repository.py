@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 
 import pytest
-from tortoise import Tortoise
+from tortoise import connections
 from tortoise.exceptions import IntegrityError
 
 from app.contexts.identity.domain.entities import OAuthAccount
@@ -9,7 +9,7 @@ from app.contexts.identity.domain.enums import SocialLoginProvider, UserApproval
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
 from tests.factories.identity import make_user
 
-pytestmark = [pytest.mark.integration, pytest.mark.usefixtures("db")]
+pytestmark = pytest.mark.integration
 
 NOW = datetime(2026, 11, 5, 9, 0, tzinfo=UTC)
 
@@ -79,13 +79,13 @@ async def test_db_check_constraints_reject_invalid_rows(column_sql: str, constra
     user = make_user()
     await repo.add(user)
     with pytest.raises(IntegrityError, match=constraint):
-        await Tortoise.get_connection("default").execute_query(
+        await connections.get("default").execute_query(
             f"UPDATE users SET {column_sql} WHERE id = $1", [user.id]
         )
 
 
 async def test_db_defaults_apply_to_raw_insert() -> None:
-    conn = Tortoise.get_connection("default")
+    conn = connections.get("default")
     await conn.execute_query(
         "INSERT INTO users (id, email, name) VALUES (gen_random_uuid(), 'raw@gmail.com', '로우')"
     )

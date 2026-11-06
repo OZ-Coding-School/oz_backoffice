@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 
 import pytest
-from tortoise import Tortoise
+from tortoise import connections
 from tortoise.exceptions import IntegrityError
 
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
@@ -21,7 +21,7 @@ from tests.factories.academy import create_cohort
 from tests.factories.identity import make_user
 from tests.factories.organization import create_department, create_position
 
-pytestmark = [pytest.mark.integration, pytest.mark.usefixtures("db")]
+pytestmark = pytest.mark.integration
 
 
 async def _registration(**overrides: object) -> EmployeeRegistration:
@@ -128,4 +128,4 @@ async def test_db_constraints(sql: str, constraint: str) -> None:
     )
     await TortoiseEmployeeRegistrationRepository().add(registration)
     with pytest.raises(IntegrityError, match=constraint):
-        await Tortoise.get_connection("default").execute_query(sql)
+        await connections.get("default").execute_query(sql)

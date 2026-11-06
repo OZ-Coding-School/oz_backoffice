@@ -92,7 +92,7 @@ docker compose exec api python -m app.cli seed-roles   # 역할·권한 정의(a
 docker compose up -d postgres redis       # 루트에서
 uv sync
 uv run uvicorn app.main:app --reload      # compose의 api와 포트(8000)가 겹치므로 api를 멈추거나 --port 변경
-uv run pytest                             # TEST_DATABASE_URL이 없으면 통합 테스트는 skip
+uv run pytest                             # TEST_DATABASE_URL이 없으면 compose postgres(localhost:5432)의 oz_backoffice_test를 쓴다
 TEST_DATABASE_URL=postgres://oz:oz@localhost:5432/oz_backoffice_test uv run pytest
 uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run mypy tests && uv run lint-imports
 ```
@@ -131,7 +131,10 @@ src/app/
   - **downgrade의 테이블 삭제 순서가 FK 의존을 고려하지 않는다.** 참조하는 쪽부터 지우도록 고친다.
   - **자기 참조 FK는 "cyclic fk references"로 생성을 거부한다.** 모델에는 `UUIDField`로 두고 FK 제약은 raw SQL로 건다(예: `departments.parent_id`).
   - 마이그레이션을 만든 뒤 개발 DB에서 `aerich upgrade` → `aerich migrate`("No changes detected" 확인) → `aerich downgrade -v <n>` → `aerich upgrade`로 검증한다.
-- 통합 테스트 픽스처(`database`)는 테스트 DB 스키마를 비우고 **aerich 마이그레이션을 처음부터 적용**한다. DB를 쓰는 테스트는 `db` 픽스처(테스트마다 TRUNCATE)를 사용한다.
+- 테스트 DB는 `tests/conftest.py`의 autouse 픽스처가 관리한다. 테스트에서 따로 요청하지 않는다.
+  - `tortoise_db`(세션): 테스트 전용 DB(이름이 `_test`로 끝나야 함)를 지우고 새로 만든다. 격리된 `TortoiseContext`(전역 연결 없음)를 열고 **aerich 마이그레이션 SQL을 처음부터 적용**한 뒤, 세션이 끝나면 DB를 지운다. `tortoise_test_context`는 `generate_schemas()`를 강제해 raw SQL 제약이 빠지므로 쓰지 않는다.
+  - `clean_tables`(테스트마다): 테스트가 끝나면 모든 모델 테이블을 TRUNCATE한다.
+  - 테스트에서 연결을 직접 쓸 때는 `tortoise.connections.get("default")`를 쓴다(`Tortoise.get_connection` 아님).
 - 테스트: `tests/unit`(DB 없음, `tests/fakes` 인메모리 리포지토리), `tests/integration`(실제 PostgreSQL), `tests/api`(AsyncClient + 의존성 오버라이드). 마커 `unit` / `integration` / `api`.
 
 ---

@@ -1,5 +1,5 @@
 import pytest
-from tortoise import Tortoise
+from tortoise import connections
 from tortoise.exceptions import IntegrityError
 
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
@@ -21,7 +21,7 @@ from app.contexts.organization.infrastructure.repositories import (
 from tests.factories.academy import create_cohort
 from tests.factories.identity import make_user
 
-pytestmark = [pytest.mark.integration, pytest.mark.usefixtures("db")]
+pytestmark = pytest.mark.integration
 
 
 async def _create_employee(department: Department | None = None) -> Employee:
@@ -70,7 +70,7 @@ async def test_department_parent_fk_restricts_delete() -> None:
     await departments.add(root)
     await departments.add(Department(name="교육 1팀", description="운영", parent_id=root.id))
     with pytest.raises(IntegrityError):
-        await Tortoise.get_connection("default").execute_query(
+        await connections.get("default").execute_query(
             "DELETE FROM departments WHERE id = $1", [root.id]
         )
 
@@ -132,4 +132,4 @@ async def test_staff_assignments() -> None:
 async def test_db_check_constraints(sql: str, constraint: str) -> None:
     await _create_employee()
     with pytest.raises(IntegrityError, match=constraint):
-        await Tortoise.get_connection("default").execute_query(sql)
+        await connections.get("default").execute_query(sql)
