@@ -6,21 +6,30 @@
 회원 조회 서비스(UserQueries)는 composition root(app.main)가 app.state.user_queries에 연결한다.
 다른 컨텍스트의 infrastructure를 import하지 않기 위해서다 (import-linter 계약).
 역할 조회 서비스(RoleQueries)도 같은 방식으로 app.state.role_queries에 연결한다.
-P3에서 require_permission(...)을 여기에 추가한다.
+- require_permission(code, ...): 승인된 회원 + 권한 코드 + 범위(경로의 과정·기수 ID) 검사
+
 """
 
+import uuid
+from collections.abc import Awaitable, Callable
 from typing import Annotated, cast
 
 from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from app.contexts.access.application.permissions import (
+    CohortDirectory,
+    PermissionChecker,
+    PermissionTarget,
+    ensure_known_permission,
+)
 from app.contexts.access.application.roles import RoleQueries
 from app.contexts.identity.application.auth_service import UserQueries
 from app.contexts.identity.application.tokens import read_access_token
 from app.contexts.identity.domain.entities import User
 from app.core.dependencies import get_jwt_service
 from app.core.security import JWTService
-from app.shared.errors import AuthenticationError, PermissionDeniedError
+from app.shared.errors import AuthenticationError, NotFoundError, PermissionDeniedError
 
 _bearer = HTTPBearer(auto_error=False, description="access 토큰")
 
@@ -52,3 +61,66 @@ async def require_approved_user(user: Annotated[User, Depends(get_current_user)]
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
 ApprovedUser = Annotated[User, Depends(require_approved_user)]
+
+
+def get_cohort_directory(request: Request) -> CohortDirectory:
+    return cast("CohortDirectory", request.app.state.academy_catalog)
+
+
+def get_permission_checker(
+    roles: Annotated[RoleQueries, Depends(get_role_queries)],
+    cohorts: Annotated[CohortDirectory, Depends(get_cohort_directory)],
+) -> PermissionChecker:
+    """요청 단위로 하나 만든다(FastAPI 의존성 캐시). 사용자 역할은 요청당 한 번만 읽는다."""
+    return PermissionChecker(roles, cohorts)
+
+
+PermissionCheckerDep = Annotated[PermissionChecker, Depends(get_permission_checker)]
+
+
+def _path_uuid(request: Request, name: str) -> uuid.UUID:
+    try:
+        return uuid.UUID(str(request.path_params[name]))
+    except (KeyError, ValueError) as exc:
+        raise NotFoundError("대상을 찾을 수 없습니다.", code="not_found") from exc
+
+
+def require_permission(
+    code: str,
+    *,
+    cohort_param: str | None = None,
+    bootcamp_param: str | None = None,
+    any_scope: bool = False,
+) -> Callable[..., Awaitable[User]]:
+    """권한 의존성을 만든다. 승인된 회원이어야 하고, 범위는 아래 중 하나로 정한다.
+
+    - 기본: 전체(GLOBAL) 범위 권한이 필요하다.
+    - cohort_param / bootcamp_param: 경로 파라미터의 기수·과정에 대한 권한이 필요하다.
+      BOOTCAMP 범위 역할은 그 과정의 모든 기수에 적용된다.
+    - any_scope=True: 어느 범위든 그 권한이 있는 역할이 하나라도 있으면 된다.
+
+        @router.post("/cohorts/{cohort_id}/teams")
+        async def create_team(
+            user: Annotated[User, Depends(require_permission("mentoring.team.manage",
+                                                              cohort_param="cohort_id"))],
+        ) -> ...
+    """
+    ensure_known_permission(code)
+    if sum((cohort_param is not None, bootcamp_param is not None, any_scope)) > 1:
+        raise ValueError("범위는 cohort_param, bootcamp_param, any_scope 중 하나만 지정한다.")
+
+    async def dependency(
+        request: Request, user: ApprovedUser, checker: PermissionCheckerDep
+    ) -> User:
+        if cohort_param is not None:
+            target = PermissionTarget.cohort(_path_uuid(request, cohort_param))
+        elif bootcamp_param is not None:
+            target = PermissionTarget.bootcamp(_path_uuid(request, bootcamp_param))
+        elif any_scope:
+            target = PermissionTarget.any_scope()
+        else:
+            target = PermissionTarget.global_()
+        await checker.require(user.id, code, target)
+        return user
+
+    return dependency
