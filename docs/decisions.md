@@ -90,6 +90,7 @@
 | A11 | 운영진 가입 흐름: ① Google 로그인 시 도메인(`nextrunners.co.kr`)만 확인하고 처음이면 **승인 대기(PENDING)** 회원을 만든다(`employees` 등록 여부로 거부하지 않음) → ② 최초 로그인 후 **부서·직위·고용 형태·담당(역할 MANAGER/ASSISTANT + 과정 또는 기수, 여러 개)** 을 입력해 신청한다. 담당 역할과 과정·기수는 **신청자가 직접 고른다**(직위와 연결하지 않음) → ③ 어드민이 입력 항목을 조정해 승인하면 `employees`·`bootcamp_staffs`·`cohort_staffs`가 만들어지고 APPROVED가 된다. 승인 후 새로고침·재로그인하면 이용할 수 있다 (2026-11-05) |
 | A12 | 운영진 승인 순서: P2에서 로그인·토큰과 신청 입력을, P3에서 권한과 함께 **승인·반려 API(SUPER_ADMIN, 항목 조정 가능)** 와 **최초 어드민 CLI**(먼저 Google로 로그인·신청한 사람을 CLI로 승인하고 SUPER_ADMIN 부여)를 만든다. 부서·직위 초기 데이터는 시드 CLI로 넣는다 (2026-11-05) |
 | A13 | Google ID 토큰은 토큰 엔드포인트에서 client secret으로 인증한 HTTPS 응답으로 직접 받으므로 **서명(JWKS)은 검증하지 않고** 클레임(`aud`, `iss`, `exp`, `email_verified`, `hd`·이메일 도메인)만 검증한다. Google 문서가 허용하는 방식이고, RS256 검증용 `cryptography` 의존성을 늘리지 않는다 (2026-11-05) |
+| A14 | 최고 관리자 등록은 CLI `python -m app.cli create-super-admin <email> [--name]`로 한다(A12의 "신청을 CLI로 승인"을 대체). 운영진 도메인 이메일만 받고, 회원이 없으면 승인된 회원을 미리 만들어 그 이메일로 처음 Google 로그인할 때 연결한다. 역할 정의를 먼저 맞추고(멱등) SUPER_ADMIN(GLOBAL)을 부여하며 감사 로그를 남긴다. 직원(`employees`) 등록은 요구하지 않는다. 부서·직위 초기 데이터 시드는 만들지 않고, 운영 데이터는 P4 API로 넣는다 (2026-11-06) |
 | A6 | 자동 승인 기준: 수강생은 명단과 **이름 + 휴대폰**(SMS 인증된 번호)이 일치하면, 멘토는 계약과 **이름 + 휴대폰**이 일치하면 자동 승인한다. 일치하지 않으면 **승인 대기**로 두고, 담당 매니저 이상이 승인한다. 대기 중에는 로그인해도 상태 화면만 볼 수 있다 |
 | A7 | 토큰: access는 응답 본문(프론트 메모리, `Authorization` 헤더), refresh는 HttpOnly·Secure·SameSite 쿠키. 갱신할 때 refresh를 회전한다 (Redis 저장) |
 | A8 | Google API(Meet, Drive, Gmail, Workspace Events)는 **서비스 계정 + 도메인 전체 위임**으로 회사 계정을 대신해 호출한다 |

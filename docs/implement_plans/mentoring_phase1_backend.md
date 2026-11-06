@@ -206,9 +206,11 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
   - `require_permission(code, scope_from=...)` 의존성. 경로의 `cohort_id`·`bootcamp_id`로 범위를 판정하고, BOOTCAMP 범위는 하위 기수에도 적용한다
   - 권한 판정 결과는 요청 단위로 캐시한다(사용자 역할 1회 조회)
   - 담당자 배정(`bootcamp_staffs`, `cohort_staffs`)과 `user_roles`를 같은 트랜잭션에서 동기화 (D4)
-  - `scripts/seed_roles.py`: §2.3 권한표를 시드 (멱등). 최초 SUPER_ADMIN 지정 명령 포함
   - **운영진 가입 승인·반려(A11·A12):** 어드민이 신청 항목(부서·직위·고용 형태·담당)을 조정해 승인하면 `employees`·`bootcamp_staffs`·`cohort_staffs`·`user_roles`를 만들고 회원을 APPROVED로 바꾼다. 반려 사유는 감사 로그
-  - **최초 어드민 CLI:** 먼저 Google로 로그인·신청한 사람의 신청을 승인하고 SUPER_ADMIN을 부여한다. 부서·직위 초기 데이터 시드 CLI 포함
+- PR을 나눈다.
+  - **P3-1 (구현 기록 10):** 역할·권한 테이블, §2.3 권한표 코드 정의(`access/domain/catalog.py`)와 시드(`python -m app.cli seed-roles`, 멱등), 최고 관리자 CLI(`python -m app.cli create-super-admin <email>`, A14), `/me` 역할 목록
+  - **P3-2:** `require_permission` 의존성과 범위 판정, 운영진 가입 승인·반려 API, 담당자 배정과 `user_roles` 동기화
+  - **P3-3:** 담당자·역할 관리 API (아래 표의 staffs·roles)
 - **API:**
   | 메서드 | 경로 | 권한 |
   | --- | --- | --- |
@@ -449,6 +451,9 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
   - [x] P2-1 인증 기반과 Google 로그인 (구현 기록 08)
   - [x] P2-2 운영진 최초 정보 입력 (구현 기록 09)
 - [ ] P3 권한
+  - [ ] P3-1 역할·권한 모델, 역할 시드, 최고 관리자 CLI (구현 기록 10)
+  - [ ] P3-2 권한 의존성, 운영진 가입 승인·반려
+  - [ ] P3-3 담당자·역할 관리 API
 - [ ] P4 조직·과정·기수 관리 API
 - [ ] P5 Airtable 수강생 명단 동기화
 - [ ] P6 S3 어댑터 + 교육 인력·계약
