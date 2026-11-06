@@ -74,6 +74,21 @@ class TortoiseUserRoleRepository:
             scope_type=scope_type,
         ).exists()
 
+    async def remove(
+        self,
+        user_id: uuid.UUID,
+        role_code: str,
+        scope_type: str,
+        scope_id: uuid.UUID | None,
+    ) -> bool:
+        role = await RoleModel.get_or_none(code=role_code)
+        if role is None:
+            return False
+        deleted = await UserRoleModel.filter(
+            _scope_filter(scope_id), user_id=user_id, role=role, scope_type=scope_type
+        ).delete()
+        return deleted > 0
+
     async def list_grants(self, user_id: uuid.UUID, *, now: datetime) -> list[RoleGrant]:
         rows = (
             await UserRoleModel.filter(
