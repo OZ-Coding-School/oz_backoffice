@@ -1,7 +1,7 @@
 # 15. P3-3a 과정·기수 담당자 관리 API
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 예정)
+- 관련 PR: #18
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P3 (P3-3a)
 - 이전 기록: [14. P3-2b 운영진 가입 신청 승인·반려](14_p3_2b_staff_registration_review.md)
 
