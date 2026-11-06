@@ -29,8 +29,17 @@ MIGRATIONS_DIR = Path(__file__).resolve().parents[1] / "migrations"
 
 @pytest.fixture(scope="session")
 def settings() -> Settings:
+    # 개발자 로컬 .env와 compose env_file(DEBUG, GOOGLE_* 등)이 테스트 결과를 바꾸지 않도록
+    # .env는 읽지 않고, 환경변수로 들어오는 값 중 결과에 영향을 주는 것은 직접 고정한다
     return Settings(
+        _env_file=None,
         environment="test",
+        debug=False,
+        google_client_id="",
+        google_client_secret="",
+        google_redirect_uri="http://localhost:5173/auth/google/callback",
+        google_allowed_domain="nextrunners.co.kr",
+        refresh_cookie_secure=True,
         database_url=TEST_DATABASE_URL or "postgres://unused:unused@localhost:5432/unused",
         jwt_secret_key="test-secret-key-with-enough-length-0123456789",
     )
