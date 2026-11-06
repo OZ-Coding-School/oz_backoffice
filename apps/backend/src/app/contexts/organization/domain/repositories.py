@@ -10,6 +10,7 @@ from app.contexts.organization.domain.entities import (
     Employee,
     EmployeePosition,
 )
+from app.contexts.organization.domain.enums import EmployeeRegistrationStatus
 from app.contexts.organization.domain.registration import EmployeeRegistration
 
 
@@ -59,4 +60,10 @@ class EmployeeRegistrationRepository(Protocol):
     async def get(self, entity_id: uuid.UUID) -> EmployeeRegistration | None: ...
     async def get_latest_by_user(self, user_id: uuid.UUID) -> EmployeeRegistration | None:
         """회원의 가장 최근 신청 (대기·승인·반려 무관)."""
+        ...
+
+    async def list_by_status(
+        self, status: EmployeeRegistrationStatus, *, limit: int, offset: int
+    ) -> tuple[list[EmployeeRegistration], int]:
+        """상태별 목록(오래된 신청부터)과 전체 건수."""
         ...

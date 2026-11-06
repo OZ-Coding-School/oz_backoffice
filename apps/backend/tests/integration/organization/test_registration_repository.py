@@ -129,3 +129,26 @@ async def test_db_constraints(sql: str, constraint: str) -> None:
     await TortoiseEmployeeRegistrationRepository().add(registration)
     with pytest.raises(IntegrityError, match=constraint):
         await connections.get("default").execute_query(sql)
+
+
+async def test_list_by_status_with_paging() -> None:
+    repo = TortoiseEmployeeRegistrationRepository()
+    pending = []
+    for _ in range(3):
+        registration = await _registration()
+        await repo.add(registration)
+        pending.append(registration.id)
+    rejected = await _registration(
+        status=EmployeeRegistrationStatus.REJECTED,
+        reviewed_at=datetime(2026, 11, 1, tzinfo=UTC),
+        reject_reason="x",
+    )
+    await repo.add(rejected)
+
+    page, total = await repo.list_by_status(EmployeeRegistrationStatus.PENDING, limit=2, offset=1)
+    assert total == 3
+    assert [r.id for r in page] == pending[1:]
+    rejected_page, rejected_total = await repo.list_by_status(
+        EmployeeRegistrationStatus.REJECTED, limit=10, offset=0
+    )
+    assert (rejected_total, [r.id for r in rejected_page]) == (1, [rejected.id])

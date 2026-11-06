@@ -1,7 +1,7 @@
 """운영진 가입 신청 (decisions A11).
 
 최초 로그인한 운영진이 부서·직위·고용 형태·담당(역할 + 과정 또는 기수)을 입력해 신청한다.
-어드민이 항목을 조정해 승인하면 직원·담당자가 만들어진다 (승인·반려는 P3).
+어드민이 항목을 조정해 승인하면 직원·담당자가 만들어진다 (승인·반려는 P3-2b).
 담당 역할과 과정·기수는 직위와 연결하지 않고 신청자가 직접 고른다.
 """
 
@@ -18,6 +18,7 @@ from app.shared.domain import AggregateRoot
 from app.shared.errors import BusinessRuleViolation
 
 MAX_ASSIGNMENTS = 20
+REJECT_REASON_MAX_LENGTH = 300
 
 
 def _require(condition: bool, message: str, code: str) -> None:
@@ -97,3 +98,34 @@ class EmployeeRegistration(AggregateRoot):
         self.position_id = position_id
         self.employment_type = employment_type
         self.assignments = list(assignments)
+
+    def approve(
+        self,
+        *,
+        now: datetime,
+        department_id: uuid.UUID,
+        position_id: uuid.UUID,
+        employment_type: EmploymentType,
+        assignments: list[RequestedAssignment],
+    ) -> None:
+        """어드민이 (조정한) 항목으로 승인한다. 승인된 항목이 직원·담당자의 원천이 된다."""
+        _require(self.is_pending, "이미 검토가 끝난 신청입니다.", "registration_not_pending")
+        _validate_assignments(assignments)
+        self.department_id = department_id
+        self.position_id = position_id
+        self.employment_type = employment_type
+        self.assignments = list(assignments)
+        self.status = EmployeeRegistrationStatus.APPROVED
+        self.reviewed_at = now
+
+    def reject(self, *, now: datetime, reason: str) -> None:
+        _require(self.is_pending, "이미 검토가 끝난 신청입니다.", "registration_not_pending")
+        reason = reason.strip()
+        _require(
+            0 < len(reason) <= REJECT_REASON_MAX_LENGTH,
+            f"반려 사유는 1~{REJECT_REASON_MAX_LENGTH}자여야 합니다.",
+            "invalid_reject_reason",
+        )
+        self.status = EmployeeRegistrationStatus.REJECTED
+        self.reviewed_at = now
+        self.reject_reason = reason

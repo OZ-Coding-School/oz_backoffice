@@ -6,6 +6,7 @@ from dataclasses import replace
 
 from app.contexts.academy.domain.entities import Bootcamp, Cohort
 from app.contexts.organization.domain.entities import Department, EmployeePosition
+from app.contexts.organization.domain.enums import EmployeeRegistrationStatus
 from app.contexts.organization.domain.registration import EmployeeRegistration
 from app.shared.errors import BusinessRuleViolation
 
@@ -61,6 +62,12 @@ class InMemoryEmployeeRegistrationRepository:
     async def get_latest_by_user(self, user_id: uuid.UUID) -> EmployeeRegistration | None:
         mine = [r for r in self.items.values() if r.user_id == user_id]
         return replace(max(mine, key=lambda r: r.id)) if mine else None  # uuid7 = 생성 순서
+
+    async def list_by_status(
+        self, status: EmployeeRegistrationStatus, *, limit: int, offset: int
+    ) -> tuple[list[EmployeeRegistration], int]:
+        matched = sorted((r for r in self.items.values() if r.status is status), key=lambda r: r.id)
+        return [replace(r) for r in matched[offset : offset + limit]], len(matched)
 
 
 class FakeStaffTargetCatalog:
