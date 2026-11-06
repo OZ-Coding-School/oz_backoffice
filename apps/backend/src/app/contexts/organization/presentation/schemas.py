@@ -100,3 +100,22 @@ class ApproveStaffRegistrationRequest(BaseModel):
 
 class RejectStaffRegistrationRequest(BaseModel):
     reason: str = Field(min_length=1, max_length=REJECT_REASON_MAX_LENGTH)
+
+
+class StaffUserSummary(BaseModel):
+    id: uuid.UUID
+    email: str
+    name: str
+
+
+class StaffMemberResponse(BaseModel):
+    id: uuid.UUID
+    employee_id: uuid.UUID
+    role: StaffRole
+    user: StaffUserSummary | None
+    created_at: datetime | None
+
+
+class AssignStaffRequest(BaseModel):
+    employee_id: uuid.UUID
+    role: StaffRole
