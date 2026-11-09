@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     api_prefix: str = "/api/v1"
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
+    # X-Forwarded-For를 믿을 프록시 주소(IP·CIDR). 비우면 직접 연결 주소만 쓴다 (A30)
+    trusted_proxies: list[str] = Field(default_factory=list)
     # 로그인 후 돌려보낼 프론트엔드 주소 (성공: /, 실패: /login?error=<code>)
     frontend_base_url: str = "http://localhost:5173"
 

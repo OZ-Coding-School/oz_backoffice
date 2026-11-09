@@ -55,3 +55,16 @@ async def test_integrity_error_is_mapped_to_conflict(app: FastAPI, client: Async
     response = await client.get("/_test/integrity")
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "conflict"
+
+
+async def test_too_many_requests_has_retry_after(app: FastAPI, client: AsyncClient) -> None:
+    from app.shared.errors import TooManyRequestsError
+
+    @app.get("/_test/rate-limited")
+    async def rate_limited() -> None:
+        raise TooManyRequestsError("잠시 후 다시 시도하세요.", retry_after=42, code="rate_limited")
+
+    response = await client.get("/_test/rate-limited")
+    assert response.status_code == 429
+    assert response.headers["retry-after"] == "42"
+    assert response.json()["error"]["code"] == "rate_limited"

@@ -18,6 +18,7 @@ from app.shared.errors import (
     NotFoundError,
     PermissionDeniedError,
     ServiceUnavailableError,
+    TooManyRequestsError,
 )
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,7 @@ _STATUS_BY_ERROR: dict[type[AppError], int] = {
     AuthenticationError: status.HTTP_401_UNAUTHORIZED,
     PermissionDeniedError: status.HTTP_403_FORBIDDEN,
     ServiceUnavailableError: status.HTTP_503_SERVICE_UNAVAILABLE,
+    TooManyRequestsError: status.HTTP_429_TOO_MANY_REQUESTS,
 }
 
 
@@ -46,7 +48,12 @@ def error_body(code: str, message: str) -> dict[str, dict[str, str]]:
 async def app_error_handler(request: Request, exc: Exception) -> JSONResponse:
     if not isinstance(exc, AppError):
         return await unhandled_error_handler(request, exc)
-    return JSONResponse(status_code=status_for(exc), content=error_body(exc.code, exc.message))
+    headers = (
+        {"Retry-After": str(exc.retry_after)} if isinstance(exc, TooManyRequestsError) else None
+    )
+    return JSONResponse(
+        status_code=status_for(exc), content=error_body(exc.code, exc.message), headers=headers
+    )
 
 
 async def integrity_error_handler(_: Request, exc: Exception) -> JSONResponse:
