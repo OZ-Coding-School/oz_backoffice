@@ -1,7 +1,7 @@
 # 23. P5-3 과정-기수 테이블로 학사 마스터 동기화
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 예정)
+- 관련 PR: #26
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P5 (P5-3)
 - 이전 기록: [22. P5-2c 명단 동기화 관리 API](22_p5_2c_roster_sync_api.md), [18. P4-2 학사 관리 API](18_p4_2_academy_admin_api.md) (기수-HRD 일치 검증을 이번에 없앰)
 
