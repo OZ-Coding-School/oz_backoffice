@@ -1,7 +1,7 @@
 # 29. P6-4 계약 수동 연결과 멘토 프로필 API
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 예정)
+- 관련 PR: #32
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P6 (P6-4)
 - 이전 기록: [28. P6-3 계약서 업로드와 계약 관리 API](28_p6_3_contract_api.md)
 
