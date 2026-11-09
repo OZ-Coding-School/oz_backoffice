@@ -1,7 +1,7 @@
 # 31. P7-2 수강생·멘토 가입 (인증코드·레이트 리밋·가입 신청)
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 예정)
+- 관련 PR: #35
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P7 (P7-2)
 - 이전 기록: [30. P7-1 메일·SMS 발송 기반과 Gmail 드라이버](30_p7_1_notification_senders.md)
 
