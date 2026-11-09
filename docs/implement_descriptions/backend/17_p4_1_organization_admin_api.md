@@ -1,7 +1,7 @@
 # 17. P4-1 조직(부서·직위·직원) 관리 API
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 예정)
+- 관련 PR: #20
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P4 (P4-1)
 - 이전 기록: [16. P3-3b 회원 역할 관리 API](16_p3_3b_user_role_api.md)
 
