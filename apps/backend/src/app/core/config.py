@@ -78,6 +78,16 @@ class Settings(BaseSettings):
     s3_presigned_get_ttl_seconds: int = 10 * 60
     s3_presigned_post_ttl_seconds: int = 10 * 60
 
+    # 메일·SMS 발송 (decisions A4). console은 로그로 출력하는 개발용 드라이버이며,
+    # 운영(environment=production)에서는 발송을 거부한다(503).
+    mail_driver: Literal["console", "gmail"] = "console"
+    sms_driver: Literal["console"] = "console"
+    mail_sender_name: str = "오즈코딩스쿨"
+    # Gmail API 발송 계정 (도메인 전체 위임으로 이 사용자를 대신해 보낸다, gmail.send)
+    gmail_sender: str = ""
+    # 서비스 계정 키 JSON 원문 (한 줄). 도메인 전체 위임이 설정된 서비스 계정이어야 한다
+    google_service_account_json: SecretStr = SecretStr("")
+
     # 업무상 날짜 경계 기준 타임존
     business_timezone: str = "Asia/Seoul"
 

@@ -80,6 +80,7 @@ docker compose exec api aerich upgrade                 # 적용
 
 docker compose exec api python -m app.cli create-super-admin <email> [--name 이름]  # 최고 관리자 등록 (멱등)
 docker compose exec api python -m app.cli seed-roles   # 역할·권한 정의(access/domain/catalog.py)를 DB에 반영 (멱등)
+docker compose exec api python -m app.cli send-test-mail <받는주소>  # 현재 MAIL_DRIVER로 확인 메일 발송 (Gmail 설정 확인)
 ```
 
 포맷 자동 수정(`ruff format .`, `ruff check --fix .`)도 컨테이너에서 실행하면 마운트된 호스트 파일이 바뀐다.

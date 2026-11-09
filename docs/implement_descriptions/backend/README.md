@@ -31,3 +31,4 @@
 | 27 | [P6-2 멘토·강사·계약·계약서 모델](27_p6_2_educator_models.md) | 완료 (#30) |
 | 28 | [P6-3 계약서 업로드와 계약 관리 API](28_p6_3_contract_api.md) | 완료 (#31) |
 | 29 | [P6-4 계약 수동 연결과 멘토 프로필 API](29_p6_4_contract_link_mentor_profile.md) | 완료 (#32) |
+| 30 | [P7-1 메일·SMS 발송 기반과 Gmail 드라이버](30_p7_1_notification_senders.md) | 완료 (#34) |

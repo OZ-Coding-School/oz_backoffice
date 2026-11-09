@@ -11,6 +11,8 @@ from fastapi import Request
 from app.core.clock import Clock
 from app.core.config import Settings
 from app.core.security import JWTService
+from app.integrations.notifications.mail import MailSender
+from app.integrations.notifications.sms import SmsSender
 from app.integrations.s3 import S3Storage
 
 
@@ -34,3 +36,12 @@ def get_http_client(request: Request) -> httpx.AsyncClient:
 def get_file_storage(request: Request) -> S3Storage:
     """S3 어댑터 (create_app에서 생성). 테스트는 app.state.storage를 가짜로 바꾼다."""
     return cast("S3Storage", request.app.state.storage)
+
+
+def get_mail_sender(request: Request) -> MailSender:
+    """메일 발송 드라이버 (create_app에서 설정으로 고른다). 테스트는 메모리 드라이버로 바꾼다."""
+    return cast("MailSender", request.app.state.mail_sender)
+
+
+def get_sms_sender(request: Request) -> SmsSender:
+    return cast("SmsSender", request.app.state.sms_sender)
