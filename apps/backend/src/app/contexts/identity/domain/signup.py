@@ -65,6 +65,11 @@ class MemberSignup(AggregateRoot):
     def is_pending(self) -> bool:
         return self.status is MemberSignupStatus.PENDING
 
+    def record_match(self, result: SignupMatchResult) -> None:
+        """자동 매칭 결과를 남긴다(가입 완료 때 한 번)."""
+        self._ensure_pending()
+        self.match_result = result
+
     def approve(self, *, now: datetime) -> None:
         self._ensure_pending()
         self.status = MemberSignupStatus.APPROVED

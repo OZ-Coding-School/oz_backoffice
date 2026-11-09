@@ -5,12 +5,17 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from fakeredis import FakeAsyncRedis
 
+from app.contexts.academy.application.student_claims import ClaimOutcome
+from app.contexts.access.domain.enums import RoleScopeType
 from app.contexts.audit.application.recorder import AuditRecorder
+from app.contexts.educator.application.mentor_onboarding import MentorMatch
 from app.contexts.educator.domain.enums import DisplayNamePreference
 from app.contexts.identity.application.signup import SignupForm, SignupService
+from app.contexts.identity.application.signup_matching import SignupMatcher
 from app.contexts.identity.domain.enums import (
     MemberSignupStatus,
     MemberSignupType,
+    SignupMatchResult,
     UserApprovalStatus,
 )
 from app.contexts.identity.infrastructure.verification_store import (
@@ -25,7 +30,11 @@ from app.shared.ids import new_id
 from tests.factories.identity import make_user
 from tests.fakes.audit import InMemoryAuditLogRepository
 from tests.fakes.identity import InMemoryMemberSignupRepository, InMemoryUserRepository
-from tests.fakes.notifications import InMemoryMailSender, InMemorySmsSender
+from tests.fakes.notifications import (
+    InMemoryMailDispatcher,
+    InMemoryMailSender,
+    InMemorySmsSender,
+)
 from tests.fakes.uow import FakeUnitOfWork
 
 pytestmark = pytest.mark.unit
@@ -49,6 +58,45 @@ class FakeCohorts:
         return cohort_id in self.open
 
 
+class FakeClaimer:
+    def __init__(self) -> None:
+        self.candidates = 0
+        self.claimed: list[uuid.UUID] = []
+
+    async def claim_in_cohort(
+        self, cohort_id: uuid.UUID, *, name: str, phone_number: str, user_id: uuid.UUID
+    ) -> ClaimOutcome:
+        if self.candidates == 1:
+            self.claimed.append(user_id)
+            return ClaimOutcome(candidate_count=1, student_id=new_id())
+        return ClaimOutcome(candidate_count=self.candidates, student_id=None)
+
+
+class FakeLinker:
+    def __init__(self) -> None:
+        self.contract_ids: list[uuid.UUID] = []
+
+    async def link_contracts(self, **kwargs: object) -> MentorMatch:
+        return MentorMatch(
+            contract_ids=self.contract_ids, mentor_id=new_id() if self.contract_ids else None
+        )
+
+
+class FakeRoles:
+    def __init__(self) -> None:
+        self.granted: list[tuple[uuid.UUID, str, RoleScopeType, uuid.UUID | None]] = []
+
+    async def grant(
+        self,
+        user_id: uuid.UUID,
+        role_code: str,
+        scope_type: RoleScopeType,
+        scope_id: uuid.UUID | None = None,
+    ) -> bool:
+        self.granted.append((user_id, role_code, scope_type, scope_id))
+        return True
+
+
 class FailingMail:
     async def send(self, message: MailMessage) -> None:
         raise MailDeliveryError("실패")
@@ -64,6 +112,10 @@ class Harness:
         self.cohort_id = new_id()
         self.audit_logs = InMemoryAuditLogRepository()
         self.challenges = RedisChallengeStore(redis)
+        self.claims = FakeClaimer()
+        self.linker = FakeLinker()
+        self.roles = FakeRoles()
+        self.dispatcher = InMemoryMailDispatcher()
         self.service = SignupService(
             users=self.users,
             signups=self.signups,
@@ -72,13 +124,16 @@ class Harness:
             limiter=RedisRateLimiter(redis),
             hasher=FakeHasher(),
             cohorts=FakeCohorts(self.cohort_id),
+            matcher=SignupMatcher(students=self.claims, mentors=self.linker, roles=self.roles),
             mail=self.mail,
+            mail_dispatcher=self.dispatcher,
             sms=self.sms,
             audit=AuditRecorder(self.audit_logs, self.clock),
             uow=FakeUnitOfWork(),
             clock=self.clock,
             code_secret="secret",
             sender_name="오즈코딩스쿨",
+            login_url="http://localhost:5173/login",
         )
 
     def last_mail_code(self) -> str:
@@ -257,3 +312,64 @@ async def test_complete_validations(h: Harness) -> None:
     with pytest.raises(BusinessRuleViolation) as missing:
         await h.service.request_phone_code("unknown-token", PHONE, client_ip=IP)
     assert missing.value.code == "signup_session_expired"
+
+
+@pytest.mark.parametrize(
+    ("candidates", "expected"),
+    [(0, SignupMatchResult.NO_MATCH), (2, SignupMatchResult.AMBIGUOUS)],
+)
+async def test_unmatched_student_stays_pending(
+    h: Harness, candidates: int, expected: SignupMatchResult
+) -> None:
+    h.claims.candidates = candidates
+    result = await h.service.complete(await h.verified_token(), h.form())
+
+    assert result.user.approval_status is UserApprovalStatus.PENDING
+    assert (result.signup.status, result.signup.match_result) == (
+        MemberSignupStatus.PENDING,
+        expected,
+    )
+    assert h.roles.granted == []
+    assert h.dispatcher.dispatched == []
+    assert h.audit_logs.logs[-1].after == {
+        "signup_type": "STUDENT",
+        "match_result": expected.value,
+        "status": "PENDING",
+    }
+
+
+async def test_matched_student_is_approved_with_role_and_mail(h: Harness) -> None:
+    h.claims.candidates = 1
+    result = await h.service.complete(await h.verified_token(), h.form())
+
+    assert result.user.approval_status is UserApprovalStatus.APPROVED
+    assert result.user.is_active
+    assert (result.signup.status, result.signup.match_result) == (
+        MemberSignupStatus.APPROVED,
+        SignupMatchResult.MATCHED,
+    )
+    assert h.roles.granted == [(result.user.id, "STUDENT", RoleScopeType.COHORT, h.cohort_id)]
+    mail = h.dispatcher.dispatched[0]  # 커밋 후 워커로 보낸다
+    assert (mail.to, mail.subject) == (EMAIL, "[오즈코딩스쿨] 가입이 승인되었습니다")
+    assert "http://localhost:5173/login" in mail.text
+
+
+async def test_matched_mentor_is_approved_without_role(h: Harness) -> None:
+    h.linker.contract_ids = [new_id()]
+    result = await h.service.complete(
+        await h.verified_token(), h.form(signup_type=MemberSignupType.MENTOR, cohort_id=None)
+    )
+    assert result.user.approval_status is UserApprovalStatus.APPROVED
+    assert h.roles.granted == []  # MENTOR 역할은 배정(P8)에서 (A17)
+    assert len(h.dispatcher.dispatched) == 1
+
+
+async def test_approval_mail_escapes_name() -> None:
+    from app.contexts.identity.application.signup import approval_mail
+
+    message = approval_mail(
+        make_user(email=EMAIL, name="<b>김</b>"), sender_name="오즈", login_url="http://x/login"
+    )
+    assert message.html is not None
+    assert "<b>김</b>" not in message.html
+    assert "&lt;b&gt;김&lt;/b&gt;" in message.html

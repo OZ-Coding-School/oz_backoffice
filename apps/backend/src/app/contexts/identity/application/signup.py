@@ -4,8 +4,8 @@
 ② 코드 확인 → 가입 토큰(30분).
 ③ SMS 인증: 가입 토큰 + 휴대폰. 다른 계정에 등록된 번호는 거부한다. 코드를 문자로 보낸다.
 ④ 가입 완료: 가입 토큰 + 이름·비밀번호·유형(수강생은 기수, 멘토는 닉네임·표시 이름) →
-   회원(PENDING) + 가입 신청을 만든다. 토큰은 주지 않는다(다시 로그인, A30).
-   자동 매칭(P7-3)은 이 단계에 붙는다.
+   회원 + 가입 신청을 만들고 자동 매칭한다(A31). 일치하면 바로 승인하고 커밋 후 승인 알림
+   메일을 워커로 보낸다. 아니면 승인 대기(PENDING). 토큰은 주지 않는다(다시 로그인, A30).
 
 발송 제한: 대상(이메일·휴대폰)당 1시간 5회, IP당 1시간 20회(메일·SMS 합산), 재발송 60초.
 코드는 HMAC-SHA256 해시로만 저장하고 상수 시간으로 비교한다. 발송에 실패하면 저장한 코드를
@@ -14,6 +14,7 @@
 
 import hashlib
 import hmac
+import html
 import secrets
 import uuid
 from collections.abc import Awaitable
@@ -22,9 +23,10 @@ from typing import Protocol
 
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.educator.domain.enums import DisplayNamePreference
+from app.contexts.identity.application.signup_matching import SignupMatcher
 from app.contexts.identity.domain.credentials import validate_password
 from app.contexts.identity.domain.entities import User
-from app.contexts.identity.domain.enums import MemberSignupType
+from app.contexts.identity.domain.enums import MemberSignupType, SignupMatchResult
 from app.contexts.identity.domain.repositories import MemberSignupRepository, UserRepository
 from app.contexts.identity.domain.signup import MemberSignup
 from app.contexts.identity.domain.verification import (
@@ -74,6 +76,28 @@ class SignupCohorts(Protocol):
     async def is_signup_cohort(self, cohort_id: uuid.UUID) -> bool: ...
 
 
+class MailDispatcher(Protocol):
+    """알림 메일을 커밋 후 워커로 보낸다 (`TaskiqMailDispatcher`)."""
+
+    async def dispatch(self, message: MailMessage) -> None: ...
+
+
+def approval_mail(user: User, *, sender_name: str, login_url: str) -> MailMessage:
+    name, url = html.escape(user.name), html.escape(login_url, quote=True)
+    return MailMessage(
+        to=user.email,
+        subject=f"[{sender_name}] 가입이 승인되었습니다",
+        text=(
+            f"{user.name}님, {sender_name} 가입이 승인되었습니다.\n"
+            f"아래 주소에서 로그인해 주세요.\n{login_url}"
+        ),
+        html=(
+            f"<p>{name}님, {sender_name} 가입이 승인되었습니다.</p>"
+            f'<p><a href="{url}">로그인하기</a></p>'
+        ),
+    )
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class SignupForm:
     name: str
@@ -105,13 +129,16 @@ class SignupService:
         limiter: RateLimiter,
         hasher: PasswordHasher,
         cohorts: SignupCohorts,
+        matcher: SignupMatcher,
         mail: MailSender,
+        mail_dispatcher: MailDispatcher,
         sms: SmsSender,
         audit: AuditRecorder,
         uow: UnitOfWork,
         clock: Clock,
         code_secret: str,
         sender_name: str,
+        login_url: str,
     ) -> None:
         self._users = users
         self._signups = signups
@@ -120,13 +147,16 @@ class SignupService:
         self._limiter = limiter
         self._hasher = hasher
         self._cohorts = cohorts
+        self._matcher = matcher
         self._mail = mail
+        self._dispatcher = mail_dispatcher
         self._sms = sms
         self._audit = audit
         self._uow = uow
         self._clock = clock
         self._secret = code_secret.encode()
         self._sender_name = sender_name
+        self._login_url = login_url
 
     # ------------------------------------------------------------------ ① ② 이메일
     async def request_email_code(self, raw_email: str, *, client_ip: str) -> None:
@@ -235,13 +265,29 @@ class SignupService:
                 raise ConflictError("이미 가입된 이메일입니다.", code="email_already_registered")
             await self._ensure_phone_free(session.phone_number)
             await self._users.add(user)
+            # 자동 매칭 (A6·A31): 일치하면 바로 승인, 아니면 승인 대기
+            result = await self._matcher.match(user, signup)
+            signup.record_match(result)
+            if result is SignupMatchResult.MATCHED:
+                now = self._clock.now()
+                user.approve(now=now)
+                signup.approve(now=now)
+                await self._users.save(user)
+                message = approval_mail(
+                    user, sender_name=self._sender_name, login_url=self._login_url
+                )
+                self._uow.on_commit(lambda: self._dispatcher.dispatch(message))
             await self._signups.add(signup)
             await self._audit.record(
                 actor_user_id=user.id,
                 action="identity.member_signup.create",
                 target_type="member_signup",
                 target_id=signup.id,
-                after={"signup_type": signup.signup_type.value},
+                after={
+                    "signup_type": signup.signup_type.value,
+                    "match_result": result.value,
+                    "status": signup.status.value,
+                },
             )
         await self._sessions.delete(token)
         return SignupResult(user=user, signup=signup)

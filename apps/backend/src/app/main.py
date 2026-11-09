@@ -10,15 +10,23 @@ from tortoise.contrib.fastapi import RegisterTortoise
 
 from app.api import health, v1
 from app.contexts.academy.application.catalog import AcademyCatalog
+from app.contexts.academy.application.student_claims import StudentClaims
 from app.contexts.academy.infrastructure.repositories import (
     TortoiseBootcampRepository,
     TortoiseCohortRepository,
+    TortoiseStudentRepository,
 )
 from app.contexts.access.application.roles import RoleAssignmentService, RoleQueries
 from app.contexts.access.infrastructure.repositories import TortoiseUserRoleRepository
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.audit.infrastructure.repositories import TortoiseAuditLogRepository
+from app.contexts.educator.application.mentor_onboarding import MentorOnboarding
+from app.contexts.educator.infrastructure.repositories import (
+    TortoiseEducatorContractRepository,
+    TortoiseMentorRepository,
+)
 from app.contexts.identity.application.auth_service import UserQueries
+from app.contexts.identity.application.signup_matching import SignupMatcher
 from app.contexts.identity.application.user_admin import UserAdministration
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
 from app.contexts.organization.application.employee_queries import EmployeeQueries
@@ -32,6 +40,7 @@ from app.core.notifications import build_mail_sender, build_sms_sender
 from app.core.redis import create_redis
 from app.core.storage import build_s3_storage
 from app.workers.broker import broker
+from app.workers.tasks.notifications import TaskiqMailDispatcher
 from app.workers.tasks.roster import TaskiqRosterSyncDispatcher
 
 
@@ -74,6 +83,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.audit_recorder = AuditRecorder(TortoiseAuditLogRepository(), clock)
     app.state.roster_sync_dispatcher = TaskiqRosterSyncDispatcher()
     app.state.employee_queries = EmployeeQueries(TortoiseEmployeeRepository())
+    app.state.mail_dispatcher = TaskiqMailDispatcher()
+    # 가입 자동 매칭 (A31): academy·educator·access 공개 서비스를 가입 트랜잭션 안에서 쓴다
+    app.state.signup_matcher = SignupMatcher(
+        students=StudentClaims(TortoiseStudentRepository()),
+        mentors=MentorOnboarding(
+            contracts=TortoiseEducatorContractRepository(), mentors=TortoiseMentorRepository()
+        ),
+        roles=RoleAssignmentService(TortoiseUserRoleRepository()),
+    )
     app.state.academy_catalog = AcademyCatalog(
         TortoiseBootcampRepository(), TortoiseCohortRepository()
     )
