@@ -2,6 +2,7 @@
 
 import uuid
 from collections.abc import Collection
+from datetime import datetime
 
 from app.contexts.academy.domain.entities import (
     Bootcamp,
@@ -159,6 +160,29 @@ class TortoiseStudentRepository(TortoiseRepository[Student, StudentModel]):
     async def list_by_user(self, user_id: uuid.UUID) -> list[Student]:
         rows = await StudentModel.filter(user_id=user_id).order_by("enrolled_at")
         return [self.to_entity(row) for row in rows]
+
+    async def list_by_record_ids(self, airtable_record_ids: list[str]) -> list[Student]:
+        if not airtable_record_ids:
+            return []
+        rows = await StudentModel.filter(airtable_record_id__in=airtable_record_ids)
+        return [self.to_entity(row) for row in rows]
+
+    async def list_sourced_by_cohorts(self, cohort_ids: list[uuid.UUID]) -> list[Student]:
+        if not cohort_ids:
+            return []
+        rows = await StudentModel.filter(cohort_id__in=cohort_ids, airtable_record_id__isnull=False)
+        return [self.to_entity(row) for row in rows]
+
+    async def add_many(self, students: list[Student]) -> None:
+        await StudentModel.bulk_create(
+            [StudentModel(id=s.id, **self.to_values(s)) for s in students], batch_size=500
+        )
+
+    async def save_many(self, students: list[Student], *, now: datetime) -> None:
+        if not students:
+            return
+        rows = [StudentModel(id=s.id, **self.to_values(s), updated_at=now) for s in students]
+        await StudentModel.bulk_update(rows, fields=[*self.fields, "updated_at"], batch_size=500)
 
     async def get_by_record_id(self, airtable_record_id: str) -> Student | None:
         row = await StudentModel.get_or_none(airtable_record_id=airtable_record_id)

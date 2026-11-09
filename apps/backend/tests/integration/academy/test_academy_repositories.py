@@ -12,6 +12,7 @@ from app.contexts.academy.domain.enums import (
     RosterSyncScope,
     RosterSyncStatus,
     RosterSyncTrigger,
+    StudentStatus,
 )
 from app.contexts.academy.infrastructure.repositories import (
     TortoiseBootcampRepository,
@@ -190,3 +191,12 @@ async def test_master_lookups_and_delete_in_use() -> None:
     assert exc.value.code == "in_use"
     await TortoiseCohortRepository().delete(cohort.id)
     assert await TortoiseCohortRepository().get(cohort.id) is None
+
+
+async def test_unknown_hrd_status_is_allowed() -> None:
+    cohort = await create_cohort()
+    student = make_student(cohort_id=cohort.id, hrd_net_status=StudentStatus.UNKNOWN)
+    await TortoiseStudentRepository().add(student)
+    loaded = await TortoiseStudentRepository().get(student.id)
+    assert loaded is not None
+    assert loaded.hrd_net_status is StudentStatus.UNKNOWN
