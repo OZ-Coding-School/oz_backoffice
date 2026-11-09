@@ -46,6 +46,11 @@ class Settings(BaseSettings):
     google_redirect_uri: str = "http://localhost:8000/api/v1/auth/google/callback"
     google_allowed_domain: str = "nextrunners.co.kr"
 
+    # Airtable 수강생 명단 (P5). 토큰은 읽기 범위(data.records:read, schema.bases:read)만
+    airtable_token: SecretStr = SecretStr("")
+    airtable_base_id: str = ""
+    airtable_table_id: str = ""  # 테이블 ID(tbl...) 또는 테이블 이름
+
     # AWS S3 (비공개 버킷 1개 + prefix: contracts/, profiles/ ...)
     # 로컬·CI는 S3 에뮬레이터(floci)를 endpoint로 지정한다.
     # 운영은 endpoint 없이 AWS 기본 엔드포인트를 쓴다.
