@@ -1,6 +1,6 @@
 # 29. P6-4 계약 수동 연결과 멘토 프로필 API
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-09 병합)
 - 관련 PR: #32
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P6 (P6-4)
 - 이전 기록: [28. P6-3 계약서 업로드와 계약 관리 API](28_p6_3_contract_api.md)
@@ -64,6 +64,7 @@ P6의 마지막 PR이다. 운영진이 계약을 가입한 멘토·강사 프로
   - 운영진: 목록 검색·계약 수, 대리 수정·사진 업로드, 권한(401·403)
   - 계약 연결·해제: 유형 불일치, 둘 다 보내면 422
 - 커밋 3개를 worktree에서 하나씩 검사했다(ruff, ruff format, mypy, mypy tests, lint-imports, pytest). 모두 통과했고 최종 431 passed다.
+- GitHub Actions (PR #32, run 42611372473): backend 잡 통과, 431 passed
 
 ## 남은 작업
 - P7 수강생·멘토 가입: 멘토 자동 매칭으로 프로필 생성·계약 연결·역할 부여, 승인 흐름에서 계약 선택
