@@ -17,6 +17,7 @@ from app.contexts.identity.infrastructure.repositories import TortoiseUserReposi
 from app.core.config import Settings
 from app.core.security import JWTService
 from tests.factories.academy import create_cohort
+from tests.factories.educator import create_instructor, create_mentor
 from tests.factories.organization import create_employee
 from tests.factories.staff_review import create_applicant, seed_roles
 
@@ -173,3 +174,28 @@ async def test_validation_errors(client: AsyncClient, admin: dict[str, str]) -> 
         headers=admin,
     )
     assert reversed_period.json()["error"]["code"] == "invalid_contract_period"
+
+
+async def test_link_and_unlink(client: AsyncClient, admin: dict[str, str]) -> None:
+    contract = (
+        await client.post(f"{API}/contracts", json=await _contract_body(), headers=admin)
+    ).json()
+    path = f"{API}/contracts/{contract['id']}/link"
+    mentor = await create_mentor()
+    instructor = await create_instructor()
+
+    linked = await client.post(path, json={"mentor_id": str(mentor.id)}, headers=admin)
+    assert linked.status_code == 200, linked.text
+    assert linked.json()["mentor_id"] == str(mentor.id)
+
+    wrong = await client.post(path, json={"instructor_id": str(instructor.id)}, headers=admin)
+    assert wrong.json()["error"]["code"] == "contract_type_mismatch"
+    both = await client.post(
+        path,
+        json={"mentor_id": str(mentor.id), "instructor_id": str(instructor.id)},
+        headers=admin,
+    )
+    assert both.json()["error"]["code"] == "invalid_contract_link"
+
+    unlinked = await client.delete(path, headers=admin)
+    assert unlinked.json()["mentor_id"] is None

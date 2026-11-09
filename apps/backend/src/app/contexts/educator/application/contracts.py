@@ -22,6 +22,8 @@ from app.contexts.educator.domain.repositories import (
     ContractFileRepository,
     ContractFilter,
     EducatorContractRepository,
+    InstructorRepository,
+    MentorRepository,
 )
 from app.core.clock import Clock
 from app.core.uow import UnitOfWork
@@ -62,6 +64,8 @@ class ContractService:
         *,
         contracts: EducatorContractRepository,
         files: ContractFileRepository,
+        mentors: MentorRepository,
+        instructors: InstructorRepository,
         employees: EmployeeDirectory,
         storage: FileStorage,
         audit: AuditRecorder,
@@ -70,6 +74,8 @@ class ContractService:
     ) -> None:
         self._contracts = contracts
         self._files = files
+        self._mentors = mentors
+        self._instructors = instructors
         self._employees = employees
         self._storage = storage
         self._audit = audit
@@ -133,6 +139,28 @@ class ContractService:
 
     async def terminate(self, contract_id: uuid.UUID, *, actor_id: uuid.UUID) -> ContractView:
         return await self._transition(contract_id, "terminate", actor_id=actor_id)
+
+    async def link(
+        self,
+        contract_id: uuid.UUID,
+        *,
+        mentor_id: uuid.UUID | None = None,
+        instructor_id: uuid.UUID | None = None,
+        actor_id: uuid.UUID,
+    ) -> ContractView:
+        """가입한 멘토·강사 프로필에 수동 연결·변경한다. 둘 다 None이면 해제(A27)."""
+        async with self._uow:
+            contract = await self._get(contract_id)
+            before = dataclasses.replace(contract)
+            contract.link(mentor_id=mentor_id, instructor_id=instructor_id)
+            if mentor_id is not None and await self._mentors.get(mentor_id) is None:
+                raise NotFoundError("멘토를 찾을 수 없습니다.", code="mentor_not_found")
+            if instructor_id is not None and not await self._instructors.exists(instructor_id):
+                raise NotFoundError("강사를 찾을 수 없습니다.", code="instructor_not_found")
+            await self._contracts.save(contract)
+            action = "unlink" if mentor_id is None and instructor_id is None else "link"
+            await self._record(actor_id, action, contract, before=before)
+        return await self.get(contract_id)
 
     async def delete(self, contract_id: uuid.UUID, *, actor_id: uuid.UUID) -> None:
         async with self._uow:

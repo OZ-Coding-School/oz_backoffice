@@ -7,6 +7,7 @@
 - ENDED·TERMINATED는 더 바뀌지 않는다.
 
 수정·삭제 (A25): DRAFT일 때만 수정(계약서 교체 포함)·삭제한다. 확정 후에는 담당 직원만 바꿀 수 있다.
+멘토·강사 연결 (A27): 상태와 무관하게 연결·변경·해제한다(계약 내용이 아니라 관리 정보).
 """
 
 import dataclasses
@@ -136,6 +137,21 @@ class EducatorContract(AggregateRoot):
             self.status = ContractStatus.ENDED
             return True
         return False
+
+    def link(self, *, mentor_id: uuid.UUID | None, instructor_id: uuid.UUID | None) -> None:
+        """멘토·강사 프로필을 연결·변경·해제한다(둘 다 None이면 해제). 상태와 무관하다(A27).
+
+        계약 유형과 프로필 종류가 같아야 한다(DB check_contract_educator_type과 같은 규칙).
+        """
+        wrong_kind = (self.educator_type is EducatorType.MENTOR and instructor_id is not None) or (
+            self.educator_type is EducatorType.INSTRUCTOR and mentor_id is not None
+        )
+        if wrong_kind:
+            raise BusinessRuleViolation(
+                "계약 유형과 연결할 프로필 종류가 다릅니다.", code="contract_type_mismatch"
+            )
+        self.mentor_id = mentor_id
+        self.instructor_id = instructor_id
 
     def ensure_deletable(self) -> None:
         if not self.is_draft:

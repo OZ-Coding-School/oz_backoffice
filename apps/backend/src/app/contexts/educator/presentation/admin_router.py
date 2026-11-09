@@ -25,6 +25,8 @@ from app.contexts.educator.infrastructure.pending_uploads import RedisPendingUpl
 from app.contexts.educator.infrastructure.repositories import (
     TortoiseContractFileRepository,
     TortoiseEducatorContractRepository,
+    TortoiseInstructorRepository,
+    TortoiseMentorRepository,
 )
 from app.contexts.identity.domain.entities import User
 from app.core.clock import Clock
@@ -33,6 +35,7 @@ from app.core.pagination import Page
 from app.core.redis import get_redis
 from app.core.uow import UnitOfWork
 from app.integrations.s3 import S3Storage
+from app.shared.errors import BusinessRuleViolation
 
 router = APIRouter(prefix="/admin", tags=["admin-contracts"])
 
@@ -47,6 +50,8 @@ def get_contract_service(
     return ContractService(
         contracts=TortoiseEducatorContractRepository(),
         files=TortoiseContractFileRepository(),
+        mentors=TortoiseMentorRepository(),
+        instructors=TortoiseInstructorRepository(),
         employees=cast("EmployeeDirectory", request.app.state.employee_queries),
         storage=storage,
         audit=cast("AuditRecorder", request.app.state.audit_recorder),
@@ -176,6 +181,13 @@ class ContractResponse(BaseModel):
         )
 
 
+class ContractLink(BaseModel):
+    """멘토 계약이면 mentor_id, 강사 계약이면 instructor_id 하나만 보낸다."""
+
+    mentor_id: uuid.UUID | None = None
+    instructor_id: uuid.UUID | None = None
+
+
 class FileUrlResponse(BaseModel):
     url: str
     file: ContractFileResponse
@@ -279,6 +291,28 @@ async def terminate_contract(
 ) -> ContractResponse:
     """ACTIVE → TERMINATED (중도 해지)."""
     return ContractResponse.of(await contracts.terminate(contract_id, actor_id=user.id))
+
+
+@router.post("/contracts/{contract_id}/link", response_model=ContractResponse)
+async def link_contract(
+    contract_id: uuid.UUID, body: ContractLink, user: Manager, contracts: ContractsDep
+) -> ContractResponse:
+    """가입한 멘토·강사 프로필에 수동 연결·변경 (계약 상태와 무관, A27)."""
+    if (body.mentor_id is None) == (body.instructor_id is None):
+        raise BusinessRuleViolation(
+            "mentor_id와 instructor_id 중 하나만 보내야 합니다.", code="invalid_contract_link"
+        )
+    view = await contracts.link(
+        contract_id, mentor_id=body.mentor_id, instructor_id=body.instructor_id, actor_id=user.id
+    )
+    return ContractResponse.of(view)
+
+
+@router.delete("/contracts/{contract_id}/link", response_model=ContractResponse)
+async def unlink_contract(
+    contract_id: uuid.UUID, user: Manager, contracts: ContractsDep
+) -> ContractResponse:
+    return ContractResponse.of(await contracts.link(contract_id, actor_id=user.id))
 
 
 @router.get("/contracts/{contract_id}/file-url", response_model=FileUrlResponse)
