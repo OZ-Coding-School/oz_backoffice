@@ -1,7 +1,7 @@
 # 21. P5-2b 명단 동기화 동시 실행 락과 taskiq 작업
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 예정)
+- 관련 PR: #24
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P5 (P5-2b), §2.5 백그라운드 작업
 - 이전 기록: [20. P5-2a Airtable 명단 레코드 해석과 동기화 서비스](20_p5_2a_roster_sync_service.md)
 
