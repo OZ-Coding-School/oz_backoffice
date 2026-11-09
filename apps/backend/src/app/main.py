@@ -28,6 +28,7 @@ from app.core.config import Settings, get_settings
 from app.core.database import build_tortoise_config
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
+from app.core.notifications import build_mail_sender, build_sms_sender
 from app.core.redis import create_redis
 from app.core.storage import build_s3_storage
 from app.workers.broker import broker
@@ -62,6 +63,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.clock = clock = SystemClock()
     app.state.storage = build_s3_storage(settings)
+    app.state.mail_sender = build_mail_sender(settings)
+    app.state.sms_sender = build_sms_sender(settings)
     # 컨텍스트 간 공개 서비스 연결 (composition root). 다른 컨텍스트의 presentation 의존성이
     # 이 서비스를 쓰되 identity.infrastructure를 직접 import하지 않게 한다.
     app.state.user_queries = UserQueries(TortoiseUserRepository())

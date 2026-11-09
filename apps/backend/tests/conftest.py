@@ -60,6 +60,11 @@ def settings() -> Settings:
         airtable_base_id="",
         airtable_student_table_id="",
         airtable_bootcamp_table_id="",
+        # 실제 메일·SMS를 보내지 않는다
+        mail_driver="console",
+        sms_driver="console",
+        gmail_sender="",
+        google_service_account_json="",
         # 개발 버킷(compose S3_*)이 아니라 테스트 전용 버킷을 쓴다
         aws_region="ap-northeast-2",
         aws_access_key_id="test",
