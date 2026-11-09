@@ -297,6 +297,7 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
   | --- | --- | --- |
   | POST | `/api/v1/admin/contract-files/uploads` → `.../{key}/confirm` | `contract.manage` |
   | GET/POST/PATCH | `/api/v1/admin/contracts` | `contract.manage` |
+  | POST | `/api/v1/admin/contracts/{id}/confirm`, `/terminate` | `contract.manage` (상태 전이, A24. 수정·삭제는 DRAFT만, A25) |
   | GET | `/api/v1/admin/contracts/{id}/file-url` | `contract.manage` (presigned GET) |
   | POST | `/api/v1/admin/contracts/{id}/link` | `contract.manage` (멘토·강사 수동 연결) |
   | GET/PATCH | `/api/v1/me/mentor-profile` | 멘토 본인 (소개, 전문 분야, 프로필 사진 업로드) |
@@ -482,7 +483,7 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
 - [ ] P6 S3 어댑터 + 교육 인력·계약
   - [x] P6-1 S3 어댑터와 S3 시나리오 통합 테스트·CI floci (구현 기록 26)
   - [x] P6-2 educator 모델·마이그레이션 (구현 기록 27, A22·A23)
-  - [ ] P6-3 계약서 업로드·계약 CRUD·상태 전이 API
+  - [x] P6-3 계약서 업로드·계약 CRUD·상태 전이 API (구현 기록 28, A24·A25·A26)
   - [ ] P6-4 계약 수동 연결·멘토 프로필 API
 - [ ] P7 수강생·멘토 가입
 - [ ] P8 기수 멘토링 설정·멘토 배정
