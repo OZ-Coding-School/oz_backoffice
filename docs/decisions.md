@@ -105,6 +105,7 @@
 | A26 | 계약서 업로드: 요청 → 브라우저가 S3로 직접 업로드(presigned POST, PDF·10MB) → 확정. 요청 정보는 **Redis에 TTL로 임시 저장**(presigned 만료 + 5분)하고 요청자만 한 번 확정한다. 확정 때 `head`로 크기·타입을 확인하고 **앞 5바이트가 `%PDF-`인지** 본다. 맞지 않으면 객체를 지우고 거부한다. 원본 파일 이름이 **100자를 넘으면 요청을 거부**한다(경로·제어 문자도 거부) (2026-11-09, 사용자 결정) |
 | A27 | 계약 수동 연결: 운영진이 **이미 있는 멘토·강사 프로필**(`mentor_id`/`instructor_id`)을 지정해 계약에 연결한다. 프로필 생성·역할 부여는 가입(P7)에서 한다. 계약 상태와 무관하게 연결·변경·해제할 수 있고(계약 내용이 아닌 관리 정보), 계약 유형과 프로필 종류가 같아야 한다. 모든 변경은 감사 로그를 남긴다 (2026-11-09, 사용자 결정) |
 | A28 | 멘토 프로필 API: 멘토 본인(`/me/mentor-profile`, 승인된 회원)과 운영진 대리 수정(`/admin/mentors/{id}/profile`, contract.manage)을 둘 다 둔다. 운영진용 멘토 목록(이름·이메일·휴대폰·닉네임 검색, 활성 여부 필터, 계약 수)을 둔다(강사 목록은 두지 않음). 사진은 **브라우저가 최적화**해 올리고 서버는 PNG·JPEG·WebP 2MB 이하와 매직 바이트만 검사한다. 업로드는 계약서와 같은 흐름이며 확정하면 바로 반영하고 이전 사진 객체는 커밋 후 지운다. 소개는 10,000자까지. 활성 여부 변경은 P8에서 정한다 (2026-11-09, 사용자 결정) |
+| A29 | P7 발송: PR은 5개(발송 기반 / 인증코드·레이트 리밋·가입 / 자동 매칭 / 로그인·잠금·재설정 / 승인 관리). **SMS는 업체가 정해질 때까지 console 드라이버**로 개발하고 업체 어댑터는 별도 PR로 붙인다. **메일은 Gmail API로 지금 구현**하며 발신은 **기존 운영 계정**(`GMAIL_SENDER`)으로 한다. 인증코드는 **API 요청 안에서 바로 발송**하고 실패하면 503으로 알린다. 메일은 텍스트 + HTML 대체 본문, 발신자 표시 이름 '오즈코딩스쿨'(설정). SMS 문구는 `[오즈코딩스쿨] 인증번호 123456 (10분 이내 입력)`(SMS 한 건 길이). 운영(environment=production)에서 console 드라이버이거나 Gmail 설정이 없으면 **앱은 뜨되 발송만 503**(`mail_not_configured`/`sms_not_configured`). Gmail 설정 확인용 CLI `send-test-mail`을 둔다 (2026-11-09, 사용자 결정) |
 | A6 | 자동 승인 기준: 수강생은 명단과 **이름 + 휴대폰**(SMS 인증된 번호)이 일치하면, 멘토는 계약과 **이름 + 휴대폰**이 일치하면 자동 승인한다. 일치하지 않으면 **승인 대기**로 두고, 담당 매니저 이상이 승인한다. 대기 중에는 로그인해도 상태 화면만 볼 수 있다 |
 | A7 | 토큰: access는 응답 본문(프론트 메모리, `Authorization` 헤더), refresh는 HttpOnly·Secure·SameSite 쿠키. 갱신할 때 refresh를 회전한다 (Redis 저장) |
 | A8 | Google API(Meet, Drive, Gmail, Workspace Events)는 **서비스 계정 + 도메인 전체 위임**으로 회사 계정을 대신해 호출한다 |
@@ -138,6 +139,7 @@
 | B10 | 다른 컨텍스트가 쓰는 공개 서비스(예: identity `UserQueries`)는 composition root인 `app.main`이 `app.state`에 연결하고, presentation 의존성이 `request.app.state`에서 꺼낸다. 다른 컨텍스트의 infrastructure를 import하지 않는 import-linter 계약을 유지하기 위해서다. 인증 의존성 `get_current_user`·`require_approved_user`는 공개 영역인 `access.presentation.dependencies`에 둔다 (2026-11-05) |
 | B11 | Airtable 연동은 **pyairtable**을 쓴다(사용자 지정). 페이지네이션·429 재시도는 라이브러리 기본 재시도 정책을 쓰고, 동기(requests) 라이브러리라 `asyncio.to_thread`로 호출해 이벤트 루프를 막지 않는다 (2026-11-09) |
 | B12 | S3 어댑터(`app/integrations/s3.py`)의 타입 검사는 개발 의존성 **`types-aioboto3[s3]`**(aioboto3 버전에 맞춰 고정)으로 한다(사용자 결정). 클라이언트 설정은 스텁이 요구하는 `AioConfig`(s3v4, path-style)를 쓴다 (2026-11-09) |
+| B13 | Google API(Gmail, 이후 Meet·Drive) 호출은 **google-api-python-client + google-auth**(서비스 계정 + 도메인 전체 위임)로 한다(사용자 결정). 동기 라이브러리라 `asyncio.to_thread`로 호출한다. 서비스 계정 키는 환경변수 `GOOGLE_SERVICE_ACCOUNT_JSON`에 **JSON 원문**(한 줄)으로 넣는다. 타입 검사는 개발 의존성 `google-api-python-client-stubs`로 하고, 타입 주석이 없는 google-auth 함수 호출 한 곳만 `type: ignore[no-untyped-call]`로 둔다. 이 의존성이 끌어오는 cryptography는 최신을 쓴다(46.0.3 이후 보안 수정 다수). Apple M4의 이전 Docker Desktop에서 47 이상이 `Illegal instruction`으로 죽던 문제는 VM이 SVE2·SME를 잘못 알리던 것으로, Docker Desktop 업데이트로 해결됐다 (2026-11-09) |
 
 ## 4-1. 저장소 운영 (2026-11-05)
 
