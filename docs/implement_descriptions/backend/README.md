@@ -28,4 +28,4 @@
 | 24 | [워커 Redis 읽기 타임아웃으로 인한 반복 종료 수정](24_fix_worker_redis_socket_timeout.md) | 완료 (#27) |
 | 25 | [P5-4 수강생 테이블 실구조 확인과 레코드 링크 매핑](25_p5_4_student_link_mapping.md) | 완료 (#28) |
 | 26 | [P6-1 S3 어댑터와 S3 시나리오 통합 테스트](26_p6_1_s3_adapter.md) | 완료 (#29) |
-| 27 | [P6-2 멘토·강사·계약·계약서 모델](27_p6_2_educator_models.md) | PR 진행 중 (#30) |
+| 27 | [P6-2 멘토·강사·계약·계약서 모델](27_p6_2_educator_models.md) | 완료 (#30) |

@@ -1,6 +1,6 @@
 # 27. P6-2 멘토·강사·계약·계약서 모델
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-09 병합)
 - 관련 PR: #30
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P6 (P6-2)
 - 이전 기록: [26. P6-1 S3 어댑터](26_p6_1_s3_adapter.md)
@@ -40,6 +40,7 @@ P6의 두 번째 PR이다. 교육 인력(멘토·강사) 프로필과 계약·�
 - 개발 DB: `aerich upgrade` → `aerich migrate`("No changes detected") → `aerich downgrade -v 8 --yes` → `aerich upgrade`
 - 통합 테스트 11개: DB 기본값(NAME, is_active, DRAFT, now()), 닉네임 check, 회원당 프로필 1개, DRAFT 계약서 생략과 ACTIVE 계약서 필수, 계약서 1:1, 기간·이메일 check, 유형-연결 check
 - `docker compose exec api`에서 ruff, ruff format, mypy, mypy tests, lint-imports(10 kept), pytest 350 passed
+- GitHub Actions (PR #30, run 42601143196): backend 잡 통과
 
 ## 남은 작업
 - P6-3 계약서 업로드·계약 CRUD·상태 전이 API
