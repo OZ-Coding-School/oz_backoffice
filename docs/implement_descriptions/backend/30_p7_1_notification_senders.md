@@ -1,7 +1,7 @@
 # 30. P7-1 메일·SMS 발송 기반과 Gmail 드라이버
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 예정)
+- 관련 PR: #34
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P7 (P7-1)
 - 이전 기록: [29. P6-4 계약 수동 연결과 멘토 프로필 API](29_p6_4_contract_link_mentor_profile.md)
 
