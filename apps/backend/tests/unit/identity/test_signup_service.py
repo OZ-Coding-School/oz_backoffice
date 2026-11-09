@@ -12,6 +12,7 @@ from app.contexts.educator.application.mentor_onboarding import MentorMatch
 from app.contexts.educator.domain.enums import DisplayNamePreference
 from app.contexts.identity.application.signup import SignupForm, SignupService
 from app.contexts.identity.application.signup_matching import SignupMatcher
+from app.contexts.identity.application.verification_codes import VerificationCodes
 from app.contexts.identity.domain.enums import (
     MemberSignupStatus,
     MemberSignupType,
@@ -119,9 +120,13 @@ class Harness:
         self.service = SignupService(
             users=self.users,
             signups=self.signups,
-            challenges=self.challenges,
+            codes=VerificationCodes(
+                challenges=self.challenges,
+                limiter=RedisRateLimiter(redis),
+                clock=self.clock,
+                secret="secret",
+            ),
             sessions=RedisSignupSessionStore(redis),
-            limiter=RedisRateLimiter(redis),
             hasher=FakeHasher(),
             cohorts=FakeCohorts(self.cohort_id),
             matcher=SignupMatcher(students=self.claims, mentors=self.linker, roles=self.roles),
@@ -131,7 +136,6 @@ class Harness:
             audit=AuditRecorder(self.audit_logs, self.clock),
             uow=FakeUnitOfWork(),
             clock=self.clock,
-            code_secret="secret",
             sender_name="오즈코딩스쿨",
             login_url="http://localhost:5173/login",
         )

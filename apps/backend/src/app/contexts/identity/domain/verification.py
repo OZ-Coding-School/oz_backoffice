@@ -20,6 +20,7 @@ SIGNUP_SESSION_TTL = timedelta(minutes=30)
 class ChallengeKind(StrEnum):
     SIGNUP_EMAIL = "signup_email"  # 키: 이메일
     SIGNUP_PHONE = "signup_phone"  # 키: 가입 토큰
+    PASSWORD_RESET = "password_reset"  # noqa: S105  # 키: 이메일 (비밀번호 값이 아니라 종류 이름)
 
 
 @dataclass(frozen=True, slots=True)

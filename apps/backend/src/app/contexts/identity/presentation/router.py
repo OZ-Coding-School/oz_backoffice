@@ -61,7 +61,7 @@ def _set_refresh_cookie(response: Response, tokens: IssuedTokens, settings: Sett
     )
 
 
-def _respond_with_tokens(
+def respond_with_tokens(
     response: Response, tokens: IssuedTokens, settings: Settings
 ) -> AccessTokenResponse:
     _set_refresh_cookie(response, tokens, settings)
@@ -142,7 +142,7 @@ async def refresh(
     if not refresh_token:
         raise AuthenticationError("로그인이 필요합니다.", code="refresh_token_missing")
     tokens = await service.refresh(refresh_token)
-    return _respond_with_tokens(response, tokens, settings)
+    return respond_with_tokens(response, tokens, settings)
 
 
 @auth_router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
