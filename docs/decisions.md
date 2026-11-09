@@ -130,6 +130,7 @@
 | B9 | Tortoise 모델은 7개 컨텍스트 모듈을 **단일 app `models`** 에 등록한다. 마이그레이션 이력이 하나라 `aerich upgrade` 한 번으로 적용되고, FK는 `"models.UserModel"`처럼 참조한다. 컨텍스트별 app은 이력이 7개로 나뉘고 다른 app 테이블 정의가 마이그레이션에 중복돼 제외했다(실험 확인). 코드 경계는 import-linter가 강제한다 (2026-11-05) |
 | B10 | 다른 컨텍스트가 쓰는 공개 서비스(예: identity `UserQueries`)는 composition root인 `app.main`이 `app.state`에 연결하고, presentation 의존성이 `request.app.state`에서 꺼낸다. 다른 컨텍스트의 infrastructure를 import하지 않는 import-linter 계약을 유지하기 위해서다. 인증 의존성 `get_current_user`·`require_approved_user`는 공개 영역인 `access.presentation.dependencies`에 둔다 (2026-11-05) |
 | B11 | Airtable 연동은 **pyairtable**을 쓴다(사용자 지정). 페이지네이션·429 재시도는 라이브러리 기본 재시도 정책을 쓰고, 동기(requests) 라이브러리라 `asyncio.to_thread`로 호출해 이벤트 루프를 막지 않는다 (2026-11-09) |
+| B12 | S3 어댑터(`app/integrations/s3.py`)의 타입 검사는 개발 의존성 **`types-aioboto3[s3]`**(aioboto3 버전에 맞춰 고정)으로 한다(사용자 결정). 클라이언트 설정은 스텁이 요구하는 `AioConfig`(s3v4, path-style)를 쓴다 (2026-11-09) |
 
 ## 4-1. 저장소 운영 (2026-11-05)
 
