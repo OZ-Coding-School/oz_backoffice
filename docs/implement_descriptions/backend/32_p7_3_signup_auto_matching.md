@@ -1,6 +1,6 @@
 # 32. P7-3 가입 자동 매칭과 승인 알림 메일
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-09 병합)
 - 관련 PR: #36
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P7 (P7-3)
 - 이전 기록: [31. P7-2 수강생·멘토 가입](31_p7_2_member_signup.md)
@@ -49,6 +49,7 @@ P7의 세 번째 PR이다. 가입을 완료하면 명단(수강생)이나 계약
 - API(PostgreSQL + fakeredis): 신청 기수에 명단이 있으면 APPROVED가 되고, 명단 연결·STUDENT 역할·MATCHED 기록·승인 메일 디스패치를 확인했다. 다른 기수에만 명단이 있으면 PENDING·NO_MATCH다.
 - 커밋 3개를 worktree에서 하나씩 검사했다(ruff, ruff format, mypy, mypy tests, lint-imports, pytest). 모두 통과했고 최종 503 passed다.
 - 개발 환경: 재시작한 워커가 `app.workers.tasks.notifications`를 불러온다.
+- GitHub Actions (PR #36, run 42628974898): backend 잡 통과, 503 passed
 
 ## 남은 작업
 - P7-4 로그인·잠금·비밀번호 재설정
