@@ -2,6 +2,7 @@ from datetime import date
 from typing import Any
 
 import pytest
+from fakeredis import FakeAsyncRedis
 
 from app.contexts.academy.application.roster_sync import RosterSyncService
 from app.contexts.academy.domain.entities import Bootcamp, Cohort, Student
@@ -19,13 +20,14 @@ from app.contexts.academy.infrastructure.repositories import (
     TortoiseRosterSyncRunRepository,
     TortoiseStudentRepository,
 )
+from app.contexts.academy.infrastructure.roster_sync_lock import RedisRosterSyncLock
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.audit.infrastructure.models import AuditLogModel
 from app.contexts.audit.infrastructure.repositories import TortoiseAuditLogRepository
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
 from app.core.clock import SystemClock
 from app.core.uow import UnitOfWork
-from app.shared.errors import BusinessRuleViolation
+from app.shared.errors import BusinessRuleViolation, ConflictError
 from tests.factories.academy import create_cohort
 from tests.factories.identity import make_user
 from tests.fakes.roster import FakeRosterSource
@@ -33,7 +35,7 @@ from tests.fakes.roster import FakeRosterSource
 pytestmark = pytest.mark.integration
 
 
-def service(source: FakeRosterSource) -> RosterSyncService:
+def service(source: FakeRosterSource, lock: RedisRosterSyncLock | None = None) -> RosterSyncService:
     clock = SystemClock()
     return RosterSyncService(
         source=source,
@@ -42,6 +44,7 @@ def service(source: FakeRosterSource) -> RosterSyncService:
         cohorts=TortoiseCohortRepository(),
         students=TortoiseStudentRepository(),
         runs=TortoiseRosterSyncRunRepository(),
+        lock=lock or RedisRosterSyncLock(FakeAsyncRedis(decode_responses=True)),
         audit=AuditRecorder(TortoiseAuditLogRepository(), clock),
         uow=UnitOfWork(),
         clock=clock,
@@ -239,3 +242,73 @@ async def test_all_scope_without_prefixes_does_nothing() -> None:
     source = FakeRosterSource()
     run = await _run(service(source), RosterSyncScope.ALL)
     assert (run.status, run.fetched_count, source.formulas) == (RosterSyncStatus.SUCCEEDED, 0, [])
+
+
+async def test_request_locks_scope_until_execution_ends(fake_redis: FakeAsyncRedis) -> None:
+    bootcamp, (c1,) = await _bootcamp_with_prefix("1인창업", 1)
+    other_bootcamp, _ = await _bootcamp_with_prefix("CEO", 1)
+    lock = RedisRosterSyncLock(fake_redis)
+    svc = service(FakeRosterSource(), lock)
+    actor = make_user()
+    await TortoiseUserRepository().add(actor)
+
+    run = await svc.request(
+        RosterSyncTrigger.MANUAL, RosterSyncScope.COHORT, cohort_id=c1.id, actor_id=actor.id
+    )
+    assert run.bootcamp_id == bootcamp.id
+    for scope, ids in (
+        (RosterSyncScope.BOOTCAMP, {"bootcamp_id": bootcamp.id}),  # 같은 과정
+        (RosterSyncScope.ALL, {}),  # 전체는 다른 실행이 있으면 막힌다
+    ):
+        with pytest.raises(ConflictError) as exc:
+            await svc.request(RosterSyncTrigger.MANUAL, scope, **ids)
+        assert exc.value.code == "roster_sync_in_progress"
+    # 다른 과정은 동시에 실행할 수 있다
+    other = await svc.request(
+        RosterSyncTrigger.MANUAL, RosterSyncScope.BOOTCAMP, bootcamp_id=other_bootcamp.id
+    )
+    await svc.execute(other.id)
+
+    await svc.execute(run.id)
+    again = await svc.request(
+        RosterSyncTrigger.MANUAL, RosterSyncScope.BOOTCAMP, bootcamp_id=bootcamp.id
+    )
+    assert again.status is RosterSyncStatus.RUNNING
+    log = await AuditLogModel.get(target_id=run.id)
+    assert log.action == "academy.roster_sync.request"
+
+
+async def test_scheduled_sync_skips_while_another_runs(fake_redis: FakeAsyncRedis) -> None:
+    bootcamp, _ = await _bootcamp_with_prefix("풀스택", 1)
+    lock = RedisRosterSyncLock(fake_redis)
+    svc = service(FakeRosterSource(), lock)
+    manual = await svc.request(
+        RosterSyncTrigger.MANUAL, RosterSyncScope.BOOTCAMP, bootcamp_id=bootcamp.id
+    )
+
+    assert await svc.run_scheduled() is None
+    await svc.execute(manual.id)
+    scheduled = await svc.run_scheduled()
+    assert scheduled is not None
+    assert (scheduled.trigger, scheduled.status) == (
+        RosterSyncTrigger.SCHEDULED,
+        RosterSyncStatus.SUCCEEDED,
+    )
+
+
+async def test_duplicate_delivery_does_not_release_new_lock(fake_redis: FakeAsyncRedis) -> None:
+    bootcamp, _ = await _bootcamp_with_prefix("AI리더", 1)
+    lock = RedisRosterSyncLock(fake_redis)
+    svc = service(FakeRosterSource(), lock)
+    first = await svc.request(
+        RosterSyncTrigger.MANUAL, RosterSyncScope.BOOTCAMP, bootcamp_id=bootcamp.id
+    )
+    await svc.execute(first.id)
+    await svc.request(RosterSyncTrigger.MANUAL, RosterSyncScope.BOOTCAMP, bootcamp_id=bootcamp.id)
+
+    await svc.execute(first.id)  # 같은 작업이 한 번 더 전달됨
+
+    with pytest.raises(ConflictError):  # 새 실행의 락은 그대로
+        await svc.request(
+            RosterSyncTrigger.MANUAL, RosterSyncScope.BOOTCAMP, bootcamp_id=bootcamp.id
+        )

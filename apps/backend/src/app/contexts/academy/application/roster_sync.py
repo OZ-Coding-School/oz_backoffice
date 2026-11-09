@@ -18,10 +18,11 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from app.contexts.academy.domain.entities import Bootcamp, Cohort, RosterSyncRun, Student
-from app.contexts.academy.domain.enums import RosterSyncScope, RosterSyncTrigger
+from app.contexts.academy.domain.enums import RosterSyncScope, RosterSyncStatus, RosterSyncTrigger
 from app.contexts.academy.domain.repositories import (
     BootcampRepository,
     CohortRepository,
+    RosterSyncLock,
     RosterSyncRunRepository,
     StudentRepository,
 )
@@ -37,7 +38,7 @@ from app.contexts.academy.domain.roster import (
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.core.clock import Clock
 from app.core.uow import UnitOfWork
-from app.shared.errors import AppError, BusinessRuleViolation, NotFoundError
+from app.shared.errors import AppError, BusinessRuleViolation, ConflictError, NotFoundError
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +80,7 @@ class RosterSyncService:
         cohorts: CohortRepository,
         students: StudentRepository,
         runs: RosterSyncRunRepository,
+        lock: RosterSyncLock,
         audit: AuditRecorder,
         uow: UnitOfWork,
         clock: Clock,
@@ -89,9 +91,57 @@ class RosterSyncService:
         self._cohorts = cohorts
         self._students = students
         self._runs = runs
+        self._lock = lock
         self._audit = audit
         self._uow = uow
         self._clock = clock
+
+    async def request(
+        self,
+        trigger: RosterSyncTrigger,
+        scope_type: RosterSyncScope,
+        *,
+        bootcamp_id: uuid.UUID | None = None,
+        cohort_id: uuid.UUID | None = None,
+        actor_id: uuid.UUID | None = None,
+    ) -> RosterSyncRun:
+        """락을 잡고 실행 이력(RUNNING)을 만든다. 실행(`execute`)이 끝나면 락을 놓는다.
+
+        같은 범위가 이미 실행 중이면 409 `roster_sync_in_progress`.
+        """
+        if scope_type is RosterSyncScope.COHORT and cohort_id is not None:
+            bootcamp_id = (await self._get_cohort(cohort_id)).bootcamp_id
+        if not await self._lock.acquire(scope_type, bootcamp_id):
+            raise ConflictError(
+                "이미 진행 중인 명단 동기화가 있습니다. 끝난 뒤 다시 실행하세요.",
+                code="roster_sync_in_progress",
+            )
+        try:
+            async with self._uow:
+                run = await self.create_run(
+                    trigger, scope_type, bootcamp_id=bootcamp_id, cohort_id=cohort_id
+                )
+                if actor_id is not None:
+                    await self._audit.record(
+                        actor_user_id=actor_id,
+                        action="academy.roster_sync.request",
+                        target_type="roster_sync_run",
+                        target_id=run.id,
+                        after={"scope_type": scope_type.value},
+                    )
+        except BaseException:
+            await self._lock.release(scope_type, bootcamp_id)
+            raise
+        return run
+
+    async def run_scheduled(self) -> RosterSyncRun | None:
+        """주기 동기화(전체). 다른 동기화가 실행 중이면 이번 주기는 건너뛴다."""
+        try:
+            run = await self.request(RosterSyncTrigger.SCHEDULED, RosterSyncScope.ALL)
+        except ConflictError:
+            logger.info("명단 동기화가 실행 중이라 이번 주기를 건너뜁니다.")
+            return None
+        return await self.execute(run.id)
 
     async def create_run(
         self,
@@ -122,6 +172,16 @@ class RosterSyncService:
         run = await self._runs.get(run_id)
         if run is None:
             raise NotFoundError("동기화 실행을 찾을 수 없습니다.", code="roster_sync_run_not_found")
+        if run.status is not RosterSyncStatus.RUNNING:
+            # 이미 끝난 실행(작업 중복 전달).
+            # 같은 범위의 새 실행이 잡은 락을 놓지 않도록 그대로 끝낸다
+            return run
+        try:
+            return await self._execute(run)
+        finally:
+            await self._lock.release(run.scope_type, run.bootcamp_id)
+
+    async def _execute(self, run: RosterSyncRun) -> RosterSyncRun:
         try:
             scope = await self._scope(run)
             fetched = (
@@ -133,7 +193,7 @@ class RosterSyncService:
                 await self._apply(run, scope, fetched)
         except Exception as exc:
             message = exc.message if isinstance(exc, AppError) else f"{type(exc).__name__}: {exc}"
-            logger.exception("명단 동기화 실패 (run=%s)", run_id)
+            logger.exception("명단 동기화 실패 (run=%s)", run.id)
             run.fail(now=self._clock.now(), error_message=message)
             await self._runs.save(run)
         return run

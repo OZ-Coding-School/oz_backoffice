@@ -13,7 +13,7 @@ from app.contexts.academy.domain.entities import (
     RosterSyncRun,
     Student,
 )
-from app.contexts.academy.domain.enums import CohortStatus
+from app.contexts.academy.domain.enums import CohortStatus, RosterSyncScope
 
 
 class HrdNetBootcampRepository(Protocol):
@@ -88,3 +88,13 @@ class RosterSyncRunRepository(Protocol):
     async def add(self, run: RosterSyncRun) -> None: ...
     async def save(self, run: RosterSyncRun) -> None: ...
     async def get(self, entity_id: uuid.UUID) -> RosterSyncRun | None: ...
+
+
+class RosterSyncLock(Protocol):
+    """명단 동기화 동시 실행 제어 (plan P5).
+
+    전체(ALL) 실행 중에는 다른 모든 동기화를 막고, 과정·기수 동기화는 같은 과정끼리만 막는다.
+    """
+
+    async def acquire(self, scope_type: RosterSyncScope, bootcamp_id: uuid.UUID | None) -> bool: ...
+    async def release(self, scope_type: RosterSyncScope, bootcamp_id: uuid.UUID | None) -> None: ...
