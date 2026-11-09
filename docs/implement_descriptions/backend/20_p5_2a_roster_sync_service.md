@@ -1,6 +1,6 @@
 # 20. P5-2a Airtable 명단 레코드 해석과 동기화 서비스
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-09 병합)
 - 관련 PR: #23
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P5 (P5-2a)
 - 이전 기록: [19. P5-1 과정 별칭 컬럼과 Airtable 클라이언트](19_p5_1_airtable_client.md)
@@ -35,6 +35,9 @@ P5-1에서 확인한 실제 Airtable 구조(A18)와 사용자 결정(A19: 수강
   - `aerich upgrade` 성공
   - `aerich migrate` → "No changes detected"
   - `aerich downgrade -v 6` → `upgrade` 성공
+- 커밋 2개를 각각 워크트리로 꺼내 같은 검사 통과
+- GitHub Actions (PR #23, run 42579711712): backend 잡 통과
+- 사용자 확인: P5 진행 지시에 따라 CI 통과 후 병합
 - 동기화 시나리오(실제 DB + 가짜 원천)
   - 전체 동기화: 생성·실패 목록·범위 밖 건너뛰기를 확인했고, 다시 실행하면 변경 0(멱등)
   - Airtable 상태 반영과 기수 이동 유지
