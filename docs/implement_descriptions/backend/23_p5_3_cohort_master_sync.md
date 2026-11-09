@@ -1,6 +1,6 @@
 # 23. P5-3 과정-기수 테이블로 학사 마스터 동기화
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-09 병합)
 - 관련 PR: #26
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P5 (P5-3)
 - 이전 기록: [22. P5-2c 명단 동기화 관리 API](22_p5_2c_roster_sync_api.md), [18. P4-2 학사 관리 API](18_p4_2_academy_admin_api.md) (기수-HRD 일치 검증을 이번에 없앰)
@@ -46,6 +46,9 @@
   - `aerich migrate` → "No changes detected"
   - `aerich downgrade -v 7` → `upgrade` 성공
 - DBML 파서 검증(테이블 42개)
+- 커밋 2개를 각각 워크트리로 꺼내 같은 검사 통과
+- GitHub Actions (PR #26, run 42586891842): backend 잡 통과
+- 사용자 확인: 수정 지시에 따라 CI 통과 후 병합. 수강생 매핑은 테이블 접근 문제 해결 후 이어서 한다
 - **개발 DB 실데이터 동기화 (사용자 요청으로 데이터를 남김)**
   - 워커로 전체 동기화를 실행했다.
   - 생성 결과: HRD 과정 9, HRD 회차 106, 운영과정 13, 기수 106

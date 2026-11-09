@@ -24,4 +24,4 @@
 | 20 | [P5-2a Airtable 명단 레코드 해석과 동기화 서비스](20_p5_2a_roster_sync_service.md) | 완료 (#23) |
 | 21 | [P5-2b 명단 동기화 동시 실행 락과 taskiq 작업](21_p5_2b_roster_sync_worker.md) | 완료 (#24) |
 | 22 | [P5-2c 명단 동기화 관리 API](22_p5_2c_roster_sync_api.md) | 완료 (#25) |
-| 23 | [P5-3 과정-기수 테이블로 학사 마스터 동기화](23_p5_3_cohort_master_sync.md) | PR 진행 중 (#26) |
+| 23 | [P5-3 과정-기수 테이블로 학사 마스터 동기화](23_p5_3_cohort_master_sync.md) | 완료 (#26) |
