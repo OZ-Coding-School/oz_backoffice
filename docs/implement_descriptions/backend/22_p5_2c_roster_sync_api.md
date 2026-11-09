@@ -1,6 +1,6 @@
 # 22. P5-2c 명단 동기화 관리 API
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-09 병합)
 - 관련 PR: #25
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P5 (P5-2c)
 - 이전 기록: [21. P5-2b 명단 동기화 동시 실행 락과 taskiq 작업](21_p5_2b_roster_sync_worker.md)
@@ -29,6 +29,9 @@ P5의 마지막 PR이다. 운영진(최고 관리자·매니저·조교)이 담�
 
 ## 검증
 - 컨테이너: ruff, ruff format, mypy(src strict, tests), lint-imports, pytest **314개 통과**
+- 커밋 2개를 각각 워크트리로 꺼내 같은 검사 통과
+- GitHub Actions (PR #25, run 42581460054): 첫 실행은 uv 내려받기 504(GitHub 일시 장애)로 실패했고, 다시 실행해 backend 잡 통과
+- 사용자 확인: P5 진행 지시에 따라 CI 통과 후 병합
 - api 컨테이너를 다시 띄워 lifespan의 브로커 연결과 함께 정상 기동하는 것을 확인했다(`/health` 200)
 
 ## 남은 작업
