@@ -1,7 +1,7 @@
 # 20. P5-2a Airtable 명단 레코드 해석과 동기화 서비스
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 예정)
+- 관련 PR: #23
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P5 (P5-2a)
 - 이전 기록: [19. P5-1 과정 별칭 컬럼과 Airtable 클라이언트](19_p5_1_airtable_client.md)
 
