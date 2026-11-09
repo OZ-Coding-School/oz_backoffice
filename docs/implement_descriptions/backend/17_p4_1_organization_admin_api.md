@@ -1,6 +1,6 @@
 # 17. P4-1 조직(부서·직위·직원) 관리 API
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-09 병합)
 - 관련 PR: #20
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P4 (P4-1)
 - 이전 기록: [16. P3-3b 회원 역할 관리 API](16_p3_3b_user_role_api.md)
@@ -34,6 +34,9 @@ P3까지는 부서·직위를 테스트 데이터로만 만들 수 있었다. �
 
 ## 검증
 - 컨테이너: ruff, ruff format, mypy(src strict, tests), lint-imports, pytest **255개 통과**
+- 커밋 3개를 각각 워크트리로 꺼내 같은 검사 통과
+- GitHub Actions (PR #20, run 42547005293): backend 잡 통과
+- 사용자 확인: P4 진행 지시에 따라 CI 통과 후 병합
 
 ## 남은 작업
 - P4-2: HRD 과정·회차, 운영과정, 기수 관리 API
