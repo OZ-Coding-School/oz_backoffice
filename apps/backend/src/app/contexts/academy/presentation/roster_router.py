@@ -24,15 +24,12 @@ from app.contexts.academy.domain.enums import (
     RosterSyncTrigger,
     StudentStatus,
 )
-from app.contexts.academy.domain.roster import RosterFieldMap
-from app.contexts.academy.infrastructure.airtable_source import AirtableRosterSource
 from app.contexts.academy.infrastructure.repositories import (
-    TortoiseBootcampRepository,
     TortoiseCohortRepository,
     TortoiseRosterSyncRunRepository,
     TortoiseStudentRepository,
 )
-from app.contexts.academy.infrastructure.roster_sync_lock import RedisRosterSyncLock
+from app.contexts.academy.presentation.roster_factory import build_roster_sync_service
 from app.contexts.access.application.permissions import PermissionTarget
 from app.contexts.access.presentation.dependencies import (
     PermissionCheckerDep,
@@ -44,8 +41,6 @@ from app.core.clock import Clock
 from app.core.config import Settings
 from app.core.dependencies import get_app_settings, get_clock
 from app.core.redis import get_redis
-from app.core.uow import UnitOfWork
-from app.integrations.airtable.client import AirtableClient
 from app.shared.errors import NotFoundError, ServiceUnavailableError
 
 router = APIRouter(prefix="/admin", tags=["admin-rosters"])
@@ -63,19 +58,10 @@ def get_roster_sync_service(
         raise ServiceUnavailableError(
             "Airtable 연동이 설정되지 않았습니다.", code="airtable_not_configured"
         )
-    client = AirtableClient(
-        token=settings.airtable_token.get_secret_value(), base_id=settings.airtable_base_id
-    )
-    return RosterSyncService(
-        source=AirtableRosterSource(client, table=settings.airtable_table_id),
-        field_map=RosterFieldMap(),
-        bootcamps=TortoiseBootcampRepository(),
-        cohorts=TortoiseCohortRepository(),
-        students=TortoiseStudentRepository(),
-        runs=TortoiseRosterSyncRunRepository(),
-        lock=RedisRosterSyncLock(redis),
+    return build_roster_sync_service(
+        settings,
+        redis=redis,
         audit=cast("AuditRecorder", request.app.state.audit_recorder),
-        uow=UnitOfWork(),
         clock=clock,
     )
 

@@ -133,11 +133,6 @@ async def test_cohort_validation(client: AsyncClient, admin: dict[str, str]) -> 
         (base, 409, "cohort_number_taken"),
         ({**base, "cohort_number": 2, "start_date": "2027-05-01"}, 422, "invalid_cohort"),
         (
-            {**base, "cohort_number": 2, "hrd_net_cohort_id": other_cohort["id"]},
-            422,
-            "hrd_cohort_mismatch",
-        ),
-        (
             {**base, "cohort_number": 2, "hrd_net_cohort_id": str(new_id())},
             404,
             "hrd_cohort_not_found",
@@ -146,6 +141,13 @@ async def test_cohort_validation(client: AsyncClient, admin: dict[str, str]) -> 
     for body, status, code in cases:
         response = await client.post(url, json=body, headers=admin)
         assert (response.status_code, response.json()["error"]["code"]) == (status, code), body
+    # 다른 HRD 과정의 회차에도 연결할 수 있다 (D6)
+    crossed = await client.post(
+        url,
+        json={**base, "cohort_number": 3, "hrd_net_cohort_id": other_cohort["id"]},
+        headers=admin,
+    )
+    assert crossed.status_code == 201
     invalid_guild = await client.post(
         url, json={**base, "cohort_number": 5, "discord_guild_id": "abc"}, headers=admin
     )

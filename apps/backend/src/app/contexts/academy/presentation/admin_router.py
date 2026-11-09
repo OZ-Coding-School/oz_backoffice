@@ -308,7 +308,7 @@ async def list_cohorts(
 async def create_cohort(
     bootcamp_id: uuid.UUID, body: CohortCreate, admin: Admin, service: ServiceDep
 ) -> CohortResponse:
-    """HRD 회차는 운영과정과 같은 HRD 과정이어야 한다 (422 hrd_cohort_mismatch)."""
+    """기수는 HRD 회차에 연결한다 (운영과정의 대표 HRD 과정과 달라도 된다, decisions D6)."""
     created = await service.create_cohort(bootcamp_id, body.model_dump(), actor_id=admin.id)
     return CohortResponse.model_validate(created)
 

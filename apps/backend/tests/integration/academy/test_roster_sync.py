@@ -4,8 +4,10 @@ from typing import Any
 import pytest
 from fakeredis import FakeAsyncRedis
 
+from app.contexts.academy.application.cohort_master_sync import CohortMasterSync
 from app.contexts.academy.application.roster_queries import RosterQueries
 from app.contexts.academy.application.roster_sync import RosterSyncService
+from app.contexts.academy.domain.cohort_source import CohortFieldMap
 from app.contexts.academy.domain.entities import Bootcamp, Cohort, Student
 from app.contexts.academy.domain.enums import (
     EnrollmentStatus,
@@ -18,6 +20,8 @@ from app.contexts.academy.domain.roster import RosterFieldMap
 from app.contexts.academy.infrastructure.repositories import (
     TortoiseBootcampRepository,
     TortoiseCohortRepository,
+    TortoiseHrdNetBootcampCohortRepository,
+    TortoiseHrdNetBootcampRepository,
     TortoiseRosterSyncRunRepository,
     TortoiseStudentRepository,
 )
@@ -28,7 +32,7 @@ from app.contexts.audit.infrastructure.repositories import TortoiseAuditLogRepos
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
 from app.core.clock import SystemClock
 from app.core.uow import UnitOfWork
-from app.shared.errors import BusinessRuleViolation, ConflictError
+from app.shared.errors import ConflictError
 from tests.factories.academy import create_cohort
 from tests.factories.identity import make_user
 from tests.fakes.roster import FakeRosterSource
@@ -36,11 +40,24 @@ from tests.fakes.roster import FakeRosterSource
 pytestmark = pytest.mark.integration
 
 
-def service(source: FakeRosterSource, lock: RedisRosterSyncLock | None = None) -> RosterSyncService:
+def service(
+    source: FakeRosterSource,
+    lock: RedisRosterSyncLock | None = None,
+    cohort_source: FakeRosterSource | None = None,
+) -> RosterSyncService:
     clock = SystemClock()
     return RosterSyncService(
         source=source,
         field_map=RosterFieldMap(),
+        cohort_source=cohort_source or FakeRosterSource(),
+        master=CohortMasterSync(
+            field_map=CohortFieldMap(),
+            hrd_bootcamps=TortoiseHrdNetBootcampRepository(),
+            hrd_cohorts=TortoiseHrdNetBootcampCohortRepository(),
+            bootcamps=TortoiseBootcampRepository(),
+            cohorts=TortoiseCohortRepository(),
+        ),
+        cohort_field_map=CohortFieldMap(),
         bootcamps=TortoiseBootcampRepository(),
         cohorts=TortoiseCohortRepository(),
         students=TortoiseStudentRepository(),
@@ -229,13 +246,11 @@ async def test_failures_are_recorded_on_the_run() -> None:
     assert loaded.status is RosterSyncStatus.FAILED
 
 
-async def test_bootcamp_without_prefix_cannot_be_synced() -> None:
+async def test_bootcamp_without_prefix_fails_the_run() -> None:
     cohort = await create_cohort()
-    with pytest.raises(BusinessRuleViolation) as exc:
-        await service(FakeRosterSource()).create_run(
-            RosterSyncTrigger.MANUAL, RosterSyncScope.COHORT, cohort_id=cohort.id
-        )
-    assert exc.value.code == "airtable_prefix_missing"
+    run = await _run(service(FakeRosterSource()), RosterSyncScope.COHORT, cohort_id=cohort.id)
+    assert run.status is RosterSyncStatus.FAILED
+    assert "Airtable 기수 별칭" in (run.error_message or "")
 
 
 async def test_all_scope_without_prefixes_does_nothing() -> None:
@@ -352,3 +367,35 @@ async def test_queries_and_abort(fake_redis: FakeAsyncRedis) -> None:
         RosterSyncTrigger.MANUAL, RosterSyncScope.BOOTCAMP, bootcamp_id=bootcamp.id
     )
     assert again.status is RosterSyncStatus.RUNNING  # 락이 풀렸다
+
+
+async def test_full_sync_builds_cohorts_from_airtable_then_students() -> None:
+    cohort_source = FakeRosterSource()
+    cohort_source.put(
+        "recC1",
+        **{
+            "캠프기수": "헬스케어 1기",
+            "과정코드": "AH",
+            "훈련과정ID": "AIG20250000501719",
+            "훈련과정명": "헬스케어 과정",
+            "훈련회차": "1",
+            "훈련시작일": "2025-01-01",
+            "훈련종료일": "2025-06-30",
+            "과정 진행상태": "취업 산정 종료",
+        },
+    )
+    source = FakeRosterSource()
+    source.put("rec1", **record("김오즈", "헬스케어 1기"))
+    svc = service(source, cohort_source=cohort_source)
+
+    run = await _run(svc, RosterSyncScope.ALL)
+
+    assert run.status is RosterSyncStatus.SUCCEEDED, run.error_message
+    assert cohort_source.formulas == [None]
+    cohort = await TortoiseCohortRepository().get_by_airtable_record_id("recC1")
+    assert cohort is not None
+    assert "rec1" in await _students(cohort)
+
+    bootcamp_run = await _run(svc, RosterSyncScope.BOOTCAMP, bootcamp_id=cohort.bootcamp_id)
+    assert bootcamp_run.status is RosterSyncStatus.SUCCEEDED
+    assert cohort_source.formulas[-1] == "{과정코드}='AH'"

@@ -1,7 +1,10 @@
 """Airtable 수강생 명단 동기화 (plan P5, decisions A9·A10·A18·A19).
 
-흐름: 실행 이력 생성(RUNNING) → [워커] Airtable 조회(트랜잭션 밖) → 한 트랜잭션에서
-신규 생성·변경 반영·원천 삭제 표시·실행 결과 저장.
+흐름: 실행 이력 생성(RUNNING) → [워커]
+1. 과정-기수 테이블 조회 → 한 트랜잭션에서 HRD 과정·회차, 운영과정, 기수를 맞춤 (A20)
+2. 수강생 테이블 조회(트랜잭션 밖) → 한 트랜잭션에서 신규 생성·변경 반영·원천 삭제 표시,
+   실행 결과 저장.
+과정-기수 레코드의 실패도 같은 실행의 실패 목록에 남긴다.
 
 - 범위: 전체(별칭이 설정된 과정 전부) / 과정 / 기수. Airtable 수식으로 범위만 읽는다.
 - upsert 키는 airtable_record_id. 새 레코드는 미가입 수강생(user_id 없음, 등록일 = 기수 시작일).
@@ -17,6 +20,8 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from app.contexts.academy.application.cohort_master_sync import CohortMasterSync
+from app.contexts.academy.domain.cohort_source import CohortFieldMap, code_formula
 from app.contexts.academy.domain.entities import Bootcamp, Cohort, RosterSyncRun, Student
 from app.contexts.academy.domain.enums import RosterSyncScope, RosterSyncStatus, RosterSyncTrigger
 from app.contexts.academy.domain.repositories import (
@@ -52,7 +57,11 @@ class RosterSyncDispatcher(Protocol):
 class RosterSource(Protocol):
     """명단 원천 (Airtable 어댑터가 구현). (레코드 ID, 필드) 목록을 돌려준다."""
 
-    async def fetch(self, formula: str, fields: list[str]) -> list[tuple[str, dict[str, Any]]]: ...
+    async def fetch(
+        self, formula: str | None, fields: list[str]
+    ) -> list[tuple[str, dict[str, Any]]]:
+        """formula가 None이면 테이블 전체."""
+        ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,6 +91,9 @@ class RosterSyncService:
         *,
         source: RosterSource,
         field_map: RosterFieldMap,
+        cohort_source: RosterSource,
+        master: CohortMasterSync,
+        cohort_field_map: CohortFieldMap,
         bootcamps: BootcampRepository,
         cohorts: CohortRepository,
         students: StudentRepository,
@@ -93,6 +105,9 @@ class RosterSyncService:
     ) -> None:
         self._source = source
         self._fields = field_map
+        self._cohort_source = cohort_source
+        self._master = master
+        self._cohort_fields = cohort_field_map
         self._bootcamps = bootcamps
         self._cohorts = cohorts
         self._students = students
@@ -172,8 +187,8 @@ class RosterSyncService:
         if scope_type is RosterSyncScope.COHORT and cohort_id is not None:
             cohort = await self._get_cohort(cohort_id)
             bootcamp_id = cohort.bootcamp_id
-        if bootcamp_id is not None:
-            await self._get_syncable_bootcamp(bootcamp_id)
+        if bootcamp_id is not None and await self._bootcamps.get(bootcamp_id) is None:
+            raise NotFoundError("운영과정을 찾을 수 없습니다.", code="bootcamp_not_found")
         run = RosterSyncRun(
             trigger=trigger,
             scope_type=scope_type,
@@ -200,6 +215,29 @@ class RosterSyncService:
 
     async def _execute(self, run: RosterSyncRun) -> RosterSyncRun:
         try:
+            # 1) 과정-기수 테이블로 HRD·운영과정·기수를 맞춘다 (A20). 과정·기수 범위면 그 과정코드만
+            master_formula = None
+            if run.bootcamp_id is not None:
+                bootcamp = await self._bootcamps.get(run.bootcamp_id)
+                if bootcamp is None:
+                    raise NotFoundError("운영과정을 찾을 수 없습니다.", code="bootcamp_not_found")
+                master_formula = code_formula(self._cohort_fields.code, bootcamp.code)
+            master_records = await self._cohort_source.fetch(
+                master_formula, self._cohort_fields.fetch_fields()
+            )
+            async with self._uow:
+                master = await self._master.apply(master_records)
+            logger.info(
+                "기수 마스터 동기화 (run=%s): 조회 %d, 운영과정 생성 %d, 기수 생성 %d·변경 %d, "
+                "실패 %d",
+                run.id,
+                master.fetched,
+                master.created_bootcamps,
+                master.created_cohorts,
+                master.updated_cohorts,
+                len(master.unmapped),
+            )
+            # 2) 수강생 명단
             scope = await self._scope(run)
             fetched = (
                 await self._source.fetch(scope.formula, self._fields.fetch_fields())
@@ -207,7 +245,7 @@ class RosterSyncService:
                 else []
             )
             async with self._uow:
-                await self._apply(run, scope, fetched)
+                await self._apply(run, scope, fetched, master.unmapped)
         except Exception as exc:
             message = exc.message if isinstance(exc, AppError) else f"{type(exc).__name__}: {exc}"
             logger.exception("명단 동기화 실패 (run=%s)", run.id)
@@ -237,7 +275,11 @@ class RosterSyncService:
         return _Scope(bootcamps, cohorts, prefixes_formula(field, prefixes) if prefixes else None)
 
     async def _apply(
-        self, run: RosterSyncRun, scope: _Scope, fetched: list[tuple[str, dict[str, Any]]]
+        self,
+        run: RosterSyncRun,
+        scope: _Scope,
+        fetched: list[tuple[str, dict[str, Any]]],
+        master_unmapped: list[UnmappedRecord],
     ) -> None:
         now = self._clock.now()
         bootcamp_by_prefix = {b.airtable_cohort_prefix: b for b in scope.bootcamps}
@@ -255,7 +297,7 @@ class RosterSyncService:
 
         created: list[Student] = []
         changed: list[Student] = []
-        unmapped: list[UnmappedRecord] = []
+        unmapped: list[UnmappedRecord] = list(master_unmapped)
         seen: set[str] = set()
         for record_id, fields in fetched:
             seen.add(record_id)
