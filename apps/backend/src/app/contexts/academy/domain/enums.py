@@ -35,7 +35,7 @@ class EnrollmentStatus(StrEnum):
 
 
 class StudentStatus(StrEnum):
-    """HRD-Net 상태 (확인 필요: 실제 상태 코드에 맞춰 조정)."""
+    """HRD-Net 상태 (Airtable `HRD상태`를 매핑, roster.py)."""
 
     REGISTERED = "REGISTERED"
     TRAINING = "TRAINING"
@@ -47,6 +47,7 @@ class StudentStatus(StrEnum):
     DROPPED_OUT = "DROPPED_OUT"
     LEAVE = "LEAVE"
     EXPELLED = "EXPELLED"
+    UNKNOWN = "UNKNOWN"  # 확인필요·미입력·알 수 없는 값
 
 
 class RosterSyncTrigger(StrEnum):

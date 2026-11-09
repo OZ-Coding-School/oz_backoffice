@@ -230,6 +230,23 @@ class Student(AggregateRoot):
         self.synced_at = synced_at
         self.is_removed_in_source = False
 
+    def sync_enrollment(
+        self, status: EnrollmentStatus, *, ended_on: date | None, reason: str | None
+    ) -> None:
+        """Airtable `상태`로 수강 상태를 맞춘다 (decisions A19).
+
+        백오피스에서만 정하는 기수 이동(TRANSFERRED)은 덮어쓰지 않는다.
+        종료일이 등록일보다 빠르면(원천 데이터 오류) 종료일은 비워 둔다.
+        """
+        if self.status is EnrollmentStatus.TRANSFERRED:
+            return
+        self.status = status
+        if status is EnrollmentStatus.ENROLLED:
+            self.ended_at, self.end_reason = None, None
+            return
+        self.ended_at = ended_on if ended_on is not None and ended_on >= self.enrolled_at else None
+        self.end_reason = reason
+
     def mark_removed_in_source(self) -> None:
         """Airtable에서 사라진 레코드. 멘토링 데이터가 참조하므로 행은 지우지 않는다."""
         self.is_removed_in_source = True
