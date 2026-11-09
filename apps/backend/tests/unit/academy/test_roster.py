@@ -138,3 +138,17 @@ def test_student_sync_enrollment() -> None:
     student.end(EnrollmentStatus.TRANSFERRED, on=date(2026, 12, 1))
     student.sync_enrollment(EnrollmentStatus.COMPLETED, ended_on=None, reason="정상수료")
     assert student.status is EnrollmentStatus.TRANSFERRED
+
+
+def test_interpret_uses_cohort_link_when_label_missing() -> None:
+    linked = interpret("rec1", fields(기수=None, **{"취업운영시트 link": ["recC"]}), FIELDS)
+    assert isinstance(linked, RosterRecord)
+    assert (linked.cohort_record_id, linked.cohort) == ("recC", None)
+    both = interpret("rec1", fields(**{"취업운영시트 link": ["recC"]}), FIELDS)
+    assert isinstance(both, RosterRecord)
+    assert (both.cohort_record_id, both.cohort) == ("recC", CohortLabel("헬스케어", 3))
+    unnamed = interpret(
+        "rec1", fields(이름=None, 기수=None, **{"취업운영시트 link": ["recC"]}), FIELDS
+    )
+    assert isinstance(unnamed, UnmappedRecord)
+    assert unnamed.cohort_label == "recC"
