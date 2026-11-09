@@ -1,6 +1,6 @@
 # 19. P5-1 과정 별칭 컬럼과 Airtable 클라이언트
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-09 병합)
 - 관련 PR: #22
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P5 (P5-1)
 - 이전 기록: [18. P4-2 학사 관리 API](18_p4_2_academy_admin_api.md), [07. 수강생 명단을 students에 합침](07_merge_student_rosters_into_students.md)
@@ -41,6 +41,9 @@ P5(Airtable 명단 동기화)의 기반이다. 계획서는 Airtable에 "과정 
   - `aerich migrate` → "No changes detected"
   - `aerich downgrade -v 5` → `upgrade` 성공
 - 실제 Airtable 읽기 조회와 범위 수식 검증(위)
+- 커밋 2개를 각각 워크트리로 꺼내 같은 검사 통과
+- GitHub Actions (PR #22, run 42578694163): backend 잡 통과
+- 사용자 확인: P5 진행 지시에 따라 CI 통과 후 병합
 
 ## 남은 작업
 - P5-2: 동기화 서비스(범위·upsert·원천 삭제 판정·기수 매핑 실패·상태 매핑), taskiq 작업, API
