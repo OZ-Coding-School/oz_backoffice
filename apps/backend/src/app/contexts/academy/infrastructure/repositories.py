@@ -41,6 +41,13 @@ class TortoiseHrdNetBootcampRepository(TortoiseRepository[HrdNetBootcamp, HrdNet
         "total_train_days",
     )
 
+    async def get_by_hrd_net_id(self, hrd_net_id: str) -> HrdNetBootcamp | None:
+        row = await HrdNetBootcampModel.get_or_none(hrd_net_id=hrd_net_id.strip())
+        return self.to_entity(row) if row else None
+
+    async def list_all(self) -> list[HrdNetBootcamp]:
+        return [self.to_entity(row) for row in await HrdNetBootcampModel.all().order_by("name")]
+
 
 class TortoiseHrdNetBootcampCohortRepository(
     TortoiseRepository[HrdNetBootcampCohort, HrdNetBootcampCohortModel]
@@ -55,6 +62,20 @@ class TortoiseHrdNetBootcampCohortRepository(
         "self_pay_amount",
     )
 
+    async def get_by_number(
+        self, hrd_net_bootcamp_id: uuid.UUID, cohort_number: int
+    ) -> HrdNetBootcampCohort | None:
+        row = await HrdNetBootcampCohortModel.get_or_none(
+            hrd_net_bootcamp_id=hrd_net_bootcamp_id, cohort_number=cohort_number
+        )
+        return self.to_entity(row) if row else None
+
+    async def list_by_bootcamp(self, hrd_net_bootcamp_id: uuid.UUID) -> list[HrdNetBootcampCohort]:
+        rows = await HrdNetBootcampCohortModel.filter(
+            hrd_net_bootcamp_id=hrd_net_bootcamp_id
+        ).order_by("cohort_number")
+        return [self.to_entity(row) for row in rows]
+
 
 class TortoiseBootcampRepository(TortoiseRepository[Bootcamp, BootcampModel]):
     model = BootcampModel
@@ -65,9 +86,16 @@ class TortoiseBootcampRepository(TortoiseRepository[Bootcamp, BootcampModel]):
         row = await BootcampModel.get_or_none(code=code.strip().upper())
         return self.to_entity(row) if row else None
 
+    async def get_by_name(self, name: str) -> Bootcamp | None:
+        row = await BootcampModel.get_or_none(name=name.strip())
+        return self.to_entity(row) if row else None
+
     async def list_active(self) -> list[Bootcamp]:
         rows = await BootcampModel.filter(is_active=True).order_by("name")
         return [self.to_entity(row) for row in rows]
+
+    async def list_all(self) -> list[Bootcamp]:
+        return [self.to_entity(row) for row in await BootcampModel.all().order_by("name")]
 
 
 class TortoiseCohortRepository(TortoiseRepository[Cohort, CohortModel]):
