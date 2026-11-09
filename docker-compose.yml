@@ -114,11 +114,12 @@ services:
 
   worker:
     <<: *backend
-    command: ["taskiq", "worker", "app.workers.broker:broker"]
+    # 작업 모듈(app.workers.tasks.*)을 함께 넘겨야 워커가 작업을 등록한다
+    command: ["taskiq", "worker", "app.workers.broker:broker", "app.workers.tasks.roster"]
 
   scheduler:
     <<: *backend
-    command: ["taskiq", "scheduler", "app.workers.broker:scheduler"]
+    command: ["taskiq", "scheduler", "app.workers.broker:scheduler", "app.workers.tasks.roster"]
 
 volumes:
   postgres-data:
