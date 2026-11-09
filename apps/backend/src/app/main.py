@@ -27,6 +27,8 @@ from app.core.database import build_tortoise_config
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.redis import create_redis
+from app.workers.broker import broker
+from app.workers.tasks.roster import TaskiqRosterSyncDispatcher
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -37,6 +39,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.redis = create_redis(settings.redis_url)
         app.state.http_client = httpx.AsyncClient(timeout=httpx.Timeout(10.0))
+        await broker.startup()  # 작업을 보내는 쪽(API)도 브로커 연결이 필요하다
         try:
             async with RegisterTortoise(
                 app,
@@ -44,6 +47,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             ):
                 yield
         finally:
+            await broker.shutdown()
             await app.state.http_client.aclose()
             await app.state.redis.aclose()
 
@@ -61,6 +65,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.role_assignments = RoleAssignmentService(TortoiseUserRoleRepository())
     app.state.user_admin = UserAdministration(TortoiseUserRepository(), clock)
     app.state.audit_recorder = AuditRecorder(TortoiseAuditLogRepository(), clock)
+    app.state.roster_sync_dispatcher = TaskiqRosterSyncDispatcher()
     app.state.academy_catalog = AcademyCatalog(
         TortoiseBootcampRepository(), TortoiseCohortRepository()
     )
