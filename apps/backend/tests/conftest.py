@@ -31,6 +31,7 @@ from app.core.config import Settings
 from app.core.database import MODEL_APP, build_tortoise_config
 from app.core.redis import get_redis
 from app.main import create_app
+from tests.s3_bucket import provision_test_bucket
 
 TEST_DATABASE_URL = os.environ.get(
     "TEST_DATABASE_URL", "postgres://oz:oz@localhost:5432/oz_backoffice_test"
@@ -100,6 +101,13 @@ async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
     transport = ASGITransport(app=app, raise_app_exceptions=False)
     async with AsyncClient(transport=transport, base_url="http://test") as http:
         yield http
+
+
+@pytest.fixture(scope="session")
+async def s3_bucket(settings: Settings) -> AsyncIterator[str]:
+    """S3 에뮬레이터(floci)의 테스트 전용 버킷. S3를 쓰는 테스트만 요청한다."""
+    async with provision_test_bucket(settings) as bucket:
+        yield bucket
 
 
 # ----------------------------------------------

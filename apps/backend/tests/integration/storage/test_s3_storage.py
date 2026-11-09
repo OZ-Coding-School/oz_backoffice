@@ -17,7 +17,7 @@ from app.core.config import Settings
 from app.core.storage import s3_settings
 from app.integrations.s3 import PresignedPost, S3Storage
 from app.shared.ids import new_id
-from tests.integration.storage.conftest import CORS_ORIGIN
+from tests.s3_bucket import CORS_ORIGIN
 
 if TYPE_CHECKING:
     from types_aiobotocore_s3 import S3Client
