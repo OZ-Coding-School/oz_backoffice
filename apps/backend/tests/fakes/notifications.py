@@ -18,3 +18,13 @@ class InMemorySmsSender:
 
     async def send(self, message: SmsMessage) -> None:
         self.sent.append(message)
+
+
+class InMemoryMailDispatcher:
+    """커밋 후 워커로 보낼 알림 메일을 모은다 (TaskiqMailDispatcher 대신)."""
+
+    def __init__(self) -> None:
+        self.dispatched: list[MailMessage] = []
+
+    async def dispatch(self, message: MailMessage) -> None:
+        self.dispatched.append(message)
