@@ -1,6 +1,6 @@
 # 30. P7-1 메일·SMS 발송 기반과 Gmail 드라이버
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-09 병합)
 - 관련 PR: #34
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P7 (P7-1)
 - 이전 기록: [29. P6-4 계약 수동 연결과 멘토 프로필 API](29_p6_4_contract_link_mentor_profile.md)
@@ -80,6 +80,7 @@ P7(수강생·멘토 가입)의 첫 PR이다. 가입 인증코드(이메일·SMS
   - 드라이버 선택: 운영 console → 503, Gmail 설정 누락 → 503
 - `send-test-mail` console 출력 확인(받는 주소 마스킹)
 - 커밋 2개를 worktree에서 하나씩 검사했다(ruff, ruff format, mypy, mypy tests, lint-imports, pytest). 모두 통과했고 최종 440 passed다.
+- GitHub Actions (PR #34, run 42620291766): backend 잡 통과
 - 실제 Gmail 발송은 사용자 설정 후 `send-test-mail`로 확인한다(아직 하지 않음).
 
 ## 남은 작업
