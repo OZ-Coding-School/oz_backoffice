@@ -7,6 +7,7 @@ from app.contexts.audit.application.recorder import AuditRecorder
 from app.core.clock import SystemClock
 from app.core.config import Settings
 from app.workers.broker import broker
+from app.workers.tasks.contracts import DAILY_0005_KST, expire_contracts
 from app.workers.tasks.roster import HOURLY, execute_roster_sync, scheduled_roster_sync
 from tests.fakes.audit import InMemoryAuditLogRepository
 
@@ -16,6 +17,14 @@ pytestmark = pytest.mark.unit
 def test_tasks_are_registered_with_schedule() -> None:
     assert execute_roster_sync.task_name == "academy.roster_sync.execute"
     assert scheduled_roster_sync.labels["schedule"] == [{"cron": HOURLY}]
+
+
+def test_contract_expiry_runs_daily_in_kst() -> None:
+    assert expire_contracts.task_name == "educator.contracts.expire"
+    assert expire_contracts.labels["schedule"] == [
+        {"cron": "5 0 * * *", "cron_offset": "Asia/Seoul"}
+    ]
+    assert DAILY_0005_KST["cron_offset"] == "Asia/Seoul"
 
 
 def test_broker_connection_has_no_read_timeout() -> None:
