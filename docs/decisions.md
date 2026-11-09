@@ -14,7 +14,7 @@
 | D3 | 수강생도 전원 `users` 계정을 가진다 (이메일 필수). 기존 exam의 링크 인증, vacation의 익명 폼은 이전 시 로그인 기반으로 바꾼다 |
 | D4 | 권한은 `user_roles`(범위 기반 RBAC: GLOBAL / BOOTCAMP / COHORT)로 판정하고, `bootcamp_staffs` / `cohort_staffs` / `cohort_mentors`는 담당자 표시용으로 함께 쓴다. 담당자 배정 시 같은 트랜잭션에서 `user_roles`를 동기화한다 |
 | D5 | `departments`는 조직도 용도만이다. 데이터 소유 범위는 bootcamp / cohort 기준이다 |
-| D6 | HRD-Net 과정 1 : 운영과정(`bootcamps`) N. 같은 HRD 과정에서 파생상품으로 운영과정이 다르게 구성된다 |
+| D6 | HRD-Net 과정 1 : 운영과정(`bootcamps`) N. 같은 HRD 과정에서 파생상품으로 운영과정이 다르게 구성된다 **(보완 2026-11-09)** HRD 연결은 기수 단위다. 기수(`cohorts.hrd_net_cohort_id`)는 운영과정의 대표 HRD 과정과 다른 HRD 과정의 회차에도 연결될 수 있다(예: CEO 1기 → 프론트엔드 HRD 9회차, 1인창업 3기 → 프론트엔드 HRD 16회차). `bootcamps.hrd_net_bootcamp_id`는 대표값이다 |
 | D7 | 파생 기수(`cohorts.parent_id`)는 이번 범위에서 제외한다 |
 | D8 | 조교·운영매니저는 내부 직원(`employees`), 멘토·강사는 외부 채용 인원(`users` + `mentors`/`instructors`)이다 |
 | D9 | 수강생 신청서(휴가·결석·지각·조퇴·중도포기·출석인정)는 공통 테이블 + 승인 워크플로로 만들고 DB를 원천으로 한다 (후속 단계) |
@@ -96,6 +96,7 @@
 | A17 | 회원 역할 직접 관리 API(`/admin/users/{id}/roles`)는 **원천 테이블이 따로 없는 역할(SUPER_ADMIN)만** 부여·회수한다. 매니저·조교 역할은 담당자 API, 멘토 역할은 멘토 배정(P8), 수강생 역할은 가입·수강 등록(P7)에서만 바꾼다(D4: 담당자 표시와 권한이 어긋나지 않게). 직접 부여는 승인된 활성 회원에게만, 만료 시각(임시 권한)을 둘 수 있다. **마지막 최고 관리자(만료되지 않은)는 회수할 수 없다**(동시 회수는 행 잠금으로 막음) (2026-11-06) |
 | A18 | Airtable 수강생 명단(KDT 학생관리툴 Base의 "수강생 정보 시트")의 `기수` 값은 `"<과정 별칭> <N>기"`(예: `헬스케어 3기`, lookup 리스트) 형식이다. 과정 별칭은 과정 코드와 달라서 **`bootcamps.airtable_cohort_prefix`**(nullable, unique)에 두고 운영과정 관리 API로 수정한다. 비어 있으면 그 과정은 명단 동기화 대상이 아니다 (2026-11-09) |
 | A19 | **수강 상태(`students.status`)는 동기화할 때마다 Airtable `상태`를 따른다**(A10의 "동기화가 덮어쓰지 않음"을 변경). 운영진이 Airtable을 계속 갱신하기 때문이다. 매핑: 수강중 → ENROLLED, 정상수료·80%이상수료·조기수료 → COMPLETED, 조기취업·80%수료후취업·70%이상조기취업 → EARLY_EMPLOYED, 수강철회·중도탈락·하차·제적·개강전취소 → DROPPED. 백오피스에서만 정하는 상태(기수 이동 TRANSFERRED)는 덮어쓰지 않는다. `HRD상태`는 `hrd_net_status`에 저장한다 (2026-11-09) |
+| A20 | Airtable 동기화 대상은 같은 Base의 두 테이블이다: **수강생 테이블**(`AIRTABLE_STUDENT_TABLE_ID`)과 **과정-기수 테이블**(`AIRTABLE_BOOTCAMP_TABLE_ID`, 기수별 레코드). 동기화할 때마다 먼저 과정-기수 테이블로 HRD 과정(훈련과정ID)·HRD 회차(훈련회차·기간)·운영과정(과정코드, 없으면 기수 별칭을 이름으로 생성, 별칭 설정)·기수(번호·기간·진행상태, `cohorts.airtable_record_id`)를 만들거나 갱신한다. 같은 HRD 과정에서 별칭·과정코드가 다르면 파생 운영과정이다. 진행상태: 개강 전 → PLANNED, 훈련 중 → ONGOING, 취업 산정 기간·종료 → ENDED. 운영진이 정한 INACTIVE·ARCHIVED는 덮어쓰지 않는다. 과정·기수 범위 동기화는 그 과정코드만 처리한다 (2026-11-09) |
 | A6 | 자동 승인 기준: 수강생은 명단과 **이름 + 휴대폰**(SMS 인증된 번호)이 일치하면, 멘토는 계약과 **이름 + 휴대폰**이 일치하면 자동 승인한다. 일치하지 않으면 **승인 대기**로 두고, 담당 매니저 이상이 승인한다. 대기 중에는 로그인해도 상태 화면만 볼 수 있다 |
 | A7 | 토큰: access는 응답 본문(프론트 메모리, `Authorization` 헤더), refresh는 HttpOnly·Secure·SameSite 쿠키. 갱신할 때 refresh를 회전한다 (Redis 저장) |
 | A8 | Google API(Meet, Drive, Gmail, Workspace Events)는 **서비스 계정 + 도메인 전체 위임**으로 회사 계정을 대신해 호출한다 |
