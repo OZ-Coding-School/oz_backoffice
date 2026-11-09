@@ -1,7 +1,7 @@
 # 26. P6-1 S3 어댑터와 S3 시나리오 통합 테스트
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 예정)
+- 관련 PR: #29
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P6 (P6-1)
 - 이전 기록: [02. docker compose 로컬 개발 환경과 S3 에뮬레이터](02_local_docker_compose_and_s3.md)
 
