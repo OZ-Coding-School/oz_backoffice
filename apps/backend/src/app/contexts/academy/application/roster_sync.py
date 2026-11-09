@@ -66,9 +66,10 @@ class RosterSource(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class _Scope:
-    bootcamps: list[Bootcamp]  # 별칭이 있는 과정만
+    bootcamps: list[Bootcamp]
     cohorts: list[Cohort]  # 원천 삭제 판정 범위
-    formula: str | None  # None이면 조회할 것이 없다
+    formula: str | None  # None이면 테이블 전체 (전체 동기화)
+    is_all: bool = False
 
 
 def _changes(student: Student) -> tuple[Any, ...]:
@@ -239,11 +240,7 @@ class RosterSyncService:
             )
             # 2) 수강생 명단
             scope = await self._scope(run)
-            fetched = (
-                await self._source.fetch(scope.formula, self._fields.fetch_fields())
-                if scope.formula
-                else []
-            )
+            fetched = await self._source.fetch(scope.formula, self._fields.fetch_fields())
             async with self._uow:
                 await self._apply(run, scope, fetched, master.unmapped)
         except Exception as exc:
@@ -267,12 +264,14 @@ class RosterSyncService:
         if run.scope_type is RosterSyncScope.BOOTCAMP:
             if run.bootcamp_id is None:  # RosterSyncRun이 보장한다
                 raise ValueError("과정 동기화에 과정이 없습니다.")
-            bootcamps = [await self._get_syncable_bootcamp(run.bootcamp_id)]
-        else:
-            bootcamps = [b for b in await self._bootcamps.list_all() if b.airtable_cohort_prefix]
+            bootcamp = await self._get_syncable_bootcamp(run.bootcamp_id)
+            cohorts = await self._cohorts.list_by_bootcamp(bootcamp.id)
+            prefix = bootcamp.airtable_cohort_prefix or ""
+            return _Scope([bootcamp], cohorts, prefixes_formula(field, [prefix]))
+        # 전체: 과정-기수 동기화로 모든 운영과정이 맞춰졌으므로 수강생 테이블 전체를 읽는다
+        bootcamps = await self._bootcamps.list_all()
         cohorts = [c for b in bootcamps for c in await self._cohorts.list_by_bootcamp(b.id)]
-        prefixes = [b.airtable_cohort_prefix for b in bootcamps if b.airtable_cohort_prefix]
-        return _Scope(bootcamps, cohorts, prefixes_formula(field, prefixes) if prefixes else None)
+        return _Scope(bootcamps, cohorts, None, is_all=True)
 
     async def _apply(
         self,
@@ -282,7 +281,10 @@ class RosterSyncService:
         master_unmapped: list[UnmappedRecord],
     ) -> None:
         now = self._clock.now()
-        bootcamp_by_prefix = {b.airtable_cohort_prefix: b for b in scope.bootcamps}
+        bootcamp_by_prefix = {
+            b.airtable_cohort_prefix: b for b in scope.bootcamps if b.airtable_cohort_prefix
+        }
+        cohort_by_record = {c.airtable_record_id: c for c in scope.cohorts if c.airtable_record_id}
         all_cohorts = {
             (c.bootcamp_id, c.cohort_number): c
             for b in scope.bootcamps
@@ -307,11 +309,19 @@ class RosterSyncService:
             if isinstance(interpreted, UnmappedRecord):
                 unmapped.append(interpreted)
                 continue
-            bootcamp = bootcamp_by_prefix.get(interpreted.cohort.prefix)
-            if bootcamp is None:
-                continue  # 별칭이 설정되지 않은 과정 (범위 밖)
-            cohort = all_cohorts.get((bootcamp.id, interpreted.cohort.number))
             student = existing.get(record_id)
+            cohort: Cohort | None
+            if interpreted.cohort_record_id is not None:
+                # 과정-기수 레코드 링크로 찾는다 (A20)
+                cohort = cohort_by_record.get(interpreted.cohort_record_id)
+                if cohort is None and not scope.is_all:
+                    continue  # 다른 과정·기수의 레코드 (범위 밖)
+            else:
+                label = interpreted.cohort
+                bootcamp = bootcamp_by_prefix.get(label.prefix) if label else None
+                if label is None or bootcamp is None:
+                    continue  # 별칭이 설정되지 않은 과정 (범위 밖)
+                cohort = all_cohorts.get((bootcamp.id, label.number))
             if cohort is None:
                 unmapped.append(_unmapped(interpreted, "cohort_not_found", student))
                 continue
@@ -405,7 +415,7 @@ def _unmapped(record: RosterRecord, reason: str, student: Student | None) -> Unm
     return UnmappedRecord(
         record_id=record.record_id,
         name=record.name,
-        cohort_label=str(record.cohort),
+        cohort_label=str(record.cohort) if record.cohort else record.cohort_record_id,
         reason=reason,
         existing_student_id=student.id if student else None,
     )

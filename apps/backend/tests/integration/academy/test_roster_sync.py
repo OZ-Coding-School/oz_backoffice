@@ -128,9 +128,9 @@ async def test_full_sync_creates_updates_and_is_idempotent() -> None:
     run = await _run(svc, RosterSyncScope.ALL)
 
     assert run.status is RosterSyncStatus.SUCCEEDED, run.error_message
-    assert source.formulas == ["FIND('헬스케어 ', ARRAYJOIN({기수}))=1"]
+    assert source.formulas == [None]  # 전체 동기화는 수강생 테이블 전체를 읽는다
     assert (run.fetched_count, run.upserted_count, run.removed_count, run.unmapped_count) == (
-        3,
+        4,
         2,
         0,
         1,
@@ -253,11 +253,15 @@ async def test_bootcamp_without_prefix_fails_the_run() -> None:
     assert "Airtable 기수 별칭" in (run.error_message or "")
 
 
-async def test_all_scope_without_prefixes_does_nothing() -> None:
+async def test_all_scope_reads_whole_table_even_without_prefixes() -> None:
     await create_cohort()
     source = FakeRosterSource()
     run = await _run(service(source), RosterSyncScope.ALL)
-    assert (run.status, run.fetched_count, source.formulas) == (RosterSyncStatus.SUCCEEDED, 0, [])
+    assert (run.status, run.fetched_count, source.formulas) == (
+        RosterSyncStatus.SUCCEEDED,
+        0,
+        [None],
+    )
 
 
 async def test_request_locks_scope_until_execution_ends(fake_redis: FakeAsyncRedis) -> None:
@@ -399,3 +403,35 @@ async def test_full_sync_builds_cohorts_from_airtable_then_students() -> None:
     bootcamp_run = await _run(svc, RosterSyncScope.BOOTCAMP, bootcamp_id=cohort.bootcamp_id)
     assert bootcamp_run.status is RosterSyncStatus.SUCCEEDED
     assert cohort_source.formulas[-1] == "{과정코드}='AH'"
+
+
+async def test_students_are_mapped_by_cohort_record_link() -> None:
+    """수강생의 과정-기수 레코드 링크로 기수를 찾는다. 라벨(lookup)이 비어도 된다 (A20)."""
+    bootcamp, (c1, c2) = await _bootcamp_with_prefix("BX", 1, 2)
+    cohorts = TortoiseCohortRepository()
+    for cohort, record_id in ((c1, "recCohort1"), (c2, "recCohort2")):
+        cohort.airtable_record_id = record_id
+        await cohorts.save(cohort)
+    source = FakeRosterSource()
+    source.records["rec1"] = {
+        "이름": "김오즈",
+        "취업운영시트 link": ["recCohort2"],
+        "상태": "수강중",
+    }
+    source.records["rec2"] = {
+        "이름": "이오즈",
+        "취업운영시트 link": ["recUnknown"],
+        "상태": "수강중",
+    }
+    source.records["rec3"] = {**record("박오즈", "BX 1기"), "취업운영시트 link": ["recCohort1"]}
+    run = await _run(service(source), RosterSyncScope.ALL)
+
+    assert run.status is RosterSyncStatus.SUCCEEDED, run.error_message
+    assert set(await _students(c2)) == {"rec1"}  # 라벨 없이 링크만으로
+    assert set(await _students(c1)) == {"rec3"}
+    assert [
+        (u["airtable_record_id"], u["reason"], u["cohort_label"]) for u in run.unmapped_records
+    ] == [("rec2", "cohort_not_found", "recUnknown")]
+    # 과정 범위 동기화에서 다른 과정 기수를 가리키는 링크는 범위 밖이라 건너뛴다
+    other = await _run(service(source), RosterSyncScope.BOOTCAMP, bootcamp_id=bootcamp.id)
+    assert other.unmapped_count == 0

@@ -54,6 +54,7 @@ class RosterFieldMap:
     phone: str = "전화번호"
     email: str = "이메일"
     cohort: str = "기수"
+    cohort_link: str = "취업운영시트 link"  # 과정-기수 테이블 레코드 링크 (A20)
     status: str = "상태"
     hrd_status: str = "HRD상태"
     dropped_on: str = "중도탈락일"
@@ -65,6 +66,7 @@ class RosterFieldMap:
             self.phone,
             self.email,
             self.cohort,
+            self.cohort_link,
             self.status,
             self.hrd_status,
             self.dropped_on,
@@ -86,7 +88,8 @@ class RosterRecord:
     """정규화한 명단 레코드 1건."""
 
     record_id: str
-    cohort: CohortLabel
+    cohort_record_id: str | None  # 과정-기수 테이블 레코드 링크 (있으면 이것으로 기수를 찾는다)
+    cohort: CohortLabel | None  # 기수 라벨 (링크가 없을 때 대신 쓴다)
     name: str
     phone_number: str | None
     email: str | None
@@ -189,15 +192,17 @@ def enrollment_status_of(status_text: str | None, hrd_status: StudentStatus) -> 
 def interpret(
     record_id: str, fields: dict[str, Any], field_map: RosterFieldMap
 ) -> RosterRecord | UnmappedRecord | None:
-    """레코드를 해석한다. 기수가 없거나 형식이 다르면 None(동기화 대상 아님)."""
+    """레코드를 해석한다. 기수 링크도 기수 라벨도 없으면 None(동기화 대상 아님)."""
+    cohort_record_id = _text(fields.get(field_map.cohort_link))
     cohort = parse_cohort_label(fields.get(field_map.cohort))
-    if cohort is None:
+    if cohort_record_id is None and cohort is None:
         return None
+    label = str(cohort) if cohort else cohort_record_id
     raw_name = _text(fields.get(field_map.name))
     try:
         name = normalize_name(raw_name or "")
     except BusinessRuleViolation:
-        return UnmappedRecord(record_id, raw_name, str(cohort), "invalid_name")
+        return UnmappedRecord(record_id, raw_name, label, "invalid_name")
 
     status_text = _text(fields.get(field_map.status))
     hrd_text = _text(fields.get(field_map.hrd_status))
@@ -210,6 +215,7 @@ def interpret(
         ended_on = _date(fields.get(field_map.training_end))
     return RosterRecord(
         record_id=record_id,
+        cohort_record_id=cohort_record_id,
         cohort=cohort,
         name=name,
         phone_number=_phone(fields.get(field_map.phone)),
