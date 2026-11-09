@@ -8,10 +8,11 @@ FK는 엔티티에서 `<이름>_id` 필드로 두면 모델의 FK 컬럼 속성(
 import uuid
 from typing import Any, ClassVar
 
+from tortoise.exceptions import IntegrityError
 from tortoise.models import Model
 
 from app.shared.domain import Entity
-from app.shared.errors import NotFoundError
+from app.shared.errors import ConflictError, NotFoundError
 
 
 class TortoiseRepository[EntityT: Entity, ModelT: Model]:
@@ -40,3 +41,12 @@ class TortoiseRepository[EntityT: Entity, ModelT: Model]:
     async def get(self, entity_id: uuid.UUID) -> EntityT | None:
         row = await self.model.get_or_none(id=entity_id)
         return self.to_entity(row) if row is not None else None  # type: ignore[arg-type]
+
+    async def delete(self, entity_id: uuid.UUID) -> None:
+        """행을 지운다. 다른 행이 참조 중이면(ON DELETE RESTRICT) 409 `in_use`."""
+        try:
+            await self.model.filter(id=entity_id).delete()
+        except IntegrityError as exc:
+            raise ConflictError(
+                "다른 데이터가 사용 중이라 삭제할 수 없습니다.", code="in_use"
+            ) from exc

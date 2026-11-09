@@ -8,6 +8,7 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette import status
+from tortoise.exceptions import IntegrityError
 
 from app.shared.errors import (
     AppError,
@@ -48,6 +49,15 @@ async def app_error_handler(request: Request, exc: Exception) -> JSONResponse:
     return JSONResponse(status_code=status_for(exc), content=error_body(exc.code, exc.message))
 
 
+async def integrity_error_handler(_: Request, exc: Exception) -> JSONResponse:
+    """서비스가 미리 검사하지 못한 DB 제약 위반(동시 요청 경합 등)의 안전망. 409로 응답한다."""
+    logger.warning("DB 제약 위반", exc_info=exc)
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content=error_body("conflict", "다른 요청과 충돌했습니다. 다시 시도해 주세요."),
+    )
+
+
 async def unhandled_error_handler(_: Request, exc: Exception) -> JSONResponse:
     logger.exception("처리되지 않은 예외", exc_info=exc)
     return JSONResponse(
@@ -58,4 +68,5 @@ async def unhandled_error_handler(_: Request, exc: Exception) -> JSONResponse:
 
 def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(AppError, app_error_handler)
+    app.add_exception_handler(IntegrityError, integrity_error_handler)
     app.add_exception_handler(Exception, unhandled_error_handler)

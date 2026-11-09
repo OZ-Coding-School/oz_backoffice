@@ -43,3 +43,15 @@ async def test_errors_are_mapped_to_http(
     response = await client.get(path)
     assert response.status_code == status
     assert response.json()["error"]["code"] == code
+
+
+async def test_integrity_error_is_mapped_to_conflict(app: FastAPI, client: AsyncClient) -> None:
+    from tortoise.exceptions import IntegrityError
+
+    @app.get("/_test/integrity")
+    async def integrity() -> None:
+        raise IntegrityError("duplicate key")
+
+    response = await client.get("/_test/integrity")
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "conflict"

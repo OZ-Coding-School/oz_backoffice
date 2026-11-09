@@ -42,6 +42,11 @@ class Department(AggregateRoot):
             "invalid_department",
         )
 
+    def update(self, *, name: str, description: str, rules: str | None) -> None:
+        """이름·설명·규칙을 바꾼다. 검증은 생성할 때와 같다."""
+        changed = Department(id=self.id, name=name, description=description, rules=rules)
+        self.name, self.description, self.rules = changed.name, changed.description, changed.rules
+
     def move_under(self, parent_id: uuid.UUID | None) -> None:
         """상위 부서를 바꾼다. 여러 단계에 걸친 순환은 부서 트리를 조회하는 서비스에서 검사한다."""
         _require(
@@ -63,6 +68,10 @@ class EmployeePosition(AggregateRoot):
         self.name = self.name.strip()
         _require(0 < len(self.name) <= 20, "직위명은 1~20자여야 합니다.", "invalid_position")
         _require(self.priority >= 0, "직급 우선순위는 0 이상이어야 합니다.", "invalid_position")
+
+    def update(self, *, name: str, priority: int) -> None:
+        changed = EmployeePosition(id=self.id, name=name, priority=priority)
+        self.name, self.priority = changed.name, changed.priority
 
 
 @dataclass(kw_only=True, eq=False)

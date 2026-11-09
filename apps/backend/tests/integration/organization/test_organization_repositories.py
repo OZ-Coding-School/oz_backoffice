@@ -18,6 +18,7 @@ from app.contexts.organization.infrastructure.repositories import (
     TortoiseEmployeePositionRepository,
     TortoiseEmployeeRepository,
 )
+from app.shared.errors import ConflictError
 from app.shared.ids import new_id
 from tests.factories.academy import create_cohort
 from tests.factories.identity import make_user
@@ -142,3 +143,44 @@ async def test_list_employees_by_ids() -> None:
     found = await TortoiseEmployeeRepository().list_by_ids([first.id, second.id, new_id()])
     assert {e.id for e in found} == {first.id, second.id}
     assert await TortoiseEmployeeRepository().list_by_ids([]) == []
+
+
+async def test_delete_in_use_is_conflict_and_lookups() -> None:
+    departments = TortoiseDepartmentRepository()
+    parent = Department(name="본부", description="설명")
+    await departments.add(parent)
+    child = Department(name="1팀", description="설명", parent_id=parent.id)
+    await departments.add(child)
+
+    found = await departments.find_by_parent_and_name(parent.id, " 1팀 ")
+    assert found is not None
+    assert found.id == child.id
+    assert await departments.find_by_parent_and_name(None, "본부") is not None
+    assert await departments.find_by_parent_and_name(None, "1팀") is None
+
+    with pytest.raises(ConflictError) as exc:
+        await departments.delete(parent.id)  # 하위 부서가 참조 중
+    assert exc.value.code == "in_use"
+    await departments.delete(child.id)
+    await departments.delete(parent.id)
+    assert await departments.get(parent.id) is None
+
+    employee = await create_employee()
+    positions = TortoiseEmployeePositionRepository()
+    position = await positions.get(employee.position_id)
+    assert position is not None
+    assert await positions.get_by_name(position.name) is not None
+    with pytest.raises(ConflictError):
+        await positions.delete(employee.position_id)
+
+
+async def test_employee_page_by_department() -> None:
+    first, second = await create_employee(), await create_employee()
+    page, total = await TortoiseEmployeeRepository().list_page(
+        department_id=None, limit=1, offset=1
+    )
+    assert (total, [e.id for e in page]) == (2, [second.id])
+    only, count_one = await TortoiseEmployeeRepository().list_page(
+        department_id=first.department_id, limit=10, offset=0
+    )
+    assert (count_one, [e.id for e in only]) == (1, [first.id])

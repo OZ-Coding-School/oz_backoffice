@@ -31,6 +31,18 @@ class TortoiseDepartmentRepository(TortoiseRepository[Department, DepartmentMode
     entity = Department
     fields = ("parent_id", "name", "description", "rules")
 
+    async def find_by_parent_and_name(
+        self, parent_id: uuid.UUID | None, name: str
+    ) -> Department | None:
+        query = DepartmentModel.filter(name=name.strip())
+        query = (
+            query.filter(parent_id__isnull=True)
+            if parent_id is None
+            else query.filter(parent_id=parent_id)
+        )
+        row = await query.first()
+        return self.to_entity(row) if row else None
+
     async def list_all(self) -> list[Department]:
         rows = await DepartmentModel.all().order_by("name")
         return [self.to_entity(row) for row in rows]
@@ -42,6 +54,10 @@ class TortoiseEmployeePositionRepository(
     model = EmployeePositionModel
     entity = EmployeePosition
     fields = ("name", "priority")
+
+    async def get_by_name(self, name: str) -> EmployeePosition | None:
+        row = await EmployeePositionModel.get_or_none(name=name.strip())
+        return self.to_entity(row) if row else None
 
     async def list_all(self) -> list[EmployeePosition]:
         rows = await EmployeePositionModel.all().order_by("priority", "name")
@@ -56,6 +72,15 @@ class TortoiseEmployeeRepository(TortoiseRepository[Employee, EmployeeModel]):
     async def get_by_user(self, user_id: uuid.UUID) -> Employee | None:
         row = await EmployeeModel.get_or_none(user_id=user_id)
         return self.to_entity(row) if row else None
+
+    async def list_page(
+        self, *, department_id: uuid.UUID | None, limit: int, offset: int
+    ) -> tuple[list[Employee], int]:
+        query = EmployeeModel.all()
+        if department_id is not None:
+            query = query.filter(department_id=department_id)
+        rows = await query.order_by("created_at", "id").offset(offset).limit(limit)
+        return [self.to_entity(row) for row in rows], await query.count()
 
     async def list_by_ids(self, employee_ids: list[uuid.UUID]) -> list[Employee]:
         if not employee_ids:
