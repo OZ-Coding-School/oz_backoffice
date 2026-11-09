@@ -1,6 +1,6 @@
 # 31. P7-2 수강생·멘토 가입 (인증코드·레이트 리밋·가입 신청)
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-09 병합)
 - 관련 PR: #35
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P7 (P7-2)
 - 이전 기록: [30. P7-1 메일·SMS 발송 기반과 Gmail 드라이버](30_p7_1_notification_senders.md)
@@ -70,6 +70,7 @@ P7의 두 번째 PR이다. 수강생·멘토가 gmail 이메일 인증과 휴대
   - 중복 휴대폰 409, 휴대폰 인증 전 가입 422
 - 개발 서버: 공개 기수 목록 15개(실데이터), 이메일 코드 요청 204와 console 출력 확인
 - 커밋 5개를 worktree에서 하나씩 검사했다(ruff, ruff format, mypy, mypy tests, lint-imports, pytest). 모두 통과했고 최종 489 passed다.
+- GitHub Actions (PR #35, run 42626543436): backend 잡 통과, 489 passed
 
 ## 남은 작업
 - P7-3 자동 매칭(가입 완료에 붙여 일치하면 바로 승인)
