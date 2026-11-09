@@ -53,7 +53,7 @@ HRD_BOOTCAMP_FIELDS = frozenset(
 HRD_COHORT_FIELDS = frozenset(
     {"cohort_number", "train_start_date", "train_end_date", "self_pay_amount"}
 )
-BOOTCAMP_FIELDS = frozenset({"name", "code", "is_active"})
+BOOTCAMP_FIELDS = frozenset({"name", "code", "is_active", "airtable_cohort_prefix"})
 COHORT_FIELDS = frozenset(
     {"hrd_net_cohort_id", "cohort_number", "start_date", "end_date", "status", "discord_guild_id"}
 )
@@ -267,6 +267,15 @@ class AcademyAdminService:
         by_code = await self._bootcamps.get_by_code(bootcamp.code)
         if by_code is not None and by_code.id != exclude:
             raise ConflictError("같은 코드의 운영과정이 있습니다.", code="bootcamp_code_taken")
+        if bootcamp.airtable_cohort_prefix is not None:
+            by_prefix = await self._bootcamps.get_by_airtable_prefix(
+                bootcamp.airtable_cohort_prefix
+            )
+            if by_prefix is not None and by_prefix.id != exclude:
+                raise ConflictError(
+                    "같은 Airtable 기수 별칭을 쓰는 운영과정이 있습니다.",
+                    code="airtable_prefix_taken",
+                )
 
     async def _ensure_cohort_number_free(self, bootcamp_id: uuid.UUID, number: int) -> None:
         if await self._cohorts.get_by_number(bootcamp_id, number):

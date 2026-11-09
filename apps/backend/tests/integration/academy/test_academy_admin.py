@@ -152,3 +152,34 @@ async def test_uniqueness_and_delete_guards(actor: User) -> None:
     await svc.delete_hrd_bootcamp(hrd.id, actor_id=actor.id)
     with pytest.raises(NotFoundError):
         await svc.get_hrd_bootcamp(hrd.id)
+
+
+async def test_airtable_prefix_is_unique(actor: User) -> None:
+    svc = service()
+    hrd, _ = await _hrd_with_cohort(svc, actor)
+    first = await svc.create_bootcamp(
+        {
+            "hrd_net_bootcamp_id": hrd.id,
+            "name": "헬스케어",
+            "code": "HC",
+            "airtable_cohort_prefix": "헬스케어",
+        },
+        actor_id=actor.id,
+    )
+    other = await svc.create_bootcamp(
+        {"hrd_net_bootcamp_id": hrd.id, "name": "백엔드", "code": "AH"}, actor_id=actor.id
+    )
+    with pytest.raises(ConflictError) as exc:
+        await svc.update_bootcamp(
+            other.id, {"airtable_cohort_prefix": "헬스케어"}, actor_id=actor.id
+        )
+    assert exc.value.code == "airtable_prefix_taken"
+    cleared = await svc.update_bootcamp(
+        first.id, {"airtable_cohort_prefix": None}, actor_id=actor.id
+    )
+    assert cleared.airtable_cohort_prefix is None
+    assert (
+        await svc.update_bootcamp(
+            other.id, {"airtable_cohort_prefix": "헬스케어"}, actor_id=actor.id
+        )
+    ).airtable_cohort_prefix == "헬스케어"

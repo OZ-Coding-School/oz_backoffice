@@ -80,7 +80,7 @@ class TortoiseHrdNetBootcampCohortRepository(
 class TortoiseBootcampRepository(TortoiseRepository[Bootcamp, BootcampModel]):
     model = BootcampModel
     entity = Bootcamp
-    fields = ("hrd_net_bootcamp_id", "name", "code", "is_active")
+    fields = ("hrd_net_bootcamp_id", "name", "code", "is_active", "airtable_cohort_prefix")
 
     async def get_by_code(self, code: str) -> Bootcamp | None:
         row = await BootcampModel.get_or_none(code=code.strip().upper())
@@ -88,6 +88,10 @@ class TortoiseBootcampRepository(TortoiseRepository[Bootcamp, BootcampModel]):
 
     async def get_by_name(self, name: str) -> Bootcamp | None:
         row = await BootcampModel.get_or_none(name=name.strip())
+        return self.to_entity(row) if row else None
+
+    async def get_by_airtable_prefix(self, prefix: str) -> Bootcamp | None:
+        row = await BootcampModel.get_or_none(airtable_cohort_prefix=prefix.strip())
         return self.to_entity(row) if row else None
 
     async def list_active(self) -> list[Bootcamp]:
