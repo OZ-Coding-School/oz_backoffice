@@ -11,8 +11,10 @@ from app.contexts.educator.application.contract_files import (
     ContractFileUploadService,
 )
 from app.contexts.educator.application.contracts import ContractService
+from app.contexts.educator.application.uploads import DirectUploads
 from app.contexts.educator.domain.entities import ContractFile
 from app.contexts.educator.domain.enums import ContractStatus, EducatorType
+from app.contexts.educator.domain.profiles import Mentor
 from app.contexts.educator.domain.repositories import ContractFilter
 from app.contexts.educator.infrastructure.pending_uploads import RedisPendingUploadStore
 from app.core.clock import FixedClock
@@ -24,6 +26,8 @@ from tests.fakes.educator import (
     FakeFileStorage,
     InMemoryContractFileRepository,
     InMemoryContractRepository,
+    InMemoryInstructorRepository,
+    InMemoryMentorRepository,
 )
 from tests.fakes.uow import FakeUnitOfWork
 
@@ -46,16 +50,20 @@ class Harness:
         self.employees = FakeEmployeeDirectory(self.manager_id)
         audit = AuditRecorder(self.audit_logs, self.clock)
         self.uploads = ContractFileUploadService(
-            storage=self.storage,
-            pending=RedisPendingUploadStore(redis),
+            uploads=DirectUploads(
+                storage=self.storage, pending=RedisPendingUploadStore(redis), clock=self.clock
+            ),
             files=self.files,
             audit=audit,
             uow=FakeUnitOfWork(),
-            clock=self.clock,
         )
+        self.mentors = InMemoryMentorRepository()
+        self.instructors = InMemoryInstructorRepository()
         self.service = ContractService(
             contracts=self.contracts,
             files=self.files,
+            mentors=self.mentors,
+            instructors=self.instructors,
             employees=self.employees,
             storage=self.storage,
             audit=audit,
@@ -274,3 +282,54 @@ async def test_list_returns_files(h: Harness) -> None:
 
     assert total == 2
     assert {v.file.id if v.file else None for v in views} == {file.id, None}
+
+
+async def test_link_change_and_unlink_regardless_of_status(h: Harness) -> None:
+    mentor = Mentor(user_id=new_id())
+    other = Mentor(user_id=new_id())
+    await h.mentors.save(mentor)
+    await h.mentors.save(other)
+    file = await h.uploaded_file()
+    created = await h.service.create(h.values(contract_file_id=file.id), actor_id=h.actor_id)
+    contract_id = created.contract.id
+    await h.service.confirm(contract_id, actor_id=h.actor_id)
+    await h.service.terminate(contract_id, actor_id=h.actor_id)  # 끝난 계약도 연결할 수 있다
+
+    linked = await h.service.link(contract_id, mentor_id=mentor.id, actor_id=h.actor_id)
+    assert linked.contract.mentor_id == mentor.id
+    changed = await h.service.link(contract_id, mentor_id=other.id, actor_id=h.actor_id)
+    assert changed.contract.mentor_id == other.id
+    unlinked = await h.service.link(contract_id, actor_id=h.actor_id)
+    assert unlinked.contract.mentor_id is None
+    assert h.actions()[-3:] == [
+        "educator.contract.link",
+        "educator.contract.link",
+        "educator.contract.unlink",
+    ]
+
+
+async def test_link_requires_matching_existing_profile(h: Harness) -> None:
+    created = await h.service.create(h.values(), actor_id=h.actor_id)
+    contract_id = created.contract.id
+    instructor_id = new_id()
+    h.instructors.ids.add(instructor_id)
+
+    with pytest.raises(BusinessRuleViolation) as kind:
+        await h.service.link(contract_id, instructor_id=instructor_id, actor_id=h.actor_id)
+    assert kind.value.code == "contract_type_mismatch"
+    with pytest.raises(NotFoundError) as missing:
+        await h.service.link(contract_id, mentor_id=new_id(), actor_id=h.actor_id)
+    assert missing.value.code == "mentor_not_found"
+
+    instructor_contract = await h.service.create(
+        h.values(educator_type=EducatorType.INSTRUCTOR), actor_id=h.actor_id
+    )
+    linked = await h.service.link(
+        instructor_contract.contract.id, instructor_id=instructor_id, actor_id=h.actor_id
+    )
+    assert linked.contract.instructor_id == instructor_id
+    with pytest.raises(NotFoundError) as no_instructor:
+        await h.service.link(
+            instructor_contract.contract.id, instructor_id=new_id(), actor_id=h.actor_id
+        )
+    assert no_instructor.value.code == "instructor_not_found"

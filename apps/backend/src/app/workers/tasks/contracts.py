@@ -14,6 +14,8 @@ from app.contexts.educator.application.contracts import ContractService
 from app.contexts.educator.infrastructure.repositories import (
     TortoiseContractFileRepository,
     TortoiseEducatorContractRepository,
+    TortoiseInstructorRepository,
+    TortoiseMentorRepository,
 )
 from app.contexts.organization.application.employee_queries import EmployeeQueries
 from app.contexts.organization.infrastructure.repositories import TortoiseEmployeeRepository
@@ -33,6 +35,8 @@ def build_contract_service() -> ContractService:
     return ContractService(
         contracts=TortoiseEducatorContractRepository(),
         files=TortoiseContractFileRepository(),
+        mentors=TortoiseMentorRepository(),
+        instructors=TortoiseInstructorRepository(),
         employees=EmployeeQueries(TortoiseEmployeeRepository()),
         storage=build_s3_storage(get_settings()),
         audit=AuditRecorder(TortoiseAuditLogRepository(), clock),

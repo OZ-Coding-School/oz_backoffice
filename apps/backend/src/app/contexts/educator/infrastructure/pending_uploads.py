@@ -1,6 +1,7 @@
 """업로드 요청 ~ 확정 사이의 대기 정보 (Redis, decisions A26).
 
-키 `oz:educator:upload:<요청자 ID>:<업로드 ID>`. 요청자 ID를 키에 넣어 다른 사람은 꺼낼 수 없고,
+키 `oz:educator:upload:<용도>:<요청자 ID>:<업로드 ID>`. 용도와 요청자 ID를 키에 넣어
+다른 용도·다른 사람은 꺼낼 수 없고,
 GETDEL로 꺼내 한 번만 확정되게 한다.
 """
 
@@ -18,8 +19,8 @@ if TYPE_CHECKING:
 _PREFIX = "oz:educator:upload:"
 
 
-def _key(requested_by: uuid.UUID, upload_id: uuid.UUID) -> str:
-    return f"{_PREFIX}{requested_by}:{upload_id}"
+def _key(purpose: str, requested_by: uuid.UUID, upload_id: uuid.UUID) -> str:
+    return f"{_PREFIX}{purpose}:{requested_by}:{upload_id}"
 
 
 class RedisPendingUploadStore:
@@ -34,16 +35,19 @@ class RedisPendingUploadStore:
             expires_at=upload.expires_at.isoformat(),
         )
         await self._redis.set(
-            _key(upload.requested_by, upload.id), json.dumps(data), ex=ttl_seconds
+            _key(upload.purpose, upload.requested_by, upload.id), json.dumps(data), ex=ttl_seconds
         )
 
-    async def take(self, requested_by: uuid.UUID, upload_id: uuid.UUID) -> PendingUpload | None:
-        raw = await self._redis.getdel(_key(requested_by, upload_id))
+    async def take(
+        self, requested_by: uuid.UUID, purpose: str, upload_id: uuid.UUID
+    ) -> PendingUpload | None:
+        raw = await self._redis.getdel(_key(purpose, requested_by, upload_id))
         if raw is None:
             return None
         data = json.loads(raw)
         return PendingUpload(
             id=uuid.UUID(data["id"]),
+            purpose=data["purpose"],
             requested_by=uuid.UUID(data["requested_by"]),
             storage_key=data["storage_key"],
             file_name=data["file_name"],

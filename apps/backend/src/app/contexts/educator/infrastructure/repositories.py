@@ -4,11 +4,18 @@ import uuid
 from datetime import date
 
 from tortoise.expressions import Q
+from tortoise.functions import Count
 
 from app.contexts.educator.domain.entities import ContractFile, EducatorContract
 from app.contexts.educator.domain.enums import ContractStatus
+from app.contexts.educator.domain.profiles import Mentor
 from app.contexts.educator.domain.repositories import ContractFilter
-from app.contexts.educator.infrastructure.models import ContractFileModel, EducatorContractModel
+from app.contexts.educator.infrastructure.models import (
+    ContractFileModel,
+    EducatorContractModel,
+    InstructorModel,
+    MentorModel,
+)
 from app.core.persistence import TortoiseRepository
 
 
@@ -78,6 +85,69 @@ class TortoiseEducatorContractRepository(
             status=ContractStatus.ACTIVE, end_date__lt=today
         ).order_by("end_date", "id")
         return [self.to_entity(row) for row in rows]
+
+    async def count_by_mentors(self, mentor_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
+        if not mentor_ids:
+            return {}
+        rows = (
+            await EducatorContractModel.filter(mentor_id__in=mentor_ids)
+            .annotate(count=Count("id"))
+            .group_by("mentor_id")
+            .values("mentor_id", "count")
+        )
+        return {row["mentor_id"]: row["count"] for row in rows}
+
+
+class TortoiseMentorRepository(TortoiseRepository[Mentor, MentorModel]):
+    model = MentorModel
+    entity = Mentor
+    fields = (
+        "user_id",
+        "nickname",
+        "display_name_preference",
+        "headline",
+        "introduction",
+        "expertise",
+        "profile_image_key",
+        "is_active",
+    )
+
+    def to_entity(self, row: MentorModel) -> Mentor:
+        entity = super().to_entity(row)
+        entity.created_at = row.created_at
+        entity.updated_at = row.updated_at
+        return entity
+
+    async def get_by_user(self, user_id: uuid.UUID) -> Mentor | None:
+        row = await MentorModel.get_or_none(user_id=user_id)
+        return self.to_entity(row) if row else None
+
+    async def list_page(
+        self, *, query: str | None, is_active: bool | None, limit: int, offset: int
+    ) -> tuple[list[Mentor], int]:
+        rows_query = MentorModel.all()
+        if is_active is not None:
+            rows_query = rows_query.filter(is_active=is_active)
+        if query:
+            # 회원 정보는 FK 관계(users)로 조인해 찾는다 (identity 코드는 import하지 않는다)
+            term = query.strip()
+            condition = (
+                Q(nickname__icontains=term)
+                | Q(user__name__icontains=term)
+                | Q(user__email__icontains=term)
+            )
+            digits = "".join(ch for ch in term if ch.isdigit())
+            if digits:
+                condition |= Q(user__phone_number__contains=digits)
+            rows_query = rows_query.filter(condition)
+        total = await rows_query.count()
+        rows = await rows_query.order_by("-created_at", "-id").offset(offset).limit(limit)
+        return [self.to_entity(row) for row in rows], total
+
+
+class TortoiseInstructorRepository:
+    async def exists(self, instructor_id: uuid.UUID) -> bool:
+        return await InstructorModel.exists(id=instructor_id)
 
 
 def _search(text: str) -> Q:

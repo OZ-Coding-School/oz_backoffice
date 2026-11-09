@@ -6,6 +6,7 @@ from datetime import date, datetime, timedelta
 
 from app.contexts.educator.domain.entities import ContractFile, EducatorContract
 from app.contexts.educator.domain.enums import ContractStatus
+from app.contexts.educator.domain.profiles import Mentor
 from app.contexts.educator.domain.repositories import ContractFilter
 from app.integrations.s3 import ObjectInfo, PresignedPost
 
@@ -48,6 +49,43 @@ class InMemoryContractRepository:
             for c in self.items.values()
             if c.status is ContractStatus.ACTIVE and c.end_date < today
         ]
+
+    async def count_by_mentors(self, mentor_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
+        counts: dict[uuid.UUID, int] = {}
+        for c in self.items.values():
+            if c.mentor_id in mentor_ids:
+                counts[c.mentor_id] = counts.get(c.mentor_id, 0) + 1
+        return counts
+
+
+class InMemoryMentorRepository:
+    def __init__(self, *mentors: Mentor) -> None:
+        self.items = {m.id: m for m in mentors}
+
+    async def get(self, mentor_id: uuid.UUID) -> Mentor | None:
+        found = self.items.get(mentor_id)
+        return dataclasses.replace(found) if found else None
+
+    async def get_by_user(self, user_id: uuid.UUID) -> Mentor | None:
+        found = next((m for m in self.items.values() if m.user_id == user_id), None)
+        return dataclasses.replace(found) if found else None
+
+    async def save(self, mentor: Mentor) -> None:
+        self.items[mentor.id] = dataclasses.replace(mentor)
+
+    async def list_page(
+        self, *, query: str | None, is_active: bool | None, limit: int, offset: int
+    ) -> tuple[list[Mentor], int]:
+        matched = [m for m in self.items.values() if is_active is None or m.is_active == is_active]
+        return matched[offset : offset + limit], len(matched)
+
+
+class InMemoryInstructorRepository:
+    def __init__(self, *instructor_ids: uuid.UUID) -> None:
+        self.ids = set(instructor_ids)
+
+    async def exists(self, instructor_id: uuid.UUID) -> bool:
+        return instructor_id in self.ids
 
 
 class InMemoryContractFileRepository:

@@ -301,6 +301,9 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
   | GET | `/api/v1/admin/contracts/{id}/file-url` | `contract.manage` (presigned GET) |
   | POST | `/api/v1/admin/contracts/{id}/link` | `contract.manage` (멘토·강사 수동 연결) |
   | GET/PATCH | `/api/v1/me/mentor-profile` | 멘토 본인 (소개, 전문 분야, 프로필 사진 업로드) |
+  | DELETE | `/api/v1/admin/contracts/{id}/link` | `contract.manage` (연결 해제, A27) |
+  | GET | `/api/v1/admin/mentors` | `contract.manage` (멘토 목록·검색, A28) |
+  | GET/PATCH | `/api/v1/admin/mentors/{id}/profile` (+ 사진 업로드·삭제) | `contract.manage` (운영진 대리 수정, A28) |
 - **테스트:** floci 통합(인증 강제): 크기 상한 초과·타입 위반 거부, 확정 시 `head` 불일치 거부. 계약 유형과 연결 컬럼 check.
 
 ### P7. 수강생·멘토 가입 🔒
@@ -480,11 +483,11 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
   - [x] P5-2c 명단 동기화 관리 API (구현 기록 22)
   - [x] P5-3 과정-기수 테이블로 학사 마스터 동기화 (구현 기록 23)
   - [x] P5-4 수강생 테이블 실구조 확인과 레코드 링크 매핑 (구현 기록 25)
-- [ ] P6 S3 어댑터 + 교육 인력·계약
+- [x] P6 S3 어댑터 + 교육 인력·계약
   - [x] P6-1 S3 어댑터와 S3 시나리오 통합 테스트·CI floci (구현 기록 26)
   - [x] P6-2 educator 모델·마이그레이션 (구현 기록 27, A22·A23)
   - [x] P6-3 계약서 업로드·계약 CRUD·상태 전이 API (구현 기록 28, A24·A25·A26)
-  - [ ] P6-4 계약 수동 연결·멘토 프로필 API
+  - [x] P6-4 계약 수동 연결·멘토 프로필 API (구현 기록 29, A27·A28)
 - [ ] P7 수강생·멘토 가입
 - [ ] P8 기수 멘토링 설정·멘토 배정
 - [ ] P9 멘토 일정
