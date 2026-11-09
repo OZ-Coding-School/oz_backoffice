@@ -1,6 +1,6 @@
 # 33. P7-4 수강생·멘토 로그인, 잠금, 비밀번호 재설정
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-09 병합)
 - 관련 PR: #37
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P7 (P7-4)
 - 이전 기록: [32. P7-3 가입 자동 매칭과 승인 알림 메일](32_p7_3_signup_auto_matching.md)
@@ -50,6 +50,7 @@ P7의 네 번째 PR이다. 가입한 수강생·멘토가 이메일 + 비밀번�
   - 재설정 코드 무노출, 없는 이메일 401
 - 커밋 3개를 worktree에서 하나씩 검사했다(ruff, ruff format, mypy, mypy tests, lint-imports, pytest). 모두 통과했고 최종 520 passed다.
 - 개발 서버: 없는 이메일 로그인 401 확인
+- GitHub Actions (PR #37, run 42631135184): backend 잡 통과, 520 passed
 
 ## 남은 작업
 - P7-5 운영진 승인 관리(대기 목록, 수강생 명단·멘토 계약 선택 승인, 반려 + 알림 메일, 재신청)
