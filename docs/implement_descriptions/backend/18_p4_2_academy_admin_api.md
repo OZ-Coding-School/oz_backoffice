@@ -1,6 +1,6 @@
 # 18. P4-2 학사(HRD 과정·회차, 운영과정, 기수) 관리 API
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-09 병합)
 - 관련 PR: #21
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P4 (P4-2)
 - 이전 기록: [17. P4-1 조직(부서·직위·직원) 관리 API](17_p4_1_organization_admin_api.md)
@@ -26,6 +26,9 @@ P4의 두 번째 PR이다. 최고 관리자(`org.manage`)가 HRD-Net 과정·회
 
 ## 검증
 - 컨테이너: ruff, ruff format, mypy(src strict, tests), lint-imports, pytest **262개 통과**
+- 커밋 3개를 각각 워크트리로 꺼내 같은 검사 통과
+- GitHub Actions (PR #21, run 42548097881): backend 잡 통과
+- 사용자 확인: P4 진행 지시에 따라 CI 통과 후 병합
 
 ## 남은 작업
 - P5: Airtable 수강생 명단 동기화 (Airtable 접근 정보와 필드 구조 필요)
