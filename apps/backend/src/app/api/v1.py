@@ -9,6 +9,7 @@ from app.contexts.educator.presentation.admin_router import router as contract_r
 from app.contexts.educator.presentation.mentor_router import admin_router as mentor_admin_router
 from app.contexts.educator.presentation.mentor_router import me_router as mentor_me_router
 from app.contexts.identity.presentation.router import auth_router, me_router
+from app.contexts.identity.presentation.signup_router import router as signup_router
 from app.contexts.organization.presentation.admin_router import (
     router as staff_registration_admin_router,
 )
@@ -18,6 +19,7 @@ from app.contexts.organization.presentation.staff_router import router as staff_
 
 router = APIRouter()
 router.include_router(auth_router)
+router.include_router(signup_router)
 router.include_router(me_router)
 router.include_router(staff_registration_router)
 router.include_router(staff_registration_admin_router)
