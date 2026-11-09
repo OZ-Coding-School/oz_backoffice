@@ -1,7 +1,7 @@
 # 22. P5-2c 명단 동기화 관리 API
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 예정)
+- 관련 PR: #25
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P5 (P5-2c)
 - 이전 기록: [21. P5-2b 명단 동기화 동시 실행 락과 taskiq 작업](21_p5_2b_roster_sync_worker.md)
 
