@@ -6,6 +6,7 @@ from app.contexts.academy.presentation.roster_factory import build_roster_sync_s
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.core.clock import SystemClock
 from app.core.config import Settings
+from app.workers.broker import broker
 from app.workers.tasks.roster import HOURLY, execute_roster_sync, scheduled_roster_sync
 from tests.fakes.audit import InMemoryAuditLogRepository
 
@@ -15,6 +16,11 @@ pytestmark = pytest.mark.unit
 def test_tasks_are_registered_with_schedule() -> None:
     assert execute_roster_sync.task_name == "academy.roster_sync.execute"
     assert scheduled_roster_sync.labels["schedule"] == [{"cron": HOURLY}]
+
+
+def test_broker_connection_has_no_read_timeout() -> None:
+    """BRPOP 대기 중 읽기 타임아웃으로 워커가 죽지 않도록 socket_timeout을 끈다."""
+    assert broker.connection_pool.connection_kwargs["socket_timeout"] is None
 
 
 def test_airtable_configured(settings: Settings) -> None:

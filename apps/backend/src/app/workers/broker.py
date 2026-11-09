@@ -18,7 +18,10 @@ from app.core.database import build_tortoise_config
 
 _settings = get_settings()
 
-broker = ListQueueBroker(url=_settings.taskiq_redis_url)
+# redis-py 8은 연결 기본 socket_timeout이 5초다. 워커는 BRPOP으로 무기한 대기하는데,
+# 큐가 5초 비면 TimeoutError가 나고 taskiq-redis는 ConnectionError만 잡아 워커 프로세스가
+# 죽는다(실행 중이던 작업도 함께 중단). 브로커 연결만 읽기 타임아웃을 끈다.
+broker = ListQueueBroker(url=_settings.taskiq_redis_url, socket_timeout=None)
 scheduler = TaskiqScheduler(broker=broker, sources=[LabelScheduleSource(broker)])
 
 
