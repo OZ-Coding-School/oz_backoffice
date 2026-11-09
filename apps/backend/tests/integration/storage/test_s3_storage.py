@@ -139,6 +139,16 @@ async def test_presigned_get_expires(
     assert (await http.get(url)).status_code in (400, 401, 403)
 
 
+async def test_read_prefix(storage: S3Storage, raw_s3: "S3Client") -> None:
+    key = _key()
+    assert await storage.read_prefix(key, 5) is None
+
+    await raw_s3.put_object(Bucket=storage.bucket, Key=key, Body=PDF)
+
+    assert await storage.read_prefix(key, 5) == b"%PDF-"
+    assert await storage.read_prefix(key, 1024) == PDF  # 객체보다 길면 전체
+
+
 async def test_head_missing_and_delete(storage: S3Storage, raw_s3: "S3Client") -> None:
     key = _key()
     assert await storage.head(key) is None
