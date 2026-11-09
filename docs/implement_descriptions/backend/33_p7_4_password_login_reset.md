@@ -1,7 +1,7 @@
 # 33. P7-4 수강생·멘토 로그인, 잠금, 비밀번호 재설정
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 예정)
+- 관련 PR: #37
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P7 (P7-4)
 - 이전 기록: [32. P7-3 가입 자동 매칭과 승인 알림 메일](32_p7_3_signup_auto_matching.md)
 

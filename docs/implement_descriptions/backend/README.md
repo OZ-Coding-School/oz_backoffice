@@ -34,4 +34,4 @@
 | 30 | [P7-1 메일·SMS 발송 기반과 Gmail 드라이버](30_p7_1_notification_senders.md) | 완료 (#34) |
 | 31 | [P7-2 수강생·멘토 가입 (인증코드·레이트 리밋·가입 신청)](31_p7_2_member_signup.md) | 완료 (#35) |
 | 32 | [P7-3 가입 자동 매칭과 승인 알림 메일](32_p7_3_signup_auto_matching.md) | 완료 (#36) |
-| 33 | [P7-4 수강생·멘토 로그인, 잠금, 비밀번호 재설정](33_p7_4_password_login_reset.md) | PR 진행 중 |
+| 33 | [P7-4 수강생·멘토 로그인, 잠금, 비밀번호 재설정](33_p7_4_password_login_reset.md) | PR 진행 중 (#37) |
