@@ -19,3 +19,4 @@
 | 15 | [P3-3a 과정·기수 담당자 관리 API](15_p3_3a_staff_assignment_api.md) | 완료 (#18) |
 | 16 | [P3-3b 회원 역할 관리 API](16_p3_3b_user_role_api.md) | 완료 (#19) |
 | 17 | [P4-1 조직(부서·직위·직원) 관리 API](17_p4_1_organization_admin_api.md) | 완료 (#20) |
+| 18 | [P4-2 학사(HRD 과정·회차, 운영과정, 기수) 관리 API](18_p4_2_academy_admin_api.md) | PR 진행 중 |
