@@ -94,6 +94,8 @@
 | A15 | Google OAuth 콜백(redirect_uri)은 **백엔드가 받는다**. 프론트는 브라우저를 `GET /api/v1/auth/google/login`으로 이동시킨다. 백엔드는 state를 HttpOnly 쿠키(`oz_oauth_state`, Path=`/api/v1/auth/google`, 10분)로 내려주고 Google로 보낸다. `GET /api/v1/auth/google/callback`에서 쿠키와 쿼리의 state를 대조하고(로그인 CSRF 방지) code를 교환하고 refresh 쿠키를 설정한 뒤, 성공하면 `{FRONTEND_BASE_URL}/`, 실패하면 `{FRONTEND_BASE_URL}/login?error=<code>`로 302 리디렉션한다. 프론트는 돌아온 뒤 `/auth/refresh`로 access 토큰을 받는다. code가 프론트 JS를 거치지 않고, 프론트에 콜백 페이지가 필요 없다. Google Cloud Console에는 백엔드 콜백 URL을 등록한다 (2026-11-06) |
 | A16 | 권한 판정은 **코드의 권한표 정의**(`access/domain/catalog.py`)로 역할→권한을 계산한다. DB `role_permissions`는 시드로 맞추는 사본이고 판정에 쓰지 않는다(요청마다 조인하지 않음). 범위: GLOBAL은 전체, BOOTCAMP는 그 과정과 소속 기수, COHORT는 그 기수만. 범위가 없는 권한(예: `contract.manage`)은 ANY로 판정해 어느 범위든 그 권한을 가진 역할이 하나라도 있으면 허용한다. 사용자 역할은 요청당 한 번 조회한다. 범위 대상 기수가 없으면 범위 역할로는 거부한다(GLOBAL은 통과 후 라우터가 404) (2026-11-06) |
 | A17 | 회원 역할 직접 관리 API(`/admin/users/{id}/roles`)는 **원천 테이블이 따로 없는 역할(SUPER_ADMIN)만** 부여·회수한다. 매니저·조교 역할은 담당자 API, 멘토 역할은 멘토 배정(P8), 수강생 역할은 가입·수강 등록(P7)에서만 바꾼다(D4: 담당자 표시와 권한이 어긋나지 않게). 직접 부여는 승인된 활성 회원에게만, 만료 시각(임시 권한)을 둘 수 있다. **마지막 최고 관리자(만료되지 않은)는 회수할 수 없다**(동시 회수는 행 잠금으로 막음) (2026-11-06) |
+| A18 | Airtable 수강생 명단(KDT 학생관리툴 Base의 "수강생 정보 시트")의 `기수` 값은 `"<과정 별칭> <N>기"`(예: `헬스케어 3기`, lookup 리스트) 형식이다. 과정 별칭은 과정 코드와 달라서 **`bootcamps.airtable_cohort_prefix`**(nullable, unique)에 두고 운영과정 관리 API로 수정한다. 비어 있으면 그 과정은 명단 동기화 대상이 아니다 (2026-11-09) |
+| A19 | **수강 상태(`students.status`)는 동기화할 때마다 Airtable `상태`를 따른다**(A10의 "동기화가 덮어쓰지 않음"을 변경). 운영진이 Airtable을 계속 갱신하기 때문이다. 매핑: 수강중 → ENROLLED, 정상수료·80%이상수료·조기수료 → COMPLETED, 조기취업·80%수료후취업·70%이상조기취업 → EARLY_EMPLOYED, 수강철회·중도탈락·하차·제적·개강전취소 → DROPPED. 백오피스에서만 정하는 상태(기수 이동 TRANSFERRED)는 덮어쓰지 않는다. `HRD상태`는 `hrd_net_status`에 저장한다 (2026-11-09) |
 | A6 | 자동 승인 기준: 수강생은 명단과 **이름 + 휴대폰**(SMS 인증된 번호)이 일치하면, 멘토는 계약과 **이름 + 휴대폰**이 일치하면 자동 승인한다. 일치하지 않으면 **승인 대기**로 두고, 담당 매니저 이상이 승인한다. 대기 중에는 로그인해도 상태 화면만 볼 수 있다 |
 | A7 | 토큰: access는 응답 본문(프론트 메모리, `Authorization` 헤더), refresh는 HttpOnly·Secure·SameSite 쿠키. 갱신할 때 refresh를 회전한다 (Redis 저장) |
 | A8 | Google API(Meet, Drive, Gmail, Workspace Events)는 **서비스 계정 + 도메인 전체 위임**으로 회사 계정을 대신해 호출한다 |
@@ -125,6 +127,7 @@
 | B8 | S3 클라이언트는 **aioboto3**(asyncio 네이티브). 의존성은 S3 어댑터를 구현할 때 추가한다 (2026-11-05) |
 | B9 | Tortoise 모델은 7개 컨텍스트 모듈을 **단일 app `models`** 에 등록한다. 마이그레이션 이력이 하나라 `aerich upgrade` 한 번으로 적용되고, FK는 `"models.UserModel"`처럼 참조한다. 컨텍스트별 app은 이력이 7개로 나뉘고 다른 app 테이블 정의가 마이그레이션에 중복돼 제외했다(실험 확인). 코드 경계는 import-linter가 강제한다 (2026-11-05) |
 | B10 | 다른 컨텍스트가 쓰는 공개 서비스(예: identity `UserQueries`)는 composition root인 `app.main`이 `app.state`에 연결하고, presentation 의존성이 `request.app.state`에서 꺼낸다. 다른 컨텍스트의 infrastructure를 import하지 않는 import-linter 계약을 유지하기 위해서다. 인증 의존성 `get_current_user`·`require_approved_user`는 공개 영역인 `access.presentation.dependencies`에 둔다 (2026-11-05) |
+| B11 | Airtable 연동은 **pyairtable**을 쓴다(사용자 지정). 페이지네이션·429 재시도는 라이브러리 기본 재시도 정책을 쓰고, 동기(requests) 라이브러리라 `asyncio.to_thread`로 호출해 이벤트 루프를 막지 않는다 (2026-11-09) |
 
 ## 4-1. 저장소 운영 (2026-11-05)
 
