@@ -21,3 +21,4 @@
 | 17 | [P4-1 조직(부서·직위·직원) 관리 API](17_p4_1_organization_admin_api.md) | 완료 (#20) |
 | 18 | [P4-2 학사(HRD 과정·회차, 운영과정, 기수) 관리 API](18_p4_2_academy_admin_api.md) | 완료 (#21) |
 | 19 | [P5-1 과정 별칭 컬럼과 Airtable 클라이언트](19_p5_1_airtable_client.md) | 완료 (#22) |
+| 20 | [P5-2a Airtable 명단 레코드 해석과 동기화 서비스](20_p5_2a_roster_sync_service.md) | PR 진행 중 |
