@@ -24,6 +24,17 @@ class InMemoryDepartmentRepository:
     async def get(self, entity_id: uuid.UUID) -> Department | None:
         return self.items.get(entity_id)
 
+    async def delete(self, entity_id: uuid.UUID) -> None:
+        self.items.pop(entity_id, None)
+
+    async def find_by_parent_and_name(
+        self, parent_id: uuid.UUID | None, name: str
+    ) -> Department | None:
+        return next(
+            (d for d in self.items.values() if d.parent_id == parent_id and d.name == name.strip()),
+            None,
+        )
+
     async def list_all(self) -> list[Department]:
         return sorted(self.items.values(), key=lambda d: d.name)
 
@@ -40,6 +51,12 @@ class InMemoryEmployeePositionRepository:
 
     async def get(self, entity_id: uuid.UUID) -> EmployeePosition | None:
         return self.items.get(entity_id)
+
+    async def delete(self, entity_id: uuid.UUID) -> None:
+        self.items.pop(entity_id, None)
+
+    async def get_by_name(self, name: str) -> EmployeePosition | None:
+        return next((p for p in self.items.values() if p.name == name.strip()), None)
 
     async def list_all(self) -> list[EmployeePosition]:
         return sorted(self.items.values(), key=lambda p: (p.priority, p.name))
