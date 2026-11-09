@@ -230,7 +230,7 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
 - **테스트:** 기수 번호 중복, 기간 역전, HRD 회차 불일치 거부.
 - PR을 나눈다.
   - **P4-1 (구현 기록 17):** 조직 — `/admin/departments`, `/admin/positions`(목록·생성·PATCH·삭제), `/admin/employees`(목록·상세·이동). 부서는 상위 안 이름 유일·여러 단계 순환 금지, 참조 중인 부서·직위 삭제는 409 `in_use`. 직원 생성은 가입 승인으로만 한다
-  - **P4-2:** 학사 — HRD 과정·회차, 운영과정, 기수
+  - **P4-2 (구현 기록 18):** 학사 — `/admin/hrd-bootcamps`(+`/{id}/cohorts`), `/admin/hrd-cohorts/{id}`, `/admin/bootcamps`(+`/{id}/cohorts`, `include_inactive`), `/admin/cohorts/{id}`. 기수의 HRD 회차는 운영과정과 같은 HRD 과정이어야 한다(422 `hrd_cohort_mismatch`). 소속 FK는 수정 불가, 운영 중단은 삭제 대신 비활성·상태 변경
 
 ### P5. Airtable 수강생 명단 동기화 🔒
 - **선행 준비:** Airtable PAT(읽기 권한), 베이스·테이블 ID, **실제 필드 구조 확인 → `AIRTABLE_FIELD_MAP` 확정**
@@ -462,9 +462,9 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
   - [x] P3-2b 운영진 가입 승인·반려 (구현 기록 14)
   - [x] P3-3a 과정·기수 담당자 관리 API (구현 기록 15)
   - [x] P3-3b 회원 역할 관리 API (구현 기록 16)
-- [ ] P4 조직·과정·기수 관리 API
+- [x] P4 조직·과정·기수 관리 API
   - [x] P4-1 조직(부서·직위·직원) 관리 API (구현 기록 17)
-  - [ ] P4-2 학사(HRD 과정·회차, 운영과정, 기수) 관리 API
+  - [x] P4-2 학사(HRD 과정·회차, 운영과정, 기수) 관리 API (구현 기록 18)
 - [ ] P5 Airtable 수강생 명단 동기화
 - [ ] P6 S3 어댑터 + 교육 인력·계약
 - [ ] P7 수강생·멘토 가입

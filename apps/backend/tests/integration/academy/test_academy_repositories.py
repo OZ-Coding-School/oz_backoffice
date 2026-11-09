@@ -16,10 +16,13 @@ from app.contexts.academy.domain.enums import (
 from app.contexts.academy.infrastructure.repositories import (
     TortoiseBootcampRepository,
     TortoiseCohortRepository,
+    TortoiseHrdNetBootcampCohortRepository,
+    TortoiseHrdNetBootcampRepository,
     TortoiseRosterSyncRunRepository,
     TortoiseStudentRepository,
 )
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
+from app.shared.errors import ConflictError
 from tests.factories.academy import create_cohort, make_student
 from tests.factories.identity import make_user
 
@@ -163,3 +166,27 @@ async def test_db_check_constraints(sql: str, constraint: str) -> None:
     await create_cohort()
     with pytest.raises(IntegrityError, match=constraint):
         await connections.get("default").execute_query(sql)
+
+
+async def test_master_lookups_and_delete_in_use() -> None:
+    cohort = await create_cohort(code="AH", cohort_number=2)
+    bootcamps = TortoiseBootcampRepository()
+    bootcamp = await bootcamps.get(cohort.bootcamp_id)
+    assert bootcamp is not None
+    assert await bootcamps.get_by_name(bootcamp.name) is not None
+    assert [b.id for b in await bootcamps.list_all()] == [bootcamp.id]
+
+    hrd_bootcamps = TortoiseHrdNetBootcampRepository()
+    hrd = await hrd_bootcamps.get(bootcamp.hrd_net_bootcamp_id)
+    assert hrd is not None
+    assert hrd.hrd_net_id is not None
+    assert await hrd_bootcamps.get_by_hrd_net_id(hrd.hrd_net_id) is not None
+    hrd_cohorts = TortoiseHrdNetBootcampCohortRepository()
+    assert [c.id for c in await hrd_cohorts.list_by_bootcamp(hrd.id)] == [cohort.hrd_net_cohort_id]
+    assert await hrd_cohorts.get_by_number(hrd.id, 2) is not None
+
+    with pytest.raises(ConflictError) as exc:
+        await hrd_bootcamps.delete(hrd.id)  # 운영과정·회차가 참조
+    assert exc.value.code == "in_use"
+    await TortoiseCohortRepository().delete(cohort.id)
+    assert await TortoiseCohortRepository().get(cohort.id) is None
