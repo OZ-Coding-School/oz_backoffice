@@ -7,63 +7,41 @@
    회원 + 가입 신청을 만들고 자동 매칭한다(A31). 일치하면 바로 승인하고 커밋 후 승인 알림
    메일을 워커로 보낸다. 아니면 승인 대기(PENDING). 토큰은 주지 않는다(다시 로그인, A30).
 
-발송 제한: 대상(이메일·휴대폰)당 1시간 5회, IP당 1시간 20회(메일·SMS 합산), 재발송 60초.
-코드는 HMAC-SHA256 해시로만 저장하고 상수 시간으로 비교한다. 발송에 실패하면 저장한 코드를
-지우고 503으로 알린다(요청 안에서 바로 발송, A29).
+코드 발급·검증·발송 제한은 `VerificationCodes`(IP당 횟수는 메일·SMS 합산). 발송은 요청 안에서
+바로 하고 실패하면 503으로 알린다(A29).
 """
 
-import hashlib
-import hmac
 import html
 import secrets
 import uuid
-from collections.abc import Awaitable
 from dataclasses import dataclass, replace
 from typing import Protocol
 
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.educator.domain.enums import DisplayNamePreference
 from app.contexts.identity.application.signup_matching import SignupMatcher
+from app.contexts.identity.application.verification_codes import VerificationCodes, seconds
 from app.contexts.identity.domain.credentials import validate_password
 from app.contexts.identity.domain.entities import User
 from app.contexts.identity.domain.enums import MemberSignupType, SignupMatchResult
 from app.contexts.identity.domain.repositories import MemberSignupRepository, UserRepository
 from app.contexts.identity.domain.signup import MemberSignup
 from app.contexts.identity.domain.verification import (
-    CODE_LENGTH,
-    CODE_MAX_ATTEMPTS,
-    CODE_TTL,
-    RESEND_INTERVAL,
     SIGNUP_SESSION_TTL,
     ChallengeKind,
-    ChallengeStore,
-    CodeChallenge,
     SignupSession,
     SignupSessionStore,
 )
 from app.core.clock import Clock
-from app.core.rate_limit import RateLimitResult
 from app.core.uow import UnitOfWork
 from app.integrations.notifications.mail import MailMessage, MailSender
 from app.integrations.notifications.sms import SmsMessage, SmsSender
-from app.shared.errors import (
-    BusinessRuleViolation,
-    ConflictError,
-    TooManyRequestsError,
-)
+from app.shared.errors import BusinessRuleViolation, ConflictError
 from app.shared.normalization import normalize_phone
 from app.shared.value_objects import Email
 
 ALLOWED_EMAIL_DOMAIN = "gmail.com"
-TARGET_LIMIT = 5  # 대상(이메일·휴대폰)당 1시간
-IP_LIMIT = 20  # IP당 1시간 (메일·SMS 합산)
-LIMIT_WINDOW_SECONDS = 60 * 60
-
-
-class RateLimiter(Protocol):
-    async def hit(
-        self, name: str, subject: str, *, limit: int, window_seconds: int
-    ) -> RateLimitResult: ...
+SIGNUP_IP_LIMIT = "signup_ip"  # 가입 메일·SMS 발송을 IP당 합산
 
 
 class PasswordHasher(Protocol):
@@ -114,19 +92,14 @@ class SignupResult:
     signup: MemberSignup
 
 
-def _ttl(delta_seconds: float) -> int:
-    return max(1, int(delta_seconds))
-
-
 class SignupService:
     def __init__(
         self,
         *,
         users: UserRepository,
         signups: MemberSignupRepository,
-        challenges: ChallengeStore,
+        codes: VerificationCodes,
         sessions: SignupSessionStore,
-        limiter: RateLimiter,
         hasher: PasswordHasher,
         cohorts: SignupCohorts,
         matcher: SignupMatcher,
@@ -136,15 +109,13 @@ class SignupService:
         audit: AuditRecorder,
         uow: UnitOfWork,
         clock: Clock,
-        code_secret: str,
         sender_name: str,
         login_url: str,
     ) -> None:
         self._users = users
         self._signups = signups
-        self._challenges = challenges
+        self._codes = codes
         self._sessions = sessions
-        self._limiter = limiter
         self._hasher = hasher
         self._cohorts = cohorts
         self._matcher = matcher
@@ -154,7 +125,6 @@ class SignupService:
         self._audit = audit
         self._uow = uow
         self._clock = clock
-        self._secret = code_secret.encode()
         self._sender_name = sender_name
         self._login_url = login_url
 
@@ -163,10 +133,16 @@ class SignupService:
         email = self._signup_email(raw_email)
         if await self._users.get_by_email(email) is not None:
             raise ConflictError("이미 가입된 이메일입니다.", code="email_already_registered")
-        await self._ensure_resend_allowed(ChallengeKind.SIGNUP_EMAIL, email)
-        await self._check_limits("signup_email", email, client_ip)
-        code = await self._issue(ChallengeKind.SIGNUP_EMAIL, email, target=email)
-        await self._deliver(
+        await self._codes.prepare(
+            ChallengeKind.SIGNUP_EMAIL,
+            email,
+            limit_name="signup_email",
+            subject=email,
+            ip_limit_name=SIGNUP_IP_LIMIT,
+            client_ip=client_ip,
+        )
+        code = await self._codes.issue(ChallengeKind.SIGNUP_EMAIL, email, target=email)
+        await self._codes.deliver(
             ChallengeKind.SIGNUP_EMAIL,
             email,
             self._mail.send(
@@ -189,14 +165,14 @@ class SignupService:
     async def verify_email_code(self, raw_email: str, code: str) -> str:
         """코드가 맞으면 가입 토큰(30분)을 돌려준다."""
         email = self._signup_email(raw_email)
-        await self._verify(ChallengeKind.SIGNUP_EMAIL, email, code)
+        await self._codes.verify(ChallengeKind.SIGNUP_EMAIL, email, code)
         now = self._clock.now()
         token = secrets.token_urlsafe(32)
         session = SignupSession(
             email=email, email_verified_at=now, expires_at=now + SIGNUP_SESSION_TTL
         )
         await self._sessions.put(
-            token, session, ttl_seconds=_ttl(SIGNUP_SESSION_TTL.total_seconds())
+            token, session, ttl_seconds=seconds(SIGNUP_SESSION_TTL.total_seconds())
         )
         return token
 
@@ -205,10 +181,16 @@ class SignupService:
         await self._session(token)
         phone = normalize_phone(raw_phone)
         await self._ensure_phone_free(phone)
-        await self._ensure_resend_allowed(ChallengeKind.SIGNUP_PHONE, token)
-        await self._check_limits("signup_phone", phone, client_ip)
-        code = await self._issue(ChallengeKind.SIGNUP_PHONE, token, target=phone)
-        await self._deliver(
+        await self._codes.prepare(
+            ChallengeKind.SIGNUP_PHONE,
+            token,
+            limit_name="signup_phone",
+            subject=phone,
+            ip_limit_name=SIGNUP_IP_LIMIT,
+            client_ip=client_ip,
+        )
+        code = await self._codes.issue(ChallengeKind.SIGNUP_PHONE, token, target=phone)
+        await self._codes.deliver(
             ChallengeKind.SIGNUP_PHONE,
             token,
             self._sms.send(
@@ -218,14 +200,14 @@ class SignupService:
 
     async def verify_phone_code(self, token: str, code: str) -> None:
         session = await self._session(token)
-        challenge = await self._verify(ChallengeKind.SIGNUP_PHONE, token, code)
+        challenge = await self._codes.verify(ChallengeKind.SIGNUP_PHONE, token, code)
         verified = replace(
             session, phone_number=challenge.target, phone_verified_at=self._clock.now()
         )
         await self._sessions.put(
             token,
             verified,
-            ttl_seconds=_ttl((session.expires_at - self._clock.now()).total_seconds()),
+            ttl_seconds=seconds((session.expires_at - self._clock.now()).total_seconds()),
         )
 
     # ------------------------------------------------------------------ ④ 가입 완료
@@ -320,79 +302,3 @@ class SignupService:
             raise ConflictError(
                 "다른 계정에 등록된 휴대폰 번호입니다.", code="phone_already_registered"
             )
-
-    async def _check_limits(self, name: str, subject: str, client_ip: str) -> None:
-        for limit_name, limit_subject, limit in (
-            (name, subject, TARGET_LIMIT),
-            ("signup_ip", client_ip, IP_LIMIT),
-        ):
-            result = await self._limiter.hit(
-                limit_name, limit_subject, limit=limit, window_seconds=LIMIT_WINDOW_SECONDS
-            )
-            if not result.allowed:
-                raise TooManyRequestsError(
-                    "요청이 너무 많습니다. 잠시 후 다시 시도하세요.",
-                    retry_after=result.retry_after,
-                    code="rate_limited",
-                )
-
-    def _hash(self, code: str) -> str:
-        return hmac.new(self._secret, code.encode(), hashlib.sha256).hexdigest()
-
-    async def _ensure_resend_allowed(self, kind: ChallengeKind, key: str) -> None:
-        """재발송 간격(60초). 레이트 리밋보다 먼저 검사해 거부된 요청은 횟수에 넣지 않는다."""
-        now = self._clock.now()
-        previous = await self._challenges.get(kind, key)
-        if previous is not None and previous.sent_at + RESEND_INTERVAL > now:
-            wait = (previous.sent_at + RESEND_INTERVAL - now).total_seconds()
-            raise TooManyRequestsError(
-                "인증코드는 1분에 한 번만 보낼 수 있습니다.",
-                retry_after=_ttl(wait),
-                code="resend_too_soon",
-            )
-
-    async def _issue(self, kind: ChallengeKind, key: str, *, target: str) -> str:
-        now = self._clock.now()
-        code = f"{secrets.randbelow(10**CODE_LENGTH):0{CODE_LENGTH}d}"
-        challenge = CodeChallenge(
-            target=target, code_hash=self._hash(code), sent_at=now, expires_at=now + CODE_TTL
-        )
-        await self._challenges.put(kind, key, challenge, ttl_seconds=_ttl(CODE_TTL.total_seconds()))
-        return code
-
-    async def _deliver(self, kind: ChallengeKind, key: str, sending: Awaitable[None]) -> None:
-        try:
-            await sending
-        except Exception:
-            await self._challenges.delete(kind, key)  # 받지 못한 코드는 남기지 않는다
-            raise
-
-    async def _verify(self, kind: ChallengeKind, key: str, code: str) -> CodeChallenge:
-        now = self._clock.now()
-        challenge = await self._challenges.get(kind, key)
-        if challenge is None or challenge.expires_at <= now:
-            raise BusinessRuleViolation(
-                "인증코드가 만료되었습니다. 다시 받아 주세요.", code="verification_code_expired"
-            )
-        if challenge.attempts >= CODE_MAX_ATTEMPTS:
-            await self._challenges.delete(kind, key)
-            raise BusinessRuleViolation(
-                "인증 시도 횟수를 넘었습니다. 코드를 다시 받아 주세요.",
-                code="verification_attempts_exceeded",
-            )
-        if not hmac.compare_digest(challenge.code_hash, self._hash(code.strip())):
-            failed = challenge.with_failed_attempt()
-            if failed.attempts >= CODE_MAX_ATTEMPTS:
-                await self._challenges.delete(kind, key)
-            else:
-                await self._challenges.put(
-                    kind,
-                    key,
-                    failed,
-                    ttl_seconds=_ttl((challenge.expires_at - now).total_seconds()),
-                )
-            raise BusinessRuleViolation(
-                "인증코드가 맞지 않습니다.", code="invalid_verification_code"
-            )
-        await self._challenges.delete(kind, key)
-        return challenge

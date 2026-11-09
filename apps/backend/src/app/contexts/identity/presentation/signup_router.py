@@ -20,6 +20,7 @@ from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.educator.domain.enums import DisplayNamePreference
 from app.contexts.identity.application.signup import MailDispatcher, SignupForm, SignupService
 from app.contexts.identity.application.signup_matching import SignupMatcher
+from app.contexts.identity.application.verification_codes import VerificationCodes
 from app.contexts.identity.domain.credentials import PASSWORD_MAX_LENGTH
 from app.contexts.identity.domain.enums import MemberSignupType, UserApprovalStatus
 from app.contexts.identity.domain.verification import SIGNUP_SESSION_TTL
@@ -61,9 +62,13 @@ def get_signup_service(
     return SignupService(
         users=TortoiseUserRepository(),
         signups=TortoiseMemberSignupRepository(),
-        challenges=RedisChallengeStore(redis),
+        codes=VerificationCodes(
+            challenges=RedisChallengeStore(redis),
+            limiter=RedisRateLimiter(redis),
+            clock=clock,
+            secret=settings.jwt_secret_key.get_secret_value(),
+        ),
         sessions=RedisSignupSessionStore(redis),
-        limiter=RedisRateLimiter(redis),
         hasher=Argon2PasswordHasher(),
         cohorts=catalog,
         matcher=cast("SignupMatcher", request.app.state.signup_matcher),
@@ -73,7 +78,6 @@ def get_signup_service(
         audit=cast("AuditRecorder", request.app.state.audit_recorder),
         uow=UnitOfWork(),
         clock=clock,
-        code_secret=settings.jwt_secret_key.get_secret_value(),
         sender_name=settings.mail_sender_name,
         login_url=f"{settings.frontend_base_url.rstrip('/')}/login",
     )
