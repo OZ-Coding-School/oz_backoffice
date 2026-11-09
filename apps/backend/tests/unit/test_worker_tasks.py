@@ -5,7 +5,6 @@ from pydantic import SecretStr
 from app.core.config import Settings
 from app.workers.tasks.roster import (
     HOURLY,
-    airtable_configured,
     build_roster_sync_service,
     execute_roster_sync,
     scheduled_roster_sync,
@@ -20,7 +19,7 @@ def test_tasks_are_registered_with_schedule() -> None:
 
 
 def test_airtable_configured(settings: Settings) -> None:
-    assert not airtable_configured(settings)
+    assert not settings.airtable_configured
     configured = settings.model_copy(
         update={
             "airtable_token": SecretStr("pat"),
@@ -28,7 +27,7 @@ def test_airtable_configured(settings: Settings) -> None:
             "airtable_table_id": "tbl",
         }
     )
-    assert airtable_configured(configured)
+    assert configured.airtable_configured
 
 
 def test_service_composition(settings: Settings) -> None:

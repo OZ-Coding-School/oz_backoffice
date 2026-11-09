@@ -37,14 +37,6 @@ logger = logging.getLogger(__name__)
 HOURLY = "0 * * * *"
 
 
-def airtable_configured(settings: Settings) -> bool:
-    return bool(
-        settings.airtable_token.get_secret_value()
-        and settings.airtable_base_id
-        and settings.airtable_table_id
-    )
-
-
 def build_roster_sync_service(settings: Settings, redis: "Redis") -> RosterSyncService:
     clock = SystemClock()
     client = AirtableClient(
@@ -83,10 +75,17 @@ async def execute_roster_sync(run_id: str) -> None:
 
 @broker.task(task_name="academy.roster_sync.scheduled", schedule=[{"cron": HOURLY}])
 async def scheduled_roster_sync() -> None:
-    if not airtable_configured(get_settings()):
+    if not get_settings().airtable_configured:
         logger.warning("Airtable 설정(AIRTABLE_*)이 없어 주기 명단 동기화를 건너뜁니다.")
         return
     async with _service() as service:
         run = await service.run_scheduled()
         if run is not None:
             logger.info("주기 명단 동기화 %s: %s", run.id, run.status)
+
+
+class TaskiqRosterSyncDispatcher:
+    """수동 동기화 실행을 워커로 보낸다 (API → taskiq). app.main이 app.state에 연결한다."""
+
+    async def dispatch(self, run_id: uuid.UUID) -> None:
+        await execute_roster_sync.kiq(str(run_id))

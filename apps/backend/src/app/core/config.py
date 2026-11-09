@@ -51,6 +51,14 @@ class Settings(BaseSettings):
     airtable_base_id: str = ""
     airtable_table_id: str = ""  # 테이블 ID(tbl...) 또는 테이블 이름
 
+    @property
+    def airtable_configured(self) -> bool:
+        return bool(
+            self.airtable_token.get_secret_value()
+            and self.airtable_base_id
+            and self.airtable_table_id
+        )
+
     # AWS S3 (비공개 버킷 1개 + prefix: contracts/, profiles/ ...)
     # 로컬·CI는 S3 에뮬레이터(floci)를 endpoint로 지정한다.
     # 운영은 endpoint 없이 AWS 기본 엔드포인트를 쓴다.

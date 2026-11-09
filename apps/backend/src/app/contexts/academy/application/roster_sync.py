@@ -43,6 +43,12 @@ from app.shared.errors import AppError, BusinessRuleViolation, ConflictError, No
 logger = logging.getLogger(__name__)
 
 
+class RosterSyncDispatcher(Protocol):
+    """실행을 백그라운드 작업으로 보낸다 (taskiq 작업이 구현, app.main이 연결)."""
+
+    async def dispatch(self, run_id: uuid.UUID) -> None: ...
+
+
 class RosterSource(Protocol):
     """명단 원천 (Airtable 어댑터가 구현). (레코드 ID, 필드) 목록을 돌려준다."""
 
