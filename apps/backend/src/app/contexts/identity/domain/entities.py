@@ -83,6 +83,10 @@ class User(AggregateRoot):
         self.phone_number = normalize_phone(phone_number)
         self.phone_verified_at = now
 
+    def change_password(self, hashed_password: str) -> None:
+        """새 비밀번호 해시로 바꾼다(재설정, 다시 해시). 비밀번호 규칙은 해시 전에 검사한다."""
+        self.hashed_password = hashed_password
+
     def record_login(self, *, now: datetime) -> None:
         self.last_login_at = now
 
