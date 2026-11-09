@@ -95,16 +95,28 @@ class HrdNetBootcampCohort(AggregateRoot):
 
 @dataclass(kw_only=True, eq=False)
 class Bootcamp(AggregateRoot):
-    """사내 운영과정. code는 대문자 영문·숫자(AH, AL, GM ...)."""
+    """사내 운영과정. code는 대문자 영문·숫자(AH, AL, GM ...).
+
+    airtable_cohort_prefix: Airtable 수강생 명단의 기수 값 앞부분(예: "헬스케어 3기"의 "헬스케어").
+    비어 있으면 명단 동기화 대상이 아니다 (decisions A18).
+    """
 
     hrd_net_bootcamp_id: uuid.UUID
     name: str
     code: str
     is_active: bool = True
+    airtable_cohort_prefix: str | None = None
 
     def __post_init__(self) -> None:
         self.name = self.name.strip()
         self.code = self.code.strip().upper()
+        if self.airtable_cohort_prefix is not None:
+            self.airtable_cohort_prefix = self.airtable_cohort_prefix.strip() or None
+        _require(
+            self.airtable_cohort_prefix is None or len(self.airtable_cohort_prefix) <= 50,
+            "Airtable 기수 별칭은 50자 이하여야 합니다.",
+            "invalid_bootcamp",
+        )
         _require(0 < len(self.name) <= 50, "운영과정명은 1~50자여야 합니다.", "invalid_bootcamp")
         _require(
             0 < len(self.code) <= 20 and self.code.isalnum(),

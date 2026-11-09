@@ -69,6 +69,7 @@ class BootcampModel(models.Model):
     name = fields.CharField(max_length=50, unique=True)
     code = fields.CharField(max_length=20, unique=True)
     is_active = fields.BooleanField(default=True)
+    airtable_cohort_prefix = fields.CharField(max_length=50, null=True, unique=True)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
 

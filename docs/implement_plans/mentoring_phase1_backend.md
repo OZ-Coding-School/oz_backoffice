@@ -233,7 +233,10 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
   - **P4-2 (구현 기록 18):** 학사 — `/admin/hrd-bootcamps`(+`/{id}/cohorts`), `/admin/hrd-cohorts/{id}`, `/admin/bootcamps`(+`/{id}/cohorts`, `include_inactive`), `/admin/cohorts/{id}`. 기수의 HRD 회차는 운영과정과 같은 HRD 과정이어야 한다(422 `hrd_cohort_mismatch`). 소속 FK는 수정 불가, 운영 중단은 삭제 대신 비활성·상태 변경
 
 ### P5. Airtable 수강생 명단 동기화 🔒
-- **선행 준비:** Airtable PAT(읽기 권한), 베이스·테이블 ID, **실제 필드 구조 확인 → `AIRTABLE_FIELD_MAP` 확정**
+- **선행 준비:** Airtable PAT(읽기 권한), 베이스·테이블 ID, **실제 필드 구조 확인 → `AIRTABLE_FIELD_MAP` 확정** — 확인 완료(2026-11-09, 구현 기록 19)
+- **실제 구조 (KDT 학생관리툴 Base, 수강생 정보 시트):** `이름`, `전화번호`(`010-1234-5678`), `이메일`, `기수`(lookup 리스트, `"<과정 별칭> <N>기"`), `상태`(운영 상태), `HRD상태`, `중도탈락일`, `훈련시작일`·`훈련종료일`. 과정 별칭은 `bootcamps.airtable_cohort_prefix`(A18), 수강 상태는 `상태`를 따른다(A19)
+- **범위 수식 (실데이터로 검증):** 기수 `ARRAYJOIN({기수})='헬스케어 3기'`, 과정 `FIND('헬스케어 ', ARRAYJOIN({기수}))=1`, 전체 = 별칭이 설정된 과정들의 OR
+- PR을 나눈다. **P5-1 (구현 기록 19):** `airtable_cohort_prefix`, pyairtable 클라이언트(B11). **P5-2:** 동기화 서비스·작업·API
 - **목표:** Airtable을 원천으로 `students`(수강 등록 = 명단 레코드, A10)를 최신으로 유지한다.
 - **작업:**
   - `AirtableClient`(httpx): 페이지네이션(offset), 429 응답 시 재시도(백오프), 초당 5요청 제한 준수
@@ -466,6 +469,8 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
   - [x] P4-1 조직(부서·직위·직원) 관리 API (구현 기록 17)
   - [x] P4-2 학사(HRD 과정·회차, 운영과정, 기수) 관리 API (구현 기록 18)
 - [ ] P5 Airtable 수강생 명단 동기화
+  - [x] P5-1 과정 별칭 컬럼과 Airtable 클라이언트 (구현 기록 19)
+  - [ ] P5-2 동기화 서비스·작업·API
 - [ ] P6 S3 어댑터 + 교육 인력·계약
 - [ ] P7 수강생·멘토 가입
 - [ ] P8 기수 멘토링 설정·멘토 배정

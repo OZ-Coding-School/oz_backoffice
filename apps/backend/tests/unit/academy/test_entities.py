@@ -201,3 +201,17 @@ def test_roster_sync_run_finishes_once() -> None:
     with pytest.raises(BusinessRuleViolation) as exc:
         run.fail(now=NOW, error_message="x")
     assert exc.value.code == "roster_sync_not_running"
+
+
+def test_bootcamp_airtable_prefix_is_trimmed_and_optional() -> None:
+    bootcamp = Bootcamp(
+        hrd_net_bootcamp_id=new_id(),
+        name="헬스케어",
+        code="HC",
+        airtable_cohort_prefix=" 헬스케어 ",
+    )
+    assert bootcamp.airtable_cohort_prefix == "헬스케어"
+    blank = Bootcamp(hrd_net_bootcamp_id=new_id(), name="x", code="X", airtable_cohort_prefix="  ")
+    assert blank.airtable_cohort_prefix is None
+    with pytest.raises(BusinessRuleViolation):
+        Bootcamp(hrd_net_bootcamp_id=new_id(), name="x", code="X", airtable_cohort_prefix="가" * 51)

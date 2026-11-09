@@ -115,12 +115,14 @@ class BootcampCreate(BaseModel):
     name: str = Field(min_length=1, max_length=50)
     code: str = Field(min_length=1, max_length=20)
     is_active: bool = True
+    airtable_cohort_prefix: str | None = Field(default=None, max_length=50)
 
 
 class BootcampUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=50)
     code: str | None = Field(default=None, min_length=1, max_length=20)
     is_active: bool | None = None
+    airtable_cohort_prefix: str | None = Field(default=None, max_length=50)
 
 
 class BootcampResponse(_FromEntity):
@@ -129,6 +131,7 @@ class BootcampResponse(_FromEntity):
     name: str
     code: str
     is_active: bool
+    airtable_cohort_prefix: str | None
 
 
 class CohortCreate(BaseModel):
@@ -273,7 +276,10 @@ async def get_bootcamp(bootcamp_id: uuid.UUID, _: Admin, service: ServiceDep) ->
 async def update_bootcamp(
     bootcamp_id: uuid.UUID, body: BootcampUpdate, admin: Admin, service: ServiceDep
 ) -> BootcampResponse:
-    """이름·코드·활성 여부. 운영을 멈출 때는 삭제 대신 is_active=false."""
+    """이름·코드·활성 여부·Airtable 기수 별칭. 운영을 멈출 때는 삭제 대신 is_active=false.
+
+    airtable_cohort_prefix를 null로 보내면 명단 동기화 대상에서 뺀다.
+    """
     changes = _not_null(_sent(body), "name", "code", "is_active")
     updated = await service.update_bootcamp(bootcamp_id, changes, actor_id=admin.id)
     return BootcampResponse.model_validate(updated)
