@@ -7,7 +7,7 @@ from tortoise.expressions import Q
 from tortoise.functions import Count
 
 from app.contexts.educator.domain.entities import ContractFile, EducatorContract
-from app.contexts.educator.domain.enums import ContractStatus
+from app.contexts.educator.domain.enums import ContractStatus, EducatorType
 from app.contexts.educator.domain.profiles import Mentor
 from app.contexts.educator.domain.repositories import ContractFilter
 from app.contexts.educator.infrastructure.models import (
@@ -84,6 +84,18 @@ class TortoiseEducatorContractRepository(
         rows = await EducatorContractModel.filter(
             status=ContractStatus.ACTIVE, end_date__lt=today
         ).order_by("end_date", "id")
+        return [self.to_entity(row) for row in rows]
+
+    async def find_unlinked_mentor_contracts(
+        self, contractor_name: str, contractor_phone: str
+    ) -> list[EducatorContract]:
+        # (contractor_name, contractor_phone) 인덱스를 쓴다
+        rows = await EducatorContractModel.filter(
+            contractor_name=contractor_name,
+            contractor_phone=contractor_phone,
+            educator_type=EducatorType.MENTOR,
+            mentor_id__isnull=True,
+        ).order_by("created_at", "id")
         return [self.to_entity(row) for row in rows]
 
     async def count_by_mentors(self, mentor_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
