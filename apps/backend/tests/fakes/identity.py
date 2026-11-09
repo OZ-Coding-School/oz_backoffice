@@ -5,6 +5,7 @@ from dataclasses import replace
 
 from app.contexts.identity.domain.entities import OAuthAccount, User
 from app.contexts.identity.domain.enums import SocialLoginProvider
+from app.contexts.identity.domain.signup import MemberSignup
 from app.integrations.google.oauth import GoogleIdentity
 from app.shared.errors import AuthenticationError
 
@@ -63,3 +64,21 @@ class FakeGoogleAuthenticator:
         if code not in self.identities:
             raise AuthenticationError("Google 인증에 실패했습니다.", code="google_auth_failed")
         return self.identities[code]
+
+
+class InMemoryMemberSignupRepository:
+    def __init__(self) -> None:
+        self.items: dict[uuid.UUID, MemberSignup] = {}
+
+    async def add(self, signup: MemberSignup) -> None:
+        self.items[signup.id] = signup
+
+    async def save(self, signup: MemberSignup) -> None:
+        self.items[signup.id] = signup
+
+    async def get(self, signup_id: uuid.UUID) -> MemberSignup | None:
+        return self.items.get(signup_id)
+
+    async def get_latest_by_user(self, user_id: uuid.UUID) -> MemberSignup | None:
+        mine = [s for s in self.items.values() if s.user_id == user_id]
+        return max(mine, key=lambda s: s.id) if mine else None

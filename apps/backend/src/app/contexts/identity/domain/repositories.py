@@ -5,6 +5,7 @@ from typing import Protocol
 
 from app.contexts.identity.domain.entities import OAuthAccount, User
 from app.contexts.identity.domain.enums import SocialLoginProvider
+from app.contexts.identity.domain.signup import MemberSignup
 
 
 class UserRepository(Protocol):
@@ -25,3 +26,13 @@ class UserRepository(Protocol):
     async def get_by_oauth(
         self, provider: SocialLoginProvider, provider_user_id: str
     ) -> User | None: ...
+
+
+class MemberSignupRepository(Protocol):
+    async def add(self, signup: MemberSignup) -> None: ...
+
+    async def save(self, signup: MemberSignup) -> None: ...
+
+    async def get(self, signup_id: uuid.UUID) -> MemberSignup | None: ...
+
+    async def get_latest_by_user(self, user_id: uuid.UUID) -> MemberSignup | None: ...

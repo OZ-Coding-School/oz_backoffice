@@ -39,3 +39,16 @@ class ServiceUnavailableError(AppError):
     """설정되지 않았거나 일시적으로 쓸 수 없는 기능 (예: Google OAuth 클라이언트 미설정)."""
 
     default_code = "service_unavailable"
+
+
+class TooManyRequestsError(AppError):
+    """요청 횟수 제한 초과 (발송 레이트 리밋, 재발송 간격).
+
+    retry_after는 다시 시도할 수 있기까지 남은 초다(응답 헤더 Retry-After).
+    """
+
+    default_code = "too_many_requests"
+
+    def __init__(self, message: str, *, retry_after: int, code: str | None = None) -> None:
+        super().__init__(message, code=code)
+        self.retry_after = max(1, retry_after)

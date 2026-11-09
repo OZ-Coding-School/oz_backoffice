@@ -1,7 +1,7 @@
 """과정·기수 선택지 조회 (다른 컨텍스트가 쓰는 공개 서비스).
 
 운영진 가입 신청(organization)에서 담당 과정·기수를 고를 때, 권한 판정(access)에서
-기수가 속한 과정을 찾을 때 쓴다.
+기수가 속한 과정을 찾을 때, 수강생 가입(identity)에서 기수를 고를 때 쓴다.
 담당으로 고를 수 있는 것은 활성 과정과, 준비·진행 중인 기수다.
 """
 
@@ -33,6 +33,10 @@ class AcademyCatalog:
         active = {bootcamp.id for bootcamp in await self._bootcamps.list_active()}
         cohorts = await self._cohorts.list_by_statuses(STAFFABLE_COHORT_STATUSES)
         return [cohort for cohort in cohorts if cohort.bootcamp_id in active]
+
+    async def is_signup_cohort(self, cohort_id: uuid.UUID) -> bool:
+        """수강생 가입 때 고를 수 있는 기수인지 (활성 과정의 PLANNED·ONGOING, decisions A30)."""
+        return any(cohort.id == cohort_id for cohort in await self.staffable_cohorts())
 
     async def ensure_staffable(
         self, *, bootcamp_ids: Iterable[uuid.UUID], cohort_ids: Iterable[uuid.UUID]
