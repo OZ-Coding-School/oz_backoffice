@@ -65,8 +65,17 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 10
+      # S3 에뮬레이터 (로컬 compose와 같은 이미지·인증 강제, decisions R7).
+      # 테스트 버킷은 tests/integration/storage/conftest.py가 만든다
+      s3:
+        image: floci/floci:2.4.0
+        env:
+          FLOCI_SERVICES_S3_ENFORCE_AUTH: "true"
+        ports:
+          - 4566:4566
     env:
       TEST_DATABASE_URL: postgres://oz:oz@localhost:5432/oz_backoffice_test
+      TEST_S3_ENDPOINT_URL: http://localhost:4566
     defaults:
       run:
         working-directory: apps/backend
@@ -88,6 +97,15 @@ jobs:
         run: uv run mypy tests
       - name: Import rules (import-linter)
         run: uv run lint-imports
+      # floci 이미지에는 헬스체크 도구가 없어 서비스 옵션 대신 여기서 응답을 기다린다
+      - name: Wait for S3 emulator
+        run: |
+          for i in $(seq 1 60); do
+            curl -s -o /dev/null http://localhost:4566 && exit 0
+            sleep 1
+          done
+          echo "S3 에뮬레이터가 60초 안에 응답하지 않았습니다." >&2
+          exit 1
       # 테스트 DB와 확장(btree_gist)은 tests/conftest.py가 세션마다 새로 만든다
       - name: Pytest (unit + api + integration) with coverage
         run: uv run coverage run -m pytest -q
