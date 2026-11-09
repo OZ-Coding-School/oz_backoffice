@@ -1,7 +1,7 @@
 # 18. P4-2 학사(HRD 과정·회차, 운영과정, 기수) 관리 API
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 예정)
+- 관련 PR: #21
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P4 (P4-2)
 - 이전 기록: [17. P4-1 조직(부서·직위·직원) 관리 API](17_p4_1_organization_admin_api.md)
 
