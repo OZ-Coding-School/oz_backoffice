@@ -1,7 +1,7 @@
 # 25. P5-4 수강생 테이블 실구조 확인과 레코드 링크 매핑
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 예정)
+- 관련 PR: #28
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P5 (P5-4)
 - 이전 기록: [23. P5-3 과정-기수 테이블로 학사 마스터 동기화](23_p5_3_cohort_master_sync.md), [24. 워커 반복 종료 수정](24_fix_worker_redis_socket_timeout.md)
 
