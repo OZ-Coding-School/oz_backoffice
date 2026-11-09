@@ -12,7 +12,12 @@ from app.contexts.academy.domain.entities import (
     RosterSyncRun,
     Student,
 )
-from app.contexts.academy.domain.enums import CohortStatus, EnrollmentStatus
+from app.contexts.academy.domain.enums import (
+    CohortStatus,
+    EnrollmentStatus,
+    RosterSyncScope,
+    RosterSyncStatus,
+)
 from app.contexts.academy.infrastructure.models import (
     BootcampModel,
     CohortModel,
@@ -173,6 +178,16 @@ class TortoiseStudentRepository(TortoiseRepository[Student, StudentModel]):
         rows = await StudentModel.filter(cohort_id__in=cohort_ids, airtable_record_id__isnull=False)
         return [self.to_entity(row) for row in rows]
 
+    async def list_by_cohort(
+        self, cohort_id: uuid.UUID, *, claimed: bool | None, include_removed: bool
+    ) -> list[Student]:
+        query = StudentModel.filter(cohort_id=cohort_id)
+        if claimed is not None:
+            query = query.filter(user_id__isnull=not claimed)
+        if not include_removed:
+            query = query.filter(is_removed_in_source=False)
+        return [self.to_entity(row) for row in await query.order_by("name", "id")]
+
     async def add_many(self, students: list[Student]) -> None:
         await StudentModel.bulk_create(
             [StudentModel(id=s.id, **self.to_values(s)) for s in students], batch_size=500
@@ -217,3 +232,20 @@ class TortoiseRosterSyncRunRepository(TortoiseRepository[RosterSyncRun, RosterSy
         "unmapped_records",
         "error_message",
     )
+
+    async def list_recent(self, *, before: uuid.UUID | None, limit: int) -> list[RosterSyncRun]:
+        query = RosterSyncRunModel.all()
+        if before is not None:
+            query = query.filter(id__lt=before)
+        rows = await query.order_by("-id").limit(limit)
+        return [self.to_entity(row) for row in rows]
+
+    async def latest_succeeded(self, scope_type: RosterSyncScope) -> RosterSyncRun | None:
+        row = (
+            await RosterSyncRunModel.filter(
+                scope_type=scope_type, status=RosterSyncStatus.SUCCEEDED
+            )
+            .order_by("-id")
+            .first()
+        )
+        return self.to_entity(row) if row else None

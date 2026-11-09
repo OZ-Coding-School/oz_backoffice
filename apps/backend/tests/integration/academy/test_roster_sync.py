@@ -4,6 +4,7 @@ from typing import Any
 import pytest
 from fakeredis import FakeAsyncRedis
 
+from app.contexts.academy.application.roster_queries import RosterQueries
 from app.contexts.academy.application.roster_sync import RosterSyncService
 from app.contexts.academy.domain.entities import Bootcamp, Cohort, Student
 from app.contexts.academy.domain.enums import (
@@ -312,3 +313,42 @@ async def test_duplicate_delivery_does_not_release_new_lock(fake_redis: FakeAsyn
         await svc.request(
             RosterSyncTrigger.MANUAL, RosterSyncScope.BOOTCAMP, bootcamp_id=bootcamp.id
         )
+
+
+async def test_queries_and_abort(fake_redis: FakeAsyncRedis) -> None:
+    bootcamp, (c1,) = await _bootcamp_with_prefix("디자이너", 1)
+    source = FakeRosterSource()
+    source.put("rec1", **record("김오즈", "디자이너 1기"))
+    source.put("rec2", **record("이오즈", "디자이너 1기"))
+    lock = RedisRosterSyncLock(fake_redis)
+    svc = service(source, lock)
+    full = await _run(svc, RosterSyncScope.ALL)
+    del source.records["rec2"]
+    partial = await _run(svc, RosterSyncScope.COHORT, cohort_id=c1.id)
+    queries = RosterQueries(
+        runs=TortoiseRosterSyncRunRepository(),
+        students=TortoiseStudentRepository(),
+        cohorts=TortoiseCohortRepository(),
+    )
+
+    assert [r.id for r in await queries.recent_runs(before=None, limit=10)] == [partial.id, full.id]
+    assert [r.id for r in await queries.recent_runs(before=partial.id, limit=10)] == [full.id]
+    latest = await queries.latest_unmapped()
+    assert latest is not None
+    assert latest.id == full.id  # 전체 동기화 기준
+    active = await queries.cohort_students(c1.id, claimed=None, include_removed=False)
+    assert [s.airtable_record_id for s in active] == ["rec1"]
+    every = await queries.cohort_students(c1.id, claimed=False, include_removed=True)
+    assert len(every) == 2
+    assert await queries.cohort_students(c1.id, claimed=True, include_removed=True) == []
+
+    run = await svc.request(
+        RosterSyncTrigger.MANUAL, RosterSyncScope.BOOTCAMP, bootcamp_id=bootcamp.id
+    )
+    await svc.abort(run.id, reason="작업 전달 실패")
+    aborted = await queries.get_run(run.id)
+    assert (aborted.status, aborted.error_message) == (RosterSyncStatus.FAILED, "작업 전달 실패")
+    again = await svc.request(
+        RosterSyncTrigger.MANUAL, RosterSyncScope.BOOTCAMP, bootcamp_id=bootcamp.id
+    )
+    assert again.status is RosterSyncStatus.RUNNING  # 락이 풀렸다

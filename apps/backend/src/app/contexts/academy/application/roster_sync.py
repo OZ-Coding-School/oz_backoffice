@@ -134,6 +134,17 @@ class RosterSyncService:
             raise
         return run
 
+    async def abort(self, run_id: uuid.UUID, *, reason: str) -> None:
+        """작업을 워커에 보내지 못했을 때 실행을 실패로 끝내고 락을 놓는다."""
+        run = await self._runs.get(run_id)
+        if run is None or run.status is not RosterSyncStatus.RUNNING:
+            return
+        try:
+            run.fail(now=self._clock.now(), error_message=reason)
+            await self._runs.save(run)
+        finally:
+            await self._lock.release(run.scope_type, run.bootcamp_id)
+
     async def run_scheduled(self) -> RosterSyncRun | None:
         """주기 동기화(전체). 다른 동기화가 실행 중이면 이번 주기는 건너뛴다."""
         try:
