@@ -51,6 +51,10 @@ def settings() -> Settings:
         google_redirect_uri="http://localhost:5173/auth/google/callback",
         google_allowed_domain="nextrunners.co.kr",
         refresh_cookie_secure=True,
+        # 실제 Airtable 자격 증명을 테스트에서 쓰지 않는다
+        airtable_token="",
+        airtable_base_id="",
+        airtable_table_id="",
         database_url=TEST_DATABASE_URL,
         jwt_secret_key="test-secret-key-with-enough-length-0123456789",
     )

@@ -1,7 +1,8 @@
 """taskiq 브로커와 스케줄러.
 
-워커:      uv run taskiq worker app.workers.broker:broker
-스케줄러:  uv run taskiq scheduler app.workers.broker:scheduler
+워커:      uv run taskiq worker app.workers.broker:broker app.workers.tasks.roster
+스케줄러:  uv run taskiq scheduler app.workers.broker:scheduler app.workers.tasks.roster
+(작업 모듈을 함께 넘겨야 등록된다. 새 작업 모듈을 만들면 docker-compose.yml 명령에도 추가한다)
 
 태스크는 각 컨텍스트에서 `@broker.task`로 정의하지 않고, 이 패키지의 tasks 모듈에서
 컨텍스트의 application 서비스를 호출하는 얇은 래퍼로 정의한다.
