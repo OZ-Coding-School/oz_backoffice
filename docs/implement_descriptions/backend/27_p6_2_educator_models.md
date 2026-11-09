@@ -1,7 +1,7 @@
 # 27. P6-2 멘토·강사·계약·계약서 모델
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 예정)
+- 관련 PR: #30
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P6 (P6-2)
 - 이전 기록: [26. P6-1 S3 어댑터](26_p6_1_s3_adapter.md)
 
