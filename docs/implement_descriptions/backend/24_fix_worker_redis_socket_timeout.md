@@ -1,6 +1,6 @@
 # 24. 워커 Redis 읽기 타임아웃으로 인한 반복 종료 수정
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-09 병합)
 - 관련 PR: #27
 - 이전 기록: [21. P5-2b 명단 동기화 동시 실행 락과 taskiq 작업](21_p5_2b_roster_sync_worker.md)
 
@@ -32,6 +32,7 @@ P5-4 작업 중 실제 Airtable 데이터로 전체 명단 동기화를 워커�
 - 수정 전: 워커를 재시작하면 약 5초마다 `worker-N is dead`가 반복됐다.
 - 수정 후: 워커·스케줄러를 재시작하고 25초 동안 대기했다. 프로세스 종료 0회.
 - `docker compose exec api`에서 ruff, ruff format, mypy, mypy tests, lint-imports(10 kept), pytest 326 passed
+- GitHub Actions (PR #27, run 42588640090): backend 잡 통과
 
 ## 남은 작업
 - 워커 중단으로 `RUNNING`에 남은 실행을 정리하는 기능 (예: 락 TTL보다 오래된 `RUNNING` 실행을 다음 주기 동기화 때 `FAILED`로 처리)

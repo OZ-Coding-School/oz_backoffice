@@ -25,4 +25,4 @@
 | 21 | [P5-2b 명단 동기화 동시 실행 락과 taskiq 작업](21_p5_2b_roster_sync_worker.md) | 완료 (#24) |
 | 22 | [P5-2c 명단 동기화 관리 API](22_p5_2c_roster_sync_api.md) | 완료 (#25) |
 | 23 | [P5-3 과정-기수 테이블로 학사 마스터 동기화](23_p5_3_cohort_master_sync.md) | 완료 (#26) |
-| 24 | [워커 Redis 읽기 타임아웃으로 인한 반복 종료 수정](24_fix_worker_redis_socket_timeout.md) | PR 진행 중 (#27) |
+| 24 | [워커 Redis 읽기 타임아웃으로 인한 반복 종료 수정](24_fix_worker_redis_socket_timeout.md) | 완료 (#27) |
