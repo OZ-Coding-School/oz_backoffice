@@ -5,6 +5,7 @@ description = "OZ 통합 백오피스 백엔드"
 requires-python = ">=3.13,<3.14"
 dependencies = [
     "aerich>=0.10.1",
+    "aioboto3>=15.5.0",
     "argon2-cffi>=25.1.0",
     "fastapi>=0.162.0",
     "httpx>=0.28.1",
@@ -29,6 +30,7 @@ dev = [
     "pytest-asyncio>=1.4.1.post1",
     "respx>=0.23.1",
     "ruff>=0.17.3",
+    "types-aioboto3[s3]~=15.5.0",
     "types-requests>=2.33.0.20261030",
 ]
 

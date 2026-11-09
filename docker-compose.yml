@@ -30,6 +30,8 @@ x-backend: &backend
     S3_BUCKET: &s3-bucket oz-backoffice-local
     S3_ENDPOINT_URL: http://s3:4566
     S3_PUBLIC_ENDPOINT_URL: http://localhost:4566
+    # S3 통합 테스트(테스트 전용 버킷)는 컨테이너 안에서 실행하므로 내부 주소를 쓴다
+    TEST_S3_ENDPOINT_URL: http://s3:4566
   # apps/backend 디렉터리 전체를 마운트한다. 단일 파일(pyproject.toml) 마운트는 호스트에서 파일
   # 크기가 바뀌면 컨테이너에 잘린 내용이 보이는 문제가 있었다. 가상환경은 이미지의 /opt/venv.
   volumes:

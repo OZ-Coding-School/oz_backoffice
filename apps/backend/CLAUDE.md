@@ -135,6 +135,7 @@ src/app/
   - `tortoise_db`(세션): 테스트 전용 DB(이름이 `_test`로 끝나야 함)를 지우고 새로 만든다. 격리된 `TortoiseContext`(전역 연결 없음)를 열고 **aerich 마이그레이션 SQL을 처음부터 적용**한 뒤, 세션이 끝나면 DB를 지운다. `tortoise_test_context`는 `generate_schemas()`를 강제해 raw SQL 제약이 빠지므로 쓰지 않는다.
   - `clean_tables`(테스트마다): 테스트가 끝나면 모든 모델 테이블을 TRUNCATE한다.
   - 테스트에서 연결을 직접 쓸 때는 `tortoise.connections.get("default")`를 쓴다(`Tortoise.get_connection` 아님).
+- S3 통합 테스트(`tests/integration/storage`)는 floci의 **테스트 전용 버킷** `oz-backoffice-test`를 쓴다. 세션 픽스처 `s3_bucket`이 만들고(CORS 포함) 끝나면 지운다. 주소는 `TEST_S3_ENDPOINT_URL`(compose `http://s3:4566`, CI·호스트 `http://localhost:4566`). 테스트 `Settings`가 S3 설정을 고정하므로 개발 버킷은 건드리지 않는다.
 - 테스트: `tests/unit`(DB 없음, `tests/fakes` 인메모리 리포지토리), `tests/integration`(실제 PostgreSQL), `tests/api`(AsyncClient + 의존성 오버라이드). 마커 `unit` / `integration` / `api`.
 
 ---
