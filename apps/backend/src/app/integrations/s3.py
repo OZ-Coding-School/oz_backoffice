@@ -137,6 +137,22 @@ class S3Storage:
             raise StorageError("파일 저장소에 연결할 수 없습니다.") from exc
         return ObjectInfo(size=head["ContentLength"], content_type=head.get("ContentType"))
 
+    async def read_prefix(self, key: str, length: int) -> bytes | None:
+        """객체의 앞부분 length바이트(Range GET). 파일 형식(매직 바이트) 확인용. 없으면 None."""
+        try:
+            async with self._client() as client:
+                response = await client.get_object(
+                    Bucket=self.bucket, Key=key, Range=f"bytes=0-{length - 1}"
+                )
+                async with response["Body"] as body:
+                    return await body.read()
+        except ClientError as exc:
+            if str(exc.response.get("Error", {}).get("Code")) in _NOT_FOUND:
+                return None
+            raise StorageError("파일 저장소에 연결할 수 없습니다.") from exc
+        except BotoCoreError as exc:
+            raise StorageError("파일 저장소에 연결할 수 없습니다.") from exc
+
     async def delete(self, key: str) -> None:
         """객체를 지운다. 없는 객체를 지워도 오류가 아니다(S3 동작과 같음)."""
         try:

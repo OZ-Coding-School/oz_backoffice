@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from app.contexts.academy.presentation.admin_router import router as academy_router
 from app.contexts.academy.presentation.roster_router import router as roster_router
 from app.contexts.access.presentation.admin_router import router as user_roles_router
+from app.contexts.educator.presentation.admin_router import router as contract_router
 from app.contexts.identity.presentation.router import auth_router, me_router
 from app.contexts.organization.presentation.admin_router import (
     router as staff_registration_admin_router,
@@ -23,3 +24,4 @@ router.include_router(user_roles_router)
 router.include_router(organization_router)
 router.include_router(academy_router)
 router.include_router(roster_router)
+router.include_router(contract_router)

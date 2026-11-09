@@ -21,12 +21,15 @@ from app.contexts.audit.infrastructure.repositories import TortoiseAuditLogRepos
 from app.contexts.identity.application.auth_service import UserQueries
 from app.contexts.identity.application.user_admin import UserAdministration
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
+from app.contexts.organization.application.employee_queries import EmployeeQueries
+from app.contexts.organization.infrastructure.repositories import TortoiseEmployeeRepository
 from app.core.clock import SystemClock
 from app.core.config import Settings, get_settings
 from app.core.database import build_tortoise_config
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.redis import create_redis
+from app.core.storage import build_s3_storage
 from app.workers.broker import broker
 from app.workers.tasks.roster import TaskiqRosterSyncDispatcher
 
@@ -58,6 +61,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.settings = settings
     app.state.clock = clock = SystemClock()
+    app.state.storage = build_s3_storage(settings)
     # 컨텍스트 간 공개 서비스 연결 (composition root). 다른 컨텍스트의 presentation 의존성이
     # 이 서비스를 쓰되 identity.infrastructure를 직접 import하지 않게 한다.
     app.state.user_queries = UserQueries(TortoiseUserRepository())
@@ -66,6 +70,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.user_admin = UserAdministration(TortoiseUserRepository(), clock)
     app.state.audit_recorder = AuditRecorder(TortoiseAuditLogRepository(), clock)
     app.state.roster_sync_dispatcher = TaskiqRosterSyncDispatcher()
+    app.state.employee_queries = EmployeeQueries(TortoiseEmployeeRepository())
     app.state.academy_catalog = AcademyCatalog(
         TortoiseBootcampRepository(), TortoiseCohortRepository()
     )
