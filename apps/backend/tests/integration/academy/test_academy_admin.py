@@ -107,17 +107,19 @@ async def test_cohort_rules(actor: User) -> None:
             actor_id=actor.id,
         )
     assert period.value.code == "invalid_cohort"
-    with pytest.raises(BusinessRuleViolation) as mismatch:
-        await svc.create_cohort(
-            bootcamp.id,
-            {**values, "cohort_number": 2, "hrd_net_cohort_id": other_hrd_cohort.id},
-            actor_id=actor.id,
-        )
-    assert mismatch.value.code == "hrd_cohort_mismatch"
-    with pytest.raises(BusinessRuleViolation):
-        await svc.update_cohort(
-            cohort.id, {"hrd_net_cohort_id": other_hrd_cohort.id}, actor_id=actor.id
-        )
+    # 기수는 다른 HRD 과정의 회차에도 연결할 수 있다 (D6: 1인창업처럼 기수마다 HRD가 다름)
+    crossed = await svc.create_cohort(
+        bootcamp.id,
+        {**values, "cohort_number": 2, "hrd_net_cohort_id": other_hrd_cohort.id},
+        actor_id=actor.id,
+    )
+    assert crossed.hrd_net_cohort_id == other_hrd_cohort.id
+    moved = await svc.update_cohort(
+        cohort.id, {"hrd_net_cohort_id": other_hrd_cohort.id}, actor_id=actor.id
+    )
+    assert moved.hrd_net_cohort_id == other_hrd_cohort.id
+    with pytest.raises(NotFoundError):
+        await svc.update_cohort(cohort.id, {"hrd_net_cohort_id": new_id()}, actor_id=actor.id)
     with pytest.raises(BusinessRuleViolation):
         await svc.update_cohort(cohort.id, {"end_date": date(2026, 1, 1)}, actor_id=actor.id)
     with pytest.raises(BusinessRuleViolation) as fixed:

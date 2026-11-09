@@ -1,7 +1,8 @@
 """학사 마스터 관리 (HRD 과정·회차, 운영과정, 기수). 권한 org.manage (decisions D6).
 
 - 수정은 `dataclasses.replace`로 엔티티를 다시 만들어 생성과 같은 검증(기간 역전 등)을 거친다.
-- 기수의 HRD 회차는 운영과정과 같은 HRD 과정의 회차여야 한다 (cohorts note, plan P4).
+- 기수는 HRD 회차에 연결한다. 그 회차가 운영과정의 (대표) HRD 과정과 달라도 된다
+  (decisions D6 보완: 1인창업처럼 기수마다 HRD 과정이 다른 운영과정이 있다).
 - 유일 조건은 먼저 검사해 409로 알려 준다: HRD-Net ID, (HRD 과정, 회차 번호),
   운영과정 이름·코드, (운영과정, 기수 번호). 참조 중인 행 삭제는 409 `in_use`.
 - 바꿀 수 없는 소속: HRD 회차의 HRD 과정, 운영과정의 HRD 과정, 기수의 운영과정
@@ -219,8 +220,8 @@ class AcademyAdminService:
     ) -> Cohort:
         cohort = Cohort(bootcamp_id=bootcamp_id, **values)
         async with self._uow:
-            bootcamp = await self.get_bootcamp(bootcamp_id)
-            await self._ensure_same_hrd_bootcamp(bootcamp, cohort.hrd_net_cohort_id)
+            await self.get_bootcamp(bootcamp_id)
+            await self.get_hrd_cohort(cohort.hrd_net_cohort_id)
             await self._ensure_cohort_number_free(bootcamp_id, cohort.cohort_number)
             await self._cohorts.add(cohort)
             await self._record(actor_id, "cohort.create", cohort)
@@ -234,8 +235,7 @@ class AcademyAdminService:
             current = await self.get_cohort(entity_id)
             updated = dataclasses.replace(current, **changes)
             if updated.hrd_net_cohort_id != current.hrd_net_cohort_id:
-                bootcamp = await self.get_bootcamp(updated.bootcamp_id)
-                await self._ensure_same_hrd_bootcamp(bootcamp, updated.hrd_net_cohort_id)
+                await self.get_hrd_cohort(updated.hrd_net_cohort_id)
             if updated.cohort_number != current.cohort_number:
                 await self._ensure_cohort_number_free(updated.bootcamp_id, updated.cohort_number)
             await self._cohorts.save(updated)
@@ -280,14 +280,6 @@ class AcademyAdminService:
     async def _ensure_cohort_number_free(self, bootcamp_id: uuid.UUID, number: int) -> None:
         if await self._cohorts.get_by_number(bootcamp_id, number):
             raise ConflictError("같은 기수 번호가 있습니다.", code="cohort_number_taken")
-
-    async def _ensure_same_hrd_bootcamp(self, bootcamp: Bootcamp, hrd_cohort_id: uuid.UUID) -> None:
-        hrd_cohort = await self.get_hrd_cohort(hrd_cohort_id)
-        if hrd_cohort.hrd_net_bootcamp_id != bootcamp.hrd_net_bootcamp_id:
-            raise BusinessRuleViolation(
-                "운영과정과 다른 HRD 과정의 회차는 연결할 수 없습니다.",
-                code="hrd_cohort_mismatch",
-            )
 
     async def _record(
         self,

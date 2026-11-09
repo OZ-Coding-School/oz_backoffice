@@ -129,8 +129,7 @@ class Bootcamp(AggregateRoot):
 class Cohort(AggregateRoot):
     """기수. (운영과정, 기수 번호)는 유일하다.
 
-    운영과정과 HRD 회차는 같은 HRD 과정을 가리켜야 한다.
-    이 일치 여부는 두 애그리거트를 조회하는 서비스에서 검증한다.
+    HRD 연결은 기수 단위다. HRD 회차가 운영과정의 대표 HRD 과정과 달라도 된다 (decisions D6).
     """
 
     hrd_net_cohort_id: uuid.UUID
