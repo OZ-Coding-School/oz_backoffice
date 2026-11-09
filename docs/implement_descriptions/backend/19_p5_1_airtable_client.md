@@ -1,7 +1,7 @@
 # 19. P5-1 과정 별칭 컬럼과 Airtable 클라이언트
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 예정)
+- 관련 PR: #22
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P5 (P5-1)
 - 이전 기록: [18. P4-2 학사 관리 API](18_p4_2_academy_admin_api.md), [07. 수강생 명단을 students에 합침](07_merge_student_rosters_into_students.md)
 
