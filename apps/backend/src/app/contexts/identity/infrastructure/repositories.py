@@ -4,7 +4,13 @@ import uuid
 
 from app.contexts.identity.domain.entities import OAuthAccount, User
 from app.contexts.identity.domain.enums import SocialLoginProvider
-from app.contexts.identity.infrastructure.models import OAuthAccountModel, UserModel
+from app.contexts.identity.domain.signup import MemberSignup
+from app.contexts.identity.infrastructure.models import (
+    MemberSignupModel,
+    OAuthAccountModel,
+    UserModel,
+)
+from app.core.persistence import TortoiseRepository
 
 _USER_FIELDS = (
     "email",
@@ -76,3 +82,28 @@ class TortoiseUserRepository:
             .first()
         )
         return _to_entity(account.user) if account else None
+
+
+class TortoiseMemberSignupRepository(TortoiseRepository[MemberSignup, MemberSignupModel]):
+    model = MemberSignupModel
+    entity = MemberSignup
+    fields = (
+        "user_id",
+        "signup_type",
+        "requested_cohort_id",
+        "nickname",
+        "display_name_preference",
+        "match_result",
+        "status",
+        "reviewed_at",
+        "reject_reason",
+    )
+
+    def to_entity(self, row: MemberSignupModel) -> MemberSignup:
+        entity = super().to_entity(row)
+        entity.created_at = row.created_at
+        return entity
+
+    async def get_latest_by_user(self, user_id: uuid.UUID) -> MemberSignup | None:
+        row = await MemberSignupModel.filter(user_id=user_id).order_by("-created_at", "-id").first()
+        return self.to_entity(row) if row else None
