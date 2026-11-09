@@ -1,6 +1,6 @@
 # 21. P5-2b 명단 동기화 동시 실행 락과 taskiq 작업
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-09 병합)
 - 관련 PR: #24
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P5 (P5-2b), §2.5 백그라운드 작업
 - 이전 기록: [20. P5-2a Airtable 명단 레코드 해석과 동기화 서비스](20_p5_2a_roster_sync_service.md)
@@ -35,6 +35,9 @@ P5-2a의 동기화 서비스를 실제로 돌리는 부분이다. Airtable 원�
 
 ## 검증
 - 컨테이너: ruff, ruff format, mypy(src strict, tests), lint-imports, pytest **308개 통과**
+- 커밋 2개를 각각 워크트리로 꺼내 같은 검사 통과
+- GitHub Actions (PR #24, run 42580624254): backend 잡 통과
+- 사용자 확인: P5 진행 지시에 따라 CI 통과 후 병합
 - **실제 Airtable + 실제 워커 E2E** (개발 DB에 임시 과정 `헬스케어` 별칭과 1~3기를 만들고, 확인 후 삭제)
   - 과정 동기화를 요청해 taskiq로 워커에 보냈고 SUCCEEDED
   - 366건 조회, 1~3기 수강생 160명 생성(1기 59명은 수식으로 센 건수와 일치)
