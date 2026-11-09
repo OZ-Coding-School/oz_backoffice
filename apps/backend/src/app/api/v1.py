@@ -6,6 +6,8 @@ from app.contexts.academy.presentation.admin_router import router as academy_rou
 from app.contexts.academy.presentation.roster_router import router as roster_router
 from app.contexts.access.presentation.admin_router import router as user_roles_router
 from app.contexts.educator.presentation.admin_router import router as contract_router
+from app.contexts.educator.presentation.mentor_router import admin_router as mentor_admin_router
+from app.contexts.educator.presentation.mentor_router import me_router as mentor_me_router
 from app.contexts.identity.presentation.router import auth_router, me_router
 from app.contexts.organization.presentation.admin_router import (
     router as staff_registration_admin_router,
@@ -25,3 +27,5 @@ router.include_router(organization_router)
 router.include_router(academy_router)
 router.include_router(roster_router)
 router.include_router(contract_router)
+router.include_router(mentor_me_router)
+router.include_router(mentor_admin_router)

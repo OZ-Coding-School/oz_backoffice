@@ -38,11 +38,11 @@ class UploadSpec:
 
     purpose: str
     key_prefix: str  # 예: "contracts/"
-    file_ext: str
-    content_type: str
+    extensions: dict[str, str]  # 허용 Content-Type → 확장자
     max_bytes: int
     magic_length: int
-    is_valid_format: Callable[[bytes], bool]
+    # (파일 앞부분, Content-Type) → 그 형식이 맞는지
+    is_valid_format: Callable[[bytes, str], bool]
     invalid_code: str
     invalid_message: str
 
@@ -60,12 +60,17 @@ class DirectUploads:
         self._clock = clock
 
     async def issue(
-        self, spec: UploadSpec, *, actor_id: uuid.UUID, file_name: str = ""
+        self, spec: UploadSpec, *, actor_id: uuid.UUID, content_type: str, file_name: str = ""
     ) -> UploadTicket:
+        file_ext = spec.extensions.get(content_type)
+        if file_ext is None:
+            raise BusinessRuleViolation(
+                "올릴 수 없는 파일 형식입니다.", code="unsupported_file_type"
+            )
         now = self._clock.now()
-        key = f"{spec.key_prefix}{new_id()}.{spec.file_ext}"
+        key = f"{spec.key_prefix}{new_id()}.{file_ext}"
         post = await self._storage.presign_post(
-            key, content_type=spec.content_type, max_bytes=spec.max_bytes, now=now
+            key, content_type=content_type, max_bytes=spec.max_bytes, now=now
         )
         upload = PendingUpload(
             id=new_id(),
@@ -73,8 +78,8 @@ class DirectUploads:
             requested_by=actor_id,
             storage_key=key,
             file_name=file_name,
-            file_ext=spec.file_ext,
-            content_type=spec.content_type,
+            file_ext=file_ext,
+            content_type=content_type,
             max_bytes=spec.max_bytes,
             expires_at=post.expires_at + CONFIRM_GRACE,
         )
@@ -110,7 +115,7 @@ class DirectUploads:
             0 < info.size <= upload.max_bytes
             and info.content_type == upload.content_type
             and prefix is not None
-            and spec.is_valid_format(prefix)
+            and spec.is_valid_format(prefix, upload.content_type)
         )
         if not valid:
             await self._storage.delete(upload.storage_key)

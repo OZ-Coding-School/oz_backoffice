@@ -15,6 +15,7 @@ from app.core.uow import UnitOfWork
 from app.shared.errors import BusinessRuleViolation
 
 PDF_EXTENSION = "pdf"
+PDF_CONTENT_TYPE = "application/pdf"
 PDF_MAGIC = b"%PDF-"
 CONTRACT_MAX_BYTES = 10 * 1024 * 1024
 FILE_NAME_MAX_LENGTH = 100
@@ -22,11 +23,10 @@ FILE_NAME_MAX_LENGTH = 100
 CONTRACT_UPLOAD = UploadSpec(
     purpose="contract_file",
     key_prefix="contracts/",
-    file_ext=PDF_EXTENSION,
-    content_type="application/pdf",
+    extensions={PDF_CONTENT_TYPE: PDF_EXTENSION},
     max_bytes=CONTRACT_MAX_BYTES,
     magic_length=len(PDF_MAGIC),
-    is_valid_format=lambda head: head == PDF_MAGIC,
+    is_valid_format=lambda head, _content_type: head == PDF_MAGIC,
     invalid_code="invalid_contract_file",
     invalid_message="PDF 파일이 아니거나 허용 크기를 넘었습니다.",
 )
@@ -69,7 +69,9 @@ class ContractFileUploadService:
 
     async def request_upload(self, file_name: str, *, actor_id: uuid.UUID) -> UploadTicket:
         name, _ = parse_pdf_file_name(file_name)
-        return await self._uploads.issue(CONTRACT_UPLOAD, actor_id=actor_id, file_name=name)
+        return await self._uploads.issue(
+            CONTRACT_UPLOAD, actor_id=actor_id, content_type=PDF_CONTENT_TYPE, file_name=name
+        )
 
     async def confirm(self, upload_id: uuid.UUID, *, actor_id: uuid.UUID) -> ContractFile:
         received = await self._uploads.receive(CONTRACT_UPLOAD, upload_id, actor_id=actor_id)
