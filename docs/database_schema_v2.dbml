@@ -350,7 +350,7 @@ Table bootcamps {
   note: "부트캠프 운영과정 정보 (하나의 HRD 과정에서 파생된 여러 운영과정 가능 → N:1)"
 
   id uuid [pk, note: "default=uuid7 사용, 고유 ID"]
-  hrd_net_bootcamp_id uuid [not null, ref: > hrd_net_bootcamps.id, note: "실제 과정 정보 매핑용 FK (N:1)"]
+  hrd_net_bootcamp_id uuid [not null, ref: > hrd_net_bootcamps.id, note: "대표 HRD 과정 (N:1). 기수별 HRD 연결은 cohorts.hrd_net_cohort_id (decisions D6 보완)"]
   name varchar(50) [not null, unique, note: "운영상 사용되는 과정 명칭"]
   code varchar(20) [not null, unique, note: "AH, AL, GM, PD, ..."]
   airtable_cohort_prefix varchar(50) [null, unique, note: "Airtable 수강생 명단 기수 값의 과정 별칭 ('헬스케어 3기'의 '헬스케어'). null이면 명단 동기화 대상 아님 (decisions A18)"]
@@ -370,13 +370,14 @@ Table cohorts {
   note: "부트캠프 기수 관리 테이블"
 
   id uuid [pk, note: "default=uuid7 사용"]
-  hrd_net_cohort_id uuid [not null, ref: > hrd_net_bootcamp_cohorts.id, note: "hrd-net 운영회차 매핑용 FK. 앱 레벨 검증: bootcamp.hrd_net_bootcamp_id = hrd_net_cohort.hrd_net_bootcamp_id"]
+  hrd_net_cohort_id uuid [not null, ref: > hrd_net_bootcamp_cohorts.id, note: "hrd-net 운영회차 매핑용 FK. 운영과정의 대표 HRD 과정과 다른 HRD 과정의 회차여도 된다 (decisions D6 보완: CEO 1기 → 프론트엔드 HRD 9회차)"]
   bootcamp_id uuid [not null, ref: > bootcamps.id]
   cohort_number smallint [not null, note: "기수 번호"]
   start_date date [not null, note: "기수 시작일"]
   end_date date [not null, note: "기수 종료일"]
   status CohortStatus [not null, default: 'PLANNED', note: "기수 운영 상태"]
   discord_guild_id varchar(32) [null, unique, note: "디스코드 길드 ID (snowflake, JS 정밀도 문제로 문자열)"]
+  airtable_record_id varchar(32) [null, unique, note: "Airtable 과정-기수 테이블 레코드 ID (기수 마스터 동기화 키, decisions A20)"]
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
 

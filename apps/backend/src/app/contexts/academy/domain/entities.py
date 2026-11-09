@@ -139,6 +139,7 @@ class Cohort(AggregateRoot):
     end_date: date
     status: CohortStatus = CohortStatus.PLANNED
     discord_guild_id: str | None = None
+    airtable_record_id: str | None = None  # Airtable 과정-기수 테이블 레코드 (A20)
 
     def __post_init__(self) -> None:
         _require(self.cohort_number > 0, "기수 번호는 1 이상이어야 합니다.", "invalid_cohort")

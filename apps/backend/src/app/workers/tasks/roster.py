@@ -11,25 +11,13 @@ import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from redis.asyncio import Redis
-
 from app.contexts.academy.application.roster_sync import RosterSyncService
-from app.contexts.academy.domain.roster import RosterFieldMap
-from app.contexts.academy.infrastructure.airtable_source import AirtableRosterSource
-from app.contexts.academy.infrastructure.repositories import (
-    TortoiseBootcampRepository,
-    TortoiseCohortRepository,
-    TortoiseRosterSyncRunRepository,
-    TortoiseStudentRepository,
-)
-from app.contexts.academy.infrastructure.roster_sync_lock import RedisRosterSyncLock
+from app.contexts.academy.presentation.roster_factory import build_roster_sync_service
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.audit.infrastructure.repositories import TortoiseAuditLogRepository
 from app.core.clock import SystemClock
-from app.core.config import Settings, get_settings
+from app.core.config import get_settings
 from app.core.redis import create_redis
-from app.core.uow import UnitOfWork
-from app.integrations.airtable.client import AirtableClient
 from app.workers.broker import broker
 
 logger = logging.getLogger(__name__)
@@ -37,31 +25,18 @@ logger = logging.getLogger(__name__)
 HOURLY = "0 * * * *"
 
 
-def build_roster_sync_service(settings: Settings, redis: "Redis") -> RosterSyncService:
-    clock = SystemClock()
-    client = AirtableClient(
-        token=settings.airtable_token.get_secret_value(), base_id=settings.airtable_base_id
-    )
-    return RosterSyncService(
-        source=AirtableRosterSource(client, table=settings.airtable_table_id),
-        field_map=RosterFieldMap(),
-        bootcamps=TortoiseBootcampRepository(),
-        cohorts=TortoiseCohortRepository(),
-        students=TortoiseStudentRepository(),
-        runs=TortoiseRosterSyncRunRepository(),
-        lock=RedisRosterSyncLock(redis),
-        audit=AuditRecorder(TortoiseAuditLogRepository(), clock),
-        uow=UnitOfWork(),
-        clock=clock,
-    )
-
-
 @asynccontextmanager
 async def _service() -> AsyncIterator[RosterSyncService]:
     settings = get_settings()
     redis = create_redis(settings.redis_url)
     try:
-        yield build_roster_sync_service(settings, redis)
+        clock = SystemClock()
+        yield build_roster_sync_service(
+            settings,
+            redis=redis,
+            audit=AuditRecorder(TortoiseAuditLogRepository(), clock),
+            clock=clock,
+        )
     finally:
         await redis.aclose()
 

@@ -225,7 +225,8 @@ def interpret(
 # ---------------------------------------------------------------- 범위 수식 (filterByFormula)
 # `기수`가 lookup(리스트) 필드여도 동작하도록 ARRAYJOIN으로 문자열로 만든 뒤 비교한다
 # (2026-11-09 실데이터로 검증, 구현 기록 19).
-def _quote(value: str) -> str:
+def quote_formula(value: str) -> str:
+    """filterByFormula 문자열 리터럴 (역슬래시·작은따옴표 이스케이프)."""
     escaped = value.replace("\\", "\\\\").replace("'", "\\'")
     return f"'{escaped}'"
 
@@ -237,10 +238,10 @@ def _cohort_text(field_name: str) -> str:
 
 
 def cohort_formula(field_name: str, label: CohortLabel) -> str:
-    return f"{_cohort_text(field_name)}={_quote(str(label))}"
+    return f"{_cohort_text(field_name)}={quote_formula(str(label))}"
 
 
 def prefixes_formula(field_name: str, prefixes: list[str]) -> str:
     """기수 라벨이 주어진 과정 별칭 중 하나로 시작하는 레코드."""
-    conditions = [f"FIND({_quote(p + ' ')}, {_cohort_text(field_name)})=1" for p in prefixes]
+    conditions = [f"FIND({quote_formula(p + ' ')}, {_cohort_text(field_name)})=1" for p in prefixes]
     return conditions[0] if len(conditions) == 1 else f"OR({', '.join(conditions)})"

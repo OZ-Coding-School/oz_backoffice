@@ -49,14 +49,17 @@ class Settings(BaseSettings):
     # Airtable 수강생 명단 (P5). 토큰은 읽기 범위(data.records:read, schema.bases:read)만
     airtable_token: SecretStr = SecretStr("")
     airtable_base_id: str = ""
-    airtable_table_id: str = ""  # 테이블 ID(tbl...) 또는 테이블 이름
+    # 같은 Base의 두 테이블 (ID tbl... 또는 이름)
+    airtable_student_table_id: str = ""  # 수강생 정보
+    airtable_bootcamp_table_id: str = ""  # 과정-기수 (기수별 레코드, decisions A20)
 
     @property
     def airtable_configured(self) -> bool:
         return bool(
             self.airtable_token.get_secret_value()
             and self.airtable_base_id
-            and self.airtable_table_id
+            and self.airtable_student_table_id
+            and self.airtable_bootcamp_table_id
         )
 
     # AWS S3 (비공개 버킷 1개 + prefix: contracts/, profiles/ ...)

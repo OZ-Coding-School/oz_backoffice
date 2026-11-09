@@ -119,7 +119,12 @@ class TortoiseCohortRepository(TortoiseRepository[Cohort, CohortModel]):
         "end_date",
         "status",
         "discord_guild_id",
+        "airtable_record_id",
     )
+
+    async def get_by_airtable_record_id(self, record_id: str) -> Cohort | None:
+        row = await CohortModel.get_or_none(airtable_record_id=record_id)
+        return self.to_entity(row) if row else None
 
     async def get_by_number(self, bootcamp_id: uuid.UUID, cohort_number: int) -> Cohort | None:
         row = await CohortModel.get_or_none(bootcamp_id=bootcamp_id, cohort_number=cohort_number)

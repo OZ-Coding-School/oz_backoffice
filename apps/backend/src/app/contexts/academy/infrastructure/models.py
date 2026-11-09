@@ -91,6 +91,7 @@ class CohortModel(models.Model):
     end_date = fields.DateField()
     status = fields.CharEnumField(CohortStatus, max_length=20, default=CohortStatus.PLANNED)
     discord_guild_id = fields.CharField(max_length=32, null=True, unique=True)
+    airtable_record_id = fields.CharField(max_length=32, null=True, unique=True)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
 

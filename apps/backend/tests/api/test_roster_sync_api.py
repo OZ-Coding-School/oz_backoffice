@@ -51,7 +51,8 @@ def dispatcher(app: FastAPI, settings: Settings) -> FakeDispatcher:
         update={
             "airtable_token": SecretStr("pat-test"),
             "airtable_base_id": "appTEST",
-            "airtable_table_id": "tblTEST",
+            "airtable_student_table_id": "tblSTUDENT",
+            "airtable_bootcamp_table_id": "tblBOOTCAMP",
         }
     )
     return fake
@@ -134,16 +135,18 @@ async def test_validation_errors(
     settings: Settings,
     app: FastAPI,
 ) -> None:
+    # 별칭이 없는 과정도 요청은 받는다.
+    # 과정-기수 테이블 동기화로 별칭이 채워지지 않으면 실행이 실패한다
     no_prefix = await create_cohort()
-    missing = await client.post(f"{API}/cohorts/{no_prefix.id}/rosters/sync", headers=admin)
-    assert missing.json()["error"]["code"] == "airtable_prefix_missing"
+    accepted = await client.post(f"{API}/cohorts/{no_prefix.id}/rosters/sync", headers=admin)
+    assert accepted.status_code == 202
     app.state.settings = settings  # Airtable 미설정
     unconfigured = await client.post(f"{API}/rosters/sync", headers=admin)
     assert (unconfigured.status_code, unconfigured.json()["error"]["code"]) == (
         503,
         "airtable_not_configured",
     )
-    assert dispatcher.sent == []
+    assert len(dispatcher.sent) == 1
 
 
 async def test_assistant_scope(

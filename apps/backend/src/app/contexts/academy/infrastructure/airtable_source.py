@@ -10,6 +10,8 @@ class AirtableRosterSource:
         self._client = client
         self._table = table
 
-    async def fetch(self, formula: str, fields: list[str]) -> list[tuple[str, dict[str, Any]]]:
+    async def fetch(
+        self, formula: str | None, fields: list[str]
+    ) -> list[tuple[str, dict[str, Any]]]:
         records = await self._client.list_records(self._table, formula=formula, fields=fields)
         return [(record.id, record.fields) for record in records]

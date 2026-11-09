@@ -54,7 +54,8 @@ def settings() -> Settings:
         # 실제 Airtable 자격 증명을 테스트에서 쓰지 않는다
         airtable_token="",
         airtable_base_id="",
-        airtable_table_id="",
+        airtable_student_table_id="",
+        airtable_bootcamp_table_id="",
         database_url=TEST_DATABASE_URL,
         jwt_secret_key="test-secret-key-with-enough-length-0123456789",
     )

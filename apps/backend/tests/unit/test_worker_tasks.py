@@ -2,13 +2,12 @@ import pytest
 from fakeredis import FakeAsyncRedis
 from pydantic import SecretStr
 
+from app.contexts.academy.presentation.roster_factory import build_roster_sync_service
+from app.contexts.audit.application.recorder import AuditRecorder
+from app.core.clock import SystemClock
 from app.core.config import Settings
-from app.workers.tasks.roster import (
-    HOURLY,
-    build_roster_sync_service,
-    execute_roster_sync,
-    scheduled_roster_sync,
-)
+from app.workers.tasks.roster import HOURLY, execute_roster_sync, scheduled_roster_sync
+from tests.fakes.audit import InMemoryAuditLogRepository
 
 pytestmark = pytest.mark.unit
 
@@ -24,14 +23,22 @@ def test_airtable_configured(settings: Settings) -> None:
         update={
             "airtable_token": SecretStr("pat"),
             "airtable_base_id": "app",
-            "airtable_table_id": "tbl",
+            "airtable_student_table_id": "tblS",
+            "airtable_bootcamp_table_id": "tblB",
         }
     )
     assert configured.airtable_configured
 
 
 def test_service_composition(settings: Settings) -> None:
-    assert build_roster_sync_service(settings, FakeAsyncRedis()) is not None
+    clock = SystemClock()
+    service = build_roster_sync_service(
+        settings,
+        redis=FakeAsyncRedis(),
+        audit=AuditRecorder(InMemoryAuditLogRepository(), clock),
+        clock=clock,
+    )
+    assert service is not None
 
 
 async def test_scheduled_task_skips_without_airtable(
