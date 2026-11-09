@@ -1,6 +1,6 @@
 # 26. P6-1 S3 어댑터와 S3 시나리오 통합 테스트
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-09 병합)
 - 관련 PR: #29
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P6 (P6-1)
 - 이전 기록: [02. docker compose 로컬 개발 환경과 S3 에뮬레이터](02_local_docker_compose_and_s3.md)
@@ -44,6 +44,7 @@ P6(S3 어댑터 + 교육 인력·계약)의 첫 PR이다. 계약서(PDF)와 프�
   - CORS preflight: 허용 origin은 응답하고, 비허용 origin은 거부된다.
   - 멀티파트 업로드와 Range GET(206)
 - `docker compose exec api`에서 ruff, ruff format, mypy, mypy tests, lint-imports(10 kept), pytest 339 passed
+- GitHub Actions (PR #29, run 42598471011): backend 잡 통과. floci 서비스 컨테이너에서 S3 통합 테스트 포함 339 passed
 
 ## 남은 작업
 - P6-2 educator 모델·마이그레이션, P6-3 계약서 업로드·계약 API, P6-4 수동 연결·멘토 프로필
