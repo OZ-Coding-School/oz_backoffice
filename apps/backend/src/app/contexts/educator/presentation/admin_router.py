@@ -17,6 +17,7 @@ from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.educator.application.contract_files import ContractFileUploadService
 from app.contexts.educator.application.contracts import ContractService, ContractView
 from app.contexts.educator.application.ports import EmployeeDirectory
+from app.contexts.educator.application.uploads import DirectUploads
 from app.contexts.educator.domain.entities import ContractFile
 from app.contexts.educator.domain.enums import ContractStatus, EducatorType
 from app.contexts.educator.domain.repositories import ContractFilter
@@ -54,19 +55,22 @@ def get_contract_service(
     )
 
 
-def get_upload_service(
-    request: Request,
+def get_direct_uploads(
     storage: Annotated[S3Storage, Depends(get_file_storage)],
     redis: Annotated[Any, Depends(get_redis)],
     clock: Annotated[Clock, Depends(get_clock)],
+) -> DirectUploads:
+    return DirectUploads(storage=storage, pending=RedisPendingUploadStore(redis), clock=clock)
+
+
+def get_upload_service(
+    request: Request, uploads: Annotated[DirectUploads, Depends(get_direct_uploads)]
 ) -> ContractFileUploadService:
     return ContractFileUploadService(
-        storage=storage,
-        pending=RedisPendingUploadStore(redis),
+        uploads=uploads,
         files=TortoiseContractFileRepository(),
         audit=cast("AuditRecorder", request.app.state.audit_recorder),
         uow=UnitOfWork(),
-        clock=clock,
     )
 
 

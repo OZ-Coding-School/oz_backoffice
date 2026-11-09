@@ -11,6 +11,7 @@ from app.contexts.educator.application.contract_files import (
     ContractFileUploadService,
 )
 from app.contexts.educator.application.contracts import ContractService
+from app.contexts.educator.application.uploads import DirectUploads
 from app.contexts.educator.domain.entities import ContractFile
 from app.contexts.educator.domain.enums import ContractStatus, EducatorType
 from app.contexts.educator.domain.repositories import ContractFilter
@@ -46,12 +47,12 @@ class Harness:
         self.employees = FakeEmployeeDirectory(self.manager_id)
         audit = AuditRecorder(self.audit_logs, self.clock)
         self.uploads = ContractFileUploadService(
-            storage=self.storage,
-            pending=RedisPendingUploadStore(redis),
+            uploads=DirectUploads(
+                storage=self.storage, pending=RedisPendingUploadStore(redis), clock=self.clock
+            ),
             files=self.files,
             audit=audit,
             uow=FakeUnitOfWork(),
-            clock=self.clock,
         )
         self.service = ContractService(
             contracts=self.contracts,
