@@ -3,7 +3,7 @@
 - unit: 외부 의존 없음
 - api: create_app() + httpx ASGITransport.
   lifespan을 돌리지 않으므로 Redis/DB 의존성은 오버라이드한다.
-- integration: 실제 PostgreSQL 사용.
+- integration: 실제 PostgreSQL 사용. S3 테스트는 에뮬레이터(floci)의 테스트 버킷 사용.
 
 DB는 모든 테스트에 autouse로 준비한다(세션당 1회 생성·마이그레이션, 테스트마다 TRUNCATE).
 테스트 DB 주소는 TEST_DATABASE_URL(compose·CI가 설정), 없으면 로컬 compose의 postgres를 쓴다.
@@ -35,6 +35,9 @@ from app.main import create_app
 TEST_DATABASE_URL = os.environ.get(
     "TEST_DATABASE_URL", "postgres://oz:oz@localhost:5432/oz_backoffice_test"
 )
+# S3 통합 테스트는 에뮬레이터(floci)의 테스트 전용 버킷을 쓴다 (tests/integration/storage)
+TEST_S3_ENDPOINT_URL = os.environ.get("TEST_S3_ENDPOINT_URL", "http://localhost:4566")
+TEST_S3_BUCKET = "oz-backoffice-test"
 MIGRATIONS_DIR = Path(__file__).resolve().parents[1] / "migrations"
 
 
@@ -56,6 +59,13 @@ def settings() -> Settings:
         airtable_base_id="",
         airtable_student_table_id="",
         airtable_bootcamp_table_id="",
+        # 개발 버킷(compose S3_*)이 아니라 테스트 전용 버킷을 쓴다
+        aws_region="ap-northeast-2",
+        aws_access_key_id="test",
+        aws_secret_access_key="test",
+        s3_bucket=TEST_S3_BUCKET,
+        s3_endpoint_url=TEST_S3_ENDPOINT_URL,
+        s3_public_endpoint_url=TEST_S3_ENDPOINT_URL,
         database_url=TEST_DATABASE_URL,
         jwt_secret_key="test-secret-key-with-enough-length-0123456789",
     )
