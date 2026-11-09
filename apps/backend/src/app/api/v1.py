@@ -7,6 +7,7 @@ from app.contexts.identity.presentation.router import auth_router, me_router
 from app.contexts.organization.presentation.admin_router import (
     router as staff_registration_admin_router,
 )
+from app.contexts.organization.presentation.org_router import router as organization_router
 from app.contexts.organization.presentation.router import router as staff_registration_router
 from app.contexts.organization.presentation.staff_router import router as staff_router
 
@@ -17,3 +18,4 @@ router.include_router(staff_registration_router)
 router.include_router(staff_registration_admin_router)
 router.include_router(staff_router)
 router.include_router(user_roles_router)
+router.include_router(organization_router)

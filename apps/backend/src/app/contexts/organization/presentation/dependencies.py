@@ -6,6 +6,7 @@ from fastapi import Depends, Request
 
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.identity.application.auth_service import UserQueries
+from app.contexts.organization.application.org_service import OrganizationAdminService
 from app.contexts.organization.application.registration_service import (
     RegistrationChoiceValidator,
     StaffRegistrationService,
@@ -93,5 +94,15 @@ def get_staff_assignment_service(
         catalog=catalog,
         roles=cast("StaffRoleSync", state.role_assignments),
         audit=cast("AuditRecorder", state.audit_recorder),
+        uow=UnitOfWork(),
+    )
+
+
+def get_organization_admin_service(request: Request) -> OrganizationAdminService:
+    return OrganizationAdminService(
+        departments=TortoiseDepartmentRepository(),
+        positions=TortoiseEmployeePositionRepository(),
+        employees=TortoiseEmployeeRepository(),
+        audit=cast("AuditRecorder", request.app.state.audit_recorder),
         uow=UnitOfWork(),
     )
