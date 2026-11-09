@@ -318,7 +318,7 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
   3. **가입 완료:** 가입 토큰 + 이름 + 비밀번호 + 유형(수강생 / 멘토) → `users` 생성(argon2, `email_verified_at`, `phone_verified_at`)
   4. **자동 매칭 (A6):**
      - 수강생: `students`에서 (이름, 휴대폰) 일치 + 수강 중 + 원천 존재 + 미가입(`user_id` NULL) (`find_claimable_by_name_and_phone`) → 일치한 등록마다 `Student.claim(user_id)`, `STUDENT` 역할(COHORT 범위) 부여 → APPROVED
-     - 멘토: `educator_contracts`에서 (이름, 휴대폰) 일치 + 유형 MENTOR → `mentors` 생성, 계약 `mentor_id` 연결, `MENTOR` 역할 부여 → APPROVED
+     - 멘토: `educator_contracts`에서 (이름, 휴대폰) 일치 + 유형 MENTOR → `mentors` 생성, 계약 `mentor_id` 연결 → APPROVED (MENTOR 역할은 P8 배정에서 부여, A17·A31)
      - 일치 없음 또는 여러 사람과 애매하게 일치하면 PENDING으로 두고 감사 로그를 남긴다
   5. 승인 여부와 관계없이 로그인할 수 있다. PENDING이면 §2.2 게이트로 상태 조회만 가능하다
 - **보안:**
@@ -492,7 +492,7 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
 - [ ] P7 수강생·멘토 가입
   - [x] P7-1 메일·SMS 발송 기반과 Gmail 드라이버 (구현 기록 30, A29·B13)
   - [x] P7-2 인증코드·레이트 리밋·가입 (구현 기록 31, A30·B14)
-  - [ ] P7-3 자동 매칭 (수강생·멘토)
+  - [x] P7-3 자동 매칭 (수강생·멘토) (구현 기록 32, A31)
   - [ ] P7-4 로그인·잠금·비밀번호 재설정
   - [ ] P7-5 운영진 승인 관리
 - [ ] P8 기수 멘토링 설정·멘토 배정

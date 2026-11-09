@@ -5,7 +5,7 @@ import uuid
 from datetime import date, datetime, timedelta
 
 from app.contexts.educator.domain.entities import ContractFile, EducatorContract
-from app.contexts.educator.domain.enums import ContractStatus
+from app.contexts.educator.domain.enums import ContractStatus, EducatorType
 from app.contexts.educator.domain.profiles import Mentor
 from app.contexts.educator.domain.repositories import ContractFilter
 from app.integrations.s3 import ObjectInfo, PresignedPost
@@ -50,6 +50,18 @@ class InMemoryContractRepository:
             if c.status is ContractStatus.ACTIVE and c.end_date < today
         ]
 
+    async def find_unlinked_mentor_contracts(
+        self, contractor_name: str, contractor_phone: str
+    ) -> list[EducatorContract]:
+        return [
+            dataclasses.replace(c)
+            for c in self.items.values()
+            if c.contractor_name == contractor_name
+            and c.contractor_phone == contractor_phone
+            and c.educator_type is EducatorType.MENTOR
+            and c.mentor_id is None
+        ]
+
     async def count_by_mentors(self, mentor_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
         counts: dict[uuid.UUID, int] = {}
         for c in self.items.values():
@@ -61,6 +73,9 @@ class InMemoryContractRepository:
 class InMemoryMentorRepository:
     def __init__(self, *mentors: Mentor) -> None:
         self.items = {m.id: m for m in mentors}
+
+    async def add(self, mentor: Mentor) -> None:
+        self.items[mentor.id] = dataclasses.replace(mentor)
 
     async def get(self, mentor_id: uuid.UUID) -> Mentor | None:
         found = self.items.get(mentor_id)

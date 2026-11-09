@@ -18,7 +18,8 @@ from pydantic import BaseModel, Field
 from app.contexts.academy.application.catalog import AcademyCatalog
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.educator.domain.enums import DisplayNamePreference
-from app.contexts.identity.application.signup import SignupForm, SignupService
+from app.contexts.identity.application.signup import MailDispatcher, SignupForm, SignupService
+from app.contexts.identity.application.signup_matching import SignupMatcher
 from app.contexts.identity.domain.credentials import PASSWORD_MAX_LENGTH
 from app.contexts.identity.domain.enums import MemberSignupType, UserApprovalStatus
 from app.contexts.identity.domain.verification import SIGNUP_SESSION_TTL
@@ -65,13 +66,16 @@ def get_signup_service(
         limiter=RedisRateLimiter(redis),
         hasher=Argon2PasswordHasher(),
         cohorts=catalog,
+        matcher=cast("SignupMatcher", request.app.state.signup_matcher),
         mail=mail,
+        mail_dispatcher=cast("MailDispatcher", request.app.state.mail_dispatcher),
         sms=sms,
         audit=cast("AuditRecorder", request.app.state.audit_recorder),
         uow=UnitOfWork(),
         clock=clock,
         code_secret=settings.jwt_secret_key.get_secret_value(),
         sender_name=settings.mail_sender_name,
+        login_url=f"{settings.frontend_base_url.rstrip('/')}/login",
     )
 
 
