@@ -1,6 +1,6 @@
 # 28. P6-3 계약서 업로드와 계약 관리 API
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-09 병합)
 - 관련 PR: #31
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P6 (P6-3)
 - 이전 기록: [27. P6-2 멘토·강사·계약·계약서 모델](27_p6_2_educator_models.md), [26. P6-1 S3 어댑터](26_p6_1_s3_adapter.md)
@@ -63,6 +63,7 @@ P6의 세 번째 PR이다. 운영진이 멘토·강사 계약을 등록하고, �
 - 통합(PostgreSQL): 저장·조회 왕복, 필터·검색·정렬·페이지, 만료 대상 조회
 - API(PostgreSQL + floci): 업로드 요청 → S3 직접 업로드 → 확정 → 계약 연결 → 확정 → 다운로드 URL로 받은 내용이 원본과 같음 → 해지. PDF가 아닌 내용은 422, 긴 파일 이름은 422, 목록 검색·DRAFT 삭제, 권한(비로그인 401, 조교 403, 매니저 200), 직원 없음 404, 기간 역전 422
 - 커밋 6개를 worktree에서 하나씩 검사했다(ruff, ruff format, mypy, mypy tests, lint-imports, pytest). 모두 통과했고 최종 400 passed다.
+- GitHub Actions (PR #31, run 42606339344): backend 잡 통과, 400 passed (floci 업로드 API 테스트 포함)
 - 개발 환경: 워커·스케줄러가 `app.workers.tasks.contracts`를 불러온다. 만료 작업을 워커로 한 번 실행해 정상 종료를 확인했다(0건).
 
 ## 남은 작업
