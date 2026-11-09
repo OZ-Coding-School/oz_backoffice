@@ -283,6 +283,7 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
 
 ### P6. S3 어댑터 + 교육 인력·계약
 - **목표:** 파일 업로드 공통 흐름, 멘토·강사 프로필, 계약 관리.
+- PR을 넷으로 나눈다(사용자 결정, 2026-11-09). **P6-1 (구현 기록 26):** S3 어댑터·통합 테스트·CI floci. **P6-2:** educator 모델·마이그레이션. **P6-3:** 계약서 업로드·계약 CRUD·상태 전이 API. **P6-4:** 수동 연결·멘토 프로필 API
 - **테이블:** `mentors`, `instructors`, `educator_contracts`, `contract_files`
 - **작업:**
   - `integrations/s3.py`(aioboto3, B8): `presign_post(key, content_type, max_bytes)`, `presign_get(key)`, `head(key)`, `delete(key)`. presigned URL은 `S3_PUBLIC_ENDPOINT_URL`로 서명한다 (C7)
@@ -479,6 +480,10 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
   - [x] P5-3 과정-기수 테이블로 학사 마스터 동기화 (구현 기록 23)
   - [x] P5-4 수강생 테이블 실구조 확인과 레코드 링크 매핑 (구현 기록 25)
 - [ ] P6 S3 어댑터 + 교육 인력·계약
+  - [x] P6-1 S3 어댑터와 S3 시나리오 통합 테스트·CI floci (구현 기록 26)
+  - [ ] P6-2 educator 모델·마이그레이션
+  - [ ] P6-3 계약서 업로드·계약 CRUD·상태 전이 API
+  - [ ] P6-4 계약 수동 연결·멘토 프로필 API
 - [ ] P7 수강생·멘토 가입
 - [ ] P8 기수 멘토링 설정·멘토 배정
 - [ ] P9 멘토 일정
