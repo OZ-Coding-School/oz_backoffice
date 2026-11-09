@@ -236,7 +236,7 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
 - **선행 준비:** Airtable PAT(읽기 권한), 베이스·테이블 ID, **실제 필드 구조 확인 → `AIRTABLE_FIELD_MAP` 확정** — 확인 완료(2026-11-09, 구현 기록 19)
 - **실제 구조 (KDT 학생관리툴 Base, 수강생 정보 시트):** `이름`, `전화번호`(`010-1234-5678`), `이메일`, `기수`(lookup 리스트, `"<과정 별칭> <N>기"`), `상태`(운영 상태), `HRD상태`, `중도탈락일`, `훈련시작일`·`훈련종료일`. 과정 별칭은 `bootcamps.airtable_cohort_prefix`(A18), 수강 상태는 `상태`를 따른다(A19)
 - **범위 수식 (실데이터로 검증):** 기수 `ARRAYJOIN({기수})='헬스케어 3기'`, 과정 `FIND('헬스케어 ', ARRAYJOIN({기수}))=1`, 전체 = 별칭이 설정된 과정들의 OR
-- PR을 나눈다. **P5-1 (구현 기록 19):** `airtable_cohort_prefix`, pyairtable 클라이언트(B11). **P5-2a (구현 기록 20):** 레코드 해석·상태 매핑·동기화 서비스. **P5-2b (구현 기록 21):** Airtable 원천 어댑터, 동시 실행 락, taskiq 작업(수동 실행·매시 전체). **P5-2c:** 관리 API
+- PR을 나눈다. **P5-1 (구현 기록 19):** `airtable_cohort_prefix`, pyairtable 클라이언트(B11). **P5-2a (구현 기록 20):** 레코드 해석·상태 매핑·동기화 서비스. **P5-2b (구현 기록 21):** Airtable 원천 어댑터, 동시 실행 락, taskiq 작업(수동 실행·매시 전체). **P5-2c (구현 기록 22):** 관리 API(동기화 요청 → taskiq 전달·202, 실행 이력 커서·담당 범위 필터, 기수 명단, 실패 목록)
 - 실패 목록(unmapped_records) 사유: `cohort_not_found`(별칭은 설정됐지만 DB에 그 기수가 없음), `cohort_changed`(레코드의 기수가 바뀜, 자동 이동 안 함), `invalid_name`. 기수가 비었거나 별칭이 설정되지 않은 과정의 레코드는 건너뛴다(대상 아님)
 - **목표:** Airtable을 원천으로 `students`(수강 등록 = 명단 레코드, A10)를 최신으로 유지한다.
 - **작업:**
@@ -268,8 +268,9 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
   | POST | `/api/v1/admin/rosters/sync` | 전체 동기화. `roster.sync` + GLOBAL 범위 (SUPER_ADMIN) |
   | POST | `/api/v1/admin/bootcamps/{id}/rosters/sync` | 과정 동기화. `roster.sync` (해당 과정 범위) |
   | POST | `/api/v1/admin/cohorts/{id}/rosters/sync` | 기수 동기화. `roster.sync` (해당 기수 또는 상위 과정 범위) |
-  | GET | `/api/v1/admin/rosters/sync-runs` | `roster.sync` (담당 범위의 실행만, SUPER_ADMIN은 전체) |
-  | GET | `/api/v1/admin/cohorts/{id}/rosters` | `roster.sync` (기수의 `students`, 가입 여부 필터) |
+  | GET | `/api/v1/admin/rosters/sync-runs?before=&limit=` | `roster.sync` (담당 범위의 실행만, SUPER_ADMIN은 전체). `next_before` 커서 |
+  | GET | `/api/v1/admin/rosters/sync-runs/{id}` | 같은 범위 규칙 (범위 밖이면 404) |
+  | GET | `/api/v1/admin/cohorts/{id}/rosters?claimed=&include_removed=` | `roster.sync` (기수의 `students`, 가입 여부·원천 삭제 필터) |
   | GET | `/api/v1/admin/rosters/unmapped` | `roster.sync` + GLOBAL 범위 (SUPER_ADMIN). 최근 실행의 `unmapped_records` |
   - 수동 동기화 요청은 즉시 `roster_sync_runs`(RUNNING)를 만들어 202 + 실행 ID를 돌려주고, 실제 동기화는 taskiq로 처리한다. 상태는 실행 이력 API로 확인한다.
 - **테스트:**
@@ -473,7 +474,7 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
   - [x] P5-1 과정 별칭 컬럼과 Airtable 클라이언트 (구현 기록 19)
   - [x] P5-2a 레코드 해석·상태 매핑·동기화 서비스 (구현 기록 20)
   - [x] P5-2b 동시 실행 락·taskiq 작업 (구현 기록 21)
-  - [ ] P5-2c 명단 동기화 관리 API
+  - [ ] P5-2c 명단 동기화 관리 API (구현 기록 22)
 - [ ] P6 S3 어댑터 + 교육 인력·계약
 - [ ] P7 수강생·멘토 가입
 - [ ] P8 기수 멘토링 설정·멘토 배정
