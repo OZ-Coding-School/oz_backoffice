@@ -10,9 +10,11 @@ MENTOR 역할은 멘토 배정(P8)에서 부여한다(A17). 트랜잭션은 호�
 import uuid
 from dataclasses import dataclass
 
-from app.contexts.educator.domain.enums import DisplayNamePreference
+from app.contexts.educator.domain.entities import EducatorContract
+from app.contexts.educator.domain.enums import DisplayNamePreference, EducatorType
 from app.contexts.educator.domain.profiles import Mentor
 from app.contexts.educator.domain.repositories import EducatorContractRepository, MentorRepository
+from app.shared.errors import BusinessRuleViolation, NotFoundError
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +40,40 @@ class MentorOnboarding:
         contracts = await self._contracts.find_unlinked_mentor_contracts(name, phone_number)
         if not contracts:
             return MentorMatch(contract_ids=[], mentor_id=None)
+        return await self._onboard(user_id, nickname, display_name_preference, contracts)
+
+    async def approve(
+        self,
+        *,
+        user_id: uuid.UUID,
+        nickname: str | None,
+        display_name_preference: DisplayNamePreference,
+        contract_ids: list[uuid.UUID],
+    ) -> MentorMatch:
+        """운영진 승인 (P7-5, A33): 고른 계약(0건 이상)을 연결하고 멘토 프로필을 만든다.
+
+        고른 계약은 유형 MENTOR이고 아직 멘토에 연결되지 않아야 한다(상태 무관).
+        """
+        contracts = []
+        for contract_id in dict.fromkeys(contract_ids):
+            contract = await self._contracts.get(contract_id)
+            if contract is None:
+                raise NotFoundError("계약을 찾을 수 없습니다.", code="contract_not_found")
+            if contract.educator_type is not EducatorType.MENTOR or contract.mentor_id is not None:
+                raise BusinessRuleViolation(
+                    "연결할 수 없는 계약입니다 (멘토 계약이 아니거나 이미 연결됨).",
+                    code="contract_not_linkable",
+                )
+            contracts.append(contract)
+        return await self._onboard(user_id, nickname, display_name_preference, contracts)
+
+    async def _onboard(
+        self,
+        user_id: uuid.UUID,
+        nickname: str | None,
+        display_name_preference: DisplayNamePreference,
+        contracts: list[EducatorContract],
+    ) -> MentorMatch:
         mentor = await self._mentors.get_by_user(user_id)
         if mentor is None:
             mentor = Mentor(

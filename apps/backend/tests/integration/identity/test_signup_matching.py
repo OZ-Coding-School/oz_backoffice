@@ -122,3 +122,60 @@ async def test_mentor_contracts_any_status_are_linked() -> None:
         linked = await contracts.get(contract_id)
         assert linked is not None
         assert linked.mentor_id == mentor.id
+
+
+async def test_selected_student_rules() -> None:
+    from app.shared.errors import BusinessRuleViolation, NotFoundError
+
+    cohort = await create_cohort()
+    claims = StudentClaims(students)
+    completed = await _student(cohort.id, status=EnrollmentStatus.COMPLETED)
+    removed = await _student(cohort.id, is_removed_in_source=True)
+    user = await create_user()
+
+    # 수강 상태는 묻지 않는다 (A33)
+    assert await claims.claim_selected(completed.id, user_id=user.id) == cohort.id
+    for student_id, code in (
+        (completed.id, "student_already_claimed"),
+        (removed.id, "student_removed_in_source"),
+    ):
+        with pytest.raises(BusinessRuleViolation) as exc:
+            await claims.cohort_of_claimable(student_id)
+        assert exc.value.code == code
+    with pytest.raises(NotFoundError):
+        await claims.cohort_of_claimable(new_id())
+
+
+async def test_mentor_approval_validates_selected_contracts() -> None:
+    from app.shared.errors import BusinessRuleViolation, NotFoundError
+
+    contracts = TortoiseEducatorContractRepository()
+    employee = await create_employee()
+    instructor_contract = EducatorContract(
+        manager_employee_id=employee.id,
+        educator_type=EducatorType.INSTRUCTOR,
+        contractor_name="박강사",
+        contractor_phone="01011112222",
+        title="강의",
+        start_date=date(2026, 1, 1),
+        end_date=date(2026, 12, 31),
+    )
+    await contracts.add(instructor_contract)
+    onboarding = MentorOnboarding(contracts=contracts, mentors=TortoiseMentorRepository())
+    user = await create_user()
+
+    with pytest.raises(BusinessRuleViolation) as wrong:
+        await onboarding.approve(
+            user_id=user.id,
+            nickname=None,
+            display_name_preference=DisplayNamePreference.NAME,
+            contract_ids=[instructor_contract.id],
+        )
+    assert wrong.value.code == "contract_not_linkable"
+    with pytest.raises(NotFoundError):
+        await onboarding.approve(
+            user_id=user.id,
+            nickname=None,
+            display_name_preference=DisplayNamePreference.NAME,
+            contract_ids=[new_id()],
+        )
