@@ -205,3 +205,24 @@ async def test_roles_are_loaded_once_per_checker(h: Harness) -> None:
 async def test_unknown_permission_code_is_a_programming_error(h: Harness) -> None:
     with pytest.raises(ValueError, match="정의되지 않은 권한"):
         await h.checker.has(h.user_id, "mentoring.unknown", G)
+
+
+async def test_scope_of_permission(h: Harness) -> None:
+    from app.contexts.access.application.permissions import PermissionScope
+
+    assert (await h.checker.scope_of(h.user_id, "user.approve")).is_empty
+
+    await h.grant(COHORT_ASSISTANT, RoleScopeType.COHORT, COHORT)
+    await h.grant(COHORT_MANAGER, RoleScopeType.BOOTCAMP, OTHER_BOOTCAMP)
+    checker = PermissionChecker(RoleQueries(h.user_roles, FixedClock(NOW)), h.cohorts)
+    assert await checker.scope_of(h.user_id, "user.approve") == PermissionScope(
+        bootcamp_ids=frozenset({OTHER_BOOTCAMP}), cohort_ids=frozenset({COHORT})
+    )
+    # 조교에게 없는 권한은 매니저 역할 범위만
+    assert await checker.scope_of(h.user_id, "contract.manage") == PermissionScope(
+        bootcamp_ids=frozenset({OTHER_BOOTCAMP})
+    )
+
+    await h.grant(SUPER_ADMIN, RoleScopeType.GLOBAL)
+    fresh = PermissionChecker(RoleQueries(h.user_roles, FixedClock(NOW)), h.cohorts)
+    assert (await fresh.scope_of(h.user_id, "user.approve")).is_global

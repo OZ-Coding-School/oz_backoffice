@@ -47,6 +47,19 @@ class PermissionTarget:
         return cls(TargetKind.COHORT, cohort_id)
 
 
+@dataclass(frozen=True, slots=True)
+class PermissionScope:
+    """권한이 미치는 범위. is_global이면 전체, 아니면 과정·기수 ID 목록."""
+
+    is_global: bool = False
+    bootcamp_ids: frozenset[uuid.UUID] = frozenset()
+    cohort_ids: frozenset[uuid.UUID] = frozenset()
+
+    @property
+    def is_empty(self) -> bool:
+        return not (self.is_global or self.bootcamp_ids or self.cohort_ids)
+
+
 class CohortDirectory(Protocol):
     """기수가 속한 과정 조회 (academy `AcademyCatalog`가 구현)."""
 
@@ -90,6 +103,29 @@ class PermissionChecker:
         if not bootcamp_scopes or target.id is None:
             return False
         return await self._cohorts.bootcamp_id_of(target.id) in bootcamp_scopes
+
+    async def scope_of(self, user_id: uuid.UUID, code: str) -> PermissionScope:
+        """목록을 담당 범위로 거를 때 쓴다 (예: 승인 대기 목록)."""
+        ensure_known_permission(code)
+        grants = [
+            g
+            for g in await self._grants_of(user_id)
+            if code in ROLES_BY_CODE[g.role_code].permissions
+        ]
+        if any(g.scope_type is RoleScopeType.GLOBAL for g in grants):
+            return PermissionScope(is_global=True)
+        return PermissionScope(
+            bootcamp_ids=frozenset(
+                g.scope_id
+                for g in grants
+                if g.scope_type is RoleScopeType.BOOTCAMP and g.scope_id is not None
+            ),
+            cohort_ids=frozenset(
+                g.scope_id
+                for g in grants
+                if g.scope_type is RoleScopeType.COHORT and g.scope_id is not None
+            ),
+        )
 
     async def require(self, user_id: uuid.UUID, code: str, target: PermissionTarget) -> None:
         if not await self.has(user_id, code, target):
