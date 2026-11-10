@@ -1,7 +1,7 @@
 # 36. P8-2 기수 멘토 배정·멘토 활성화·팀리드 권한
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #40
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P8 (P8-2), §2.3 권한표
 - 이전 기록: [35. P8-1 기수 멘토링 설정·금지 시간대·추가 휴일](35_p8_1_mentoring_settings.md)
 
