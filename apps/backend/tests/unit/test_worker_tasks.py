@@ -8,6 +8,7 @@ from app.core.clock import SystemClock
 from app.core.config import Settings
 from app.workers.broker import broker
 from app.workers.tasks.contracts import DAILY_0005_KST, expire_contracts
+from app.workers.tasks.mentoring import build_assignment_service, expire_assignments
 from app.workers.tasks.roster import HOURLY, execute_roster_sync, scheduled_roster_sync
 from tests.fakes.audit import InMemoryAuditLogRepository
 
@@ -25,6 +26,14 @@ def test_contract_expiry_runs_daily_in_kst() -> None:
         {"cron": "5 0 * * *", "cron_offset": "Asia/Seoul"}
     ]
     assert DAILY_0005_KST["cron_offset"] == "Asia/Seoul"
+
+
+def test_assignment_expiry_runs_daily_at_midnight_kst() -> None:
+    assert expire_assignments.task_name == "mentoring.assignments.expire"
+    assert expire_assignments.labels["schedule"] == [
+        {"cron": "0 0 * * *", "cron_offset": "Asia/Seoul"}
+    ]
+    assert build_assignment_service() is not None
 
 
 def test_broker_connection_has_no_read_timeout() -> None:
