@@ -1,7 +1,7 @@
 # 34. P7-5 수강생·멘토 가입 승인 관리와 재신청
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 예정)
+- 관련 PR: #38
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P7 (P7-5)
 - 이전 기록: [33. P7-4 로그인·잠금·비밀번호 재설정](33_p7_4_password_login_reset.md)
 
