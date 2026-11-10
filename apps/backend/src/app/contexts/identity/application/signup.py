@@ -11,7 +11,6 @@
 바로 하고 실패하면 503으로 알린다(A29).
 """
 
-import html
 import secrets
 import uuid
 from dataclasses import dataclass, replace
@@ -19,6 +18,7 @@ from typing import Protocol
 
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.educator.domain.enums import DisplayNamePreference
+from app.contexts.identity.application.signup_mails import approval_mail
 from app.contexts.identity.application.signup_matching import SignupMatcher
 from app.contexts.identity.application.verification_codes import VerificationCodes, seconds
 from app.contexts.identity.domain.credentials import validate_password
@@ -60,20 +60,32 @@ class MailDispatcher(Protocol):
     async def dispatch(self, message: MailMessage) -> None: ...
 
 
-def approval_mail(user: User, *, sender_name: str, login_url: str) -> MailMessage:
-    name, url = html.escape(user.name), html.escape(login_url, quote=True)
-    return MailMessage(
-        to=user.email,
-        subject=f"[{sender_name}] 가입이 승인되었습니다",
-        text=(
-            f"{user.name}님, {sender_name} 가입이 승인되었습니다.\n"
-            f"아래 주소에서 로그인해 주세요.\n{login_url}"
-        ),
-        html=(
-            f"<p>{name}님, {sender_name} 가입이 승인되었습니다.</p>"
-            f'<p><a href="{url}">로그인하기</a></p>'
-        ),
-    )
+async def settle_auto_match(
+    *,
+    matcher: SignupMatcher,
+    user: User,
+    signup: MemberSignup,
+    users: UserRepository,
+    uow: UnitOfWork,
+    dispatcher: MailDispatcher,
+    clock: Clock,
+    sender_name: str,
+    login_url: str,
+) -> SignupMatchResult:
+    """자동 매칭하고 일치하면 회원·신청을 승인한다(A31). 커밋 후 승인 메일을 보낸다.
+
+    가입 완료와 재신청이 함께 쓴다. 호출하는 쪽의 트랜잭션 안에서 실행한다.
+    """
+    result = await matcher.match(user, signup)
+    signup.record_match(result)
+    if result is SignupMatchResult.MATCHED:
+        now = clock.now()
+        user.approve(now=now)
+        signup.approve(now=now)
+        await users.save(user)
+        message = approval_mail(user, sender_name=sender_name, login_url=login_url)
+        uow.on_commit(lambda: dispatcher.dispatch(message))
+    return result
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -248,17 +260,17 @@ class SignupService:
             await self._ensure_phone_free(session.phone_number)
             await self._users.add(user)
             # 자동 매칭 (A6·A31): 일치하면 바로 승인, 아니면 승인 대기
-            result = await self._matcher.match(user, signup)
-            signup.record_match(result)
-            if result is SignupMatchResult.MATCHED:
-                now = self._clock.now()
-                user.approve(now=now)
-                signup.approve(now=now)
-                await self._users.save(user)
-                message = approval_mail(
-                    user, sender_name=self._sender_name, login_url=self._login_url
-                )
-                self._uow.on_commit(lambda: self._dispatcher.dispatch(message))
+            result = await settle_auto_match(
+                matcher=self._matcher,
+                user=user,
+                signup=signup,
+                users=self._users,
+                uow=self._uow,
+                dispatcher=self._dispatcher,
+                clock=self._clock,
+                sender_name=self._sender_name,
+                login_url=self._login_url,
+            )
             await self._signups.add(signup)
             await self._audit.record(
                 actor_user_id=user.id,

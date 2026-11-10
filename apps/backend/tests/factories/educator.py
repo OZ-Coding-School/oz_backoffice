@@ -1,6 +1,7 @@
 """educator 테스트 데이터 빌더. 멘토·강사 프로필은 가입 기능(P7) 전이라 직접 만든다."""
 
-from typing import Any
+import uuid
+from typing import TYPE_CHECKING, Any
 
 from app.contexts.educator.domain.profiles import Mentor
 from app.contexts.educator.infrastructure.models import InstructorModel, MentorModel
@@ -8,6 +9,10 @@ from app.contexts.educator.infrastructure.repositories import TortoiseMentorRepo
 from app.contexts.identity.domain.entities import User
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
 from tests.factories.identity import make_user
+
+if TYPE_CHECKING:
+    from app.contexts.identity.domain.enums import MemberSignupType
+    from app.contexts.identity.domain.signup import MemberSignup
 
 
 async def create_user(**overrides: Any) -> User:
@@ -27,3 +32,19 @@ async def create_mentor(user: User | None = None, **overrides: Any) -> Mentor:
 async def create_instructor(user: User | None = None) -> InstructorModel:
     user = user or await create_user()
     return await InstructorModel.create(user_id=user.id)
+
+
+async def create_applicant_signup(
+    signup_type: "MemberSignupType",
+    *,
+    cohort_id: "uuid.UUID | None" = None,
+    **user_overrides: Any,
+) -> tuple[User, "MemberSignup"]:
+    """승인 대기 수강생·멘토(회원 PENDING + 가입 신청)."""
+    from app.contexts.identity.domain.signup import MemberSignup
+    from app.contexts.identity.infrastructure.repositories import TortoiseMemberSignupRepository
+
+    user = await create_user(**user_overrides)
+    signup = MemberSignup(user_id=user.id, signup_type=signup_type, requested_cohort_id=cohort_id)
+    await TortoiseMemberSignupRepository().add(signup)
+    return user, signup
