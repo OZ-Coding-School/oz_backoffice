@@ -13,6 +13,7 @@ from app.contexts.identity.presentation.approval_router import me_router as memb
 from app.contexts.identity.presentation.password_router import router as password_router
 from app.contexts.identity.presentation.router import auth_router, me_router
 from app.contexts.identity.presentation.signup_router import router as signup_router
+from app.contexts.mentoring.presentation.settings_router import router as mentoring_settings_router
 from app.contexts.organization.presentation.admin_router import (
     router as staff_registration_admin_router,
 )
@@ -37,3 +38,4 @@ router.include_router(roster_router)
 router.include_router(contract_router)
 router.include_router(mentor_me_router)
 router.include_router(mentor_admin_router)
+router.include_router(mentoring_settings_router)

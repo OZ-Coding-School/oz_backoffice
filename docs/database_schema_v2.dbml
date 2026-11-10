@@ -500,7 +500,7 @@ Table roster_sync_runs {
 // 멘토링 관리용 테이블
 // ==============================================
 Table cohort_mentoring_settings {
-  note: "기수별 멘토링 설정"
+  note: "기수별 멘토링 설정 (decisions A34). 첫 저장 때 만든다. 값 제한: 진행 단위 30·60분, 신청 마감 6·12·24시간, 대기 신청 1~3건, 기본 지급 시간 60분 단위, 팀·1:1 중 하나 이상"
 
   id uuid [pk, note: "default=uuid7 사용"]
   cohort_id uuid [not null, unique, ref: - cohorts.id]
@@ -517,11 +517,16 @@ Table cohort_mentoring_settings {
   checks {
     `default_1on1_minutes >= 0 AND default_team_minutes >= 0` [name: "check_settings_default_minutes"]
     `min_lead_hours >= 0 AND max_pending_requests > 0 AND allowed_duration > 0` [name: "check_settings_rules"]
+    `allowed_duration IN (30, 60)` [name: "check_settings_allowed_duration"]
+    `min_lead_hours IN (6, 12, 24)` [name: "check_settings_min_lead_hours"]
+    `max_pending_requests BETWEEN 1 AND 3` [name: "check_settings_max_pending"]
+    `default_1on1_minutes % 60 = 0 AND default_team_minutes % 60 = 0` [name: "check_settings_default_hours"]
+    `allow_team_mentoring OR allow_1_on_1` [name: "check_settings_some_mode"]
   }
 }
 
 Table cohort_mentoring_block_times {
-  note: "기수별 멘토링 금지 시간대 설정"
+  note: "기수별 멘토링 금지 시간대 (decisions A34). 기간 안의 평일(월~금)에만 적용하고 주말·공휴일(holidays 패키지 + mentoring_holidays)은 제외한다. 멘토링 신청과 멘토 일정 열기를 막는다"
 
   id uuid [pk, note: "default=uuid7 사용"]
   cohort_id uuid [not null, ref: > cohorts.id]
@@ -534,12 +539,22 @@ Table cohort_mentoring_block_times {
   updated_at timestamptz [not null, default: `now()`]
 
   indexes {
-    (cohort_id, period_start)
+    (cohort_id, period_start) [note: "겹침 방지: EXCLUDE USING gist (cohort_id WITH =, daterange(period_start, period_end, '[]') WITH &&, tsrange(DATE '2000-01-01' + start_time, DATE '2000-01-01' + end_time) WITH &&) — raw SQL"]
   }
   checks {
     `period_start <= period_end` [name: "check_block_period"]
     `start_time < end_time` [name: "check_block_time"]
   }
+}
+
+Table mentoring_holidays {
+  note: "운영진이 등록하는 전사 공통 추가 휴일 (임시공휴일·휴무일, decisions A34). 법정공휴일은 holidays 패키지로 판단하고 이 표로 보충한다. 금지 시간대가 적용되지 않는 날"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  holiday_date date [not null, unique, note: "휴일"]
+  name varchar(50) [not null, note: "휴일 이름 (예: 임시공휴일, 학원 휴무)"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
 }
 
 Table cohort_mentors {
