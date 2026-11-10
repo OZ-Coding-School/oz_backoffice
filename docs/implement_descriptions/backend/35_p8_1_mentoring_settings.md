@@ -1,7 +1,7 @@
 # 35. P8-1 기수 멘토링 설정·금지 시간대·추가 휴일
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 예정)
+- 관련 PR: #39
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P8 (P8-1)
 - 이전 기록: [34. P7-5 수강생·멘토 가입 승인 관리와 재신청](34_p7_5_signup_approvals.md)
 
