@@ -1,7 +1,8 @@
 """mentoring 리포지토리 구현 (Tortoise)."""
 
 import uuid
-from datetime import date
+from datetime import UTC, date
+from typing import Any
 
 from app.contexts.mentoring.domain.settings import (
     CohortMentoringSettings,
@@ -56,6 +57,14 @@ class TortoiseMentoringBlockTimeRepository(
         entity.start_time = entity.start_time.replace(tzinfo=None)
         entity.end_time = entity.end_time.replace(tzinfo=None)
         return entity
+
+    def to_values(self, entity: MentoringBlockTime) -> dict[str, Any]:
+        # Tortoise(use_tz)가 시간대 없는 시각에 경고를 내므로 표시만 붙여 넘긴다
+        # (TIME 컬럼에는 시:분만 저장된다)
+        values = super().to_values(entity)
+        values["start_time"] = entity.start_time.replace(tzinfo=UTC)
+        values["end_time"] = entity.end_time.replace(tzinfo=UTC)
+        return values
 
     async def list_by_cohort(self, cohort_id: uuid.UUID) -> list[MentoringBlockTime]:
         rows = await CohortMentoringBlockTimeModel.filter(cohort_id=cohort_id).order_by(
