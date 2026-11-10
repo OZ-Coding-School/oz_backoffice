@@ -1,6 +1,6 @@
 # 35. P8-1 기수 멘토링 설정·금지 시간대·추가 휴일
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-10 병합)
 - 관련 PR: #39
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P8 (P8-1)
 - 이전 기록: [34. P7-5 수강생·멘토 가입 승인 관리와 재신청](34_p7_5_signup_approvals.md)
@@ -51,6 +51,7 @@ P8의 첫 PR이다. 기수마다 멘토링 규칙(허용 방식, 기본 지급 �
   - 휴일: 조회(PUBLIC·CUSTOM), 중복 409
   - 권한: 매니저 담당 기수 200·다른 기수 403, 조교 403, 매니저 추가 휴일 등록, 비로그인 401
 - 커밋 4개를 worktree에서 하나씩 검사했다(ruff, ruff format, mypy, mypy tests, lint-imports, pytest). 모두 통과했고 최종 566 passed다.
+- GitHub Actions (PR #39, run 42754527111): backend 잡 통과, 566 passed
 
 ## 남은 작업
 - P8-2 멘토 배정(계약 기간 검증, 겹침 EXCLUDE, MENTOR 역할, 본인 배정 조회)
