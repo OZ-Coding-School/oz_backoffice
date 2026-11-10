@@ -1,6 +1,6 @@
 # 36. P8-2 기수 멘토 배정·멘토 활성화·팀리드 권한
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-10 병합)
 - 관련 PR: #40
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P8 (P8-2), §2.3 권한표
 - 이전 기록: [35. P8-1 기수 멘토링 설정·금지 시간대·추가 휴일](35_p8_1_mentoring_settings.md)
@@ -88,6 +88,8 @@ P8의 두 번째 PR이다. 운영진이 기수에 멘토를 배정하고(유형�
   - 권한: 매니저 담당 기수 201·다른 기수 403, 조교 403, `mentor.manage` 매니저 200·조교 403, 비로그인 401, 팀리드 담당자 API 200·역할 부여 403·운영진 가입 승인 403
 - 전체 595 passed (compose `api` 컨테이너, ruff·ruff format·mypy·mypy tests·lint-imports 통과)
 - 코드 커밋 4개를 worktree에서 하나씩 검사했다(ruff, ruff format, mypy, mypy tests, lint-imports, pytest). 모두 통과했다(581 → 582 → 590 → 595 passed)
+- GitHub Actions (PR #40, run 42809497997): backend 잡 통과, 595 passed
+- 사용자가 작업 완료를 확인했다(2026-11-10)
 - 워커·스케줄러 재기동 후 `app.workers.tasks.mentoring` 등록 확인. 개발 DB에 `seed-roles`로 TEAM_LEAD·새 권한 반영
 
 ## 배포 시 주의
