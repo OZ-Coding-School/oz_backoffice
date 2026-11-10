@@ -97,3 +97,13 @@ def test_can_login_depends_on_deletion_and_suspension() -> None:
 
     deleted = make_user(deleted_at=NOW)
     assert not deleted.can_login
+
+
+def test_only_rejected_user_can_resubmit() -> None:
+    user = make_user()
+    with pytest.raises(BusinessRuleViolation) as pending:
+        user.resubmit()
+    assert pending.value.code == "user_not_rejected"
+    user.reject()
+    user.resubmit()
+    assert user.approval_status is UserApprovalStatus.PENDING

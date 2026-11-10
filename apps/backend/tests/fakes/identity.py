@@ -5,6 +5,7 @@ from dataclasses import replace
 
 from app.contexts.identity.domain.entities import OAuthAccount, User
 from app.contexts.identity.domain.enums import SocialLoginProvider
+from app.contexts.identity.domain.repositories import PendingSignupFilter
 from app.contexts.identity.domain.signup import MemberSignup
 from app.integrations.google.oauth import GoogleIdentity
 from app.shared.errors import AuthenticationError
@@ -82,3 +83,12 @@ class InMemoryMemberSignupRepository:
     async def get_latest_by_user(self, user_id: uuid.UUID) -> MemberSignup | None:
         mine = [s for s in self.items.values() if s.user_id == user_id]
         return max(mine, key=lambda s: s.id) if mine else None
+
+    async def get_pending_by_user(self, user_id: uuid.UUID) -> MemberSignup | None:
+        return next((s for s in self.items.values() if s.user_id == user_id and s.is_pending), None)
+
+    async def list_pending(
+        self, signup_filter: PendingSignupFilter, *, limit: int, offset: int
+    ) -> tuple[list[MemberSignup], int]:
+        pending = sorted((s for s in self.items.values() if s.is_pending), key=lambda s: s.id)
+        return pending[offset : offset + limit], len(pending)

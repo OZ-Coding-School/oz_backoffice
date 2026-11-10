@@ -2,8 +2,15 @@
 
 import uuid
 
+from tortoise.expressions import Q
+
 from app.contexts.identity.domain.entities import OAuthAccount, User
-from app.contexts.identity.domain.enums import SocialLoginProvider
+from app.contexts.identity.domain.enums import (
+    MemberSignupStatus,
+    MemberSignupType,
+    SocialLoginProvider,
+)
+from app.contexts.identity.domain.repositories import PendingSignupFilter, SignupVisibility
 from app.contexts.identity.domain.signup import MemberSignup
 from app.contexts.identity.infrastructure.models import (
     MemberSignupModel,
@@ -104,6 +111,57 @@ class TortoiseMemberSignupRepository(TortoiseRepository[MemberSignup, MemberSign
         entity.created_at = row.created_at
         return entity
 
+    async def get_pending_by_user(self, user_id: uuid.UUID) -> MemberSignup | None:
+        row = await MemberSignupModel.get_or_none(
+            user_id=user_id, status=MemberSignupStatus.PENDING
+        )
+        return self.to_entity(row) if row else None
+
+    async def list_pending(
+        self, signup_filter: PendingSignupFilter, *, limit: int, offset: int
+    ) -> tuple[list[MemberSignup], int]:
+        visible = _visible(signup_filter.visibility)
+        if visible is None:
+            return [], 0
+        query = MemberSignupModel.filter(visible, status=MemberSignupStatus.PENDING)
+        if signup_filter.signup_type is not None:
+            query = query.filter(signup_type=signup_filter.signup_type)
+        if signup_filter.cohort_id is not None:
+            query = query.filter(requested_cohort_id=signup_filter.cohort_id)
+        total = await query.count()
+        rows = await query.order_by("created_at", "id").offset(offset).limit(limit)
+        return [self.to_entity(row) for row in rows], total
+
     async def get_latest_by_user(self, user_id: uuid.UUID) -> MemberSignup | None:
         row = await MemberSignupModel.filter(user_id=user_id).order_by("-created_at", "-id").first()
         return self.to_entity(row) if row else None
+
+
+def _visible(visibility: SignupVisibility) -> Q | None:
+    """볼 수 있는 신청 조건. 아무것도 볼 수 없으면 None."""
+    conditions: list[Q] = []
+    if visibility.all_students:
+        conditions.append(Q(signup_type=MemberSignupType.STUDENT))
+    else:
+        if visibility.student_cohort_ids:
+            conditions.append(
+                Q(
+                    signup_type=MemberSignupType.STUDENT,
+                    requested_cohort_id__in=list(visibility.student_cohort_ids),
+                )
+            )
+        if visibility.student_bootcamp_ids:
+            conditions.append(
+                Q(
+                    signup_type=MemberSignupType.STUDENT,
+                    requested_cohort__bootcamp_id__in=list(visibility.student_bootcamp_ids),
+                )
+            )
+    if visibility.mentors:
+        conditions.append(Q(signup_type=MemberSignupType.MENTOR))
+    if not conditions:
+        return None
+    combined = conditions[0]
+    for condition in conditions[1:]:
+        combined |= condition
+    return combined

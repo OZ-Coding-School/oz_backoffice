@@ -16,7 +16,7 @@ class User(AggregateRoot):
     """회원 (운영진·멘토·강사·수강생 공통).
 
     - email은 소문자로 정규화한다 (users.email check 제약).
-    - 승인 상태: PENDING → APPROVED | REJECTED, REJECTED → APPROVED(재승인).
+    - 승인 상태: PENDING → APPROVED | REJECTED, REJECTED → APPROVED(재승인) | PENDING(재신청).
     """
 
     email: str
@@ -75,6 +75,14 @@ class User(AggregateRoot):
                 "승인 대기 중인 회원만 반려할 수 있습니다.", code="user_not_pending"
             )
         self.approval_status = UserApprovalStatus.REJECTED
+
+    def resubmit(self) -> None:
+        """반려된 회원이 다시 신청한다: REJECTED → PENDING (decisions A30·A33)."""
+        if self.approval_status is not UserApprovalStatus.REJECTED:
+            raise BusinessRuleViolation(
+                "반려된 회원만 다시 신청할 수 있습니다.", code="user_not_rejected"
+            )
+        self.approval_status = UserApprovalStatus.PENDING
 
     def verify_email(self, *, now: datetime) -> None:
         self.email_verified_at = now

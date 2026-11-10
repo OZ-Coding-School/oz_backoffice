@@ -8,6 +8,8 @@ from app.contexts.access.presentation.admin_router import router as user_roles_r
 from app.contexts.educator.presentation.admin_router import router as contract_router
 from app.contexts.educator.presentation.mentor_router import admin_router as mentor_admin_router
 from app.contexts.educator.presentation.mentor_router import me_router as mentor_me_router
+from app.contexts.identity.presentation.approval_router import admin_router as approval_admin_router
+from app.contexts.identity.presentation.approval_router import me_router as member_signup_router
 from app.contexts.identity.presentation.password_router import router as password_router
 from app.contexts.identity.presentation.router import auth_router, me_router
 from app.contexts.identity.presentation.signup_router import router as signup_router
@@ -22,6 +24,8 @@ router = APIRouter()
 router.include_router(auth_router)
 router.include_router(signup_router)
 router.include_router(password_router)
+router.include_router(member_signup_router)
+router.include_router(approval_admin_router)
 router.include_router(me_router)
 router.include_router(staff_registration_router)
 router.include_router(staff_registration_admin_router)

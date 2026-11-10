@@ -369,7 +369,7 @@ async def test_matched_mentor_is_approved_without_role(h: Harness) -> None:
 
 
 async def test_approval_mail_escapes_name() -> None:
-    from app.contexts.identity.application.signup import approval_mail
+    from app.contexts.identity.application.signup_mails import approval_mail
 
     message = approval_mail(
         make_user(email=EMAIL, name="<b>김</b>"), sender_name="오즈", login_url="http://x/login"

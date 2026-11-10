@@ -10,7 +10,9 @@
 import uuid
 from dataclasses import dataclass
 
+from app.contexts.academy.domain.entities import Student
 from app.contexts.academy.domain.repositories import StudentRepository
+from app.shared.errors import BusinessRuleViolation, NotFoundError
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,3 +39,31 @@ class StudentClaims:
         student.claim(user_id)
         await self._students.save(student)
         return ClaimOutcome(candidate_count=1, student_id=student.id)
+
+    async def cohort_of_claimable(self, student_id: uuid.UUID) -> uuid.UUID:
+        """운영진이 고른 명단이 연결 가능한지 확인하고 그 기수를 돌려준다 (P7-5, A33).
+
+        회원과 연결되지 않았고 원천에서 삭제되지 않은 명단이면 수강 상태는 묻지 않는다.
+        """
+        return (await self._claimable(student_id)).cohort_id
+
+    async def _claimable(self, student_id: uuid.UUID) -> Student:
+        student = await self._students.get(student_id)
+        if student is None:
+            raise NotFoundError("수강생 명단을 찾을 수 없습니다.", code="student_not_found")
+        if student.is_claimed:
+            raise BusinessRuleViolation(
+                "이미 회원과 연결된 수강생입니다.", code="student_already_claimed"
+            )
+        if student.is_removed_in_source:
+            raise BusinessRuleViolation(
+                "원천(Airtable)에서 삭제된 명단입니다.", code="student_removed_in_source"
+            )
+        return student
+
+    async def claim_selected(self, student_id: uuid.UUID, *, user_id: uuid.UUID) -> uuid.UUID:
+        """운영진이 고른 명단을 회원에 연결하고 그 기수를 돌려준다."""
+        student = await self._claimable(student_id)
+        student.claim(user_id)
+        await self._students.save(student)
+        return student.cohort_id
