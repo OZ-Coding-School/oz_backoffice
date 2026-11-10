@@ -96,3 +96,32 @@ async def test_last_super_admin_and_errors(
     )
     assert not_approved.json()["error"]["code"] == "user_not_approved"
     assert (await client.get(url)).status_code == 401
+
+
+async def test_team_lead_assigns_staff_but_not_roles(
+    client: AsyncClient, boss: tuple[User, dict[str, str]], settings: Settings
+) -> None:
+    """팀리드(A36): 회원 역할 API로 GLOBAL 부여.
+
+    담당자 배정·멘토 관리만 되고 역할 부여는 안 된다."""
+    from tests.factories.academy import create_cohort
+
+    _, admin = boss
+    target = await approved_user()
+    url = f"/api/v1/admin/users/{target.id}/roles"
+    granted = await client.post(url, json={"role": "TEAM_LEAD"}, headers=admin)
+    assert granted.status_code == 201, granted.text
+    assert (granted.json()["scope_type"], granted.json()["managed_by"]) == ("GLOBAL", "direct")
+
+    lead = bearer(settings, target)
+    cohort = await create_cohort()
+    assert (
+        await client.get(f"/api/v1/admin/cohorts/{cohort.id}/staffs", headers=lead)
+    ).status_code == 200
+    assert (await client.get("/api/v1/admin/mentors", headers=lead)).status_code == 200
+    other = await approved_user()
+    denied = await client.post(
+        f"/api/v1/admin/users/{other.id}/roles", json={"role": "SUPER_ADMIN"}, headers=lead
+    )
+    assert denied.status_code == 403
+    assert (await client.get("/api/v1/admin/staff-registrations", headers=lead)).status_code == 403

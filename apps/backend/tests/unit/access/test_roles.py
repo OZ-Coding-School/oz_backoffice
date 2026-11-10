@@ -9,6 +9,7 @@ from app.contexts.access.domain.catalog import (
     ROLES_BY_CODE,
     STUDENT,
     SUPER_ADMIN,
+    TEAM_LEAD,
 )
 from app.contexts.access.domain.entities import UserRole
 from app.contexts.access.domain.enums import RoleScopeType
@@ -21,14 +22,19 @@ NOW = datetime(2026, 11, 6, tzinfo=UTC)
 
 
 def test_permission_table_matches_plan() -> None:
-    """plan §2.3 권한표: 매니저는 조교 권한 + 계약·설정·배정·정산, SUPER_ADMIN은 전부."""
+    """plan §2.3 권한표: 매니저는 조교 권한 + 계약·멘토·설정·배정·정산,
+    팀리드는 매니저 + 담당자 배정(A36), SUPER_ADMIN은 전부."""
     admin = ROLES_BY_CODE[SUPER_ADMIN].permissions
     manager = ROLES_BY_CODE[COHORT_MANAGER].permissions
+    team_lead = ROLES_BY_CODE[TEAM_LEAD].permissions
     assistant = ROLES_BY_CODE[COHORT_ASSISTANT].permissions
     assert admin == set(PERMISSIONS)
-    assert assistant < manager < admin
+    assert assistant < manager < team_lead < admin
+    assert team_lead - manager == {"staff.assign"}
+    assert admin - team_lead == {"org.manage", "role.assign"}
     assert manager - assistant == {
         "contract.manage",
+        "mentor.manage",
         "mentoring.settings.manage",
         "mentoring.assignment.manage",
         "mentoring.settlement.close",
