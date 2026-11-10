@@ -4,6 +4,7 @@
 - 닉네임은 앞뒤 공백을 지우고 빈 값은 None으로 둔다. 표시 이름 NICKNAME은 닉네임이 있어야 한다.
 - 길이: 닉네임 30자, 한 줄 소개 100자, 전문 분야 200자, 소개(마크다운) 10,000자.
 - 사진은 비공개 버킷 `profiles/` 객체 키만 둔다. 바꾸거나 지우면 이전 객체는 커밋 후 지운다.
+- 운영진(mentor.manage)이 비활성화·재활성화한다. 비활성 멘토는 새 기수 배정을 받지 못한다(A35·A36).
 """
 
 import dataclasses
@@ -75,6 +76,24 @@ class Mentor(AggregateRoot):
         if not set(changes) <= PROFILE_FIELDS:
             raise BusinessRuleViolation("수정할 수 없는 항목입니다.", code="invalid_profile_field")
         return dataclasses.replace(self, **changes)  # type: ignore[arg-type]  # 허용 필드만 통과
+
+    def display_name(self, real_name: str) -> str:
+        """수강생에게 보이는 이름 (표시 이름 선택 반영)."""
+        if self.display_name_preference is DisplayNamePreference.NICKNAME and self.nickname:
+            return self.nickname
+        return real_name
+
+    def deactivate(self) -> None:
+        if not self.is_active:
+            raise BusinessRuleViolation(
+                "이미 비활성화된 멘토입니다.", code="mentor_already_inactive"
+            )
+        self.is_active = False
+
+    def activate(self) -> None:
+        if self.is_active:
+            raise BusinessRuleViolation("이미 활성화된 멘토입니다.", code="mentor_already_active")
+        self.is_active = True
 
     def replace_image(self, key: str | None) -> str | None:
         """사진 키를 바꾸고 이전 키를 돌려준다(커밋 후 객체 삭제용)."""

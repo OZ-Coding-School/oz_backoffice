@@ -1,7 +1,8 @@
 """회원 역할 직접 관리 (decisions A17).
 
 담당자·멘토 배정·수강 등록처럼 원천 테이블과 짝을 이루는 역할은 그 기능에서만 부여·회수한다
-(D4: 담당자 표시와 권한이 어긋나지 않게). 이 서비스는 원천이 따로 없는 역할(SUPER_ADMIN)만 다룬다.
+(D4: 담당자 표시와 권한이 어긋나지 않게). 이 서비스는 원천이 따로 없는 역할
+(SUPER_ADMIN, TEAM_LEAD — A36)만 GLOBAL 범위로 다룬다.
 마지막 최고 관리자는 회수할 수 없다 (관리자가 아무도 없는 상태 방지).
 """
 
@@ -9,7 +10,7 @@ import uuid
 from datetime import datetime
 from typing import Protocol
 
-from app.contexts.access.domain.catalog import ROLES_BY_CODE, SUPER_ADMIN
+from app.contexts.access.domain.catalog import ROLES_BY_CODE, SUPER_ADMIN, TEAM_LEAD
 from app.contexts.access.domain.entities import UserRole
 from app.contexts.access.domain.enums import RoleScopeType
 from app.contexts.access.domain.repositories import UserRoleRepository
@@ -19,7 +20,7 @@ from app.core.clock import Clock
 from app.core.uow import UnitOfWork
 from app.shared.errors import BusinessRuleViolation, ConflictError, NotFoundError
 
-DIRECTLY_MANAGED_ROLES = frozenset({SUPER_ADMIN})
+DIRECTLY_MANAGED_ROLES = frozenset({SUPER_ADMIN, TEAM_LEAD})
 
 
 class UserDirectory(Protocol):

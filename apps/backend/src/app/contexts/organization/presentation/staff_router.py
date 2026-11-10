@@ -1,4 +1,4 @@
-"""과정·기수 담당자 관리 API. 권한: role.assign (전체 범위, SUPER_ADMIN).
+"""과정·기수 담당자 관리 API. 권한: staff.assign (전체 범위, SUPER_ADMIN·TEAM_LEAD, decisions A36).
 
 배정·해제하면 같은 트랜잭션에서 담당에 맞는 역할이 부여·회수된다 (decisions D4).
 """
@@ -29,7 +29,7 @@ from app.contexts.organization.presentation.schemas import (
 
 router = APIRouter(prefix="/admin", tags=["admin-staffs"])
 
-Admin = Annotated[User, Depends(require_permission("role.assign"))]
+Admin = Annotated[User, Depends(require_permission("staff.assign"))]
 ServiceDep = Annotated[StaffAssignmentService, Depends(get_staff_assignment_service)]
 UsersDep = Annotated[UserQueries, Depends(get_user_queries)]
 

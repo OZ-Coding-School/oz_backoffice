@@ -10,10 +10,12 @@ from app.contexts.access.domain.enums import RoleScopeType
 
 PERMISSIONS: dict[str, str] = {
     "org.manage": "부서·직위·직원·과정·HRD·기수 관리",
-    "role.assign": "역할 부여, 담당자 배정, 운영진 가입 승인",
+    "role.assign": "역할 직접 부여, 운영진 가입 승인",
+    "staff.assign": "과정·기수 담당자 배정",
     "user.approve": "가입 승인·반려, 수동 매칭 (매니저·조교는 담당 범위의 수강생만)",
     "roster.sync": "명단 동기화 실행·명단·이력 조회 (매니저·조교는 담당 범위만)",
     "contract.manage": "계약·계약서, 멘토/강사 연결",
+    "mentor.manage": "멘토 목록·프로필 대리 수정·활성화",
     "mentoring.settings.manage": "기수 멘토링 설정, 금지 시간대",
     "mentoring.assignment.manage": "멘토 배정·단가",
     "mentoring.team.manage": "멘토링 팀 구성",
@@ -35,12 +37,15 @@ _ASSISTANT = frozenset(
 )
 _MANAGER = _ASSISTANT | {
     "contract.manage",
+    "mentor.manage",
     "mentoring.settings.manage",
     "mentoring.assignment.manage",
     "mentoring.settlement.close",
 }
+_TEAM_LEAD = _MANAGER | {"staff.assign"}
 
 SUPER_ADMIN = "SUPER_ADMIN"
+TEAM_LEAD = "TEAM_LEAD"
 COHORT_MANAGER = "COHORT_MANAGER"
 COHORT_ASSISTANT = "COHORT_ASSISTANT"
 MENTOR = "MENTOR"
@@ -64,6 +69,13 @@ ROLES: tuple[RoleDefinition, ...] = (
         "최고 관리자",
         "모든 권한 (전체 범위)",
         frozenset(PERMISSIONS),
+        frozenset({RoleScopeType.GLOBAL}),
+    ),
+    RoleDefinition(
+        TEAM_LEAD,
+        "팀리드",
+        "매니저 권한 + 멘토 관리·담당자 배정 (전체 범위, decisions A36)",
+        _TEAM_LEAD,
         frozenset({RoleScopeType.GLOBAL}),
     ),
     RoleDefinition(COHORT_MANAGER, "운영 매니저", "담당 과정·기수의 운영", _MANAGER, _STAFF_SCOPES),

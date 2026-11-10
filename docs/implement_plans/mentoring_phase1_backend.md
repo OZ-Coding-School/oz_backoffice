@@ -63,22 +63,24 @@
 
 ### 2.3 권한표 (M31)
 
-역할 코드: `SUPER_ADMIN`(GLOBAL), `COHORT_MANAGER`(BOOTCAMP / COHORT 범위), `COHORT_ASSISTANT`(BOOTCAMP / COHORT 범위), `MENTOR`, `STUDENT`
+역할 코드: `SUPER_ADMIN`(GLOBAL), `TEAM_LEAD`(GLOBAL, A36), `COHORT_MANAGER`(BOOTCAMP / COHORT 범위), `COHORT_ASSISTANT`(BOOTCAMP / COHORT 범위), `MENTOR`, `STUDENT`
 
-| 권한 코드 | SUPER_ADMIN | 매니저 | 조교 | 비고 |
-| --- | :-: | :-: | :-: | --- |
-| `org.manage` (부서·직위·직원·과정·HRD·기수 관리) | ✅ | | | |
-| `role.assign` (역할 부여, 담당자 배정) | ✅ | | | |
-| `user.approve` (가입 승인·반려, 수동 매칭) | ✅ | ✅ | ✅ | 매니저·조교는 담당 범위의 수강생만. 멘토 승인은 `contract.manage` 권한자 |
-| `roster.sync` (명단 동기화 실행·명단·이력 조회) | ✅ | ✅ | ✅ | 매니저·조교는 **담당 범위의 과정·기수만 동기화**하고 그 명단만 조회한다. 전체 동기화와 기수 매핑 실패 명단(`unmapped`) 조회는 SUPER_ADMIN만 (주기 동기화는 전체) |
-| `contract.manage` (계약·계약서, 멘토/강사 연결) | ✅ | ✅ | | 계약은 기수 범위가 없으므로 매니저 역할이 하나라도 있으면 허용 |
-| `mentoring.settings.manage` (기수 설정, 금지 시간대) | ✅ | ✅ | | |
-| `mentoring.assignment.manage` (멘토 배정·단가) | ✅ | ✅ | | |
-| `mentoring.team.manage` (팀 구성) | ✅ | ✅ | ✅ | 매니저·조교는 담당 범위의 팀만 |
-| `mentoring.balance.grant` (시간 지급·조정) | ✅ | ✅ | ✅ | 매니저·조교는 담당 범위의 수강생 또는 팀만 |
-| `mentoring.request.read` (신청·세션 조회) | ✅ | ✅ | ✅ | |
-| `mentoring.request.cancel` (운영진 취소, 환불 선택) | ✅ | ✅ | ✅ | |
-| `mentoring.settlement.close` (정산 집계·마감·조회) | ✅ | ✅ | | |
+| 권한 코드 | SUPER_ADMIN | 팀리드 | 매니저 | 조교 | 비고 |
+| --- | :-: | :-: | :-: | :-: | --- |
+| `org.manage` (부서·직위·직원·과정·HRD·기수 관리) | ✅ | | | | |
+| `role.assign` (역할 직접 부여, 운영진 가입 승인) | ✅ | | | | 담당자 배정은 `staff.assign`으로 분리(A36) |
+| `staff.assign` (과정·기수 담당자 배정) | ✅ | ✅ | | | A36 |
+| `user.approve` (가입 승인·반려, 수동 매칭) | ✅ | ✅ | ✅ | ✅ | 매니저·조교는 담당 범위의 수강생만. 멘토 승인은 `contract.manage` 권한자 |
+| `roster.sync` (명단 동기화 실행·명단·이력 조회) | ✅ | ✅ | ✅ | ✅ | 매니저·조교는 **담당 범위의 과정·기수만 동기화**하고 그 명단만 조회한다. 전체 동기화와 기수 매핑 실패 명단(`unmapped`) 조회는 전체 범위만 (주기 동기화는 전체) |
+| `contract.manage` (계약·계약서, 멘토/강사 연결) | ✅ | ✅ | ✅ | | 계약은 기수 범위가 없으므로 매니저 역할이 하나라도 있으면 허용 |
+| `mentor.manage` (멘토 목록·프로필 대리 수정·활성화) | ✅ | ✅ | ✅ | | A36. 범위가 하나라도 있으면 허용 |
+| `mentoring.settings.manage` (기수 설정, 금지 시간대) | ✅ | ✅ | ✅ | | |
+| `mentoring.assignment.manage` (멘토 배정·단가) | ✅ | ✅ | ✅ | | |
+| `mentoring.team.manage` (팀 구성) | ✅ | ✅ | ✅ | ✅ | 매니저·조교는 담당 범위의 팀만 |
+| `mentoring.balance.grant` (시간 지급·조정) | ✅ | ✅ | ✅ | ✅ | 매니저·조교는 담당 범위의 수강생 또는 팀만 |
+| `mentoring.request.read` (신청·세션 조회) | ✅ | ✅ | ✅ | ✅ | |
+| `mentoring.request.cancel` (운영진 취소, 환불 선택) | ✅ | ✅ | ✅ | ✅ | |
+| `mentoring.settlement.close` (정산 집계·마감·조회) | ✅ | ✅ | ✅ | | |
 
 - 범위 판정: COHORT 범위 권한은 그 기수에만, BOOTCAMP 범위 권한은 그 과정의 모든 기수에 적용된다. GLOBAL은 전체다.
 - 멘토·수강생 기능은 권한 코드가 아니라 **소유 관계**로 검사한다(본인 신청, 본인 배정 기수, 본인 세션). 서비스 계층에서 확인한다.
@@ -344,15 +346,26 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
   - 발송은 메모리 드라이버로 수집해 검증한다
 
 ### P8. 기수 멘토링 설정·멘토 배정
-- **테이블:** `cohort_mentoring_settings`, `cohort_mentoring_block_times`, `mentoring_holidays`(A34), `cohort_mentors`
-- PR을 둘로 나눈다(사용자 결정). **P8-1 (구현 기록 35):** 설정·금지 시간대·추가 휴일. **P8-2:** 멘토 배정
-- **규칙:**
-  - 배정 기간은 멘토의 ACTIVE 계약 기간 안에 있어야 한다 (M15)
-  - 같은 (멘토, 기수, 유형)의 활성 배정끼리 기간이 겹치면 안 된다 (EXCLUDE, raw SQL)
+- **테이블:** `cohort_mentoring_settings`, `cohort_mentoring_block_times`, `mentoring_holidays`(A34), `cohort_mentors`(A35)
+- PR을 둘로 나눈다(사용자 결정). **P8-1 (구현 기록 35):** 설정·금지 시간대·추가 휴일. **P8-2 (구현 기록 36):** 멘토 배정, 멘토 활성화, `mentor.manage`·`staff.assign` 권한과 TEAM_LEAD 역할(A36)
+- **규칙 (A35):**
+  - ~~배정 기간은 멘토의 ACTIVE 계약 기간 안에 있어야 한다 (M15)~~ → 계약과 배정은 별개(A35)
+  - 활성 배정은 (멘토, 기수, 유형)당 하나 (부분 유니크, raw SQL). 시작일은 기수 기간 안, 종료일은 선택
+  - 매일 00:00 KST 종료일이 지난 배정을 비활성화(EXPIRED). 삭제 = 비활성화(MANUAL)
   - `pay_unit`은 HOURLY / PER_SESSION만 허용한다
+  - 비활성 멘토는 새 배정·재활성화 불가. 멘토 비활성화는 미리보기 후 confirm, 활성 배정을 모두 끈다(MENTOR_DEACTIVATED). 재활성화 응답에 복구 후보, 일괄 재활성화는 가능한 것만(A36)
   - 설정 변경은 진행 중인 신청에 소급하지 않는다
-- **API (`mentoring.settings.manage`, `mentoring.assignment.manage`):** 설정 조회·수정, 금지 시간대 CRUD, 배정 CRUD·비활성화 / 멘토 본인: `GET /api/v1/me/mentor-assignments`
-- **테스트:** EXCLUDE 위반 시 409, 계약 기간 밖 배정 거부.
+- **API:**
+  | 메서드 | 경로 | 설명 |
+  | --- | --- | --- |
+  | GET/POST | `/api/v1/admin/cohorts/{cohort_id}/mentor-assignments` | 기수 배정 목록(페이징 없음, `include_inactive`)·등록. `mentoring.assignment.manage`(기수 범위) |
+  | PATCH/DELETE | `/api/v1/admin/cohorts/{cohort_id}/mentor-assignments/{id}` | 기간·정산 조건 수정 / 비활성화 |
+  | POST | `/api/v1/admin/cohorts/{cohort_id}/mentor-assignments/{id}/reactivate` | 배정 재활성화 |
+  | POST | `/api/v1/admin/mentors/{id}/deactivate` | `mentor.manage`. `confirm=false`면 함께 꺼질 배정 미리보기, `true`면 실행 |
+  | POST | `/api/v1/admin/mentors/{id}/activate` | `mentor.manage`. 응답에 복구 후보 배정 |
+  | POST | `/api/v1/admin/mentors/{id}/mentor-assignments/reactivate` | `mentor.manage`. 고른 배정 일괄 재활성화(가능한 것만) |
+  | GET | `/api/v1/me/mentor-assignments?include_inactive=` | 멘토 본인 배정(정산 조건 포함) |
+- **테스트:** 부분 유니크 위반 409, 시작일 기수 기간 밖 거부, 비활성 멘토 배정 거부, 만료 작업, 멘토 비활성화 미리보기·실행·복구.
 
 ### P9. 멘토 일정
 - **테이블:** `mentor_availabilities`, `mentor_unavailable_periods`
@@ -497,9 +510,9 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
   - [x] P7-3 자동 매칭 (수강생·멘토) (구현 기록 32, A31)
   - [x] P7-4 로그인·잠금·비밀번호 재설정 (구현 기록 33, A32)
   - [x] P7-5 운영진 승인 관리 (구현 기록 34, A33)
-- [ ] P8 기수 멘토링 설정·멘토 배정
+- [x] P8 기수 멘토링 설정·멘토 배정
   - [x] P8-1 기수 멘토링 설정·금지 시간대·추가 휴일 (구현 기록 35, A34·B15)
-  - [ ] P8-2 멘토 배정
+  - [x] P8-2 멘토 배정·멘토 활성화·팀리드 권한 (구현 기록 36, A35·A36)
 - [ ] P9 멘토 일정
 - [ ] P10 팀·시간 계좌
 - [ ] P11 신청·승인·반려·취소

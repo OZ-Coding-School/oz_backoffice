@@ -1,6 +1,6 @@
 """회원 역할 관리 API (/admin/users/{user_id}/roles). 권한: role.assign (전체 범위, SUPER_ADMIN).
 
-직접 부여·회수할 수 있는 역할은 SUPER_ADMIN뿐이다 (decisions A17).
+직접 부여·회수할 수 있는 역할은 SUPER_ADMIN·TEAM_LEAD(GLOBAL)다 (decisions A17·A36).
 매니저·조교 역할은 담당자 API, 멘토·수강생 역할은 배정·가입 기능이 관리한다.
 """
 
@@ -90,7 +90,10 @@ async def grant_user_role(
     service: ServiceDep,
     clock: Annotated[Clock, Depends(get_clock)],
 ) -> UserRoleResponse:
-    """직접 관리 역할(SUPER_ADMIN)을 부여한다. 다른 역할은 422 role_managed_by_assignment."""
+    """직접 관리 역할(SUPER_ADMIN·TEAM_LEAD)을 부여한다.
+
+    다른 역할은 422 role_managed_by_assignment.
+    """
     user_role = await service.grant(
         user_id, body.role, actor_id=admin.id, expires_at=body.expires_at
     )

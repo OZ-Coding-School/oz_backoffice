@@ -4,6 +4,10 @@ import uuid
 from datetime import UTC, date
 from typing import Any
 
+from tortoise.exceptions import IntegrityError
+
+from app.contexts.mentoring.domain.assignment import CohortMentor
+from app.contexts.mentoring.domain.enums import MentoringPeriodType
 from app.contexts.mentoring.domain.settings import (
     CohortMentoringSettings,
     MentoringBlockTime,
@@ -12,9 +16,13 @@ from app.contexts.mentoring.domain.settings import (
 from app.contexts.mentoring.infrastructure.models import (
     CohortMentoringBlockTimeModel,
     CohortMentoringSettingsModel,
+    CohortMentorModel,
     MentoringHolidayModel,
 )
 from app.core.persistence import TortoiseRepository
+from app.shared.errors import ConflictError
+
+ACTIVE_ASSIGNMENT_INDEX = "uid_cohort_mentors_active"
 
 
 class TortoiseCohortMentoringSettingsRepository(
@@ -88,4 +96,83 @@ class TortoiseMentoringHolidayRepository(
         rows = await MentoringHolidayModel.filter(
             holiday_date__gte=start, holiday_date__lte=end
         ).order_by("holiday_date")
+        return [self.to_entity(row) for row in rows]
+
+
+class TortoiseCohortMentorRepository(TortoiseRepository[CohortMentor, CohortMentorModel]):
+    model = CohortMentorModel
+    entity = CohortMentor
+    fields = (
+        "cohort_id",
+        "mentor_id",
+        "period_type",
+        "start_date",
+        "end_date",
+        "cost_settlement_policy",
+        "pay_unit",
+        "pay_rate",
+        "no_show_pay_amount",
+        "is_active",
+        "deactivated_at",
+        "deactivation_reason",
+    )
+
+    def to_entity(self, row: CohortMentorModel) -> CohortMentor:
+        entity = super().to_entity(row)
+        entity.created_at = row.created_at
+        entity.updated_at = row.updated_at
+        return entity
+
+    async def add(self, entity: CohortMentor) -> None:
+        await self._guard(super().add(entity))
+
+    async def save(self, entity: CohortMentor) -> None:
+        await self._guard(super().save(entity))
+
+    @staticmethod
+    async def _guard(operation: Any) -> None:
+        """동시 요청이 서비스 검사를 지나도 부분 유니크가 막는다 → 409."""
+        try:
+            await operation
+        except IntegrityError as exc:
+            if ACTIVE_ASSIGNMENT_INDEX not in str(exc):
+                raise
+            raise ConflictError(
+                "이 기수에 같은 유형으로 활성 배정된 멘토입니다.", code="assignment_already_exists"
+            ) from exc
+
+    async def list_by_ids(self, assignment_ids: list[uuid.UUID]) -> list[CohortMentor]:
+        if not assignment_ids:
+            return []
+        rows = await CohortMentorModel.filter(id__in=assignment_ids)
+        return [self.to_entity(row) for row in rows]
+
+    async def find_active(
+        self, mentor_id: uuid.UUID, cohort_id: uuid.UUID, period_type: MentoringPeriodType
+    ) -> CohortMentor | None:
+        row = await CohortMentorModel.get_or_none(
+            mentor_id=mentor_id, cohort_id=cohort_id, period_type=period_type, is_active=True
+        )
+        return self.to_entity(row) if row else None
+
+    async def list_by_cohort(
+        self, cohort_id: uuid.UUID, *, include_inactive: bool
+    ) -> list[CohortMentor]:
+        query = CohortMentorModel.filter(cohort_id=cohort_id)
+        if not include_inactive:
+            query = query.filter(is_active=True)
+        rows = await query.order_by("-is_active", "start_date", "id")
+        return [self.to_entity(row) for row in rows]
+
+    async def list_by_mentor(
+        self, mentor_id: uuid.UUID, *, include_inactive: bool
+    ) -> list[CohortMentor]:
+        query = CohortMentorModel.filter(mentor_id=mentor_id)
+        if not include_inactive:
+            query = query.filter(is_active=True)
+        rows = await query.order_by("-is_active", "-start_date", "id")
+        return [self.to_entity(row) for row in rows]
+
+    async def list_expired(self, today: date) -> list[CohortMentor]:
+        rows = await CohortMentorModel.filter(is_active=True, end_date__lt=today).order_by("id")
         return [self.to_entity(row) for row in rows]

@@ -2,7 +2,8 @@
 
 - 멘토 본인(승인된 회원 + 멘토 프로필): GET/PATCH `/me/mentor-profile`,
   사진 업로드 요청·확정, 사진 삭제
-- 운영진(contract.manage): GET `/admin/mentors`(목록·검색), GET/PATCH `/admin/mentors/{id}/profile`,
+- 운영진(mentor.manage, decisions A36): GET `/admin/mentors`(목록·검색),
+  GET/PATCH `/admin/mentors/{id}/profile`,
   사진 대리 업로드·삭제
 사진은 브라우저가 최적화해 올린다. 서버는 PNG·JPEG·WebP 2MB 이하인지와 형식만 검사한다.
 """
@@ -41,7 +42,7 @@ from app.integrations.s3 import S3Storage
 me_router = APIRouter(prefix="/me/mentor-profile", tags=["mentor-profile"])
 admin_router = APIRouter(prefix="/admin/mentors", tags=["admin-mentors"])
 
-Manager = Annotated[User, Depends(require_permission("contract.manage", any_scope=True))]
+Manager = Annotated[User, Depends(require_permission("mentor.manage", any_scope=True))]
 
 
 def get_mentor_profile_service(
@@ -110,9 +111,7 @@ class MentorListItem(BaseModel):
 
 
 def display_name(mentor: Mentor, real_name: str) -> str:
-    if mentor.display_name_preference is DisplayNamePreference.NICKNAME and mentor.nickname:
-        return mentor.nickname
-    return real_name
+    return mentor.display_name(real_name)
 
 
 async def _profile(

@@ -558,30 +558,35 @@ Table mentoring_holidays {
 }
 
 Table cohort_mentors {
-  note: "멘토가 멘토링을 진행해야하는 기수 관리 테이블. 배정/활성화 조건: 배정 기간이 해당 멘토의 ACTIVE 계약(educator_contracts) 기간 안에 있어야 함 (앱 레벨 검증)"
+  note: "기수에 멘토를 배정한 내용 (decisions A35). 계약과 별개로 운영진이 관리한다. 활성 배정은 (멘토, 기수, 유형)당 하나. 시작일은 기수 기간 안, 종료일은 없어도 됨. 매일 00:00 KST 종료일이 지난 배정을 비활성화한다. 삭제는 비활성화"
 
   id uuid [pk, note: "default=uuid7 사용"]
   cohort_id uuid [not null, ref: > cohorts.id]
   mentor_id uuid [not null, ref: > mentors.id]
   period_type MentoringPeriodType [not null, note: "멘토링 진행 유형 (평시, 프로젝트)"]
-  start_date date [not null, note: "멘토링 시작일"]
-  end_date date [not null, note: "멘토링 종료일"]
+  start_date date [not null, note: "멘토링 시작일 (기수 기간 안)"]
+  end_date date [null, note: "멘토링 종료일 (없으면 기한 없음, 기수 기간 밖도 가능)"]
   cost_settlement_policy MentoringSettlementPolicy [not null, note: "멘토링 비용 정산 기준"]
   pay_unit PayUnit [not null, note: "단가 기준 (HOURLY / PER_SESSION만, 정산 시 명세에 스냅샷)"]
   pay_rate integer [not null, note: "단가 (원)"]
   no_show_pay_amount integer [not null, default: 0, note: "노쇼 세션 1건당 정산 고정 금액 (원)"]
   is_active bool [not null, default: true, note: "해당 기수 진행 권한 활성화 여부, 기록 보존용"]
+  deactivated_at timestamptz [null, note: "비활성화 시각"]
+  deactivation_reason CohortMentorDeactivationReason [null, note: "비활성 사유 (만료/수동/멘토 비활성화)"]
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
 
   Indexes {
-    (mentor_id, cohort_id, period_type) [note: "기간 겹침 방지: EXCLUDE USING gist (mentor_id WITH =, cohort_id WITH =, period_type WITH =, daterange(start_date, end_date, '[]') WITH &&) WHERE (is_active) — raw SQL"]
+    (mentor_id, cohort_id, period_type) [note: "활성 배정은 하나: UNIQUE WHERE is_active — raw SQL 부분 유니크"]
     (cohort_id, is_active)
+    (is_active, end_date) [note: "매일 만료 대상 조회"]
+    (mentor_id, is_active) [note: "멘토별 배정 조회·멘토 비활성화"]
   }
   checks {
-    `start_date <= end_date` [name: "check_cohort_mentor_period"]
+    `end_date IS NULL OR start_date <= end_date` [name: "check_cohort_mentor_period"]
     `pay_rate >= 0 AND no_show_pay_amount >= 0` [name: "check_cohort_mentor_pay_rate"]
     `pay_unit IN ('HOURLY', 'PER_SESSION')` [name: "check_cohort_mentor_pay_unit"]
+    `is_active = (deactivated_at IS NULL) AND is_active = (deactivation_reason IS NULL)` [name: "check_cohort_mentor_deactivation"]
   }
 }
 
@@ -1018,6 +1023,12 @@ Enum RoleScopeType {
 Enum StaffRole {
   MANAGER [note: "운영 매니저"]
   ASSISTANT [note: "조교"]
+}
+
+Enum CohortMentorDeactivationReason {
+  EXPIRED [note: "종료일 경과 (매일 작업)"]
+  MANUAL [note: "운영진 비활성화(삭제)"]
+  MENTOR_DEACTIVATED [note: "멘토 비활성화로 함께 비활성화"]
 }
 
 Enum PayUnit {

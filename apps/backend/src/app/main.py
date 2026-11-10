@@ -21,6 +21,7 @@ from app.contexts.access.infrastructure.repositories import TortoiseUserRoleRepo
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.audit.infrastructure.repositories import TortoiseAuditLogRepository
 from app.contexts.educator.application.mentor_onboarding import MentorOnboarding
+from app.contexts.educator.application.mentor_queries import MentorQueries
 from app.contexts.educator.infrastructure.repositories import (
     TortoiseEducatorContractRepository,
     TortoiseMentorRepository,
@@ -97,6 +98,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.academy_catalog = AcademyCatalog(
         TortoiseBootcampRepository(), TortoiseCohortRepository()
     )
+    # 기수 멘토 배정·멘토 활성화(A35·A36): 멘토링이 educator 멘토를 조회·잠금·활성 변경한다
+    app.state.mentor_queries = MentorQueries(TortoiseMentorRepository())
 
     app.add_middleware(
         CORSMiddleware,

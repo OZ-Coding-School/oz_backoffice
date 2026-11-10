@@ -134,6 +134,16 @@ class TortoiseMentorRepository(TortoiseRepository[Mentor, MentorModel]):
         row = await MentorModel.get_or_none(user_id=user_id)
         return self.to_entity(row) if row else None
 
+    async def get_many(self, mentor_ids: list[uuid.UUID]) -> dict[uuid.UUID, Mentor]:
+        if not mentor_ids:
+            return {}
+        rows = await MentorModel.filter(id__in=mentor_ids)
+        return {row.id: self.to_entity(row) for row in rows}
+
+    async def lock(self, mentor_id: uuid.UUID) -> Mentor | None:
+        row = await MentorModel.select_for_update().get_or_none(id=mentor_id)
+        return self.to_entity(row) if row else None
+
     async def list_page(
         self, *, query: str | None, is_active: bool | None, limit: int, offset: int
     ) -> tuple[list[Mentor], int]:
