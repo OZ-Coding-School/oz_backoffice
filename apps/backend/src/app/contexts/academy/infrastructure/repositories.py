@@ -140,6 +140,12 @@ class TortoiseCohortRepository(TortoiseRepository[Cohort, CohortModel]):
         )
         return [self.to_entity(row) for row in rows]
 
+    async def list_by_ids(self, cohort_ids: Collection[uuid.UUID]) -> list[Cohort]:
+        if not cohort_ids:
+            return []
+        rows = await CohortModel.filter(id__in=list(cohort_ids))
+        return [self.to_entity(row) for row in rows]
+
 
 class TortoiseStudentRepository(TortoiseRepository[Student, StudentModel]):
     model = StudentModel

@@ -85,6 +85,12 @@ class InMemoryMentorRepository:
         found = next((m for m in self.items.values() if m.user_id == user_id), None)
         return dataclasses.replace(found) if found else None
 
+    async def get_many(self, mentor_ids: list[uuid.UUID]) -> dict[uuid.UUID, Mentor]:
+        return {i: dataclasses.replace(self.items[i]) for i in mentor_ids if i in self.items}
+
+    async def lock(self, mentor_id: uuid.UUID) -> Mentor | None:
+        return await self.get(mentor_id)
+
     async def save(self, mentor: Mentor) -> None:
         self.items[mentor.id] = dataclasses.replace(mentor)
 

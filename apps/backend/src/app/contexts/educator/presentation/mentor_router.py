@@ -111,9 +111,7 @@ class MentorListItem(BaseModel):
 
 
 def display_name(mentor: Mentor, real_name: str) -> str:
-    if mentor.display_name_preference is DisplayNamePreference.NICKNAME and mentor.nickname:
-        return mentor.nickname
-    return real_name
+    return mentor.display_name(real_name)
 
 
 async def _profile(

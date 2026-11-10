@@ -4,6 +4,8 @@ import uuid
 from datetime import UTC, date
 from typing import Any
 
+from tortoise.exceptions import IntegrityError
+
 from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.enums import MentoringPeriodType
 from app.contexts.mentoring.domain.settings import (
@@ -18,6 +20,9 @@ from app.contexts.mentoring.infrastructure.models import (
     MentoringHolidayModel,
 )
 from app.core.persistence import TortoiseRepository
+from app.shared.errors import ConflictError
+
+ACTIVE_ASSIGNMENT_INDEX = "uid_cohort_mentors_active"
 
 
 class TortoiseCohortMentoringSettingsRepository(
@@ -117,6 +122,24 @@ class TortoiseCohortMentorRepository(TortoiseRepository[CohortMentor, CohortMent
         entity.created_at = row.created_at
         entity.updated_at = row.updated_at
         return entity
+
+    async def add(self, entity: CohortMentor) -> None:
+        await self._guard(super().add(entity))
+
+    async def save(self, entity: CohortMentor) -> None:
+        await self._guard(super().save(entity))
+
+    @staticmethod
+    async def _guard(operation: Any) -> None:
+        """동시 요청이 서비스 검사를 지나도 부분 유니크가 막는다 → 409."""
+        try:
+            await operation
+        except IntegrityError as exc:
+            if ACTIVE_ASSIGNMENT_INDEX not in str(exc):
+                raise
+            raise ConflictError(
+                "이 기수에 같은 유형으로 활성 배정된 멘토입니다.", code="assignment_already_exists"
+            ) from exc
 
     async def list_by_ids(self, assignment_ids: list[uuid.UUID]) -> list[CohortMentor]:
         if not assignment_ids:

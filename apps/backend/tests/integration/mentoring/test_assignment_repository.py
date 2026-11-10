@@ -15,6 +15,7 @@ from app.contexts.mentoring.domain.enums import (
 )
 from app.contexts.mentoring.infrastructure.models import CohortMentorModel
 from app.contexts.mentoring.infrastructure.repositories import TortoiseCohortMentorRepository
+from app.shared.errors import ConflictError
 from tests.factories.academy import create_cohort
 from tests.factories.educator import create_mentor
 
@@ -47,8 +48,9 @@ async def test_one_active_assignment_per_mentor_cohort_type() -> None:
     first = await _assignment()
     keys = {"cohort_id": first.cohort_id, "mentor_id": first.mentor_id}
     await _assignment(**keys, period_type=MentoringPeriodType.PROJECT_MENTORING)  # 다른 유형
-    with pytest.raises(IntegrityError):
+    with pytest.raises(ConflictError) as dup:  # 부분 유니크 위반은 409로 바꾼다
         await _assignment(**keys)
+    assert dup.value.code == "assignment_already_exists"
 
     first.deactivate(CohortMentorDeactivationReason.MANUAL, now=NOW)
     await repo.save(first)

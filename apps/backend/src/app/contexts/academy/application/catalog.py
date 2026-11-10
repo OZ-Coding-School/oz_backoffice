@@ -7,6 +7,7 @@
 
 import uuid
 from collections.abc import Iterable
+from dataclasses import dataclass
 
 from app.contexts.academy.domain.entities import Bootcamp, Cohort
 from app.contexts.academy.domain.enums import CohortStatus
@@ -14,6 +15,15 @@ from app.contexts.academy.domain.repositories import BootcampRepository, CohortR
 from app.shared.errors import BusinessRuleViolation
 
 STAFFABLE_COHORT_STATUSES = (CohortStatus.PLANNED, CohortStatus.ONGOING)
+
+
+@dataclass(frozen=True, slots=True)
+class CohortLabel:
+    """화면 표시용 기수 이름 (과정명 + 기수 번호)."""
+
+    cohort_id: uuid.UUID
+    bootcamp_name: str
+    cohort_number: int
 
 
 class AcademyCatalog:
@@ -25,6 +35,18 @@ class AcademyCatalog:
         """기수가 속한 과정 (권한 범위 판정용). 없는 기수면 None."""
         cohort = await self._cohorts.get(cohort_id)
         return cohort.bootcamp_id if cohort else None
+
+    async def get_cohort(self, cohort_id: uuid.UUID) -> Cohort | None:
+        return await self._cohorts.get(cohort_id)
+
+    async def cohort_labels(self, cohort_ids: Iterable[uuid.UUID]) -> dict[uuid.UUID, CohortLabel]:
+        cohorts = await self._cohorts.list_by_ids(set(cohort_ids))
+        if not cohorts:
+            return {}
+        names = {bootcamp.id: bootcamp.name for bootcamp in await self._bootcamps.list_all()}
+        return {
+            c.id: CohortLabel(c.id, names.get(c.bootcamp_id, ""), c.cohort_number) for c in cohorts
+        }
 
     async def staffable_bootcamps(self) -> list[Bootcamp]:
         return await self._bootcamps.list_active()
