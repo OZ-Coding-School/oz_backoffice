@@ -1,6 +1,6 @@
 # 34. P7-5 수강생·멘토 가입 승인 관리와 재신청
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-10 병합)
 - 관련 PR: #38
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P7 (P7-5)
 - 이전 기록: [33. P7-4 로그인·잠금·비밀번호 재설정](33_p7_4_password_login_reset.md)
@@ -58,6 +58,7 @@ P7의 마지막 PR이다. 자동 매칭(P7-3)에서 승인되지 않은 수강�
   - 반려(사유 이스케이프 메일) → 내 신청 조회 → 재신청 PENDING·NO_MATCH → 반려 아닌 상태 재신청 거부
   - 권한 401·403
 - 커밋 4개를 worktree에서 하나씩 검사했다(ruff, ruff format, mypy, mypy tests, lint-imports, pytest). 모두 통과했고 최종 531 passed다.
+- GitHub Actions (PR #38, run 42730086702): backend 잡 통과, 531 passed
 
 ## 남은 작업
 - P8 기수 멘토링 설정·멘토 배정(MENTOR 역할 부여, 멘토 활성 여부)
