@@ -84,13 +84,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.roster_sync_dispatcher = TaskiqRosterSyncDispatcher()
     app.state.employee_queries = EmployeeQueries(TortoiseEmployeeRepository())
     app.state.mail_dispatcher = TaskiqMailDispatcher()
-    # 가입 자동 매칭 (A31): academy·educator·access 공개 서비스를 가입 트랜잭션 안에서 쓴다
+    # 가입 자동 매칭(A31)·승인(A33): academy·educator·access 공개 서비스를 가입 트랜잭션 안에서 쓴다
+    app.state.student_claims = StudentClaims(TortoiseStudentRepository())
+    app.state.mentor_onboarding = MentorOnboarding(
+        contracts=TortoiseEducatorContractRepository(), mentors=TortoiseMentorRepository()
+    )
     app.state.signup_matcher = SignupMatcher(
-        students=StudentClaims(TortoiseStudentRepository()),
-        mentors=MentorOnboarding(
-            contracts=TortoiseEducatorContractRepository(), mentors=TortoiseMentorRepository()
-        ),
-        roles=RoleAssignmentService(TortoiseUserRoleRepository()),
+        students=app.state.student_claims,
+        mentors=app.state.mentor_onboarding,
+        roles=app.state.role_assignments,
     )
     app.state.academy_catalog = AcademyCatalog(
         TortoiseBootcampRepository(), TortoiseCohortRepository()
