@@ -19,15 +19,19 @@ from app.contexts.mentoring.domain.settings import (
     MentoringHoliday,
     OperatingHours,
 )
+from app.contexts.mentoring.domain.team import MentoringTeam
 from app.contexts.mentoring.infrastructure.models import (
     CohortMentoringBlockTimeModel,
     CohortMentoringSettingsModel,
     CohortMentorModel,
     MentoringHolidayModel,
+    MentoringTeamMemberModel,
+    MentoringTeamModel,
     MentorUnavailablePeriodModel,
 )
 from app.core.persistence import TortoiseRepository
 from app.shared.errors import ConflictError
+from app.shared.ids import new_id
 
 ACTIVE_ASSIGNMENT_INDEX = "uid_cohort_mentors_active"
 
@@ -65,6 +69,12 @@ class TortoiseCohortMentoringSettingsRepository(
 
     async def get_by_cohort(self, cohort_id: uuid.UUID) -> CohortMentoringSettings | None:
         row = await CohortMentoringSettingsModel.get_or_none(cohort_id=cohort_id)
+        return self.to_entity(row) if row else None
+
+    async def lock_by_cohort(self, cohort_id: uuid.UUID) -> CohortMentoringSettings | None:
+        row = await CohortMentoringSettingsModel.select_for_update().get_or_none(
+            cohort_id=cohort_id
+        )
         return self.to_entity(row) if row else None
 
 
@@ -227,3 +237,137 @@ class TortoiseMentorUnavailablePeriodRepository(
             "starts_at", "id"
         )
         return [self.to_entity(row) for row in rows]
+
+
+class TortoiseMentoringTeamRepository:
+    """팀과 팀원을 함께 다룬다 (팀원은 루트와 함께 저장)."""
+
+    async def add(self, team: MentoringTeam) -> None:
+        await MentoringTeamModel.create(
+            id=team.id,
+            cohort_id=team.cohort_id,
+            mentor_id=team.mentor_id,
+            team_number=team.team_number,
+            period_type=team.period_type,
+            name=team.name,
+        )
+        await self._insert_members(team, team.member_ids)
+
+    async def save(self, team: MentoringTeam) -> None:
+        await MentoringTeamModel.filter(id=team.id).update(mentor_id=team.mentor_id, name=team.name)
+        row = await MentoringTeamModel.get(id=team.id)
+        await row.save(update_fields=["updated_at"])  # auto_now 갱신
+        current = set(
+            await MentoringTeamMemberModel.filter(team_id=team.id).values_list(
+                "student_id", flat=True
+            )
+        )
+        wanted = set(team.member_ids)
+        if removed := current - wanted:
+            await MentoringTeamMemberModel.filter(
+                team_id=team.id, student_id__in=list(removed)
+            ).delete()
+        await self._insert_members(team, [s for s in team.member_ids if s not in current])
+
+    async def get(self, team_id: uuid.UUID) -> MentoringTeam | None:
+        row = await MentoringTeamModel.get_or_none(id=team_id)
+        if row is None:
+            return None
+        return (await self._with_members([row]))[0]
+
+    async def delete(self, team_id: uuid.UUID) -> None:
+        try:
+            await MentoringTeamModel.filter(id=team_id).delete()
+        except IntegrityError as exc:
+            raise ConflictError(
+                "시간 계좌나 신청이 있는 팀은 삭제할 수 없습니다.", code="team_in_use"
+            ) from exc
+
+    async def list_by_cohort(
+        self, cohort_id: uuid.UUID, period_type: MentoringPeriodType | None
+    ) -> list[MentoringTeam]:
+        query = MentoringTeamModel.filter(cohort_id=cohort_id)
+        if period_type is not None:
+            query = query.filter(period_type=period_type)
+        return await self._with_members(await query.order_by("period_type", "team_number"))
+
+    async def next_number(self, cohort_id: uuid.UUID, period_type: MentoringPeriodType) -> int:
+        top = (
+            await MentoringTeamModel.filter(cohort_id=cohort_id, period_type=period_type)
+            .order_by("-team_number")
+            .first()
+        )
+        return top.team_number + 1 if top else 1
+
+    async def team_of_students(
+        self, student_ids: list[uuid.UUID], period_type: MentoringPeriodType
+    ) -> dict[uuid.UUID, uuid.UUID]:
+        if not student_ids:
+            return {}
+        rows = await MentoringTeamMemberModel.filter(
+            student_id__in=student_ids, period_type=period_type
+        ).values_list("student_id", "team_id")
+        return {student_id: team_id for student_id, team_id in rows}
+
+    async def list_by_students(self, student_ids: list[uuid.UUID]) -> list[MentoringTeam]:
+        if not student_ids:
+            return []
+        team_ids = await MentoringTeamMemberModel.filter(student_id__in=student_ids).values_list(
+            "team_id", flat=True
+        )
+        rows = await MentoringTeamModel.filter(id__in=list(set(team_ids))).order_by(
+            "period_type", "team_number"
+        )
+        return await self._with_members(rows)
+
+    async def list_by_mentor(self, mentor_id: uuid.UUID) -> list[MentoringTeam]:
+        rows = await MentoringTeamModel.filter(mentor_id=mentor_id).order_by(
+            "cohort_id", "period_type", "team_number"
+        )
+        return await self._with_members(rows)
+
+    @staticmethod
+    async def _insert_members(team: MentoringTeam, student_ids: list[uuid.UUID]) -> None:
+        if not student_ids:
+            return
+        try:
+            await MentoringTeamMemberModel.bulk_create(
+                [
+                    MentoringTeamMemberModel(
+                        id=new_id(),
+                        team_id=team.id,
+                        student_id=student_id,
+                        period_type=team.period_type,
+                    )
+                    for student_id in student_ids
+                ]
+            )
+        except IntegrityError as exc:
+            raise ConflictError(
+                "이미 같은 유형의 다른 팀에 속한 수강생이 있습니다.", code="student_in_other_team"
+            ) from exc
+
+    @staticmethod
+    async def _with_members(rows: list[MentoringTeamModel]) -> list[MentoringTeam]:
+        members: dict[uuid.UUID, list[uuid.UUID]] = {row.id: [] for row in rows}
+        if rows:
+            for team_id, student_id in (
+                await MentoringTeamMemberModel.filter(team_id__in=list(members))
+                .order_by("created_at", "id")
+                .values_list("team_id", "student_id")
+            ):
+                members[team_id].append(student_id)
+        return [
+            MentoringTeam(
+                id=row.id,
+                cohort_id=row.cohort_id,  # type: ignore[attr-defined]  # FK 컬럼 속성
+                mentor_id=row.mentor_id,  # type: ignore[attr-defined]
+                period_type=row.period_type,
+                team_number=row.team_number,
+                name=row.name,
+                member_ids=members[row.id],
+                created_at=row.created_at,
+                updated_at=row.updated_at,
+            )
+            for row in rows
+        ]

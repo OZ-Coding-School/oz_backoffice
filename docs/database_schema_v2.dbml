@@ -685,7 +685,7 @@ Table mentoring_balance_transactions {
 }
 
 Table mentoring_teams {
-  note: "멘토링 팀 구성 관리 테이블"
+  note: "멘토링 팀 (decisions M11·A39). 팀 멘토링을 허용한 기수에서만 만든다. 담당 멘토는 언제든 바꿀 수 있다. 계좌·신청이 참조하면 삭제 불가(RESTRICT)"
 
   id uuid [pk, note: "default=uuid7 사용"]
   cohort_id uuid [not null, ref: > cohorts.id]
@@ -701,10 +701,13 @@ Table mentoring_teams {
     (id, period_type) [unique, note: "team_members 복합 FK 대상"]
     mentor_id
   }
+  checks {
+    `team_number > 0` [name: "check_team_number"]
+  }
 }
 
 Table mentoring_team_members {
-  note: "멘토링 팀 멤버 구성 관리 테이블"
+  note: "멘토링 팀원 (A39). 그 기수 수강 중인 수강생(가입 여부 무관). 팀을 지우면 함께 지운다(복합 FK ON DELETE CASCADE). 수강 종료 시 명단 동기화 후 작업이 뺀다(P10-2)"
 
   id uuid [pk, note: "default=uuid7 사용"]
   student_id uuid [not null, ref: > students.id]
@@ -715,6 +718,7 @@ Table mentoring_team_members {
   indexes {
     (team_id, student_id) [unique]
     (student_id, period_type) [unique, note: "수강생은 유형별로 한 팀에만 소속"]
+    team_id
   }
 }
 

@@ -29,6 +29,8 @@ from app.contexts.mentoring.presentation.schedule_router import (
     me_router as mentor_schedule_me_router,
 )
 from app.contexts.mentoring.presentation.settings_router import router as mentoring_settings_router
+from app.contexts.mentoring.presentation.team_router import admin_router as team_admin_router
+from app.contexts.mentoring.presentation.team_router import me_router as team_me_router
 from app.contexts.organization.presentation.admin_router import (
     router as staff_registration_admin_router,
 )
@@ -59,3 +61,5 @@ router.include_router(mentor_assignment_me_router)
 router.include_router(mentor_schedule_me_router)
 router.include_router(mentor_schedule_admin_router)
 router.include_router(mentor_available_times_router)
+router.include_router(team_admin_router)
+router.include_router(team_me_router)
