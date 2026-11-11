@@ -1,7 +1,7 @@
 # 39. P10-1 멘토링 팀 구성
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #44
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P10 (P10-1)
 - 이전 기록: [38. P9-2 신청 가능 시간 계산·조회](38_p9_2_available_times.md)
 
