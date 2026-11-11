@@ -28,6 +28,8 @@ Git 브랜치·커밋·PR·구현 기록 규칙은 README를 따른다.
 | `docs/database_schema_v2_mentoring_review.md` | 멘토링 스키마 리뷰와 결정 과정 | 결정 결과는 `decisions.md`에 정리 |
 | `docs/database_schema.dbml`, `docs/database_schema_review.md` | 사용자가 작성한 최초 스키마 초안과 그 리뷰 | 이력 보존용. 작업 기준 아님 |
 | `docs/implement_descriptions/` | 구현 기록 | 작업 완료 시 README 규칙대로 추가 |
+| `docs/operations/external_setup.md` | 외부 준비물(Google 위임·Pub/Sub, SMS, OAuth, Airtable) 설정 방법과 상태 | |
+| `docs/operations/production_notes.md` | 운영 배포 설정 참고사항(환경 변수, 실행 구성, S3, 첫 배포 순서, 정기 작업) | 운영 설정은 나중에 한 번에 한다. 운영 관련 사항이 생기면 여기에 추가 |
 
 ## 작업 방식 (사용자 선호)
 

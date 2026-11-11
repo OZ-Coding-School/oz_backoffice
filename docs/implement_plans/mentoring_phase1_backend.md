@@ -453,11 +453,13 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
 
 ## 5. 선행 준비물 체크리스트 (외부)
 
+설정 방법은 `docs/operations/external_setup.md`, 운영 배포 설정은 `docs/operations/production_notes.md`에 정리했다.
+
 | 준비물 | 필요한 PR | 담당 | 상태 |
 | --- | --- | --- | --- |
 | Airtable PAT·베이스·테이블 ID, 필드 구조 | P5 | 사용자 | 확인 완료 (2026-11-09) |
 | **SMS 발송 업체 결정**, 발신번호 등록 | P7 | 사용자 | 미정 |
-| Gmail 발송 계정, 서비스 계정 DWD `gmail.send` | P7 | Workspace 관리자 | 미확인 |
+| Gmail 발송 계정, 서비스 계정 DWD `gmail.send` | P7 | Workspace 관리자 | 진행 중 (키 유효, 위임 `unauthorized_client`) |
 | 서비스 계정 DWD Meet·Drive 범위 | P12, P13 | Workspace 관리자 | 미확인 |
 | GCP 프로젝트, Pub/Sub 토픽·pull 구독, Workspace Events 발행 권한 | P12 | 사용자 | 미확인 |
 | AWS S3 운영 버킷, IAM 역할, 수명 주기 규칙(미확정 업로드 정리) | P6 (운영 배포 시) | 사용자 | 미확인 |
