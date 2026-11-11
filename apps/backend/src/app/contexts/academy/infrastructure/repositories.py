@@ -189,6 +189,11 @@ class TortoiseStudentRepository(TortoiseRepository[Student, StudentModel]):
         rows = await StudentModel.filter(cohort_id__in=cohort_ids, airtable_record_id__isnull=False)
         return [self.to_entity(row) for row in rows]
 
+    async def list_by_ids(self, student_ids: list[uuid.UUID]) -> list[Student]:
+        if not student_ids:
+            return []
+        return [self.to_entity(row) for row in await StudentModel.filter(id__in=student_ids)]
+
     async def list_by_cohort(
         self, cohort_id: uuid.UUID, *, claimed: bool | None, include_removed: bool
     ) -> list[Student]:

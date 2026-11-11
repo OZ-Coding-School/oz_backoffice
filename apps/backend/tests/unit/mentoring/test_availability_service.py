@@ -28,6 +28,7 @@ from tests.fakes.educator import InMemoryMentorRepository
 from tests.fakes.mentoring import (
     InMemoryBlockTimeRepository,
     InMemoryCohortMentorRepository,
+    InMemorySettingsRepository,
     InMemoryUnavailablePeriodRepository,
 )
 
@@ -35,20 +36,6 @@ pytestmark = pytest.mark.unit
 
 NOW = datetime(2026, 11, 11, 0, 0, tzinfo=UTC)  # 2026-11-11(수) 09:00 KST
 MON = date(2026, 11, 16)
-
-
-class Settings:
-    def __init__(self, *items: CohortMentoringSettings) -> None:
-        self.items = {s.cohort_id: s for s in items}
-
-    async def get_by_cohort(self, cohort_id: uuid.UUID) -> CohortMentoringSettings | None:
-        return self.items.get(cohort_id)
-
-    async def add(self, settings: CohortMentoringSettings) -> None:
-        self.items[settings.cohort_id] = settings
-
-    async def save(self, settings: CohortMentoringSettings) -> None:
-        self.items[settings.cohort_id] = settings
 
 
 class Holidays:
@@ -88,7 +75,7 @@ class Harness:
                 pay_rate=30000,
             )
         )
-        self.settings = Settings(
+        self.settings = InMemorySettingsRepository(
             CohortMentoringSettings(cohort_id=self.cohort_id, allow_1_on_1=True)
         )
         self.enrollments = Enrollments()

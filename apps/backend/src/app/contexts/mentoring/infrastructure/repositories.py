@@ -71,6 +71,12 @@ class TortoiseCohortMentoringSettingsRepository(
         row = await CohortMentoringSettingsModel.get_or_none(cohort_id=cohort_id)
         return self.to_entity(row) if row else None
 
+    async def lock_by_cohort(self, cohort_id: uuid.UUID) -> CohortMentoringSettings | None:
+        row = await CohortMentoringSettingsModel.select_for_update().get_or_none(
+            cohort_id=cohort_id
+        )
+        return self.to_entity(row) if row else None
+
 
 def _hours(open_minute: int | None, close_minute: int | None) -> OperatingHours | None:
     if open_minute is None or close_minute is None:
