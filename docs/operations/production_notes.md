@@ -119,7 +119,8 @@ app.workers.tasks.mentoring       # 기수 멘토 배정 만료 (매일 00:00 KS
 
 ## 4. 데이터베이스와 첫 배포 순서
 
-1. 운영 DB를 만들고 `DATABASE_URL`을 넣는다. 로컬 개발용 `infra/postgres/init` SQL은 운영에 쓰지 않는다(필요한 확장 등이 있는지는 배포 때 그 파일을 확인한다).
+1. 운영 DB를 만들고 `DATABASE_URL`을 넣는다. 로컬 개발용 `infra/postgres/init` SQL(테스트 DB 생성 등)은 운영에 쓰지 않는다.
+   - **`btree_gist` 확장을 먼저 만든다**: `CREATE EXTENSION IF NOT EXISTS btree_gist;` (마이그레이션의 EXCLUDE 제약 — 금지 시간대·가능 시간 겹침, 이후 세션 겹침 — 에 필요. 로컬은 init SQL이 만든다). RDS는 마스터 사용자로 실행할 수 있다.
 2. 마이그레이션: `aerich upgrade` (api 이미지로 일회성 실행). 이후 배포마다 api를 띄우기 전에 실행한다.
 3. 역할·권한 시드: `python -m app.cli seed-roles` (멱등). **역할·권한 정의가 바뀐 배포마다** 실행한다. 판정은 코드 기준이라 시드 전에도 동작하지만 DB 사본을 맞춘다(A16). 예: P8-2에서 TEAM_LEAD·`mentor.manage`·`staff.assign` 추가.
 4. 최고 관리자: `python -m app.cli create-super-admin <회사 이메일> [--name 이름]` (멱등, A14).
