@@ -30,6 +30,7 @@ class MentorModel(models.Model):
     expertise = fields.CharField(max_length=200, null=True)
     profile_image_key = fields.CharField(max_length=1024, null=True)
     is_active = fields.BooleanField(default=True)
+    accepting_requests = fields.BooleanField(default=False)  # 신청 받기 (A37)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
 

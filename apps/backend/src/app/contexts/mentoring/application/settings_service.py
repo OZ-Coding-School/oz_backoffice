@@ -24,6 +24,7 @@ from app.contexts.mentoring.domain.settings import (
     CohortMentoringSettings,
     MentoringBlockTime,
     MentoringHoliday,
+    OperatingHours,
 )
 from app.core.uow import UnitOfWork
 from app.shared.errors import ConflictError, NotFoundError
@@ -42,6 +43,11 @@ def _jsonable(value: Any) -> Any:
         return value.isoformat()
     if isinstance(value, Enum):
         return value.value
+    if isinstance(value, OperatingHours):
+        return {
+            "start": OperatingHours.label(value.start_minute),
+            "end": OperatingHours.label(value.end_minute),
+        }
     return value
 
 

@@ -5,6 +5,7 @@ Tortoise는 이 패키지(__init__)만 스캔한다.
 """
 
 from app.contexts.mentoring.infrastructure.models.assignment import CohortMentorModel
+from app.contexts.mentoring.infrastructure.models.schedule import MentorUnavailablePeriodModel
 from app.contexts.mentoring.infrastructure.models.settings import (
     CohortMentoringBlockTimeModel,
     CohortMentoringSettingsModel,
@@ -15,5 +16,6 @@ __all__ = [
     "CohortMentorModel",
     "CohortMentoringBlockTimeModel",
     "CohortMentoringSettingsModel",
+    "MentorUnavailablePeriodModel",
     "MentoringHolidayModel",
 ]

@@ -22,6 +22,11 @@ class CohortMentoringSettingsModel(models.Model):
     min_lead_hours = fields.SmallIntField(default=24)
     allowed_duration = fields.SmallIntField(default=30)
     max_pending_requests = fields.SmallIntField(default=1)
+    # 운영시간: 자정부터 지난 분(0~1440). 시작·끝이 모두 NULL이면 운영 안 함 (A37)
+    weekday_open_minute = fields.SmallIntField(null=True, default=600)
+    weekday_close_minute = fields.SmallIntField(null=True, default=1140)
+    weekend_open_minute = fields.SmallIntField(null=True)
+    weekend_close_minute = fields.SmallIntField(null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
 

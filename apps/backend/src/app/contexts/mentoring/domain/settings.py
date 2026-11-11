@@ -2,6 +2,9 @@
 
 - 설정 값: 진행 단위 30·60분, 신청 마감 6·12·24시간, 대기 신청 1~3건, 기본 지급 시간 60분 단위,
   팀·1:1 중 하나 이상 허용.
+- 운영시간(A37): 평일, 주말·공휴일 각각 시작~끝(한국 시각, 30분 경계, 24:00까지)
+  또는 운영 안 함(None).
+  수강생은 이 시간 안에서만 신청한다. 기본값은 평일 10:00~19:00, 주말·공휴일 운영 안 함.
 - 금지 시간대: 기간(시작일~종료일) 안의 평일(월~금)에만 적용하고 주말·공휴일에는 적용하지 않는다.
   같은 기수에서 기간과 시간대가 모두 겹치면 안 된다.
 """
@@ -31,13 +34,55 @@ SETTINGS_FIELDS = frozenset(
         "min_lead_hours",
         "allowed_duration",
         "max_pending_requests",
+        "weekday_hours",
+        "weekend_hours",
     }
 )
+MINUTES_PER_DAY = 24 * 60
 
 
 def _rule(condition: bool, message: str, code: str) -> None:
     if not condition:
         raise BusinessRuleViolation(message, code=code)
+
+
+@dataclass(frozen=True, slots=True)
+class OperatingHours:
+    """하루 운영시간. 자정부터 지난 분(0~1440)으로 두어 24:00을 표현한다."""
+
+    start_minute: int
+    end_minute: int
+
+    def __post_init__(self) -> None:
+        _rule(
+            0 <= self.start_minute < self.end_minute <= MINUTES_PER_DAY
+            and self.start_minute % 30 == 0
+            and self.end_minute % 30 == 0,
+            "운영시간은 00:00~24:00 안에서 30분 단위로, 시작이 끝보다 빨라야 합니다.",
+            "invalid_operating_hours",
+        )
+
+    @classmethod
+    def of(cls, start: str, end: str) -> "OperatingHours":
+        """ "HH:MM" (끝은 "24:00" 가능)."""
+        return cls(start_minute=_minutes(start), end_minute=_minutes(end))
+
+    @staticmethod
+    def label(minute: int) -> str:
+        return f"{minute // 60:02d}:{minute % 60:02d}"
+
+
+def _minutes(text: str) -> int:
+    hour, _, minute = text.partition(":")
+    _rule(
+        hour.isdigit() and minute.isdigit() and len(minute) == 2,
+        "시각은 HH:MM 형식입니다.",
+        "invalid_operating_hours",
+    )
+    return int(hour) * 60 + int(minute)
+
+
+DEFAULT_WEEKDAY_HOURS = OperatingHours(start_minute=10 * 60, end_minute=19 * 60)
 
 
 @dataclass(kw_only=True, eq=False)
@@ -50,6 +95,8 @@ class CohortMentoringSettings(AggregateRoot):
     min_lead_hours: int = 24
     allowed_duration: int = 30
     max_pending_requests: int = 1
+    weekday_hours: OperatingHours | None = DEFAULT_WEEKDAY_HOURS
+    weekend_hours: OperatingHours | None = None  # 주말·공휴일, None = 운영 안 함
     created_at: datetime | None = None
     updated_at: datetime | None = None
 

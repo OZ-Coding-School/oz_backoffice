@@ -22,3 +22,11 @@ class CohortMentorDeactivationReason(StrEnum):
     EXPIRED = "EXPIRED"  # 종료일 경과 (매일 작업)
     MANUAL = "MANUAL"  # 운영진 비활성화(삭제)
     MENTOR_DEACTIVATED = "MENTOR_DEACTIVATED"  # 멘토 비활성화로 함께 비활성화
+
+
+class UnavailableRepeat(StrEnum):
+    """멘토 불가 시간 반복 규칙 (A37)."""
+
+    ONCE = "ONCE"  # 일회성
+    DAILY = "DAILY"  # 매일
+    WEEKLY = "WEEKLY"  # 매주 (요일 여러 개)

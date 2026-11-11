@@ -122,6 +122,7 @@ class TortoiseMentorRepository(TortoiseRepository[Mentor, MentorModel]):
         "expertise",
         "profile_image_key",
         "is_active",
+        "accepting_requests",
     )
 
     def to_entity(self, row: MentorModel) -> Mentor:

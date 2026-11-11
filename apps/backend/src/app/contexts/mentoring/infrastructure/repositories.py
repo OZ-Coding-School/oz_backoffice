@@ -8,16 +8,23 @@ from tortoise.exceptions import IntegrityError
 
 from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.enums import MentoringPeriodType
+from app.contexts.mentoring.domain.schedule import (
+    MentorUnavailablePeriod,
+    mask_to_weekdays,
+    weekdays_to_mask,
+)
 from app.contexts.mentoring.domain.settings import (
     CohortMentoringSettings,
     MentoringBlockTime,
     MentoringHoliday,
+    OperatingHours,
 )
 from app.contexts.mentoring.infrastructure.models import (
     CohortMentoringBlockTimeModel,
     CohortMentoringSettingsModel,
     CohortMentorModel,
     MentoringHolidayModel,
+    MentorUnavailablePeriodModel,
 )
 from app.core.persistence import TortoiseRepository
 from app.shared.errors import ConflictError
@@ -43,13 +50,28 @@ class TortoiseCohortMentoringSettingsRepository(
 
     def to_entity(self, row: CohortMentoringSettingsModel) -> CohortMentoringSettings:
         entity = super().to_entity(row)
+        entity.weekday_hours = _hours(row.weekday_open_minute, row.weekday_close_minute)
+        entity.weekend_hours = _hours(row.weekend_open_minute, row.weekend_close_minute)
         entity.created_at = row.created_at
         entity.updated_at = row.updated_at
         return entity
 
+    def to_values(self, entity: CohortMentoringSettings) -> dict[str, Any]:
+        values = super().to_values(entity)
+        for prefix, hours in (("weekday", entity.weekday_hours), ("weekend", entity.weekend_hours)):
+            values[f"{prefix}_open_minute"] = hours.start_minute if hours else None
+            values[f"{prefix}_close_minute"] = hours.end_minute if hours else None
+        return values
+
     async def get_by_cohort(self, cohort_id: uuid.UUID) -> CohortMentoringSettings | None:
         row = await CohortMentoringSettingsModel.get_or_none(cohort_id=cohort_id)
         return self.to_entity(row) if row else None
+
+
+def _hours(open_minute: int | None, close_minute: int | None) -> OperatingHours | None:
+    if open_minute is None or close_minute is None:
+        return None
+    return OperatingHours(start_minute=open_minute, end_minute=close_minute)
 
 
 class TortoiseMentoringBlockTimeRepository(
@@ -175,4 +197,33 @@ class TortoiseCohortMentorRepository(TortoiseRepository[CohortMentor, CohortMent
 
     async def list_expired(self, today: date) -> list[CohortMentor]:
         rows = await CohortMentorModel.filter(is_active=True, end_date__lt=today).order_by("id")
+        return [self.to_entity(row) for row in rows]
+
+
+class TortoiseMentorUnavailablePeriodRepository(
+    TortoiseRepository[MentorUnavailablePeriod, MentorUnavailablePeriodModel]
+):
+    model = MentorUnavailablePeriodModel
+    entity = MentorUnavailablePeriod
+    fields = ("mentor_id", "repeat", "starts_at", "ends_at", "repeat_until", "category", "reason")
+
+    def to_entity(self, row: MentorUnavailablePeriodModel) -> MentorUnavailablePeriod:
+        entity = MentorUnavailablePeriod(
+            id=row.id,
+            weekdays=mask_to_weekdays(row.weekdays_mask),
+            **{name: getattr(row, name) for name in self.fields},
+        )
+        entity.created_at = row.created_at
+        entity.updated_at = row.updated_at
+        return entity
+
+    def to_values(self, entity: MentorUnavailablePeriod) -> dict[str, Any]:
+        values = super().to_values(entity)
+        values["weekdays_mask"] = weekdays_to_mask(entity.weekdays)
+        return values
+
+    async def list_by_mentor(self, mentor_id: uuid.UUID) -> list[MentorUnavailablePeriod]:
+        rows = await MentorUnavailablePeriodModel.filter(mentor_id=mentor_id).order_by(
+            "starts_at", "id"
+        )
         return [self.to_entity(row) for row in rows]

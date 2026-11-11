@@ -132,6 +132,7 @@ src/app/
   - **downgrade의 테이블 삭제 순서가 FK 의존을 고려하지 않는다.** 참조하는 쪽부터 지우도록 고친다.
   - **자기 참조 FK는 "cyclic fk references"로 생성을 거부한다.** 모델에는 `UUIDField`로 두고 FK 제약은 raw SQL로 건다(예: `departments.parent_id`).
   - 마이그레이션을 만든 뒤 개발 DB에서 `aerich upgrade` → `aerich migrate`("No changes detected" 확인) → `aerich downgrade -v <n>` → `aerich upgrade`로 검증한다.
+  - `aerich downgrade -v <n>`은 **버전 n까지 포함해** 되돌린다(n 이후 전부 삭제). 새 마이그레이션 n만 되돌리려면 `-v n`을 쓴다. `-v n-1`은 그 전 마이그레이션 테이블까지 지운다.
 - 테스트 DB는 `tests/conftest.py`의 autouse 픽스처가 관리한다. 테스트에서 따로 요청하지 않는다.
   - `tortoise_db`(세션): 테스트 전용 DB(이름이 `_test`로 끝나야 함)를 지우고 새로 만든다. 격리된 `TortoiseContext`(전역 연결 없음)를 열고 **aerich 마이그레이션 SQL을 처음부터 적용**한 뒤, 세션이 끝나면 DB를 지운다. `tortoise_test_context`는 `generate_schemas()`를 강제해 raw SQL 제약이 빠지므로 쓰지 않는다.
   - `clean_tables`(테스트마다): 테스트가 끝나면 모든 모델 테이블을 TRUNCATE한다.
