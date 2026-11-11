@@ -1,11 +1,6 @@
 from enum import StrEnum
 
 
-class MentoringPeriodType(StrEnum):
-    PROJECT_MENTORING = "PROJECT_MENTORING"  # 프로젝트 기간 멘토링
-    REGULAR_MENTORING = "REGULAR_MENTORING"  # 정기(평시) 멘토링
-
-
 class MentoringSettlementPolicy(StrEnum):
     STUDENT_REQUEST = "STUDENT_REQUEST"  # 수강생 요청 시간 기준
     ACTUAL_DURATION = "ACTUAL_DURATION"  # 실제 진행 시간 기준

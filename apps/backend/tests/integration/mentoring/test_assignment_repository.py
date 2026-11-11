@@ -9,7 +9,6 @@ from tortoise.exceptions import IntegrityError
 from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.enums import (
     CohortMentorDeactivationReason,
-    MentoringPeriodType,
     MentoringSettlementPolicy,
     PayUnit,
 )
@@ -27,7 +26,6 @@ NOW = datetime(2026, 11, 10, tzinfo=UTC)
 
 async def _assignment(**overrides: Any) -> CohortMentor:
     values: dict[str, Any] = {
-        "period_type": MentoringPeriodType.REGULAR_MENTORING,
         "start_date": date(2026, 11, 1),
         "end_date": date(2026, 12, 31),
         "cost_settlement_policy": MentoringSettlementPolicy.ACTUAL_DURATION,
@@ -44,10 +42,10 @@ async def _assignment(**overrides: Any) -> CohortMentor:
     return entity
 
 
-async def test_one_active_assignment_per_mentor_cohort_type() -> None:
+async def test_one_active_assignment_per_mentor_cohort() -> None:
     first = await _assignment()
     keys = {"cohort_id": first.cohort_id, "mentor_id": first.mentor_id}
-    await _assignment(**keys, period_type=MentoringPeriodType.PROJECT_MENTORING)  # 다른 유형
+    await _assignment(mentor_id=first.mentor_id)  # 다른 기수는 따로 (A41)
     with pytest.raises(ConflictError) as dup:  # 부분 유니크 위반은 409로 바꾼다
         await _assignment(**keys)
     assert dup.value.code == "assignment_already_exists"
@@ -55,13 +53,11 @@ async def test_one_active_assignment_per_mentor_cohort_type() -> None:
     first.deactivate(CohortMentorDeactivationReason.MANUAL, now=NOW)
     await repo.save(first)
     second = await _assignment(**keys)  # 비활성이면 다시 배정 가능
-    found = await repo.find_active(
-        first.mentor_id, first.cohort_id, MentoringPeriodType.REGULAR_MENTORING
-    )
+    found = await repo.find_active(first.mentor_id, first.cohort_id)
     assert found is not None
     assert found.id == second.id
-    assert len(await repo.list_by_cohort(first.cohort_id, include_inactive=True)) == 3
-    assert len(await repo.list_by_cohort(first.cohort_id, include_inactive=False)) == 2
+    assert len(await repo.list_by_cohort(first.cohort_id, include_inactive=True)) == 2
+    assert len(await repo.list_by_cohort(first.cohort_id, include_inactive=False)) == 1
     assert len(await repo.list_by_mentor(first.mentor_id, include_inactive=False)) == 2
 
 
@@ -89,7 +85,6 @@ async def test_db_checks(values: dict[str, Any]) -> None:
     data: dict[str, Any] = {
         "cohort_id": (await create_cohort()).id,
         "mentor_id": (await create_mentor()).id,
-        "period_type": "REGULAR_MENTORING",
         "start_date": date(2026, 11, 1),
         "cost_settlement_policy": "ACTUAL_DURATION",
         "pay_unit": "HOURLY",

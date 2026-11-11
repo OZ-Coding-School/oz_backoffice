@@ -2,7 +2,6 @@
 
 import pytest
 
-from app.contexts.mentoring.domain.enums import MentoringPeriodType
 from app.contexts.mentoring.domain.team import MentoringTeam
 from app.shared.errors import BusinessRuleViolation, ConflictError
 from app.shared.ids import new_id
@@ -13,7 +12,6 @@ pytestmark = pytest.mark.unit
 def _team(**overrides: object) -> MentoringTeam:
     values: dict[str, object] = {
         "cohort_id": new_id(),
-        "period_type": MentoringPeriodType.PROJECT_MENTORING,
         "team_number": 3,
         "mentor_id": new_id(),
     }

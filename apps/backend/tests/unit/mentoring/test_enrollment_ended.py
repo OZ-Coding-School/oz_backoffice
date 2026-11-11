@@ -11,7 +11,7 @@ from app.contexts.academy.domain.enums import EnrollmentStatus, StudentStatus
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.mentoring.application.enrollment_ended import EnrollmentEndedService
 from app.contexts.mentoring.domain.balance import BalanceAccount
-from app.contexts.mentoring.domain.enums import MentoringBalanceTransactionType, MentoringPeriodType
+from app.contexts.mentoring.domain.enums import MentoringBalanceTransactionType
 from app.contexts.mentoring.domain.team import MentoringTeam
 from app.core.clock import FixedClock
 from app.shared.ids import new_id
@@ -52,7 +52,6 @@ class Students:
 def _account(student_id: uuid.UUID, minutes: int) -> BalanceAccount:
     account = BalanceAccount(
         student_id=student_id,
-        period_type=MentoringPeriodType.REGULAR_MENTORING,
         valid_from=date(2026, 11, 1),
         valid_until=date(2027, 4, 30),
     )
@@ -71,7 +70,6 @@ async def test_removes_members_and_revokes_remaining_idempotently() -> None:
     teams = InMemoryTeamRepository()
     team = MentoringTeam(
         cohort_id=COHORT,
-        period_type=MentoringPeriodType.PROJECT_MENTORING,
         team_number=1,
         mentor_id=new_id(),
         member_ids=[active.id, dropped.id, removed.id, gone],

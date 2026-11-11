@@ -6,7 +6,6 @@ import pytest
 from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.enums import (
     CohortMentorDeactivationReason,
-    MentoringPeriodType,
     MentoringSettlementPolicy,
     PayUnit,
 )
@@ -23,7 +22,6 @@ def assignment(**overrides: Any) -> CohortMentor:
     values: dict[str, Any] = {
         "cohort_id": new_id(),
         "mentor_id": new_id(),
-        "period_type": MentoringPeriodType.REGULAR_MENTORING,
         "start_date": date(2026, 11, 1),
         "end_date": date(2027, 4, 30),
         "cost_settlement_policy": MentoringSettlementPolicy.ACTUAL_DURATION,

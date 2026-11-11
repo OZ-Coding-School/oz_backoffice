@@ -68,7 +68,7 @@ def _restorable(
 
 
 def _key(assignment: CohortMentor) -> tuple[object, ...]:
-    return (assignment.mentor_id, assignment.cohort_id, assignment.period_type)
+    return (assignment.mentor_id, assignment.cohort_id)
 
 
 class MentorActivationService:
@@ -119,7 +119,7 @@ class MentorActivationService:
         assignments = await self._assignments.list_by_mentor(mentor_id, include_inactive=True)
         active_keys = {_key(a) for a in assignments if a.is_active}
         candidates = [a for a in assignments if _restorable(a, today, active_keys)]
-        # 같은 (기수, 유형) 후보가 여럿이면 가장 최근에 꺼진 것만 보여 준다
+        # 같은 기수 후보가 여럿이면 가장 최근에 꺼진 것만 보여 준다
         latest: dict[tuple[object, ...], CohortMentor] = {}
         for candidate in sorted(candidates, key=lambda a: a.deactivated_at or datetime.min):
             latest[_key(candidate)] = candidate
@@ -173,7 +173,7 @@ class MentorActivationService:
         if assignment.end_date is not None and assignment.end_date < today:
             return "assignment_period_ended", "종료일이 지난 배정입니다. 종료일을 먼저 바꾸세요."
         if _key(assignment) in active_keys:
-            return "assignment_already_exists", "이 기수에 같은 유형으로 활성 배정된 멘토입니다."
+            return "assignment_already_exists", "이 기수에 이미 활성 배정된 멘토입니다."
         return None
 
     @staticmethod

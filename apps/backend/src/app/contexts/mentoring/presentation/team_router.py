@@ -1,8 +1,8 @@
 """멘토링 팀 API (decisions M11·A39).
 
 mentoring.team.manage (기수 범위):
-  GET/POST       /admin/cohorts/{cohort_id}/mentoring-teams?period_type=     (목록은 페이징 없음)
-  GET            /admin/cohorts/{cohort_id}/mentoring-teams/unassigned-students?period_type=
+  GET/POST       /admin/cohorts/{cohort_id}/mentoring-teams     (목록은 페이징 없음)
+  GET            /admin/cohorts/{cohort_id}/mentoring-teams/unassigned-students
   PATCH/DELETE   /admin/cohorts/{cohort_id}/mentoring-teams/{team_id}       (이름·담당 멘토 / 삭제)
   POST           /admin/cohorts/{cohort_id}/mentoring-teams/{team_id}/members
   DELETE         /admin/cohorts/{cohort_id}/mentoring-teams/{team_id}/members/{student_id}
@@ -28,7 +28,6 @@ from app.contexts.mentoring.application.team_service import (
     MentorOfUser,
     StudentLookup,
 )
-from app.contexts.mentoring.domain.enums import MentoringPeriodType
 from app.contexts.mentoring.domain.team import NAME_MAX_LENGTH, MentoringTeam
 from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseCohortMentoringSettingsRepository,
@@ -65,8 +64,7 @@ ServiceDep = Annotated[MentoringTeamService, Depends(get_team_service)]
 
 # ---------------------------------------------------------------- 스키마
 class TeamCreate(BaseModel):
-    period_type: MentoringPeriodType
-    mentor_id: uuid.UUID = Field(description="그 기수·유형에 활성 배정된 멘토")
+    mentor_id: uuid.UUID = Field(description="그 기수에 활성 배정된 멘토")
     name: str | None = Field(default=None, max_length=NAME_MAX_LENGTH)
     student_ids: list[uuid.UUID] = Field(default_factory=list, max_length=100)
 
@@ -102,7 +100,6 @@ class MentorSummary(BaseModel):
 class TeamResponse(BaseModel):
     id: uuid.UUID
     cohort_id: uuid.UUID
-    period_type: MentoringPeriodType
     team_number: int
     name: str | None
     label: str = Field(description="팀 이름, 없으면 'N팀'")
@@ -125,7 +122,6 @@ class StudentTeamResponse(BaseModel):
 
     id: uuid.UUID
     cohort_id: uuid.UUID
-    period_type: MentoringPeriodType
     team_number: int
     label: str
     mentor: StudentTeamMentor
@@ -164,7 +160,6 @@ class Presenter:
             TeamResponse(
                 id=t.id,
                 cohort_id=t.cohort_id,
-                period_type=t.period_type,
                 team_number=t.team_number,
                 name=t.name,
                 label=t.label,
@@ -184,7 +179,6 @@ class Presenter:
             StudentTeamResponse(
                 id=t.id,
                 cohort_id=t.cohort_id,
-                period_type=t.period_type,
                 team_number=t.team_number,
                 label=t.label,
                 mentor=StudentTeamMentor(
@@ -208,10 +202,9 @@ async def list_teams(
     _: TeamManager,
     service: ServiceDep,
     presenter: PresenterDep,
-    period_type: MentoringPeriodType | None = None,
 ) -> list[TeamResponse]:
-    """기수의 팀 전체 (페이징 없음, A39). 유형·팀 번호 순."""
-    return await presenter.teams(await service.list_by_cohort(cohort_id, period_type))
+    """기수의 팀 전체 (페이징 없음, A39). 팀 번호 순."""
+    return await presenter.teams(await service.list_by_cohort(cohort_id))
 
 
 @admin_router.get("/unassigned-students", response_model=list[StudentSummary])
@@ -219,10 +212,9 @@ async def list_unassigned_students(
     cohort_id: uuid.UUID,
     _: TeamManager,
     service: ServiceDep,
-    period_type: MentoringPeriodType,
 ) -> list[StudentSummary]:
-    """그 유형의 팀이 없는 수강 중 수강생 (가입 여부 무관, 이름순)."""
-    return [StudentSummary.of(s) for s in await service.unassigned_students(cohort_id, period_type)]
+    """팀이 없는 수강 중 수강생 (가입 여부 무관, 이름순)."""
+    return [StudentSummary.of(s) for s in await service.unassigned_students(cohort_id)]
 
 
 @admin_router.post("", response_model=TeamResponse, status_code=status.HTTP_201_CREATED)
@@ -235,7 +227,6 @@ async def create_team(
 ) -> TeamResponse:
     team = await service.create(
         cohort_id,
-        period_type=body.period_type,
         mentor_id=body.mentor_id,
         name=body.name,
         student_ids=body.student_ids,

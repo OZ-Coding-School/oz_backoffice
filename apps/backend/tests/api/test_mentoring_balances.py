@@ -19,8 +19,6 @@ from tests.factories.educator import create_user
 
 pytestmark = pytest.mark.api
 
-REGULAR = "REGULAR_MENTORING"
-
 
 def bearer(settings: Settings, user: User) -> dict[str, str]:
     token, _ = JWTService(settings).encode(str(user.id), "access", now=datetime.now(UTC))
@@ -68,7 +66,7 @@ async def _setup(client: AsyncClient, settings: Settings) -> dict[str, Any]:
 async def test_grant_adjust_and_view(client: AsyncClient, settings: Settings) -> None:
     ctx = await _setup(client, settings)
     path, admin = ctx["path"], ctx["admin"]
-    body = {"period_type": REGULAR, "target": "ALL_STUDENTS", "reason": "기본 지급"}
+    body = {"target": "ALL_STUDENTS", "reason": "기본 지급"}
 
     missing_key = await client.post(f"{path}/grants", json=body, headers=admin)
     assert missing_key.status_code == 422
@@ -89,7 +87,6 @@ async def test_grant_adjust_and_view(client: AsyncClient, settings: Settings) ->
     picked = await client.post(
         f"{path}/grants",
         json={
-            "period_type": REGULAR,
             "target": "STUDENTS",
             "ids": [str(ctx["signed"].id), str(ctx["dropped"].id)],
             "minutes": 60,

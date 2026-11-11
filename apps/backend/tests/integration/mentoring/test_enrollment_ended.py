@@ -16,7 +16,6 @@ from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.audit.infrastructure.repositories import TortoiseAuditLogRepository
 from app.contexts.mentoring.application.balance_service import BalanceService, GrantTarget
 from app.contexts.mentoring.application.enrollment_ended import EnrollmentEndedService
-from app.contexts.mentoring.domain.enums import MentoringPeriodType
 from app.contexts.mentoring.domain.team import MentoringTeam
 from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseBalanceAccountRepository,
@@ -44,7 +43,6 @@ async def test_process_on_real_db() -> None:
     teams = TortoiseMentoringTeamRepository()
     team = MentoringTeam(
         cohort_id=cohort.id,
-        period_type=MentoringPeriodType.PROJECT_MENTORING,
         team_number=1,
         mentor_id=(await create_mentor()).id,
         member_ids=[active.id, dropped.id],
@@ -66,7 +64,6 @@ async def test_process_on_real_db() -> None:
         clock=CLOCK,
     ).grant(
         cohort.id,
-        period_type=MentoringPeriodType.REGULAR_MENTORING,
         target=GrantTarget.ALL_STUDENTS,
         ids=[],
         minutes=120,
@@ -92,7 +89,7 @@ async def test_process_on_real_db() -> None:
     stored = await teams.get(team.id)
     assert stored is not None
     assert stored.member_ids == [active.id]
-    (left,) = await accounts.find_by_owners(student_ids=[dropped.id], team_ids=[], period_type=None)
+    (left,) = await accounts.find_by_owners(student_ids=[dropped.id], team_ids=[])
     assert left.remaining_minutes == 0
     history = await ledger.list_by_account(left.id, before=None, limit=5)
     assert [(e.amount, e.reason) for e in history] == [(-120, "수강 종료로 회수"), (120, "지급")]

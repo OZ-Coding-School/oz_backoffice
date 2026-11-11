@@ -565,12 +565,11 @@ Table mentoring_holidays {
 }
 
 Table cohort_mentors {
-  note: "기수에 멘토를 배정한 내용 (decisions A35). 계약과 별개로 운영진이 관리한다. 활성 배정은 (멘토, 기수, 유형)당 하나. 시작일은 기수 기간 안, 종료일은 없어도 됨. 매일 00:00 KST 종료일이 지난 배정을 비활성화한다. 삭제는 비활성화"
+  note: "기수에 멘토를 배정한 내용 (decisions A35). 계약과 별개로 운영진이 관리한다. 활성 배정은 (멘토, 기수)당 하나(유형 구분 없음, A41). 시작일은 기수 기간 안, 종료일은 없어도 됨. 매일 00:00 KST 종료일이 지난 배정을 비활성화한다. 삭제는 비활성화"
 
   id uuid [pk, note: "default=uuid7 사용"]
   cohort_id uuid [not null, ref: > cohorts.id]
   mentor_id uuid [not null, ref: > mentors.id]
-  period_type MentoringPeriodType [not null, note: "멘토링 진행 유형 (평시, 프로젝트)"]
   start_date date [not null, note: "멘토링 시작일 (기수 기간 안)"]
   end_date date [null, note: "멘토링 종료일 (없으면 기한 없음, 기수 기간 밖도 가능)"]
   cost_settlement_policy MentoringSettlementPolicy [not null, note: "멘토링 비용 정산 기준"]
@@ -584,7 +583,7 @@ Table cohort_mentors {
   updated_at timestamptz [not null, default: `now()`]
 
   Indexes {
-    (mentor_id, cohort_id, period_type) [note: "활성 배정은 하나: UNIQUE WHERE is_active — raw SQL 부분 유니크"]
+    (mentor_id, cohort_id) [note: "활성 배정은 하나: UNIQUE WHERE is_active — raw SQL 부분 유니크"]
     (cohort_id, is_active)
     (is_active, end_date) [note: "매일 만료 대상 조회"]
     (mentor_id, is_active) [note: "멘토별 배정 조회·멘토 비활성화"]
@@ -625,12 +624,11 @@ Table mentor_unavailable_periods {
 }
 
 Table mentoring_balance_accounts {
-  note: "멘토링 잔여 시간 계좌 (소유자 x 기간 유형별, A39·A40). 첫 지급 때 만들고 사용 기간(기수 기간 안)을 정한다. 기간이 끝난 계좌에는 지급·늘리는 조정을 하지 않는다. 차감/지급 시 계좌 행 SELECT ... FOR UPDATE 후 원장과 같은 트랜잭션으로 갱신"
+  note: "멘토링 잔여 시간 계좌 (수강생(수강 등록) 또는 팀당 하나, A39·A40·A41). 첫 지급 때 만들고 사용 기간(기수 기간 안)을 정한다. 기간이 끝난 계좌에는 지급·늘리는 조정을 하지 않는다. 차감/지급 시 계좌 행 SELECT ... FOR UPDATE 후 원장과 같은 트랜잭션으로 갱신"
 
   id uuid [pk, note: "default=uuid7 사용"]
   student_id uuid [null, ref: > students.id, note: "1:1 멘토링 계좌 소유 수강생"]
   team_id uuid [null, ref: > mentoring_teams.id, note: "팀 멘토링 계좌 소유 팀"]
-  period_type MentoringPeriodType [not null, note: "기간 유형 (평시, 프로젝트)"]
   valid_from date [not null, note: "사용 가능 시작일"]
   valid_until date [not null, note: "사용 가능 종료일, 이후 신청 불가(만료)"]
   total_minutes integer [not null, default: 0, note: "누적 지급 시간 (분단위)"]
@@ -641,8 +639,8 @@ Table mentoring_balance_accounts {
   updated_at timestamptz [not null, default: `now()`]
 
   indexes {
-    (student_id, period_type) [unique, note: "student_id IS NOT NULL 부분 유니크"]
-    (team_id, period_type) [unique, note: "team_id IS NOT NULL 부분 유니크"]
+    student_id [unique, note: "student_id IS NOT NULL 부분 유니크"]
+    team_id [unique, note: "team_id IS NOT NULL 부분 유니크"]
   }
   checks {
     `num_nonnulls(student_id, team_id) = 1` [name: "check_balance_owner_exists"]
@@ -690,16 +688,14 @@ Table mentoring_teams {
 
   id uuid [pk, note: "default=uuid7 사용"]
   cohort_id uuid [not null, ref: > cohorts.id]
-  mentor_id uuid [not null, ref: > mentors.id, note: "담당 멘토 (팀 신청은 담당 멘토에게만, 해당 기수/유형의 활성 cohort_mentors여야 함 — 앱 레벨 검증)"]
-  team_number smallint [not null, note: "팀 번호, 기수 x 유형별 자동 부여"]
-  period_type MentoringPeriodType [not null, note: "멘토링 진행 유형 (평시, 프로젝트)"]
+  mentor_id uuid [not null, ref: > mentors.id, note: "담당 멘토 (팀 신청은 담당 멘토에게만, 해당 기수의 활성 cohort_mentors여야 함 — 앱 레벨 검증)"]
+  team_number smallint [not null, note: "팀 번호, 기수별 자동 부여 (A41)"]
   name varchar(50) [null, note: "멘토링 팀명"]
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
 
   indexes {
-    (cohort_id, period_type, team_number) [unique]
-    (id, period_type) [unique, note: "team_members 복합 FK 대상"]
+    (cohort_id, team_number) [unique]
     mentor_id
   }
   checks {
@@ -708,17 +704,16 @@ Table mentoring_teams {
 }
 
 Table mentoring_team_members {
-  note: "멘토링 팀원 (A39). 그 기수 수강 중인 수강생(가입 여부 무관). 팀을 지우면 함께 지운다(복합 FK ON DELETE CASCADE). 수강 종료 시 명단 동기화 후 작업이 뺀다(P10-2)"
+  note: "멘토링 팀원 (A39). 그 기수 수강 중인 수강생(가입 여부 무관). 팀을 지우면 함께 지운다(FK ON DELETE CASCADE, raw SQL). 수강생(수강 등록)은 한 팀에만 소속(A41). 수강 종료 시 명단 동기화 후 작업이 뺀다(P10-2)"
 
   id uuid [pk, note: "default=uuid7 사용"]
   student_id uuid [not null, ref: > students.id]
   team_id uuid [not null, ref: > mentoring_teams.id]
-  period_type MentoringPeriodType [not null, note: "비정규화: 같은 유형 팀 중복 소속 방지. 복합 FK (team_id, period_type) → mentoring_teams(id, period_type)로 일치 보장 — raw SQL"]
   created_at timestamptz [not null, default: `now()`]
 
   indexes {
     (team_id, student_id) [unique]
-    (student_id, period_type) [unique, note: "수강생은 유형별로 한 팀에만 소속"]
+    student_id [unique, note: "수강생(수강 등록)은 한 팀에만 소속"]
     team_id
   }
 }
@@ -1162,7 +1157,3 @@ Enum MentoringArtifactStatus {
   FAILED [note: "실패"]
 }
 
-Enum MentoringPeriodType {
-  PROJECT_MENTORING [note: "프로젝트 기간 멘토링"]
-  REGULAR_MENTORING [note: "정기 멘토링"]
-}

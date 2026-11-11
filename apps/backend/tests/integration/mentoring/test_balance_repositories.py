@@ -8,7 +8,6 @@ from tortoise.exceptions import IntegrityError
 
 from app.contexts.academy.infrastructure.repositories import TortoiseStudentRepository
 from app.contexts.mentoring.domain.balance import BalanceAccount
-from app.contexts.mentoring.domain.enums import MentoringPeriodType
 from app.contexts.mentoring.domain.team import MentoringTeam
 from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseBalanceAccountRepository,
@@ -24,14 +23,11 @@ pytestmark = pytest.mark.integration
 
 accounts = TortoiseBalanceAccountRepository()
 ledger = TortoiseBalanceTransactionRepository()
-REGULAR = MentoringPeriodType.REGULAR_MENTORING
-PROJECT = MentoringPeriodType.PROJECT_MENTORING
 TODAY = date(2026, 11, 11)
 
 
 def _account(**owner: object) -> BalanceAccount:
     return BalanceAccount(
-        period_type=owner.pop("period_type", REGULAR),  # type: ignore[arg-type]
         valid_from=date(2026, 11, 1),
         valid_until=date(2027, 4, 30),
         **owner,  # type: ignore[arg-type]
@@ -44,7 +40,6 @@ async def test_accounts_ledger_and_constraints() -> None:
     await TortoiseStudentRepository().add(student)
     team = MentoringTeam(
         cohort_id=cohort.id,
-        period_type=PROJECT,
         team_number=1,
         mentor_id=(await create_mentor()).id,
     )
@@ -56,7 +51,7 @@ async def test_accounts_ledger_and_constraints() -> None:
     entries.append(account.adjust(-60, "정정", today=TODAY))
     await accounts.save(account)
     await ledger.add_many(entries)
-    team_account = _account(team_id=team.id, period_type=PROJECT)
+    team_account = _account(team_id=team.id)
     await accounts.add(team_account)
 
     (locked,) = await accounts.lock_many([account.id])
@@ -66,27 +61,20 @@ async def test_accounts_ledger_and_constraints() -> None:
     older = await ledger.list_by_account(account.id, before=history[0].id, limit=10)
     assert [e.amount for e in older] == [180]
 
-    found = await accounts.find_by_owners(
-        student_ids=[student.id], team_ids=[team.id], period_type=None
-    )
+    found = await accounts.find_by_owners(student_ids=[student.id], team_ids=[team.id])
     assert {a.id for a in found} == {account.id, team_account.id}
-    page, total = await accounts.list_page(
-        cohort.id, period_type=None, owner=None, limit=10, offset=0
-    )
+    page, total = await accounts.list_page(cohort.id, owner=None, limit=10, offset=0)
     assert total == 2
     assert {a.id for a in page} == {account.id, team_account.id}
-    teams_only, _ = await accounts.list_page(
-        cohort.id, period_type=None, owner="TEAM", limit=10, offset=0
-    )
+    teams_only, _ = await accounts.list_page(cohort.id, owner="TEAM", limit=10, offset=0)
     assert [a.id for a in teams_only] == [team_account.id]
-    other, other_total = await accounts.list_page(
-        new_id(), period_type=None, owner=None, limit=10, offset=0
-    )
+    other, other_total = await accounts.list_page(new_id(), owner=None, limit=10, offset=0)
     assert (other, other_total) == ([], 0)
 
-    with pytest.raises(ConflictError):  # (수강생, 유형)당 하나
+    with pytest.raises(ConflictError):  # 수강생당 하나 (A41)
         await accounts.add(_account(student_id=student.id))
-    await accounts.add(_account(student_id=student.id, period_type=PROJECT))
+    with pytest.raises(ConflictError):  # 팀당 하나
+        await accounts.add(_account(team_id=team.id))
 
     db = connections.get("default")
     for sql in (

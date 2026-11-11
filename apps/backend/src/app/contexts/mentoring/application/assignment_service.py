@@ -1,7 +1,7 @@
 """기수 멘토 배정 관리 (decisions A35, 권한 mentoring.assignment.manage).
 
 - 계약과 별개로 운영진이 등록·수정·비활성화(삭제)·재활성화한다.
-- 활성 배정은 (멘토, 기수, 유형)당 하나 → 409 `assignment_already_exists`.
+- 활성 배정은 (멘토, 기수)당 하나 → 409 `assignment_already_exists` (유형 구분 없음, A41).
 - 시작일은 기수 기간 안, 종료일은 선택. 비활성 멘토는 새 배정·재활성화 불가 → 422 `mentor_inactive`.
 - 배정 생성·재활성화는 멘토 행을 잠가 멘토 비활성화와 겹치지 않게 한다.
 - 매일 00:00 KST 작업이 종료일이 지난 배정을 비활성화한다(EXPIRED, 멱등).
@@ -83,12 +83,10 @@ async def record_change(
 async def ensure_no_active_duplicate(
     assignments: CohortMentorRepository, assignment: CohortMentor
 ) -> None:
-    active = await assignments.find_active(
-        assignment.mentor_id, assignment.cohort_id, assignment.period_type
-    )
+    active = await assignments.find_active(assignment.mentor_id, assignment.cohort_id)
     if active is not None and active.id != assignment.id:
         raise ConflictError(
-            "이 기수에 같은 유형으로 활성 배정된 멘토입니다.", code="assignment_already_exists"
+            "이 기수에 이미 활성 배정된 멘토입니다.", code="assignment_already_exists"
         )
 
 

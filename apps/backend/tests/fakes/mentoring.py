@@ -6,7 +6,6 @@ from datetime import date
 
 from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.balance import BalanceAccount, BalanceTransaction
-from app.contexts.mentoring.domain.enums import MentoringPeriodType
 from app.contexts.mentoring.domain.schedule import MentorUnavailablePeriod
 from app.contexts.mentoring.domain.settings import CohortMentoringSettings, MentoringBlockTime
 from app.contexts.mentoring.domain.team import MentoringTeam
@@ -30,16 +29,9 @@ class InMemoryCohortMentorRepository:
     async def list_by_ids(self, assignment_ids: list[uuid.UUID]) -> list[CohortMentor]:
         return [dataclasses.replace(self.items[i]) for i in assignment_ids if i in self.items]
 
-    async def find_active(
-        self, mentor_id: uuid.UUID, cohort_id: uuid.UUID, period_type: MentoringPeriodType
-    ) -> CohortMentor | None:
+    async def find_active(self, mentor_id: uuid.UUID, cohort_id: uuid.UUID) -> CohortMentor | None:
         for a in self.items.values():
-            if (a.mentor_id, a.cohort_id, a.period_type, a.is_active) == (
-                mentor_id,
-                cohort_id,
-                period_type,
-                True,
-            ):
+            if (a.mentor_id, a.cohort_id, a.is_active) == (mentor_id, cohort_id, True):
                 return dataclasses.replace(a)
         return None
 
@@ -151,34 +143,16 @@ class InMemoryTeamRepository:
             raise ConflictError("사용 중", code="team_in_use")
         self.items.pop(team_id, None)
 
-    async def list_by_cohort(
-        self, cohort_id: uuid.UUID, period_type: MentoringPeriodType | None
-    ) -> list[MentoringTeam]:
-        found = [
-            t
-            for t in self.items.values()
-            if t.cohort_id == cohort_id and (period_type is None or t.period_type == period_type)
-        ]
-        return [self._copy(t) for t in sorted(found, key=lambda t: (t.period_type, t.team_number))]
+    async def list_by_cohort(self, cohort_id: uuid.UUID) -> list[MentoringTeam]:
+        found = [t for t in self.items.values() if t.cohort_id == cohort_id]
+        return [self._copy(t) for t in sorted(found, key=lambda t: t.team_number)]
 
-    async def next_number(self, cohort_id: uuid.UUID, period_type: MentoringPeriodType) -> int:
-        numbers = [
-            t.team_number
-            for t in self.items.values()
-            if t.cohort_id == cohort_id and t.period_type == period_type
-        ]
+    async def next_number(self, cohort_id: uuid.UUID) -> int:
+        numbers = [t.team_number for t in self.items.values() if t.cohort_id == cohort_id]
         return max(numbers, default=0) + 1
 
-    async def team_of_students(
-        self, student_ids: list[uuid.UUID], period_type: MentoringPeriodType
-    ) -> dict[uuid.UUID, uuid.UUID]:
-        return {
-            s: t.id
-            for t in self.items.values()
-            if t.period_type == period_type
-            for s in t.member_ids
-            if s in student_ids
-        }
+    async def team_of_students(self, student_ids: list[uuid.UUID]) -> dict[uuid.UUID, uuid.UUID]:
+        return {s: t.id for t in self.items.values() for s in t.member_ids if s in student_ids}
 
     async def list_by_students(self, student_ids: list[uuid.UUID]) -> list[MentoringTeam]:
         return [self._copy(t) for t in self.items.values() if set(t.member_ids) & set(student_ids)]
@@ -221,13 +195,11 @@ class InMemoryBalanceAccountRepository:
         *,
         student_ids: list[uuid.UUID],
         team_ids: list[uuid.UUID],
-        period_type: MentoringPeriodType | None,
     ) -> list[BalanceAccount]:
         return [
             dataclasses.replace(a)
             for a in self.items.values()
-            if (a.student_id in student_ids or a.team_id in team_ids)
-            and (period_type is None or a.period_type == period_type)
+            if a.student_id in student_ids or a.team_id in team_ids
         ]
 
     async def list_student_accounts_with_remaining(self) -> list[BalanceAccount]:
@@ -241,7 +213,6 @@ class InMemoryBalanceAccountRepository:
         self,
         cohort_id: uuid.UUID,
         *,
-        period_type: MentoringPeriodType | None,
         owner: str | None,
         limit: int,
         offset: int,

@@ -10,7 +10,6 @@ from app.contexts.academy.domain.entities import Cohort, Student
 from app.contexts.academy.domain.enums import EnrollmentStatus, StudentStatus
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.mentoring.application.balance_service import BalanceService, GrantTarget
-from app.contexts.mentoring.domain.enums import MentoringPeriodType
 from app.contexts.mentoring.domain.settings import CohortMentoringSettings
 from app.contexts.mentoring.domain.team import MentoringTeam
 from app.core.clock import FixedClock
@@ -29,8 +28,6 @@ pytestmark = pytest.mark.unit
 
 NOW = datetime(2026, 11, 11, 3, tzinfo=UTC)
 ACTOR = new_id()
-REGULAR = MentoringPeriodType.REGULAR_MENTORING
-PROJECT = MentoringPeriodType.PROJECT_MENTORING
 
 
 class Students:
@@ -107,10 +104,9 @@ class Harness:
             clock=self.clock,
         )
 
-    async def team(self, period_type: MentoringPeriodType = PROJECT) -> MentoringTeam:
+    async def team(self, cohort_id: uuid.UUID | None = None) -> MentoringTeam:
         team = MentoringTeam(
-            cohort_id=self.cohort.id,
-            period_type=period_type,
+            cohort_id=cohort_id or self.cohort.id,
             team_number=len(self.teams.items) + 1,
             mentor_id=new_id(),
         )
@@ -119,7 +115,6 @@ class Harness:
 
     async def grant(self, target: GrantTarget, *ids: uuid.UUID, **overrides: Any) -> Any:
         values: dict[str, Any] = {
-            "period_type": REGULAR,
             "target": target,
             "ids": list(ids),
             "minutes": None,
@@ -183,13 +178,14 @@ async def test_grant_skips_with_reasons(h: Harness) -> None:
 
 
 async def test_grant_teams(h: Harness) -> None:
-    project = await h.team(PROJECT)
-    regular = await h.team(REGULAR)
-    result = await h.grant(GrantTarget.ALL_TEAMS, period_type=PROJECT)
-    assert [(g.owner_id, g.minutes) for g in result.granted] == [(project.id, 120)]
-    mismatch = await h.grant(GrantTarget.TEAMS, regular.id, project.id, period_type=PROJECT)
-    assert [g.owner_id for g in mismatch.granted] == [project.id]
-    assert [s.code for s in mismatch.skipped] == ["team_period_mismatch"]
+    first = await h.team()
+    second = await h.team()
+    elsewhere = await h.team(new_id())  # 다른 기수의 팀
+    result = await h.grant(GrantTarget.ALL_TEAMS)
+    assert [(g.owner_id, g.minutes) for g in result.granted] == [(first.id, 120), (second.id, 120)]
+    picked = await h.grant(GrantTarget.TEAMS, elsewhere.id, first.id)
+    assert [g.owner_id for g in picked.granted] == [first.id]
+    assert [s.code for s in picked.skipped] == ["team_not_found"]
 
 
 async def test_grant_validation(h: Harness) -> None:
@@ -212,7 +208,6 @@ async def test_grant_validation(h: Harness) -> None:
     with pytest.raises(NotFoundError):
         await h.service.grant(
             new_id(),
-            period_type=REGULAR,
             target=GrantTarget.ALL_STUDENTS,
             ids=[],
             minutes=60,
@@ -256,10 +251,10 @@ async def test_adjust_validity_and_ledger(h: Harness) -> None:
 async def test_team_account_visible_to_members(h: Harness) -> None:
     user_id = new_id()
     student = h.students.add(h.cohort.id, user_id=user_id)
-    team = await h.team(PROJECT)
+    team = await h.team()
     team.add_member(student.id)
     await h.teams.save(team)
-    await h.grant(GrantTarget.TEAMS, team.id, period_type=PROJECT)
+    await h.grant(GrantTarget.TEAMS, team.id)
     (account,) = await h.service.mine(user_id)
     assert account.team_id == team.id
     owners = await h.service.owners_of([account])

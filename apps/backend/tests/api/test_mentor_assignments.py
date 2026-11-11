@@ -63,7 +63,6 @@ async def _mentor(**overrides: Any) -> Mentor:
 def _body(mentor: Mentor, **overrides: Any) -> dict[str, Any]:
     body: dict[str, Any] = {
         "mentor_id": str(mentor.id),
-        "period_type": "REGULAR_MENTORING",
         "start_date": "2026-11-01",
         "cost_settlement_policy": "ACTUAL_DURATION",
         "pay_unit": "HOURLY",
@@ -90,13 +89,11 @@ async def test_assignment_crud(client: AsyncClient, admin: dict[str, str]) -> No
     assert duplicate.json()["error"]["code"] == "assignment_already_exists"
     outside = await client.post(
         path,
-        json=_body(mentor, period_type="PROJECT_MENTORING", start_date="2026-10-31"),
+        json=_body(mentor, start_date="2026-10-31"),
         headers=admin,
     )
     assert outside.json()["error"]["code"] == "assignment_start_outside_cohort"
-    monthly = await client.post(
-        path, json=_body(mentor, period_type="PROJECT_MENTORING", pay_unit="MONTHLY"), headers=admin
-    )
+    monthly = await client.post(path, json=_body(mentor, pay_unit="MONTHLY"), headers=admin)
     assert monthly.status_code == 422
 
     updated = await client.patch(
@@ -144,9 +141,8 @@ async def test_mentor_deactivation_flow(
     mentor = await _mentor()
     path = f"{API}/cohorts/{cohort.id}/mentor-assignments"
     regular = (await client.post(path, json=_body(mentor), headers=admin)).json()
-    project = (
-        await client.post(path, json=_body(mentor, period_type="PROJECT_MENTORING"), headers=admin)
-    ).json()
+    other_path = f"{API}/cohorts/{(await create_cohort()).id}/mentor-assignments"
+    project = (await client.post(other_path, json=_body(mentor), headers=admin)).json()
 
     preview = await client.post(f"{API}/mentors/{mentor.id}/deactivate", json={}, headers=admin)
     assert preview.status_code == 200

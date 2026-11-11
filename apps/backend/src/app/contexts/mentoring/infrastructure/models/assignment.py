@@ -6,7 +6,6 @@ from tortoise import fields, models
 
 from app.contexts.mentoring.domain.enums import (
     CohortMentorDeactivationReason,
-    MentoringPeriodType,
     MentoringSettlementPolicy,
     PayUnit,
 )
@@ -21,7 +20,6 @@ class CohortMentorModel(models.Model):
     mentor: fields.ForeignKeyRelation[Any] = fields.ForeignKeyField(
         "models.MentorModel", related_name=False, on_delete=fields.RESTRICT
     )
-    period_type = fields.CharEnumField(MentoringPeriodType, max_length=30)
     start_date = fields.DateField()
     end_date = fields.DateField(null=True)
     cost_settlement_policy = fields.CharEnumField(MentoringSettlementPolicy, max_length=30)

@@ -9,7 +9,6 @@ from tortoise.expressions import Q
 
 from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.balance import BalanceAccount, BalanceTransaction
-from app.contexts.mentoring.domain.enums import MentoringPeriodType
 from app.contexts.mentoring.domain.schedule import (
     MentorUnavailablePeriod,
     mask_to_weekdays,
@@ -141,7 +140,6 @@ class TortoiseCohortMentorRepository(TortoiseRepository[CohortMentor, CohortMent
     fields = (
         "cohort_id",
         "mentor_id",
-        "period_type",
         "start_date",
         "end_date",
         "cost_settlement_policy",
@@ -174,7 +172,7 @@ class TortoiseCohortMentorRepository(TortoiseRepository[CohortMentor, CohortMent
             if ACTIVE_ASSIGNMENT_INDEX not in str(exc):
                 raise
             raise ConflictError(
-                "이 기수에 같은 유형으로 활성 배정된 멘토입니다.", code="assignment_already_exists"
+                "이 기수에 이미 활성 배정된 멘토입니다.", code="assignment_already_exists"
             ) from exc
 
     async def list_by_ids(self, assignment_ids: list[uuid.UUID]) -> list[CohortMentor]:
@@ -183,11 +181,9 @@ class TortoiseCohortMentorRepository(TortoiseRepository[CohortMentor, CohortMent
         rows = await CohortMentorModel.filter(id__in=assignment_ids)
         return [self.to_entity(row) for row in rows]
 
-    async def find_active(
-        self, mentor_id: uuid.UUID, cohort_id: uuid.UUID, period_type: MentoringPeriodType
-    ) -> CohortMentor | None:
+    async def find_active(self, mentor_id: uuid.UUID, cohort_id: uuid.UUID) -> CohortMentor | None:
         row = await CohortMentorModel.get_or_none(
-            mentor_id=mentor_id, cohort_id=cohort_id, period_type=period_type, is_active=True
+            mentor_id=mentor_id, cohort_id=cohort_id, is_active=True
         )
         return self.to_entity(row) if row else None
 
@@ -252,7 +248,6 @@ class TortoiseMentoringTeamRepository:
             cohort_id=team.cohort_id,
             mentor_id=team.mentor_id,
             team_number=team.team_number,
-            period_type=team.period_type,
             name=team.name,
         )
         await self._insert_members(team, team.member_ids)
@@ -287,30 +282,20 @@ class TortoiseMentoringTeamRepository:
                 "시간 계좌나 신청이 있는 팀은 삭제할 수 없습니다.", code="team_in_use"
             ) from exc
 
-    async def list_by_cohort(
-        self, cohort_id: uuid.UUID, period_type: MentoringPeriodType | None
-    ) -> list[MentoringTeam]:
-        query = MentoringTeamModel.filter(cohort_id=cohort_id)
-        if period_type is not None:
-            query = query.filter(period_type=period_type)
-        return await self._with_members(await query.order_by("period_type", "team_number"))
+    async def list_by_cohort(self, cohort_id: uuid.UUID) -> list[MentoringTeam]:
+        rows = await MentoringTeamModel.filter(cohort_id=cohort_id).order_by("team_number")
+        return await self._with_members(rows)
 
-    async def next_number(self, cohort_id: uuid.UUID, period_type: MentoringPeriodType) -> int:
-        top = (
-            await MentoringTeamModel.filter(cohort_id=cohort_id, period_type=period_type)
-            .order_by("-team_number")
-            .first()
-        )
+    async def next_number(self, cohort_id: uuid.UUID) -> int:
+        top = await MentoringTeamModel.filter(cohort_id=cohort_id).order_by("-team_number").first()
         return top.team_number + 1 if top else 1
 
-    async def team_of_students(
-        self, student_ids: list[uuid.UUID], period_type: MentoringPeriodType
-    ) -> dict[uuid.UUID, uuid.UUID]:
+    async def team_of_students(self, student_ids: list[uuid.UUID]) -> dict[uuid.UUID, uuid.UUID]:
         if not student_ids:
             return {}
-        rows = await MentoringTeamMemberModel.filter(
-            student_id__in=student_ids, period_type=period_type
-        ).values_list("student_id", "team_id")
+        rows = await MentoringTeamMemberModel.filter(student_id__in=student_ids).values_list(
+            "student_id", "team_id"
+        )
         return {student_id: team_id for student_id, team_id in rows}
 
     async def list_by_students(self, student_ids: list[uuid.UUID]) -> list[MentoringTeam]:
@@ -320,7 +305,7 @@ class TortoiseMentoringTeamRepository:
             "team_id", flat=True
         )
         rows = await MentoringTeamModel.filter(id__in=list(set(team_ids))).order_by(
-            "period_type", "team_number"
+            "cohort_id", "team_number"
         )
         return await self._with_members(rows)
 
@@ -343,7 +328,7 @@ class TortoiseMentoringTeamRepository:
 
     async def list_by_mentor(self, mentor_id: uuid.UUID) -> list[MentoringTeam]:
         rows = await MentoringTeamModel.filter(mentor_id=mentor_id).order_by(
-            "cohort_id", "period_type", "team_number"
+            "cohort_id", "team_number"
         )
         return await self._with_members(rows)
 
@@ -358,14 +343,13 @@ class TortoiseMentoringTeamRepository:
                         id=new_id(),
                         team_id=team.id,
                         student_id=student_id,
-                        period_type=team.period_type,
                     )
                     for student_id in student_ids
                 ]
             )
         except IntegrityError as exc:
             raise ConflictError(
-                "이미 같은 유형의 다른 팀에 속한 수강생이 있습니다.", code="student_in_other_team"
+                "이미 다른 팀에 속한 수강생이 있습니다.", code="student_in_other_team"
             ) from exc
 
     @staticmethod
@@ -383,7 +367,6 @@ class TortoiseMentoringTeamRepository:
                 id=row.id,
                 cohort_id=row.cohort_id,  # type: ignore[attr-defined]  # FK 컬럼 속성
                 mentor_id=row.mentor_id,  # type: ignore[attr-defined]
-                period_type=row.period_type,
                 team_number=row.team_number,
                 name=row.name,
                 member_ids=members[row.id],
@@ -402,7 +385,6 @@ class TortoiseBalanceAccountRepository(
     fields = (
         "student_id",
         "team_id",
-        "period_type",
         "valid_from",
         "valid_until",
         "total_minutes",
@@ -426,7 +408,7 @@ class TortoiseBalanceAccountRepository(
             await super().add(entity)
         except IntegrityError as exc:
             raise ConflictError(
-                "이미 같은 유형의 계좌가 있습니다. 다시 시도하세요.", code="balance_account_exists"
+                "이미 계좌가 있습니다. 다시 시도하세요.", code="balance_account_exists"
             ) from exc
 
     async def lock_many(self, account_ids: list[uuid.UUID]) -> list[BalanceAccount]:
@@ -444,16 +426,13 @@ class TortoiseBalanceAccountRepository(
         *,
         student_ids: list[uuid.UUID],
         team_ids: list[uuid.UUID],
-        period_type: MentoringPeriodType | None,
     ) -> list[BalanceAccount]:
         if not student_ids and not team_ids:
             return []
-        query = MentoringBalanceAccountModel.filter(
+        rows = await MentoringBalanceAccountModel.filter(
             Q(student_id__in=student_ids) | Q(team_id__in=team_ids)
-        )
-        if period_type is not None:
-            query = query.filter(period_type=period_type)
-        return [self.to_entity(row) for row in await query.order_by("period_type", "id")]
+        ).order_by("id")
+        return [self.to_entity(row) for row in rows]
 
     async def list_student_accounts_with_remaining(self) -> list[BalanceAccount]:
         rows = await MentoringBalanceAccountModel.filter(
@@ -465,7 +444,6 @@ class TortoiseBalanceAccountRepository(
         self,
         cohort_id: uuid.UUID,
         *,
-        period_type: MentoringPeriodType | None,
         owner: str | None,
         limit: int,
         offset: int,
@@ -476,10 +454,8 @@ class TortoiseBalanceAccountRepository(
         elif owner == "TEAM":
             condition = Q(team__cohort_id=cohort_id)
         query = MentoringBalanceAccountModel.filter(condition)
-        if period_type is not None:
-            query = query.filter(period_type=period_type)
         total = await query.count()
-        rows = await query.order_by("period_type", "id").offset(offset).limit(limit)
+        rows = await query.order_by("id").offset(offset).limit(limit)
         return [self.to_entity(row) for row in rows], total
 
 

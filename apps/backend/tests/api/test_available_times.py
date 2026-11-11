@@ -43,7 +43,6 @@ async def test_student_sees_available_times(client: AsyncClient, settings: Setti
         f"{api}/mentor-assignments",
         json={
             "mentor_id": str(mentor.id),
-            "period_type": "REGULAR_MENTORING",
             "start_date": "2026-11-01",
             "cost_settlement_policy": "ACTUAL_DURATION",
             "pay_unit": "HOURLY",
