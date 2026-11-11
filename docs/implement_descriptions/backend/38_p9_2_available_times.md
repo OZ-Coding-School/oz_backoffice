@@ -1,7 +1,7 @@
 # 38. P9-2 신청 가능 시간 계산·조회
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #43
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P9 (P9-2)
 - 이전 기록: [37. P9-1 멘토 불가 시간·신청 받기·기수 운영시간](37_p9_1_mentor_schedule.md)
 
