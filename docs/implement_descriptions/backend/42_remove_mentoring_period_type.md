@@ -1,7 +1,7 @@
 # 42. 멘토링 유형(평시/프로젝트) 제거
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #47
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P11 (선행 PR)
 - 이전 기록: [41. P10-2b 명단 동기화 후 수강 종료 처리](41_p10_2b_enrollment_ended.md)
 
