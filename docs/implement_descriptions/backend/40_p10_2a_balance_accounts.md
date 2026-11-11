@@ -1,6 +1,6 @@
 # 40. P10-2a 멘토링 시간 계좌·지급·조정·조회
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-11 병합)
 - 관련 PR: #45
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P10 (P10-2a)
 - 이전 기록: [39. P10-1 멘토링 팀 구성](39_p10_1_mentoring_teams.md)
@@ -69,6 +69,8 @@ P10의 두 번째 PR이다. 운영진이 수강생(1:1)·팀에 멘토링 시간
   - 원장: 커서
   - 본인: 계좌·원장, 남의 계좌 404
   - 권한: 401·403, 다른 기수
+- GitHub Actions (PR #45): backend 잡 통과, 675 passed
+- 사용자가 작업 완료를 확인했다(2026-11-11). 사용 기간은 시작일 = 종료일(하루)도 허용한다
 - 전체 675 passed (compose `api` 컨테이너, ruff·ruff format·mypy·mypy tests·lint-imports 통과)
 - 마이그레이션 왕복: upgrade → migrate("No changes detected") → downgrade -v 15 → upgrade. DBML 검증
 - 코드 커밋 3개를 worktree에서 하나씩 검사했다(ruff, ruff format, mypy, mypy tests, lint-imports, pytest). 모두 통과했다(665 → 671 → 675 passed)
