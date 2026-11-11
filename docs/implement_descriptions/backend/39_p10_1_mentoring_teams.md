@@ -1,6 +1,6 @@
 # 39. P10-1 멘토링 팀 구성
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-11 병합)
 - 관련 PR: #44
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P10 (P10-1)
 - 이전 기록: [38. P9-2 신청 가능 시간 계산·조회](38_p9_2_available_times.md)
@@ -54,6 +54,8 @@ P10의 첫 PR이다. 운영진(매니저·조교)이 기수·유형별로 멘토
   - 미배정 목록(가입 여부 표시) → 생성(멘토 실명·표시 이름) → 수강 종료 팀원 422 → 추가 → 중복 409 → 이름 변경 → 팀원 제거 → 목록
   - 내 팀(수강생은 멘토 실명 없음, 멘토는 담당 팀) → 삭제
   - 규칙·권한: 미배정 멘토·다른 유형, 팀 멘토링 미허용, 조교 200·다른 기수 403, 수강생 403, 비로그인 401
+- GitHub Actions (PR #44): backend 잡 통과, 655 passed
+- 사용자가 작업 완료를 확인했다(2026-11-11)
 - 전체 655 passed (compose `api` 컨테이너, ruff·ruff format·mypy·mypy tests·lint-imports 통과)
 - 마이그레이션 왕복: upgrade → migrate("No changes detected") → downgrade -v 14 → upgrade. DBML `@dbml/core` 11 검증
 - 코드 커밋 3개를 worktree에서 하나씩 검사했다(ruff, ruff format, mypy, mypy tests, lint-imports, pytest). 모두 통과했다(649 → 653 → 655 passed)
