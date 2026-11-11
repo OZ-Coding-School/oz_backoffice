@@ -35,6 +35,14 @@ def clean_reason(reason: str) -> str:
     return text
 
 
+def ensure_grant_minutes(minutes: int) -> None:
+    _rule(
+        minutes > 0 and minutes % GRANT_UNIT_MINUTES == 0,
+        "지급 시간은 60분 단위의 양수입니다.",
+        "invalid_balance_minutes",
+    )
+
+
 def ensure_validity(
     valid_from: date, valid_until: date, *, cohort_start: date, cohort_end: date
 ) -> None:
@@ -95,11 +103,7 @@ class BalanceAccount(AggregateRoot):
         return self.valid_until < today
 
     def grant(self, minutes: int, reason: str, *, today: date) -> BalanceTransaction:
-        _rule(
-            minutes > 0 and minutes % GRANT_UNIT_MINUTES == 0,
-            "지급 시간은 60분 단위의 양수입니다.",
-            "invalid_balance_minutes",
-        )
+        ensure_grant_minutes(minutes)
         _rule(
             not self.is_expired(today),
             "사용 기간이 끝난 계좌입니다. 기간을 먼저 연장하세요.",

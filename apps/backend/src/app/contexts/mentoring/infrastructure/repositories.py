@@ -324,6 +324,11 @@ class TortoiseMentoringTeamRepository:
         )
         return await self._with_members(rows)
 
+    async def list_by_ids(self, team_ids: list[uuid.UUID]) -> list[MentoringTeam]:
+        if not team_ids:
+            return []
+        return await self._with_members(await MentoringTeamModel.filter(id__in=team_ids))
+
     async def list_by_mentor(self, mentor_id: uuid.UUID) -> list[MentoringTeam]:
         rows = await MentoringTeamModel.filter(mentor_id=mentor_id).order_by(
             "cohort_id", "period_type", "team_number"
