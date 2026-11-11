@@ -1,6 +1,6 @@
 # 38. P9-2 신청 가능 시간 계산·조회
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-11 병합)
 - 관련 PR: #43
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P9 (P9-2)
 - 이전 기록: [37. P9-1 멘토 불가 시간·신청 받기·기수 운영시간](37_p9_1_mentor_schedule.md)
@@ -35,7 +35,7 @@ P9의 두 번째 PR이다. P9-1에서 만든 재료(멘토 불가 시간, 신청
 - 기수 설정이 없으면 404 `mentoring_settings_not_configured`다.
 - 조회는 한 번에 최대 31일, 오늘부터 60일 뒤까지다.
 
-## 결정에서 정하지 않아 구현에서 정한 것 (확인 요청)
+## 결정에서 정하지 않아 구현에서 정한 것 (사용자 확인 → decisions A38)
 - `from`이 오늘보다 앞이거나 범위를 벗어나면 잘라서 주지 않고 422 `invalid_time_range`로 거부한다.
 - 그 기수에 활성 배정이 없으면 404 `mentor_not_assigned`다.
 - 신청 받기가 꺼져 있거나 멘토가 비활성이면, 오류 대신 `accepting_requests=false`와 빈 목록을 준다(프론트가 안내 문구를 띄울 수 있게).
@@ -49,6 +49,8 @@ P9의 두 번째 PR이다. P9-1에서 만든 재료(멘토 불가 시간, 신청
   - 설정 없음 404 → 신청 받기 꺼짐(빈 목록) → 켜고 매일 점심 불가 등록
   - 7일 × 두 구간(10~12시, 13~19시)
   - 멘토 본인·운영진 200, 다른 회원 403, 비로그인 401, 32일 422
+- GitHub Actions (PR #43): backend 잡 통과, 646 passed
+- 사용자가 작업 완료와 위 세부를 확인했다(2026-11-11)
 - 전체 646 passed (compose `api` 컨테이너, ruff·ruff format·mypy·mypy tests·lint-imports 통과)
 - 코드 커밋 3개를 worktree에서 하나씩 검사했다(ruff, ruff format, mypy, mypy tests, lint-imports, pytest). 모두 통과했다(637 → 645 → 646 passed)
 
