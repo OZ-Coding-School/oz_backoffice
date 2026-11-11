@@ -6,6 +6,8 @@ from datetime import date
 
 from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.enums import MentoringPeriodType
+from app.contexts.mentoring.domain.schedule import MentorUnavailablePeriod
+from app.contexts.mentoring.domain.settings import MentoringBlockTime
 
 
 class InMemoryCohortMentorRepository:
@@ -62,3 +64,45 @@ class InMemoryCohortMentorRepository:
             for a in self.items.values()
             if a.is_active and a.end_date is not None and a.end_date < today
         ]
+
+
+class InMemoryUnavailablePeriodRepository:
+    def __init__(self) -> None:
+        self.items: dict[uuid.UUID, MentorUnavailablePeriod] = {}
+
+    async def add(self, period: MentorUnavailablePeriod) -> None:
+        self.items[period.id] = dataclasses.replace(period)
+
+    async def save(self, period: MentorUnavailablePeriod) -> None:
+        self.items[period.id] = dataclasses.replace(period)
+
+    async def get(self, period_id: uuid.UUID) -> MentorUnavailablePeriod | None:
+        found = self.items.get(period_id)
+        return dataclasses.replace(found) if found else None
+
+    async def delete(self, period_id: uuid.UUID) -> None:
+        self.items.pop(period_id, None)
+
+    async def list_by_mentor(self, mentor_id: uuid.UUID) -> list[MentorUnavailablePeriod]:
+        found = [p for p in self.items.values() if p.mentor_id == mentor_id]
+        return [dataclasses.replace(p) for p in sorted(found, key=lambda p: p.starts_at)]
+
+
+class InMemoryBlockTimeRepository:
+    def __init__(self, *blocks: MentoringBlockTime) -> None:
+        self.items = {b.id: b for b in blocks}
+
+    async def add(self, block: MentoringBlockTime) -> None:
+        self.items[block.id] = block
+
+    async def save(self, block: MentoringBlockTime) -> None:
+        self.items[block.id] = block
+
+    async def get(self, block_id: uuid.UUID) -> MentoringBlockTime | None:
+        return self.items.get(block_id)
+
+    async def delete(self, block_id: uuid.UUID) -> None:
+        self.items.pop(block_id, None)
+
+    async def list_by_cohort(self, cohort_id: uuid.UUID) -> list[MentoringBlockTime]:
+        return [b for b in self.items.values() if b.cohort_id == cohort_id]
