@@ -131,6 +131,14 @@ class BalanceAccount(AggregateRoot):
         self.total_minutes += delta
         return self._entry(MentoringBalanceTransactionType.STAFF_ADJUST, delta, reason)
 
+    def revoke_remaining(self, reason: str) -> BalanceTransaction | None:
+        """수강 종료 회수: 잔여 전부를 줄인다(단위·사용 기간과 무관, A39). 잔여가 없으면 None."""
+        if self.remaining_minutes <= 0:
+            return None
+        delta = -self.remaining_minutes
+        self.total_minutes += delta
+        return self._entry(MentoringBalanceTransactionType.STAFF_ADJUST, delta, reason)
+
     def change_validity(
         self, valid_from: date, valid_until: date, *, cohort_start: date, cohort_end: date
     ) -> None:

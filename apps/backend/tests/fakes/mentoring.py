@@ -183,6 +183,15 @@ class InMemoryTeamRepository:
     async def list_by_students(self, student_ids: list[uuid.UUID]) -> list[MentoringTeam]:
         return [self._copy(t) for t in self.items.values() if set(t.member_ids) & set(student_ids)]
 
+    async def list_memberships(self) -> list[tuple[uuid.UUID, uuid.UUID]]:
+        return [(t.id, s) for t in self.items.values() for s in t.member_ids]
+
+    async def remove_memberships(self, pairs: list[tuple[uuid.UUID, uuid.UUID]]) -> None:
+        for team_id, student_id in pairs:
+            team = self.items.get(team_id)
+            if team and student_id in team.member_ids:
+                team.member_ids.remove(student_id)
+
     async def list_by_ids(self, team_ids: list[uuid.UUID]) -> list[MentoringTeam]:
         return [self._copy(self.items[i]) for i in team_ids if i in self.items]
 
@@ -219,6 +228,13 @@ class InMemoryBalanceAccountRepository:
             for a in self.items.values()
             if (a.student_id in student_ids or a.team_id in team_ids)
             and (period_type is None or a.period_type == period_type)
+        ]
+
+    async def list_student_accounts_with_remaining(self) -> list[BalanceAccount]:
+        return [
+            dataclasses.replace(a)
+            for a in self.items.values()
+            if a.student_id is not None and a.remaining_minutes > 0
         ]
 
     async def list_page(
