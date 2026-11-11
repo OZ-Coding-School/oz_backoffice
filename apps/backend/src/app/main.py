@@ -11,6 +11,7 @@ from tortoise.contrib.fastapi import RegisterTortoise
 from app.api import health, v1
 from app.contexts.academy.application.catalog import AcademyCatalog
 from app.contexts.academy.application.student_claims import StudentClaims
+from app.contexts.academy.application.student_queries import StudentQueries
 from app.contexts.academy.infrastructure.repositories import (
     TortoiseBootcampRepository,
     TortoiseCohortRepository,
@@ -100,6 +101,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     # 기수 멘토 배정·멘토 활성화(A35·A36): 멘토링이 educator 멘토를 조회·잠금·활성 변경한다
     app.state.mentor_queries = MentorQueries(TortoiseMentorRepository())
+    # 신청 가능 시간 조회(A37): 그 기수 수강 중인지 확인
+    app.state.student_queries = StudentQueries(TortoiseStudentRepository())
 
     app.add_middleware(
         CORSMiddleware,
