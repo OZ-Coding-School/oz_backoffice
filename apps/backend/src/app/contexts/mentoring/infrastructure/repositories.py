@@ -324,6 +324,18 @@ class TortoiseMentoringTeamRepository:
         )
         return await self._with_members(rows)
 
+    async def list_memberships(self) -> list[tuple[uuid.UUID, uuid.UUID]]:
+        rows = await MentoringTeamMemberModel.all().values_list("team_id", "student_id")
+        return [(team_id, student_id) for team_id, student_id in rows]
+
+    async def remove_memberships(self, pairs: list[tuple[uuid.UUID, uuid.UUID]]) -> None:
+        if not pairs:
+            return
+        condition = Q()
+        for team_id, student_id in pairs:
+            condition |= Q(team_id=team_id, student_id=student_id)
+        await MentoringTeamMemberModel.filter(condition).delete()
+
     async def list_by_ids(self, team_ids: list[uuid.UUID]) -> list[MentoringTeam]:
         if not team_ids:
             return []
@@ -442,6 +454,12 @@ class TortoiseBalanceAccountRepository(
         if period_type is not None:
             query = query.filter(period_type=period_type)
         return [self.to_entity(row) for row in await query.order_by("period_type", "id")]
+
+    async def list_student_accounts_with_remaining(self) -> list[BalanceAccount]:
+        rows = await MentoringBalanceAccountModel.filter(
+            student_id__isnull=False, remaining_minutes__gt=0
+        ).order_by("id")
+        return [self.to_entity(row) for row in rows]
 
     async def list_page(
         self,

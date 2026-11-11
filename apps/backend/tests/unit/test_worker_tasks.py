@@ -7,8 +7,14 @@ from app.contexts.audit.application.recorder import AuditRecorder
 from app.core.clock import SystemClock
 from app.core.config import Settings
 from app.workers.broker import broker
+from app.workers.tasks import roster
 from app.workers.tasks.contracts import DAILY_0005_KST, expire_contracts
-from app.workers.tasks.mentoring import build_assignment_service, expire_assignments
+from app.workers.tasks.mentoring import (
+    build_assignment_service,
+    build_enrollment_ended_service,
+    expire_assignments,
+    process_enrollment_ended,
+)
 from app.workers.tasks.roster import HOURLY, execute_roster_sync, scheduled_roster_sync
 from tests.fakes.audit import InMemoryAuditLogRepository
 
@@ -70,3 +76,26 @@ async def test_scheduled_task_skips_without_airtable(
 ) -> None:
     monkeypatch.setattr("app.workers.tasks.roster.get_settings", lambda: settings)
     await scheduled_roster_sync.original_func()  # 설정이 없으면 아무것도 하지 않는다
+
+
+async def test_enrollment_ended_runs_after_successful_sync(monkeypatch: pytest.MonkeyPatch) -> None:
+    """명단 동기화가 성공했을 때만 수강 종료 처리를 보낸다 (A39)."""
+    from app.contexts.academy.domain.entities import RosterSyncRun
+    from app.contexts.academy.domain.enums import RosterSyncStatus
+
+    assert process_enrollment_ended.task_name == "mentoring.enrollment_ended.process"
+    assert build_enrollment_ended_service() is not None
+    sent: list[str] = []
+
+    async def fake_kiq() -> None:
+        sent.append("sent")
+
+    monkeypatch.setattr(process_enrollment_ended, "kiq", fake_kiq)  # roster가 쓰는 같은 작업
+    for status, expected in (
+        (RosterSyncStatus.SUCCEEDED, 1),
+        (RosterSyncStatus.FAILED, 1),
+    ):
+        run = RosterSyncRun.__new__(RosterSyncRun)
+        run.status = status
+        await roster._after_sync(run)
+        assert len(sent) == expected

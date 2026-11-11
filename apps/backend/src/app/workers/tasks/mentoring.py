@@ -2,6 +2,8 @@
 
 - `mentoring.assignments.expire`: 매일 00:00 KST, 종료일이 지난 활성 기수 멘토 배정을 비활성화한다
   (decisions A35, 사유 EXPIRED). 멱등이라 워커가 멈췄다가 다시 돌아도 밀린 배정을 모두 처리한다.
+- `mentoring.enrollment_ended.process`: 명단 동기화가 성공하면 보낸다(roster 작업). 수강 중이 아닌
+  수강생을 팀에서 빼고 1:1 잔여를 회수한다(decisions A39, 멱등).
 
 이 모듈은 composition root라 여러 컨텍스트의 infrastructure를 직접 조립한다.
 """
@@ -9,16 +11,24 @@
 import logging
 
 from app.contexts.academy.application.catalog import AcademyCatalog
+from app.contexts.academy.application.student_queries import StudentQueries
 from app.contexts.academy.infrastructure.repositories import (
     TortoiseBootcampRepository,
     TortoiseCohortRepository,
+    TortoiseStudentRepository,
 )
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.audit.infrastructure.repositories import TortoiseAuditLogRepository
 from app.contexts.educator.application.mentor_queries import MentorQueries
 from app.contexts.educator.infrastructure.repositories import TortoiseMentorRepository
 from app.contexts.mentoring.application.assignment_service import CohortMentorService
-from app.contexts.mentoring.infrastructure.repositories import TortoiseCohortMentorRepository
+from app.contexts.mentoring.application.enrollment_ended import EnrollmentEndedService
+from app.contexts.mentoring.infrastructure.repositories import (
+    TortoiseBalanceAccountRepository,
+    TortoiseBalanceTransactionRepository,
+    TortoiseCohortMentorRepository,
+    TortoiseMentoringTeamRepository,
+)
 from app.core.clock import SystemClock
 from app.core.uow import UnitOfWork
 from app.workers.broker import broker
@@ -44,3 +54,25 @@ def build_assignment_service() -> CohortMentorService:
 async def expire_assignments() -> None:
     count = await build_assignment_service().expire_ended()
     logger.info("종료일이 지난 기수 멘토 배정 %d건을 비활성화했습니다.", count)
+
+
+def build_enrollment_ended_service() -> EnrollmentEndedService:
+    return EnrollmentEndedService(
+        teams=TortoiseMentoringTeamRepository(),
+        accounts=TortoiseBalanceAccountRepository(),
+        ledger=TortoiseBalanceTransactionRepository(),
+        students=StudentQueries(TortoiseStudentRepository()),
+        audit=AuditRecorder(TortoiseAuditLogRepository(), SystemClock()),
+        uow=UnitOfWork(),
+    )
+
+
+@broker.task(task_name="mentoring.enrollment_ended.process")
+async def process_enrollment_ended() -> None:
+    result = await build_enrollment_ended_service().process()
+    logger.info(
+        "수강 종료 처리: 팀원 %d명 제외, 1:1 계좌 %d개에서 %d분 회수",
+        result.removed_members,
+        result.revoked_accounts,
+        result.revoked_minutes,
+    )
