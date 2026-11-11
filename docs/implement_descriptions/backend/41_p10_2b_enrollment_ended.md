@@ -1,7 +1,7 @@
 # 41. P10-2b 명단 동기화 후 수강 종료 처리
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #46
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P10 (P10-2b)
 - 이전 기록: [40. P10-2a 멘토링 시간 계좌·지급·조정·조회](40_p10_2a_balance_accounts.md)
 
