@@ -1,7 +1,7 @@
 # 40. P10-2a 멘토링 시간 계좌·지급·조정·조회
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #45
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P10 (P10-2a)
 - 이전 기록: [39. P10-1 멘토링 팀 구성](39_p10_1_mentoring_teams.md)
 
