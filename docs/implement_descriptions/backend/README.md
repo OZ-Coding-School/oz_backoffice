@@ -43,3 +43,4 @@
 | 39 | [P10-1 멘토링 팀 구성](39_p10_1_mentoring_teams.md) | 완료 (#44) |
 | 40 | [P10-2a 멘토링 시간 계좌·지급·조정·조회](40_p10_2a_balance_accounts.md) | 완료 (#45) |
 | 41 | [P10-2b 명단 동기화 후 수강 종료 처리](41_p10_2b_enrollment_ended.md) | 완료 (#46) |
+| 42 | [멘토링 유형(평시/프로젝트) 제거](42_remove_mentoring_period_type.md) | PR 진행 중 |
