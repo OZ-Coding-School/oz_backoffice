@@ -1,6 +1,6 @@
 # 42. 멘토링 유형(평시/프로젝트) 제거
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-11 병합)
 - 관련 PR: #47
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P11 (선행 PR)
 - 이전 기록: [41. P10-2b 명단 동기화 후 수강 종료 처리](41_p10_2b_enrollment_ended.md)
@@ -41,6 +41,8 @@ P11(신청) 결정을 확인하던 중 사용자가 "멘토링 유형 컬럼이 
 - 마이그레이션의 팀 번호 재부여가 `team_number > 0` check에 막혔다(임시 음수 번호). 데이터를 넣고 롤백하는 트랜잭션으로 시험해 발견했고, check를 먼저 떼도록 순서를 고쳤다.
 
 ## 검증
+- GitHub Actions (PR #47): backend 잡 통과, 679 passed
+- 사용자가 작업 완료를 확인했다(2026-11-11)
 - 전체 679 passed (compose `api` 컨테이너, ruff·ruff format·mypy·mypy tests·lint-imports 통과)
 - 테스트를 유형 없는 규칙으로 바꿨다: "다른 유형은 따로"를 "다른 기수는 따로"로, 팀 중복 소속·계좌 하나·기수별 팀 번호 유니크.
 - 마이그레이션: upgrade → migrate("No changes detected") → downgrade -v 16 → upgrade
