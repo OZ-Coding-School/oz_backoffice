@@ -15,7 +15,6 @@ from app.contexts.academy.infrastructure.repositories import (
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.audit.infrastructure.repositories import TortoiseAuditLogRepository
 from app.contexts.mentoring.application.balance_service import BalanceService, GrantTarget
-from app.contexts.mentoring.domain.enums import MentoringPeriodType
 from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseBalanceAccountRepository,
     TortoiseBalanceTransactionRepository,
@@ -53,7 +52,6 @@ async def test_concurrent_adjustments_never_go_negative() -> None:
     actor = (await create_user()).id
     result = await _service().grant(
         cohort.id,
-        period_type=MentoringPeriodType.REGULAR_MENTORING,
         target=GrantTarget.STUDENTS,
         ids=[student.id],
         minutes=60,

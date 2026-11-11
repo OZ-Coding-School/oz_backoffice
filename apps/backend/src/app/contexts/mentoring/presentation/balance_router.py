@@ -1,7 +1,7 @@
 """멘토링 시간 계좌 API (decisions M8·M9·A39·A40).
 
 mentoring.balance.grant (기수 범위, 매니저·조교):
-  GET    /admin/cohorts/{cohort_id}/mentoring-balances?period_type=&owner=&limit=&offset=
+  GET    /admin/cohorts/{cohort_id}/mentoring-balances?owner=&limit=&offset=
   POST   /admin/cohorts/{cohort_id}/mentoring-balances/grants              (Idempotency-Key 필수)
   PATCH  /admin/cohorts/{cohort_id}/mentoring-balances/{account_id}        (사용 기간)
   POST   /admin/cohorts/{cohort_id}/mentoring-balances/{account_id}/adjustments  (Idempotency-Key)
@@ -33,7 +33,7 @@ from app.contexts.mentoring.domain.balance import (
     BalanceAccount,
     BalanceTransaction,
 )
-from app.contexts.mentoring.domain.enums import MentoringBalanceTransactionType, MentoringPeriodType
+from app.contexts.mentoring.domain.enums import MentoringBalanceTransactionType
 from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseBalanceAccountRepository,
     TortoiseBalanceTransactionRepository,
@@ -100,7 +100,6 @@ class AccountResponse(BaseModel):
     owner_type: OwnerType
     owner_id: uuid.UUID = Field(description="수강생(students.id) 또는 팀 ID")
     owner_name: str = Field(description="수강생 이름 또는 팀 이름(없으면 'N팀')")
-    period_type: MentoringPeriodType
     valid_from: date
     valid_until: date
     is_expired: bool
@@ -133,9 +132,8 @@ class TransactionResponse(BaseModel):
 
 
 class GrantRequest(BaseModel):
-    period_type: MentoringPeriodType
     target: GrantTarget = Field(
-        description="ALL_STUDENTS(기수 전체 수강 중) / STUDENTS / ALL_TEAMS(기수·유형 전체) / TEAMS"
+        description="ALL_STUDENTS(기수 전체 수강 중) / STUDENTS / ALL_TEAMS(기수 전체) / TEAMS"
     )
     ids: list[uuid.UUID] = Field(
         default_factory=list, max_length=500, description="STUDENTS·TEAMS일 때 대상 ID"
@@ -197,7 +195,6 @@ def _accounts(accounts: list[BalanceAccount], owners: Owners, today: date) -> li
                 owner_type=owner_type,
                 owner_id=owner_id,
                 owner_name=name,
-                period_type=a.period_type,
                 valid_from=a.valid_from,
                 valid_until=a.valid_until,
                 is_expired=a.is_expired(today),
@@ -226,13 +223,12 @@ async def list_accounts(
     _: BalanceManager,
     service: ServiceDep,
     clock: ClockDep,
-    period_type: MentoringPeriodType | None = None,
     owner: OwnerType | None = None,
     limit: Limit = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> Page[AccountResponse]:
     accounts, total = await service.list_accounts(
-        cohort_id, period_type=period_type, owner=owner, limit=limit, offset=offset
+        cohort_id, owner=owner, limit=limit, offset=offset
     )
     owners = await service.owners_of(accounts)
     items = _accounts(accounts, owners, business_date(clock.now()))
@@ -253,7 +249,6 @@ async def grant(
     async def run() -> GrantResponse:
         result = await service.grant(
             cohort_id,
-            period_type=body.period_type,
             target=body.target,
             ids=body.ids,
             minutes=body.minutes,

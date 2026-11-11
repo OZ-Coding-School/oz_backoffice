@@ -1,9 +1,10 @@
 """기수에 멘토를 배정한 내용 (decisions A35, M13·M30).
 
-- 계약과 별개로 운영진이 관리한다. 활성 배정은 (멘토, 기수, 유형)당 하나(DB 부분 유니크).
+- 계약과 별개로 운영진이 관리한다.
+- 활성 배정은 (멘토, 기수)당 하나(DB 부분 유니크, 유형 구분 없음 A41).
 - 시작일은 기수 기간 안이어야 하고, 종료일은 없어도 되며 기수 기간 밖이어도 된다.
 - 종료일이 지나면(다음 날 00:00 KST) 비활성화한다. 삭제는 비활성화다.
-- 기간·정산 조건은 언제든 바꾼다(멘토·기수·유형은 바꾸지 않는다).
+- 기간·정산 조건은 언제든 바꾼다(멘토·기수는 바꾸지 않는다).
 - 비활성 배정은 종료일이 없거나 오늘 이후일 때 다시 활성화한다(멘토 활성·중복 검사는 서비스).
 """
 
@@ -15,7 +16,6 @@ from typing import Any
 
 from app.contexts.mentoring.domain.enums import (
     CohortMentorDeactivationReason,
-    MentoringPeriodType,
     MentoringSettlementPolicy,
     PayUnit,
 )
@@ -44,7 +44,6 @@ def _rule(condition: bool, message: str, code: str) -> None:
 class CohortMentor(AggregateRoot):
     cohort_id: uuid.UUID
     mentor_id: uuid.UUID
-    period_type: MentoringPeriodType
     start_date: date
     cost_settlement_policy: MentoringSettlementPolicy
     pay_unit: PayUnit

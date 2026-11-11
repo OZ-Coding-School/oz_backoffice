@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 
 from app.contexts.mentoring.domain.balance import BalanceAccount, ensure_validity
-from app.contexts.mentoring.domain.enums import MentoringBalanceTransactionType, MentoringPeriodType
+from app.contexts.mentoring.domain.enums import MentoringBalanceTransactionType
 from app.shared.errors import BusinessRuleViolation
 from app.shared.ids import new_id
 
@@ -19,7 +19,6 @@ COHORT = {"cohort_start": date(2026, 11, 1), "cohort_end": date(2027, 4, 30)}
 def _account(**overrides: Any) -> BalanceAccount:
     values: dict[str, Any] = {
         "student_id": new_id(),
-        "period_type": MentoringPeriodType.REGULAR_MENTORING,
         "valid_from": date(2026, 11, 1),
         "valid_until": date(2027, 4, 30),
     }

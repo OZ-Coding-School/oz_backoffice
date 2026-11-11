@@ -1,6 +1,7 @@
 """멘토링 시간 계좌와 원장 (decisions M8·M9·M10·A39·A40).
 
-- 계좌는 (수강생 또는 팀) × 기간 유형당 하나이고, 사용 기간(valid_from~valid_until)이 있다.
+- 계좌는 수강생(수강 등록) 또는 팀당 하나이고(유형 구분 없음, A41),
+  사용 기간(valid_from~valid_until)이 있다.
 - 잔여 = 지급 합계 − 보류 − 사용, 음수 불가.
 - 운영진 지급·조정은 60분 단위, 사유 필수(100자). 사용 기간이 끝난 계좌에는 지급·늘리는 조정을
   하지 않고 줄이는 조정만 한다.
@@ -12,7 +13,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import date, datetime
 
-from app.contexts.mentoring.domain.enums import MentoringBalanceTransactionType, MentoringPeriodType
+from app.contexts.mentoring.domain.enums import MentoringBalanceTransactionType
 from app.shared.domain import AggregateRoot, Entity
 from app.shared.errors import BusinessRuleViolation
 
@@ -72,7 +73,6 @@ class BalanceTransaction(Entity):
 
 @dataclass(kw_only=True, eq=False)
 class BalanceAccount(AggregateRoot):
-    period_type: MentoringPeriodType
     valid_from: date
     valid_until: date
     student_id: uuid.UUID | None = None

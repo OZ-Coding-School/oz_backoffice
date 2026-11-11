@@ -15,7 +15,6 @@ from app.contexts.mentoring.application.calendar import BusinessCalendar
 from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.availability import Interval
 from app.contexts.mentoring.domain.enums import (
-    MentoringPeriodType,
     MentoringSettlementPolicy,
     PayUnit,
 )
@@ -68,7 +67,6 @@ class Harness:
             CohortMentor(
                 cohort_id=self.cohort_id,
                 mentor_id=self.mentor.id,
-                period_type=MentoringPeriodType.REGULAR_MENTORING,
                 start_date=date(2026, 11, 1),
                 cost_settlement_policy=MentoringSettlementPolicy.ACTUAL_DURATION,
                 pay_unit=PayUnit.HOURLY,

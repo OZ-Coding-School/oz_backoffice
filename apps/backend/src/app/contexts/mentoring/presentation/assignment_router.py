@@ -32,7 +32,6 @@ from app.contexts.mentoring.application.mentor_activation import MentorActivatio
 from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.enums import (
     CohortMentorDeactivationReason,
-    MentoringPeriodType,
     MentoringSettlementPolicy,
     PayUnit,
 )
@@ -131,7 +130,6 @@ class PayTerms(BaseModel):
 
 class AssignmentCreate(PayTerms):
     mentor_id: uuid.UUID
-    period_type: MentoringPeriodType
     start_date: date = Field(description="기수 기간 안")
     end_date: date | None = Field(default=None, description="없으면 기한 없음, 기수 밖도 가능")
 
@@ -150,7 +148,6 @@ class AssignmentUpdate(BaseModel):
 class AssignmentFields(PayTerms):
     id: uuid.UUID
     cohort_id: uuid.UUID
-    period_type: MentoringPeriodType
     start_date: date
     end_date: date | None
     is_active: bool
@@ -186,7 +183,6 @@ def _fields(a: CohortMentor) -> dict[str, object]:
     return {
         "id": a.id,
         "cohort_id": a.cohort_id,
-        "period_type": a.period_type,
         "start_date": a.start_date,
         "end_date": a.end_date,
         "cost_settlement_policy": a.cost_settlement_policy,

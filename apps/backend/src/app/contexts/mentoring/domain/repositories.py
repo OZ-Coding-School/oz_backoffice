@@ -4,7 +4,6 @@ from typing import Protocol
 
 from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.balance import BalanceAccount, BalanceTransaction
-from app.contexts.mentoring.domain.enums import MentoringPeriodType
 from app.contexts.mentoring.domain.schedule import MentorUnavailablePeriod
 from app.contexts.mentoring.domain.settings import (
     CohortMentoringSettings,
@@ -48,7 +47,7 @@ class CohortMentorRepository(Protocol):
     async def get(self, assignment_id: uuid.UUID) -> CohortMentor | None: ...
     async def list_by_ids(self, assignment_ids: list[uuid.UUID]) -> list[CohortMentor]: ...
     async def find_active(
-        self, mentor_id: uuid.UUID, cohort_id: uuid.UUID, period_type: MentoringPeriodType
+        self, mentor_id: uuid.UUID, cohort_id: uuid.UUID
     ) -> CohortMentor | None: ...
     async def list_by_cohort(
         self, cohort_id: uuid.UUID, *, include_inactive: bool
@@ -82,17 +81,13 @@ class MentoringTeamRepository(Protocol):
         """팀원과 함께 지운다. 계좌·신청이 참조하면 409 `in_use`."""
         ...
 
-    async def list_by_cohort(
-        self, cohort_id: uuid.UUID, period_type: MentoringPeriodType | None
-    ) -> list[MentoringTeam]:
-        """유형·팀 번호 순."""
+    async def list_by_cohort(self, cohort_id: uuid.UUID) -> list[MentoringTeam]:
+        """팀 번호 순."""
         ...
 
-    async def next_number(self, cohort_id: uuid.UUID, period_type: MentoringPeriodType) -> int: ...
-    async def team_of_students(
-        self, student_ids: list[uuid.UUID], period_type: MentoringPeriodType
-    ) -> dict[uuid.UUID, uuid.UUID]:
-        """수강생 → 그 유형의 소속 팀."""
+    async def next_number(self, cohort_id: uuid.UUID) -> int: ...
+    async def team_of_students(self, student_ids: list[uuid.UUID]) -> dict[uuid.UUID, uuid.UUID]:
+        """수강생 → 소속 팀."""
         ...
 
     async def list_by_students(self, student_ids: list[uuid.UUID]) -> list[MentoringTeam]: ...
@@ -118,7 +113,6 @@ class BalanceAccountRepository(Protocol):
         *,
         student_ids: list[uuid.UUID],
         team_ids: list[uuid.UUID],
-        period_type: MentoringPeriodType | None,
     ) -> list[BalanceAccount]: ...
     async def list_student_accounts_with_remaining(self) -> list[BalanceAccount]:
         """잔여가 남은 1:1 계좌 (수강 종료 회수 대상 후보)."""
@@ -128,7 +122,6 @@ class BalanceAccountRepository(Protocol):
         self,
         cohort_id: uuid.UUID,
         *,
-        period_type: MentoringPeriodType | None,
         owner: str | None,
         limit: int,
         offset: int,

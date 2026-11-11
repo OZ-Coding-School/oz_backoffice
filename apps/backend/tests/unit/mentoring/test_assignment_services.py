@@ -15,7 +15,6 @@ from app.contexts.mentoring.application.mentor_activation import MentorActivatio
 from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.enums import (
     CohortMentorDeactivationReason,
-    MentoringPeriodType,
     MentoringSettlementPolicy,
     PayUnit,
 )
@@ -31,8 +30,6 @@ pytestmark = pytest.mark.unit
 
 NOW = datetime(2026, 11, 10, 3, 0, tzinfo=UTC)  # 2026-11-10 12:00 KST
 ACTOR = new_id()
-REGULAR = MentoringPeriodType.REGULAR_MENTORING
-PROJECT = MentoringPeriodType.PROJECT_MENTORING
 
 
 class Cohorts:
@@ -56,7 +53,6 @@ def _cohort() -> Cohort:
 def _values(mentor: Mentor, **overrides: Any) -> dict[str, Any]:
     values: dict[str, Any] = {
         "mentor_id": mentor.id,
-        "period_type": REGULAR,
         "start_date": date(2026, 11, 1),
         "end_date": None,
         "cost_settlement_policy": MentoringSettlementPolicy.ACTUAL_DURATION,
@@ -70,6 +66,7 @@ def _values(mentor: Mentor, **overrides: Any) -> dict[str, Any]:
 class Harness:
     def __init__(self) -> None:
         self.cohort = _cohort()
+        self.other_cohort = _cohort()
         self.mentor = Mentor(user_id=new_id())
         self.mentor_repo = InMemoryMentorRepository(self.mentor)
         self.repo = InMemoryCohortMentorRepository()
@@ -80,7 +77,7 @@ class Harness:
         self.service = CohortMentorService(
             assignments=self.repo,
             mentors=mentors,
-            cohorts=Cohorts(self.cohort),
+            cohorts=Cohorts(self.cohort, self.other_cohort),
             audit=audit,
             uow=FakeUnitOfWork(),
             clock=self.clock,
@@ -93,9 +90,10 @@ class Harness:
             clock=self.clock,
         )
 
-    async def assign(self, **overrides: Any) -> CohortMentor:
+    async def assign(self, *, other: bool = False, **overrides: Any) -> CohortMentor:
+        cohort = self.other_cohort if other else self.cohort
         return await self.service.create(
-            self.cohort.id, _values(self.mentor, **overrides), actor_id=ACTOR
+            cohort.id, _values(self.mentor, **overrides), actor_id=ACTOR
         )
 
 
@@ -108,8 +106,8 @@ async def test_create_rules(h: Harness) -> None:
     created = await h.assign()
     assert created.is_active
     assert created.end_date is None
-    # 다른 유형은 따로, 같은 유형은 하나만
-    await h.assign(period_type=PROJECT)
+    # 다른 기수는 따로, 같은 기수는 하나만 (A41)
+    await h.assign(other=True)
     with pytest.raises(ConflictError) as dup:
         await h.assign()
     assert dup.value.code == "assignment_already_exists"
@@ -164,7 +162,7 @@ async def test_update_deactivate_reactivate(h: Harness) -> None:
 
 async def test_expire_ended_is_idempotent(h: Harness) -> None:
     ended = await h.assign(end_date=date(2026, 11, 9))
-    today_end = await h.assign(period_type=PROJECT, end_date=date(2026, 11, 10))
+    today_end = await h.assign(other=True, end_date=date(2026, 11, 10))
     assert await h.service.expire_ended() == 1
     assert await h.service.expire_ended() == 0
     expired = await h.repo.get(ended.id)
@@ -185,7 +183,7 @@ async def test_list_mine_requires_mentor_profile(h: Harness) -> None:
 
 async def test_mentor_deactivation_preview_then_confirm(h: Harness) -> None:
     regular = await h.assign()
-    project = await h.assign(period_type=PROJECT)
+    project = await h.assign(other=True)
 
     preview = await h.activation.deactivate(h.mentor.id, confirm=False, actor_id=ACTOR)
     assert not preview.applied
@@ -207,7 +205,7 @@ async def test_mentor_deactivation_preview_then_confirm(h: Harness) -> None:
 
 async def test_mentor_activation_returns_restorable_and_bulk_is_partial(h: Harness) -> None:
     regular = await h.assign()
-    project = await h.assign(period_type=PROJECT, end_date=date(2026, 11, 20))
+    project = await h.assign(other=True, end_date=date(2026, 11, 20))
     await h.activation.deactivate(h.mentor.id, confirm=True, actor_id=ACTOR)
 
     h.clock.set(NOW + timedelta(days=15))  # 2026-11-25: project 배정은 종료일이 지남

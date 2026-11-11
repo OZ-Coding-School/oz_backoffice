@@ -1,10 +1,10 @@
 """멘토링 팀 구성 (decisions M11·A39, 권한 mentoring.team.manage).
 
 - 팀 멘토링을 허용한 기수에서만 만든다(설정이 없으면 404, 허용 안 함이면 422).
-- 담당 멘토는 그 기수·유형의 활성 배정이어야 하고 언제든 바꿀 수 있다
+- 담당 멘토는 그 기수의 활성 배정이어야 하고 언제든 바꿀 수 있다
   (이미 잡힌 신청·세션은 기존 멘토 유지 — P11).
-- 팀 번호는 기수×유형별 다음 번호. 기수 설정 행을 잠가 동시 생성 번호 충돌을 막는다.
-- 팀원은 그 기수 수강 중(가입 여부 무관)이어야 하고, 같은 유형 다른 팀에 있으면 409.
+- 팀 번호는 기수별 다음 번호(유형 구분 없음, A41). 기수 설정 행을 잠가 동시 생성 번호 충돌을 막는다.
+- 팀원은 그 기수 수강 중(가입 여부 무관)이어야 하고, 다른 팀에 있으면 409.
 - 팀은 시간 계좌·신청이 없을 때만 삭제한다(409 `team_in_use`). 팀원은 언제든 넣고 뺀다.
 모든 변경은 감사 로그를 남긴다.
 """
@@ -16,7 +16,6 @@ from typing import Any, Protocol
 from app.contexts.academy.domain.entities import Student
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.educator.domain.profiles import Mentor
-from app.contexts.mentoring.domain.enums import MentoringPeriodType
 from app.contexts.mentoring.domain.repositories import (
     CohortMentoringSettingsRepository,
     CohortMentorRepository,
@@ -52,7 +51,6 @@ class MyTeams:
 def _snapshot(team: MentoringTeam) -> dict[str, Any]:
     return {
         "cohort_id": str(team.cohort_id),
-        "period_type": team.period_type.value,
         "team_number": team.team_number,
         "mentor_id": str(team.mentor_id),
         "name": team.name,
@@ -81,17 +79,13 @@ class MentoringTeamService:
         self._uow = uow
 
     # ------------------------------------------------------------------ 조회
-    async def list_by_cohort(
-        self, cohort_id: uuid.UUID, period_type: MentoringPeriodType | None
-    ) -> list[MentoringTeam]:
-        return await self._teams.list_by_cohort(cohort_id, period_type)
+    async def list_by_cohort(self, cohort_id: uuid.UUID) -> list[MentoringTeam]:
+        return await self._teams.list_by_cohort(cohort_id)
 
-    async def unassigned_students(
-        self, cohort_id: uuid.UUID, period_type: MentoringPeriodType
-    ) -> list[Student]:
-        """그 유형의 팀이 없는 수강 중 수강생 (이름순)."""
+    async def unassigned_students(self, cohort_id: uuid.UUID) -> list[Student]:
+        """팀이 없는 수강 중 수강생 (이름순)."""
         enrolled = await self._students.enrolled_in_cohort(cohort_id)
-        assigned = await self._teams.team_of_students([s.id for s in enrolled], period_type)
+        assigned = await self._teams.team_of_students([s.id for s in enrolled])
         return [s for s in enrolled if s.id not in assigned]
 
     async def mine(self, user_id: uuid.UUID) -> MyTeams:
@@ -111,7 +105,6 @@ class MentoringTeamService:
         self,
         cohort_id: uuid.UUID,
         *,
-        period_type: MentoringPeriodType,
         mentor_id: uuid.UUID,
         name: str | None,
         student_ids: list[uuid.UUID],
@@ -129,13 +122,12 @@ class MentoringTeamService:
                     "팀 멘토링을 허용한 기수에서만 팀을 만들 수 있습니다.",
                     code="team_mentoring_not_allowed",
                 )
-            await self._ensure_assigned(mentor_id, cohort_id, period_type)
+            await self._ensure_assigned(mentor_id, cohort_id)
             members = list(dict.fromkeys(student_ids))
-            await self._ensure_members(cohort_id, period_type, members, team_id=None)
+            await self._ensure_members(cohort_id, members, team_id=None)
             team = MentoringTeam(
                 cohort_id=cohort_id,
-                period_type=period_type,
-                team_number=await self._teams.next_number(cohort_id, period_type),
+                team_number=await self._teams.next_number(cohort_id),
                 mentor_id=mentor_id,
                 name=name,
                 member_ids=members,
@@ -159,7 +151,7 @@ class MentoringTeamService:
             if "name" in changes:
                 team.rename(changes["name"])
             if "mentor_id" in changes and changes["mentor_id"] != team.mentor_id:
-                await self._ensure_assigned(changes["mentor_id"], cohort_id, team.period_type)
+                await self._ensure_assigned(changes["mentor_id"], cohort_id)
                 team.assign_mentor(changes["mentor_id"])
             await self._teams.save(team)
             await self._record(actor_id, "update", team, before)
@@ -190,7 +182,7 @@ class MentoringTeamService:
         async with self._uow:
             team = await self._get(cohort_id, team_id)
             before = _snapshot(team)
-            await self._ensure_members(cohort_id, team.period_type, [student_id], team_id=team.id)
+            await self._ensure_members(cohort_id, [student_id], team_id=team.id)
             team.add_member(student_id)
             await self._teams.save(team)
             await self._record(actor_id, "member_add", team, before)
@@ -219,19 +211,16 @@ class MentoringTeamService:
             raise NotFoundError("팀을 찾을 수 없습니다.", code="team_not_found")
         return team
 
-    async def _ensure_assigned(
-        self, mentor_id: uuid.UUID, cohort_id: uuid.UUID, period_type: MentoringPeriodType
-    ) -> None:
-        if await self._assignments.find_active(mentor_id, cohort_id, period_type) is None:
+    async def _ensure_assigned(self, mentor_id: uuid.UUID, cohort_id: uuid.UUID) -> None:
+        if await self._assignments.find_active(mentor_id, cohort_id) is None:
             raise BusinessRuleViolation(
-                "담당 멘토는 이 기수·유형에 활성 배정된 멘토여야 합니다.",
+                "담당 멘토는 이 기수에 활성 배정된 멘토여야 합니다.",
                 code="mentor_not_assigned",
             )
 
     async def _ensure_members(
         self,
         cohort_id: uuid.UUID,
-        period_type: MentoringPeriodType,
         student_ids: list[uuid.UUID],
         *,
         team_id: uuid.UUID | None,
@@ -247,10 +236,10 @@ class MentoringTeamService:
                 raise BusinessRuleViolation(
                     "수강 중인 수강생만 팀에 넣을 수 있습니다.", code="student_not_enrolled"
                 )
-        teams = await self._teams.team_of_students(student_ids, period_type)
+        teams = await self._teams.team_of_students(student_ids)
         if any(other != team_id for other in teams.values()):
             raise ConflictError(
-                "이미 같은 유형의 다른 팀에 속한 수강생이 있습니다.", code="student_in_other_team"
+                "이미 다른 팀에 속한 수강생이 있습니다.", code="student_in_other_team"
             )
 
     async def _record(

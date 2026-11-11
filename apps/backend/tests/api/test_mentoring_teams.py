@@ -24,8 +24,6 @@ from tests.factories.staff_review import create_applicant, seed_roles
 
 pytestmark = pytest.mark.api
 
-PROJECT = "PROJECT_MENTORING"
-
 
 def bearer(settings: Settings, user: User) -> dict[str, str]:
     token, _ = JWTService(settings).encode(str(user.id), "access", now=datetime.now(UTC))
@@ -53,7 +51,6 @@ async def _setup(client: AsyncClient, settings: Settings) -> dict[str, Any]:
         f"{api}/mentor-assignments",
         json={
             "mentor_id": str(mentor.id),
-            "period_type": PROJECT,
             "start_date": "2026-11-01",
             "cost_settlement_policy": "ACTUAL_DURATION",
             "pay_unit": "HOURLY",
@@ -90,9 +87,7 @@ async def test_team_lifecycle(client: AsyncClient, settings: Settings) -> None:
     ctx = await _setup(client, settings)
     path, admin = ctx["path"], ctx["admin"]
 
-    unassigned = await client.get(
-        f"{path}/unassigned-students", params={"period_type": PROJECT}, headers=admin
-    )
+    unassigned = await client.get(f"{path}/unassigned-students", headers=admin)
     assert [(s["name"], s["is_signed_up"]) for s in unassigned.json()] == [
         ("가수강", True),
         ("나수강", False),
@@ -100,7 +95,6 @@ async def test_team_lifecycle(client: AsyncClient, settings: Settings) -> None:
     created = await client.post(
         path,
         json={
-            "period_type": PROJECT,
             "mentor_id": str(ctx["mentor"].id),
             "student_ids": [str(ctx["signed"].id)],
         },
@@ -123,7 +117,6 @@ async def test_team_lifecycle(client: AsyncClient, settings: Settings) -> None:
     second = await client.post(
         path,
         json={
-            "period_type": PROJECT,
             "mentor_id": str(ctx["mentor"].id),
             "student_ids": [str(ctx["pending"].id)],
         },
@@ -135,7 +128,7 @@ async def test_team_lifecycle(client: AsyncClient, settings: Settings) -> None:
     assert renamed.json()["label"] == "알파"
     removed = await client.delete(f"{team_url}/members/{ctx['pending'].id}", headers=admin)
     assert [m["name"] for m in removed.json()["members"]] == ["가수강"]
-    listed = await client.get(path, params={"period_type": PROJECT}, headers=admin)
+    listed = await client.get(path, headers=admin)
     assert [t["id"] for t in listed.json()] == [team["id"]]
 
     mine = (await client.get("/api/v1/me/mentoring-teams", headers=ctx["student_h"])).json()
@@ -154,25 +147,15 @@ async def test_team_rules_and_permissions(client: AsyncClient, settings: Setting
     ctx = await _setup(client, settings)
     path, admin = ctx["path"], ctx["admin"]
     other_mentor = await create_mentor()
-    unassigned = await client.post(
-        path, json={"period_type": PROJECT, "mentor_id": str(other_mentor.id)}, headers=admin
-    )
+    unassigned = await client.post(path, json={"mentor_id": str(other_mentor.id)}, headers=admin)
     assert unassigned.json()["error"]["code"] == "mentor_not_assigned"
-    regular = await client.post(
-        path,
-        json={"period_type": "REGULAR_MENTORING", "mentor_id": str(ctx["mentor"].id)},
-        headers=admin,
-    )
-    assert regular.json()["error"]["code"] == "mentor_not_assigned"
 
     await client.put(
         f"/api/v1/admin/cohorts/{ctx['cohort'].id}/mentoring-settings",
         json={"allow_1_on_1": True},
         headers=admin,
     )
-    not_allowed = await client.post(
-        path, json={"period_type": PROJECT, "mentor_id": str(ctx["mentor"].id)}, headers=admin
-    )
+    not_allowed = await client.post(path, json={"mentor_id": str(ctx["mentor"].id)}, headers=admin)
     assert not_allowed.json()["error"]["code"] == "team_mentoring_not_allowed"
 
     await seed_roles()

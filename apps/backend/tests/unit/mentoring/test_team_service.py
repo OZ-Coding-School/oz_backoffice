@@ -13,7 +13,6 @@ from app.contexts.educator.domain.profiles import Mentor
 from app.contexts.mentoring.application.team_service import MentoringTeamService
 from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.enums import (
-    MentoringPeriodType,
     MentoringSettlementPolicy,
     PayUnit,
 )
@@ -33,8 +32,6 @@ from tests.fakes.uow import FakeUnitOfWork
 pytestmark = pytest.mark.unit
 
 ACTOR = new_id()
-PROJECT = MentoringPeriodType.PROJECT_MENTORING
-REGULAR = MentoringPeriodType.REGULAR_MENTORING
 
 
 class Students:
@@ -70,13 +67,10 @@ class Students:
         return [s for s in self.items.values() if s.user_id == user_id]
 
 
-def _assignment(
-    mentor: Mentor, cohort_id: uuid.UUID, period_type: MentoringPeriodType
-) -> CohortMentor:
+def _assignment(mentor: Mentor, cohort_id: uuid.UUID) -> CohortMentor:
     return CohortMentor(
         cohort_id=cohort_id,
         mentor_id=mentor.id,
-        period_type=period_type,
         start_date=date(2026, 11, 1),
         cost_settlement_policy=MentoringSettlementPolicy.ACTUAL_DURATION,
         pay_unit=PayUnit.HOURLY,
@@ -93,8 +87,8 @@ class Harness:
             CohortMentoringSettings(cohort_id=self.cohort_id, allow_team_mentoring=True)
         )
         self.assignments = InMemoryCohortMentorRepository(
-            _assignment(self.mentor, self.cohort_id, PROJECT),
-            _assignment(self.other_mentor, self.cohort_id, PROJECT),
+            _assignment(self.mentor, self.cohort_id),
+            _assignment(self.other_mentor, self.cohort_id),
         )
         self.teams = InMemoryTeamRepository()
         self.students = Students()
@@ -111,7 +105,6 @@ class Harness:
 
     async def create(self, *members: uuid.UUID, **overrides: object) -> uuid.UUID:
         values: dict[str, object] = {
-            "period_type": PROJECT,
             "mentor_id": self.mentor.id,
             "name": None,
             "student_ids": list(members),
@@ -132,7 +125,7 @@ async def test_create_numbers_and_members(h: Harness) -> None:
     b = h.students.add(h.cohort_id, user_id=new_id()).id
     first = await h.create(a)
     second = await h.create(b, name="베타")
-    teams = await h.service.list_by_cohort(h.cohort_id, PROJECT)
+    teams = await h.service.list_by_cohort(h.cohort_id)
     assert [(t.team_number, t.label) for t in teams] == [(1, "1팀"), (2, "베타")]
     assert teams[0].id == first
     assert teams[1].member_ids == [b]
@@ -144,7 +137,7 @@ async def test_create_numbers_and_members(h: Harness) -> None:
 
 async def test_create_rules(h: Harness) -> None:
     with pytest.raises(BusinessRuleViolation) as unassigned:
-        await h.create(period_type=REGULAR)
+        await h.create(mentor_id=new_id())  # 이 기수에 배정되지 않은 멘토
     assert unassigned.value.code == "mentor_not_assigned"
     dropped = h.students.add(h.cohort_id, status=EnrollmentStatus.DROPPED).id
     with pytest.raises(BusinessRuleViolation) as not_enrolled:
@@ -183,7 +176,7 @@ async def test_update_members_and_delete(h: Harness) -> None:
         await h.service.add_member(h.cohort_id, team_id, b, actor_id=ACTOR)
     removed = await h.service.remove_member(h.cohort_id, team_id, a, actor_id=ACTOR)
     assert removed.member_ids == [b]
-    assert [s.id for s in await h.service.unassigned_students(h.cohort_id, PROJECT)] == [a]
+    assert [s.id for s in await h.service.unassigned_students(h.cohort_id)] == [a]
 
     with pytest.raises(NotFoundError):
         await h.service.delete(new_id(), team_id, actor_id=ACTOR)
@@ -192,7 +185,7 @@ async def test_update_members_and_delete(h: Harness) -> None:
         await h.service.delete(h.cohort_id, team_id, actor_id=ACTOR)
     h.teams.in_use.clear()
     await h.service.delete(h.cohort_id, team_id, actor_id=ACTOR)
-    assert await h.service.list_by_cohort(h.cohort_id, None) == []
+    assert await h.service.list_by_cohort(h.cohort_id) == []
     actions = [log.action for log in h.audit_logs.logs]
     assert actions[0] == "mentoring.team.create"
     assert actions[-1] == "mentoring.team.delete"

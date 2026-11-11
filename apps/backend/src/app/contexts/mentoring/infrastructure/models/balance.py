@@ -8,7 +8,7 @@ from typing import Any
 
 from tortoise import fields, models
 
-from app.contexts.mentoring.domain.enums import MentoringBalanceTransactionType, MentoringPeriodType
+from app.contexts.mentoring.domain.enums import MentoringBalanceTransactionType
 from app.shared.ids import new_id
 
 
@@ -20,7 +20,6 @@ class MentoringBalanceAccountModel(models.Model):
     team: fields.ForeignKeyNullableRelation[Any] = fields.ForeignKeyField(
         "models.MentoringTeamModel", related_name=False, null=True, on_delete=fields.RESTRICT
     )
-    period_type = fields.CharEnumField(MentoringPeriodType, max_length=30)
     valid_from = fields.DateField()
     valid_until = fields.DateField()
     total_minutes = fields.IntField(default=0)

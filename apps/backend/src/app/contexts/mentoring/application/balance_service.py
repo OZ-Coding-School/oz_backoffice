@@ -1,6 +1,6 @@
 """멘토링 시간 계좌 지급·조정·조회 (decisions M8·M9·M10·A39·A40, 권한 mentoring.balance.grant).
 
-- 지급(개별·일괄): 대상은 기수 전체 수강 중 수강생 / 고른 수강생 / 기수·유형의 모든 팀 / 고른 팀.
+- 지급(개별·일괄): 대상은 기수 전체 수강 중 수강생 / 고른 수강생 / 기수의 모든 팀 / 고른 팀.
   계좌가 없으면 만들고 사용 기간을 정한다(기본: 기수 시작일~종료일, 기수 기간 안).
   이미 있으면 기간은 그대로 두고 더한다. 분을 비우면 기수 설정의 기본 지급 시간.
   가능한 대상만 지급하고 만료·수강 종료·다른 기수 등은 사유와 함께 돌려준다(한 트랜잭션).
@@ -24,7 +24,6 @@ from app.contexts.mentoring.domain.balance import (
     ensure_grant_minutes,
     ensure_validity,
 )
-from app.contexts.mentoring.domain.enums import MentoringPeriodType
 from app.contexts.mentoring.domain.repositories import (
     BalanceAccountRepository,
     BalanceTransactionRepository,
@@ -43,7 +42,7 @@ TARGET = "mentoring_balance_account"
 class GrantTarget(StrEnum):
     ALL_STUDENTS = "ALL_STUDENTS"  # 기수 전체 수강 중 수강생 (1:1)
     STUDENTS = "STUDENTS"  # 고른 수강생 (1:1)
-    ALL_TEAMS = "ALL_TEAMS"  # 기수·유형의 모든 팀
+    ALL_TEAMS = "ALL_TEAMS"  # 기수의 모든 팀
     TEAMS = "TEAMS"  # 고른 팀
 
 
@@ -125,7 +124,6 @@ class BalanceService:
         self,
         cohort_id: uuid.UUID,
         *,
-        period_type: MentoringPeriodType,
         target: GrantTarget,
         ids: list[uuid.UUID],
         minutes: int | None,
@@ -142,14 +140,13 @@ class BalanceService:
         ensure_grant_minutes(amount)  # 요청 전체의 오류는 대상별로 건너뛰지 않고 거부한다
         reason = clean_reason(reason)
         today = business_date(self._clock.now())
-        owners, skipped = await self._resolve(cohort_id, period_type, target, ids)
+        owners, skipped = await self._resolve(cohort_id, target, ids)
 
         granted: list[Granted] = []
         async with self._uow:
             existing = await self._accounts.find_by_owners(
                 student_ids=[o.id for o in owners if not o.is_team],
                 team_ids=[o.id for o in owners if o.is_team],
-                period_type=period_type,
             )
             locked = await self._accounts.lock_many([a.id for a in existing])
             by_owner = {owner_of(a): a for a in locked}
@@ -161,7 +158,6 @@ class BalanceService:
                     account = BalanceAccount(
                         student_id=None if owner.is_team else owner.id,
                         team_id=owner.id if owner.is_team else None,
-                        period_type=period_type,
                         valid_from=start,
                         valid_until=end,
                     )
@@ -183,7 +179,6 @@ class BalanceService:
                     target_type="cohort",
                     target_id=cohort_id,
                     after={
-                        "period_type": period_type.value,
                         "target": target.value,
                         "minutes": amount,
                         "reason": reason,
@@ -259,14 +254,11 @@ class BalanceService:
         self,
         cohort_id: uuid.UUID,
         *,
-        period_type: MentoringPeriodType | None,
         owner: str | None,
         limit: int,
         offset: int,
     ) -> tuple[list[BalanceAccount], int]:
-        return await self._accounts.list_page(
-            cohort_id, period_type=period_type, owner=owner, limit=limit, offset=offset
-        )
+        return await self._accounts.list_page(cohort_id, owner=owner, limit=limit, offset=offset)
 
     async def transactions(
         self, cohort_id: uuid.UUID, account_id: uuid.UUID, *, before: uuid.UUID | None, limit: int
@@ -283,7 +275,6 @@ class BalanceService:
         return await self._accounts.find_by_owners(
             student_ids=[s.id for s in students],
             team_ids=[t.id for t in teams],
-            period_type=None,
         )
 
     async def my_transactions(
@@ -318,7 +309,6 @@ class BalanceService:
     async def _resolve(
         self,
         cohort_id: uuid.UUID,
-        period_type: MentoringPeriodType,
         target: GrantTarget,
         ids: list[uuid.UUID],
     ) -> tuple[list[_Owner], list[Skipped]]:
@@ -327,7 +317,7 @@ class BalanceService:
             students = await self._students.enrolled_in_cohort(cohort_id)
             return [_Owner(s.id, False) for s in students], skipped
         if target is GrantTarget.ALL_TEAMS:
-            teams = await self._teams.list_by_cohort(cohort_id, period_type)
+            teams = await self._teams.list_by_cohort(cohort_id)
             return [_Owner(t.id, True) for t in teams], skipped
         wanted = list(dict.fromkeys(ids))
         if not wanted:
@@ -355,10 +345,6 @@ class BalanceService:
             team = await self._teams.get(team_id)
             if team is None or team.cohort_id != cohort_id:
                 skipped.append(Skipped(team_id, "team_not_found", "이 기수의 팀이 아닙니다."))
-            elif team.period_type is not period_type:
-                skipped.append(
-                    Skipped(team_id, "team_period_mismatch", "지급 유형과 팀 유형이 다릅니다.")
-                )
             else:
                 owners.append(_Owner(team_id, True))
         return owners, skipped
