@@ -26,6 +26,7 @@ from app.contexts.mentoring.domain.settings import (
     CohortMentoringSettings,
     MentoringBlockTime,
     MentoringHoliday,
+    OperatingHours,
 )
 from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseCohortMentoringSettingsRepository,
@@ -56,6 +57,25 @@ ServiceDep = Annotated[MentoringSettingsService, Depends(get_settings_service)]
 
 
 # ---------------------------------------------------------------- 스키마
+class HoursBody(BaseModel):
+    """운영시간 (한국 시각, 정각·30분, 끝은 24:00까지)."""
+
+    start: str = Field(pattern=r"^\d{2}:\d{2}$", examples=["10:00"])
+    end: str = Field(pattern=r"^\d{2}:\d{2}$", examples=["19:00"])
+
+    def to_hours(self) -> OperatingHours:
+        return OperatingHours.of(self.start, self.end)
+
+    @classmethod
+    def of(cls, hours: OperatingHours | None) -> "HoursBody | None":
+        if hours is None:
+            return None
+        return cls(
+            start=OperatingHours.label(hours.start_minute),
+            end=OperatingHours.label(hours.end_minute),
+        )
+
+
 class SettingsFields(BaseModel):
     """설정 전체 (PUT). 값 제한은 서비스·DB가 검사한다."""
 
@@ -66,6 +86,19 @@ class SettingsFields(BaseModel):
     min_lead_hours: Literal[6, 12, 24] = 24
     allowed_duration: Literal[30, 60] = 30
     max_pending_requests: int = Field(default=1, ge=1, le=3)
+    weekday_hours: HoursBody | None = Field(
+        default_factory=lambda: HoursBody(start="10:00", end="19:00"),
+        description="평일 운영시간 (null = 운영 안 함). 수강생은 이 시간 안에서만 신청한다 (A37)",
+    )
+    weekend_hours: HoursBody | None = Field(
+        default=None, description="주말·공휴일 운영시간 (null = 운영 안 함)"
+    )
+
+    def to_values(self) -> dict[str, object]:
+        values = self.model_dump(exclude={"weekday_hours", "weekend_hours"})
+        values["weekday_hours"] = self.weekday_hours.to_hours() if self.weekday_hours else None
+        values["weekend_hours"] = self.weekend_hours.to_hours() if self.weekend_hours else None
+        return values
 
 
 class SettingsResponse(SettingsFields):
@@ -83,6 +116,8 @@ class SettingsResponse(SettingsFields):
             min_lead_hours=cast("Literal[6, 12, 24]", s.min_lead_hours),
             allowed_duration=cast("Literal[30, 60]", s.allowed_duration),
             max_pending_requests=s.max_pending_requests,
+            weekday_hours=HoursBody.of(s.weekday_hours),
+            weekend_hours=HoursBody.of(s.weekend_hours),
             updated_at=s.updated_at,
         )
 
@@ -153,7 +188,7 @@ async def save_settings(
     cohort_id: uuid.UUID, body: SettingsFields, user: CohortManager, service: ServiceDep
 ) -> SettingsResponse:
     """설정 전체 저장(없으면 생성). 진행 중인 신청에는 소급하지 않는다."""
-    saved = await service.save_settings(cohort_id, body.model_dump(), actor_id=user.id)
+    saved = await service.save_settings(cohort_id, body.to_values(), actor_id=user.id)
     return SettingsResponse.of(saved)
 
 
