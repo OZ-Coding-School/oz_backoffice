@@ -1,6 +1,6 @@
 # 37. P9-1 멘토 불가 시간·신청 받기·기수 운영시간
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-11 병합)
 - 관련 PR: #42
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P9 (P9-1)
 - 이전 기록: [36. P8-2 기수 멘토 배정·멘토 활성화·팀리드 권한](36_p8_2_cohort_mentors.md)
@@ -86,6 +86,8 @@ P9의 첫 PR이다. 멘토 일정 등록을 만들고, 신청 가능 시간 계�
   - 운영진 대리, 권한(조교 403, 비로그인 401, 프로필 없음 404)
   - 기수 운영시간: 기본값, 사용자 지정, 24:00, 잘못된 값
 - 전체 629 passed (compose `api` 컨테이너, ruff·ruff format·mypy·mypy tests·lint-imports 통과)
+- GitHub Actions (PR #42): backend 잡 통과, 629 passed
+- 사용자가 작업 완료를 확인했다(2026-11-11)
 - 마이그레이션: upgrade → migrate("No changes detected") → downgrade -v 13 → upgrade. DBML `@dbml/core` 11 검증(43개 테이블)
 - 코드 커밋 3개를 worktree에서 하나씩 검사했다(ruff, ruff format, mypy, mypy tests, lint-imports, pytest). 모두 통과했다(619 → 625 → 629 passed)
 
