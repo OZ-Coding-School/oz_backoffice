@@ -625,7 +625,7 @@ Table mentor_unavailable_periods {
 }
 
 Table mentoring_balance_accounts {
-  note: "멘토링 잔여 시간 계좌 (소유자 x 기간 유형별). 차감/지급 시 계좌 행 SELECT ... FOR UPDATE 후 원장과 같은 트랜잭션으로 갱신"
+  note: "멘토링 잔여 시간 계좌 (소유자 x 기간 유형별, A39·A40). 첫 지급 때 만들고 사용 기간(기수 기간 안)을 정한다. 기간이 끝난 계좌에는 지급·늘리는 조정을 하지 않는다. 차감/지급 시 계좌 행 SELECT ... FOR UPDATE 후 원장과 같은 트랜잭션으로 갱신"
 
   id uuid [pk, note: "default=uuid7 사용"]
   student_id uuid [null, ref: > students.id, note: "1:1 멘토링 계좌 소유 수강생"]
@@ -666,7 +666,7 @@ Table mentoring_balance_transactions {
 
   id uuid [pk, note: "default=uuid7 사용"]
   account_id uuid [not null, ref: > mentoring_balance_accounts.id]
-  request_id uuid [null, ref: > mentoring_requests.id, note: "HOLD/RELEASE/USING/REFUND의 원인 신청 (운영진 지급/조정은 null)"]
+  request_id uuid [null, ref: > mentoring_requests.id, note: "HOLD/RELEASE/USING/REFUND의 원인 신청 (운영진 지급/조정은 null). FK 제약은 mentoring_requests가 생기는 P11 마이그레이션에서 건다"]
   type MentoringBalanceTransactionType [not null, note: "변경 유형"]
   amount integer [not null, note: "대상 시간(분단위). STAFF_ADJUST만 음수 허용, 나머지는 양수"]
   after_remaining integer [not null, note: "변경 후 신청 가능 잔여 시간 (분단위)"]
@@ -679,6 +679,7 @@ Table mentoring_balance_transactions {
     (request_id, type) [unique, note: "request_id IS NOT NULL 부분 유니크 — 같은 신청의 중복 HOLD/USING/RELEASE/REFUND 방지"]
   }
   checks {
+    `type IN ('STAFF_GRANT', 'STAFF_ADJUST', 'HOLD', 'RELEASE', 'USING', 'REFUND')` [name: "check_transaction_type"]
     `type = 'STAFF_ADJUST' OR amount > 0` [name: "check_transaction_amount"]
     `(type IN ('STAFF_GRANT', 'STAFF_ADJUST')) = (request_id IS NULL)` [name: "check_transaction_request"]
   }
