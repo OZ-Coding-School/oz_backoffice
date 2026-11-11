@@ -1,6 +1,6 @@
 # 41. P10-2b 명단 동기화 후 수강 종료 처리
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-11 병합)
 - 관련 PR: #46
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P10 (P10-2b)
 - 이전 기록: [40. P10-2a 멘토링 시간 계좌·지급·조정·조회](40_p10_2a_balance_accounts.md)
@@ -42,6 +42,8 @@ P10의 마지막 PR이다. 수강생의 수강 상태는 Airtable 명단 동기�
 - 통합(PostgreSQL):
   - 실제 지급 → 수강 상태 변경 → 처리: 팀원 제외, 계좌 회수, 원장 2줄, 멱등
   - 작업 이름, 동기화 성공일 때만 작업을 보냄(실패면 보내지 않음)
+- GitHub Actions (PR #46): backend 잡 통과, 679 passed
+- 사용자가 작업 완료를 확인했다(2026-11-11)
 - 전체 679 passed (compose `api` 컨테이너, ruff·ruff format·mypy·mypy tests·lint-imports 통과)
 - 워커 재시작 후 작업 모듈 로드 확인
 - 코드 커밋 2개를 worktree에서 하나씩 검사했다(ruff, ruff format, mypy, mypy tests, lint-imports, pytest). 모두 통과했다(678 → 679 passed)

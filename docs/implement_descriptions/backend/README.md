@@ -42,4 +42,4 @@
 | 38 | [P9-2 신청 가능 시간 계산·조회](38_p9_2_available_times.md) | 완료 (#43) |
 | 39 | [P10-1 멘토링 팀 구성](39_p10_1_mentoring_teams.md) | 완료 (#44) |
 | 40 | [P10-2a 멘토링 시간 계좌·지급·조정·조회](40_p10_2a_balance_accounts.md) | 완료 (#45) |
-| 41 | [P10-2b 명단 동기화 후 수강 종료 처리](41_p10_2b_enrollment_ended.md) | PR 진행 중 |
+| 41 | [P10-2b 명단 동기화 후 수강 종료 처리](41_p10_2b_enrollment_ended.md) | 완료 (#46) |
