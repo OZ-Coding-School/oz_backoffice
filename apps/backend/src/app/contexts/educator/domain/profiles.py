@@ -5,6 +5,8 @@
 - 길이: 닉네임 30자, 한 줄 소개 100자, 전문 분야 200자, 소개(마크다운) 10,000자.
 - 사진은 비공개 버킷 `profiles/` 객체 키만 둔다. 바꾸거나 지우면 이전 객체는 커밋 후 지운다.
 - 운영진(mentor.manage)이 비활성화·재활성화한다. 비활성 멘토는 새 기수 배정을 받지 못한다(A35·A36).
+- 신청 받기(A37): 켜야 수강생이 신청할 수 있다(기본 꺼짐).
+  비활성 멘토는 켤 수 없고, 비활성화하면 꺼진다.
 """
 
 import dataclasses
@@ -47,6 +49,7 @@ class Mentor(AggregateRoot):
     expertise: str | None = None
     profile_image_key: str | None = None
     is_active: bool = True
+    accepting_requests: bool = False
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
@@ -89,6 +92,14 @@ class Mentor(AggregateRoot):
                 "이미 비활성화된 멘토입니다.", code="mentor_already_inactive"
             )
         self.is_active = False
+        self.accepting_requests = False
+
+    def set_accepting(self, on: bool) -> None:
+        if on and not self.is_active:
+            raise BusinessRuleViolation(
+                "비활성화된 멘토는 신청을 받을 수 없습니다.", code="mentor_inactive"
+            )
+        self.accepting_requests = on
 
     def activate(self) -> None:
         if self.is_active:

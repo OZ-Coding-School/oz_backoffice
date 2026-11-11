@@ -26,6 +26,10 @@ class MentorQueries:
         """배정 생성·재활성화와 멘토 비활성화가 겹치지 않게 멘토 행을 잠근다."""
         return await self._mentors.lock(mentor_id)
 
+    async def set_accepting(self, mentor: Mentor, on: bool) -> None:
+        mentor.set_accepting(on)
+        await self._mentors.save(mentor)
+
     async def set_active(self, mentor: Mentor, active: bool) -> None:
         if active:
             mentor.activate()

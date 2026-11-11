@@ -54,7 +54,7 @@
 | 조직 | `organization` | departments, employee_positions, employees, bootcamp_staffs, cohort_staffs | 담당자 배정 시 `access` 서비스로 user_roles 동기화 |
 | 과정·기수 | `academy` | hrd_net_bootcamps, hrd_net_bootcamp_cohorts, bootcamps, cohorts, students | 공통 마스터 |
 | 교육 인력 | `educator` | mentors, instructors, educator_contracts, contract_files | 가입 시 계약 이메일로 자동 연결 |
-| 멘토링 | `mentoring` | cohort_mentoring_*, cohort_mentors, mentor_availabilities, mentor_unavailable_periods, mentoring_* | 가장 큰 컨텍스트. 내부를 애그리거트 단위로 다시 나눈다 |
+| 멘토링 | `mentoring` | cohort_mentoring_*, cohort_mentors, mentor_unavailable_periods, mentoring_* | 가장 큰 컨텍스트. 내부를 애그리거트 단위로 다시 나눈다 |
 | 감사 | `audit` | audit_logs | 다른 컨텍스트가 `AuditRecorder`로 기록 |
 
 ### 멘토링 애그리거트
