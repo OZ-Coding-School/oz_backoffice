@@ -131,6 +131,23 @@ class BalanceAccount(AggregateRoot):
         self.total_minutes += delta
         return self._entry(MentoringBalanceTransactionType.STAFF_ADJUST, delta, reason)
 
+    def hold(self, minutes: int, *, request_id: uuid.UUID, reason: str) -> BalanceTransaction:
+        """신청: 잔여에서 보류로 옮긴다 (M9)."""
+        _rule(minutes > 0, "보류 시간이 올바르지 않습니다.", "invalid_balance_minutes")
+        _rule(self.remaining_minutes >= minutes, "잔여 시간이 부족합니다.", "insufficient_balance")
+        self.held_minutes += minutes
+        return self._entry(MentoringBalanceTransactionType.HOLD, minutes, reason, request_id)
+
+    def release(self, minutes: int, *, request_id: uuid.UUID, reason: str) -> BalanceTransaction:
+        """승인 전 반려·취소·만료: 보류를 잔여로 돌린다 (M9)."""
+        _rule(
+            0 < minutes <= self.held_minutes,
+            "해제할 보류 시간이 없습니다.",
+            "invalid_balance_minutes",
+        )
+        self.held_minutes -= minutes
+        return self._entry(MentoringBalanceTransactionType.RELEASE, minutes, reason, request_id)
+
     def revoke_remaining(self, reason: str) -> BalanceTransaction | None:
         """수강 종료 회수: 잔여 전부를 줄인다(단위·사용 기간과 무관, A39). 잔여가 없으면 None."""
         if self.remaining_minutes <= 0:
@@ -147,7 +164,11 @@ class BalanceAccount(AggregateRoot):
         self.valid_until = valid_until
 
     def _entry(
-        self, type_: MentoringBalanceTransactionType, amount: int, reason: str
+        self,
+        type_: MentoringBalanceTransactionType,
+        amount: int,
+        reason: str,
+        request_id: uuid.UUID | None = None,
     ) -> BalanceTransaction:
         return BalanceTransaction(
             account_id=self.id,
@@ -156,4 +177,5 @@ class BalanceAccount(AggregateRoot):
             after_remaining=self.remaining_minutes,
             after_held=self.held_minutes,
             reason=clean_reason(reason),
+            request_id=request_id,
         )

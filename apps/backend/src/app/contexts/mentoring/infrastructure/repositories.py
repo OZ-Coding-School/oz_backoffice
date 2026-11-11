@@ -1,7 +1,7 @@
 """mentoring 리포지토리 구현 (Tortoise)."""
 
 import uuid
-from datetime import UTC, date
+from datetime import UTC, date, datetime
 from typing import Any
 
 from tortoise.exceptions import IntegrityError
@@ -9,6 +9,8 @@ from tortoise.expressions import Q
 
 from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.balance import BalanceAccount, BalanceTransaction
+from app.contexts.mentoring.domain.enums import MentoringRequestStatus
+from app.contexts.mentoring.domain.request import MentoringRequest
 from app.contexts.mentoring.domain.schedule import (
     MentorUnavailablePeriod,
     mask_to_weekdays,
@@ -28,6 +30,7 @@ from app.contexts.mentoring.infrastructure.models import (
     MentoringBalanceAccountModel,
     MentoringBalanceTransactionModel,
     MentoringHolidayModel,
+    MentoringRequestModel,
     MentoringTeamMemberModel,
     MentoringTeamModel,
     MentorUnavailablePeriodModel,
@@ -500,3 +503,137 @@ class TortoiseBalanceTransactionRepository:
             )
             for row in rows
         ]
+
+
+class TortoiseMentoringRequestRepository:
+    """희망 일시 1~3은 컬럼 desired_at_1~3으로 저장한다."""
+
+    @staticmethod
+    def _values(r: MentoringRequest) -> dict[str, Any]:
+        desired = [*r.desired_times, None, None][:3]
+        return {
+            "replaced_request_id": r.replaced_request_id,
+            "team_id": r.team_id,
+            "requester_id": r.requester_id,
+            "mentor_id": r.mentor_id,
+            "topic": r.topic,
+            "detail": r.detail,
+            "desired_at_1": desired[0],
+            "desired_at_2": desired[1],
+            "desired_at_3": desired[2],
+            "duration": r.duration,
+            "status": r.status,
+            "rejected_at": r.rejected_at,
+            "reject_reason": r.reject_reason,
+            "canceled_at": r.canceled_at,
+            "cancel_reason": r.cancel_reason,
+        }
+
+    @staticmethod
+    def _entity(row: MentoringRequestModel) -> MentoringRequest:
+        desired = [t for t in (row.desired_at_1, row.desired_at_2, row.desired_at_3) if t]
+        return MentoringRequest(
+            id=row.id,
+            replaced_request_id=row.replaced_request_id,
+            team_id=row.team_id,  # type: ignore[attr-defined]  # FK 컬럼 속성
+            requester_id=row.requester_id,  # type: ignore[attr-defined]
+            mentor_id=row.mentor_id,  # type: ignore[attr-defined]
+            topic=row.topic,
+            detail=row.detail,
+            desired_times=desired,
+            duration=row.duration,
+            status=row.status,
+            rejected_at=row.rejected_at,
+            reject_reason=row.reject_reason,
+            canceled_at=row.canceled_at,
+            cancel_reason=row.cancel_reason,
+            created_at=row.created_at,
+            updated_at=row.updated_at,
+        )
+
+    async def add(self, request: MentoringRequest) -> None:
+        await MentoringRequestModel.create(id=request.id, **self._values(request))
+
+    async def save(self, request: MentoringRequest) -> None:
+        row = await MentoringRequestModel.get(id=request.id)
+        for name, value in self._values(request).items():
+            setattr(row, name, value)
+        await row.save()
+
+    async def get(self, request_id: uuid.UUID) -> MentoringRequest | None:
+        row = await MentoringRequestModel.get_or_none(id=request_id)
+        return self._entity(row) if row else None
+
+    async def lock(self, request_id: uuid.UUID) -> MentoringRequest | None:
+        row = await MentoringRequestModel.select_for_update().get_or_none(id=request_id)
+        return self._entity(row) if row else None
+
+    async def count_pending(
+        self, *, requester_id: uuid.UUID | None = None, team_id: uuid.UUID | None = None
+    ) -> int:
+        query = MentoringRequestModel.filter(status=MentoringRequestStatus.PENDING)
+        if team_id is not None:
+            return await query.filter(team_id=team_id).count()
+        return await query.filter(requester_id=requester_id, team_id__isnull=True).count()
+
+    async def _page(
+        self, query: Any, limit: int, offset: int
+    ) -> tuple[list[MentoringRequest], int]:
+        total = await query.count()
+        rows = await query.order_by("-created_at", "-id").offset(offset).limit(limit)
+        return [self._entity(row) for row in rows], total
+
+    async def list_for_participants(
+        self,
+        *,
+        student_ids: list[uuid.UUID],
+        team_ids: list[uuid.UUID],
+        status: MentoringRequestStatus | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[MentoringRequest], int]:
+        if not student_ids and not team_ids:
+            return [], 0
+        query = MentoringRequestModel.filter(
+            Q(requester_id__in=student_ids, team_id__isnull=True) | Q(team_id__in=team_ids)
+        )
+        if status is not None:
+            query = query.filter(status=status)
+        return await self._page(query, limit, offset)
+
+    async def list_for_mentor(
+        self,
+        mentor_id: uuid.UUID,
+        *,
+        status: MentoringRequestStatus | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[MentoringRequest], int]:
+        query = MentoringRequestModel.filter(mentor_id=mentor_id)
+        if status is not None:
+            query = query.filter(status=status)
+        return await self._page(query, limit, offset)
+
+    async def list_by_cohort(
+        self,
+        cohort_id: uuid.UUID,
+        *,
+        status: MentoringRequestStatus | None,
+        mentor_id: uuid.UUID | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[MentoringRequest], int]:
+        query = MentoringRequestModel.filter(requester__cohort_id=cohort_id)
+        if status is not None:
+            query = query.filter(status=status)
+        if mentor_id is not None:
+            query = query.filter(mentor_id=mentor_id)
+        return await self._page(query, limit, offset)
+
+    async def list_stale(self, now: datetime) -> list[MentoringRequest]:
+        rows = await MentoringRequestModel.filter(
+            Q(status=MentoringRequestStatus.PENDING, desired_at_1__lte=now)
+            & (Q(desired_at_2__isnull=True) | Q(desired_at_2__lte=now))
+            & (Q(desired_at_3__isnull=True) | Q(desired_at_3__lte=now))
+        ).order_by("id")
+        return [self._entity(row) for row in rows]
