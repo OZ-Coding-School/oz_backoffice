@@ -5,6 +5,7 @@ import uuid
 from datetime import date
 
 from app.contexts.mentoring.domain.assignment import CohortMentor
+from app.contexts.mentoring.domain.balance import BalanceAccount, BalanceTransaction
 from app.contexts.mentoring.domain.enums import MentoringPeriodType
 from app.contexts.mentoring.domain.schedule import MentorUnavailablePeriod
 from app.contexts.mentoring.domain.settings import CohortMentoringSettings, MentoringBlockTime
@@ -182,5 +183,70 @@ class InMemoryTeamRepository:
     async def list_by_students(self, student_ids: list[uuid.UUID]) -> list[MentoringTeam]:
         return [self._copy(t) for t in self.items.values() if set(t.member_ids) & set(student_ids)]
 
+    async def list_by_ids(self, team_ids: list[uuid.UUID]) -> list[MentoringTeam]:
+        return [self._copy(self.items[i]) for i in team_ids if i in self.items]
+
     async def list_by_mentor(self, mentor_id: uuid.UUID) -> list[MentoringTeam]:
         return [self._copy(t) for t in self.items.values() if t.mentor_id == mentor_id]
+
+
+class InMemoryBalanceAccountRepository:
+    def __init__(self) -> None:
+        self.items: dict[uuid.UUID, BalanceAccount] = {}
+
+    async def add(self, account: BalanceAccount) -> None:
+        self.items[account.id] = dataclasses.replace(account)
+
+    async def save(self, account: BalanceAccount) -> None:
+        self.items[account.id] = dataclasses.replace(account)
+
+    async def get(self, account_id: uuid.UUID) -> BalanceAccount | None:
+        found = self.items.get(account_id)
+        return dataclasses.replace(found) if found else None
+
+    async def lock_many(self, account_ids: list[uuid.UUID]) -> list[BalanceAccount]:
+        return [dataclasses.replace(self.items[i]) for i in sorted(account_ids) if i in self.items]
+
+    async def find_by_owners(
+        self,
+        *,
+        student_ids: list[uuid.UUID],
+        team_ids: list[uuid.UUID],
+        period_type: MentoringPeriodType | None,
+    ) -> list[BalanceAccount]:
+        return [
+            dataclasses.replace(a)
+            for a in self.items.values()
+            if (a.student_id in student_ids or a.team_id in team_ids)
+            and (period_type is None or a.period_type == period_type)
+        ]
+
+    async def list_page(
+        self,
+        cohort_id: uuid.UUID,
+        *,
+        period_type: MentoringPeriodType | None,
+        owner: str | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[BalanceAccount], int]:
+        found = [dataclasses.replace(a) for a in self.items.values()]
+        return found[offset : offset + limit], len(found)
+
+
+class InMemoryBalanceLedger:
+    def __init__(self) -> None:
+        self.entries: list[BalanceTransaction] = []
+
+    async def add_many(self, entries: list[BalanceTransaction]) -> None:
+        self.entries.extend(entries)
+
+    async def list_by_account(
+        self, account_id: uuid.UUID, *, before: uuid.UUID | None, limit: int
+    ) -> list[BalanceTransaction]:
+        found = [
+            e
+            for e in reversed(self.entries)
+            if e.account_id == account_id and (before is None or e.id < before)
+        ]
+        return found[:limit]

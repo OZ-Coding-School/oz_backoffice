@@ -3,6 +3,7 @@ from datetime import date
 from typing import Protocol
 
 from app.contexts.mentoring.domain.assignment import CohortMentor
+from app.contexts.mentoring.domain.balance import BalanceAccount, BalanceTransaction
 from app.contexts.mentoring.domain.enums import MentoringPeriodType
 from app.contexts.mentoring.domain.schedule import MentorUnavailablePeriod
 from app.contexts.mentoring.domain.settings import (
@@ -95,4 +96,42 @@ class MentoringTeamRepository(Protocol):
         ...
 
     async def list_by_students(self, student_ids: list[uuid.UUID]) -> list[MentoringTeam]: ...
+    async def list_by_ids(self, team_ids: list[uuid.UUID]) -> list[MentoringTeam]: ...
     async def list_by_mentor(self, mentor_id: uuid.UUID) -> list[MentoringTeam]: ...
+
+
+class BalanceAccountRepository(Protocol):
+    async def add(self, account: BalanceAccount) -> None: ...
+    async def save(self, account: BalanceAccount) -> None: ...
+    async def get(self, account_id: uuid.UUID) -> BalanceAccount | None: ...
+    async def lock_many(self, account_ids: list[uuid.UUID]) -> list[BalanceAccount]:
+        """행을 id 순서로 잠그고 읽는다 (SELECT … FOR UPDATE, 교착 방지)."""
+        ...
+
+    async def find_by_owners(
+        self,
+        *,
+        student_ids: list[uuid.UUID],
+        team_ids: list[uuid.UUID],
+        period_type: MentoringPeriodType | None,
+    ) -> list[BalanceAccount]: ...
+    async def list_page(
+        self,
+        cohort_id: uuid.UUID,
+        *,
+        period_type: MentoringPeriodType | None,
+        owner: str | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[BalanceAccount], int]:
+        """기수의 계좌 (수강생·팀 소유, owner = STUDENT | TEAM | None)."""
+        ...
+
+
+class BalanceTransactionRepository(Protocol):
+    async def add_many(self, entries: list[BalanceTransaction]) -> None: ...
+    async def list_by_account(
+        self, account_id: uuid.UUID, *, before: uuid.UUID | None, limit: int
+    ) -> list[BalanceTransaction]:
+        """최신순 (id = uuid7 커서)."""
+        ...

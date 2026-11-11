@@ -5,8 +5,10 @@ from datetime import UTC, date
 from typing import Any
 
 from tortoise.exceptions import IntegrityError
+from tortoise.expressions import Q
 
 from app.contexts.mentoring.domain.assignment import CohortMentor
+from app.contexts.mentoring.domain.balance import BalanceAccount, BalanceTransaction
 from app.contexts.mentoring.domain.enums import MentoringPeriodType
 from app.contexts.mentoring.domain.schedule import (
     MentorUnavailablePeriod,
@@ -24,6 +26,8 @@ from app.contexts.mentoring.infrastructure.models import (
     CohortMentoringBlockTimeModel,
     CohortMentoringSettingsModel,
     CohortMentorModel,
+    MentoringBalanceAccountModel,
+    MentoringBalanceTransactionModel,
     MentoringHolidayModel,
     MentoringTeamMemberModel,
     MentoringTeamModel,
@@ -320,6 +324,11 @@ class TortoiseMentoringTeamRepository:
         )
         return await self._with_members(rows)
 
+    async def list_by_ids(self, team_ids: list[uuid.UUID]) -> list[MentoringTeam]:
+        if not team_ids:
+            return []
+        return await self._with_members(await MentoringTeamModel.filter(id__in=team_ids))
+
     async def list_by_mentor(self, mentor_id: uuid.UUID) -> list[MentoringTeam]:
         rows = await MentoringTeamModel.filter(mentor_id=mentor_id).order_by(
             "cohort_id", "period_type", "team_number"
@@ -368,6 +377,132 @@ class TortoiseMentoringTeamRepository:
                 member_ids=members[row.id],
                 created_at=row.created_at,
                 updated_at=row.updated_at,
+            )
+            for row in rows
+        ]
+
+
+class TortoiseBalanceAccountRepository(
+    TortoiseRepository[BalanceAccount, MentoringBalanceAccountModel]
+):
+    model = MentoringBalanceAccountModel
+    entity = BalanceAccount
+    fields = (
+        "student_id",
+        "team_id",
+        "period_type",
+        "valid_from",
+        "valid_until",
+        "total_minutes",
+        "held_minutes",
+        "used_minutes",
+    )
+
+    def to_entity(self, row: MentoringBalanceAccountModel) -> BalanceAccount:
+        entity = super().to_entity(row)
+        entity.created_at = row.created_at
+        entity.updated_at = row.updated_at
+        return entity
+
+    def to_values(self, entity: BalanceAccount) -> dict[str, Any]:
+        values = super().to_values(entity)
+        values["remaining_minutes"] = entity.remaining_minutes
+        return values
+
+    async def add(self, entity: BalanceAccount) -> None:
+        try:
+            await super().add(entity)
+        except IntegrityError as exc:
+            raise ConflictError(
+                "이미 같은 유형의 계좌가 있습니다. 다시 시도하세요.", code="balance_account_exists"
+            ) from exc
+
+    async def lock_many(self, account_ids: list[uuid.UUID]) -> list[BalanceAccount]:
+        if not account_ids:
+            return []
+        rows = (
+            await MentoringBalanceAccountModel.filter(id__in=account_ids)
+            .order_by("id")
+            .select_for_update()
+        )
+        return [self.to_entity(row) for row in rows]
+
+    async def find_by_owners(
+        self,
+        *,
+        student_ids: list[uuid.UUID],
+        team_ids: list[uuid.UUID],
+        period_type: MentoringPeriodType | None,
+    ) -> list[BalanceAccount]:
+        if not student_ids and not team_ids:
+            return []
+        query = MentoringBalanceAccountModel.filter(
+            Q(student_id__in=student_ids) | Q(team_id__in=team_ids)
+        )
+        if period_type is not None:
+            query = query.filter(period_type=period_type)
+        return [self.to_entity(row) for row in await query.order_by("period_type", "id")]
+
+    async def list_page(
+        self,
+        cohort_id: uuid.UUID,
+        *,
+        period_type: MentoringPeriodType | None,
+        owner: str | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[BalanceAccount], int]:
+        condition = Q(student__cohort_id=cohort_id) | Q(team__cohort_id=cohort_id)
+        if owner == "STUDENT":
+            condition = Q(student__cohort_id=cohort_id)
+        elif owner == "TEAM":
+            condition = Q(team__cohort_id=cohort_id)
+        query = MentoringBalanceAccountModel.filter(condition)
+        if period_type is not None:
+            query = query.filter(period_type=period_type)
+        total = await query.count()
+        rows = await query.order_by("period_type", "id").offset(offset).limit(limit)
+        return [self.to_entity(row) for row in rows], total
+
+
+class TortoiseBalanceTransactionRepository:
+    async def add_many(self, entries: list[BalanceTransaction]) -> None:
+        if not entries:
+            return
+        await MentoringBalanceTransactionModel.bulk_create(
+            [
+                MentoringBalanceTransactionModel(
+                    id=e.id,
+                    account_id=e.account_id,
+                    request_id=e.request_id,
+                    type=e.type,
+                    amount=e.amount,
+                    after_remaining=e.after_remaining,
+                    after_held=e.after_held,
+                    reason=e.reason,
+                )
+                for e in entries
+            ]
+        )
+
+    async def list_by_account(
+        self, account_id: uuid.UUID, *, before: uuid.UUID | None, limit: int
+    ) -> list[BalanceTransaction]:
+        query = MentoringBalanceTransactionModel.filter(account_id=account_id)
+        if before is not None:
+            query = query.filter(id__lt=before)
+        rows = await query.order_by("-id").limit(limit)
+        return [
+            BalanceTransaction(
+                id=row.id,
+                account_id=row.account_id,  # type: ignore[attr-defined]  # FK 컬럼 속성
+                request_id=row.request_id,
+                type=row.type,
+                amount=row.amount,
+                after_remaining=row.after_remaining,
+                after_held=row.after_held,
+                reason=row.reason,
+                created_at=row.created_at,
             )
             for row in rows
         ]
