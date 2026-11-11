@@ -11,6 +11,10 @@ from app.contexts.mentoring.infrastructure.models.settings import (
     CohortMentoringSettingsModel,
     MentoringHolidayModel,
 )
+from app.contexts.mentoring.infrastructure.models.team import (
+    MentoringTeamMemberModel,
+    MentoringTeamModel,
+)
 
 __all__ = [
     "CohortMentorModel",
@@ -18,4 +22,6 @@ __all__ = [
     "CohortMentoringSettingsModel",
     "MentorUnavailablePeriodModel",
     "MentoringHolidayModel",
+    "MentoringTeamMemberModel",
+    "MentoringTeamModel",
 ]

@@ -10,6 +10,7 @@ from app.contexts.mentoring.domain.settings import (
     MentoringBlockTime,
     MentoringHoliday,
 )
+from app.contexts.mentoring.domain.team import MentoringTeam
 
 
 class CohortMentoringSettingsRepository(Protocol):
@@ -63,3 +64,31 @@ class MentorUnavailablePeriodRepository(Protocol):
     async def list_by_mentor(self, mentor_id: uuid.UUID) -> list[MentorUnavailablePeriod]:
         """시작 시각 순 (일회성·반복 모두)."""
         ...
+
+
+class MentoringTeamRepository(Protocol):
+    async def add(self, team: MentoringTeam) -> None: ...
+    async def save(self, team: MentoringTeam) -> None:
+        """팀과 팀원(추가·제거)을 함께 저장한다."""
+        ...
+
+    async def get(self, team_id: uuid.UUID) -> MentoringTeam | None: ...
+    async def delete(self, team_id: uuid.UUID) -> None:
+        """팀원과 함께 지운다. 계좌·신청이 참조하면 409 `in_use`."""
+        ...
+
+    async def list_by_cohort(
+        self, cohort_id: uuid.UUID, period_type: MentoringPeriodType | None
+    ) -> list[MentoringTeam]:
+        """유형·팀 번호 순."""
+        ...
+
+    async def next_number(self, cohort_id: uuid.UUID, period_type: MentoringPeriodType) -> int: ...
+    async def team_of_students(
+        self, student_ids: list[uuid.UUID], period_type: MentoringPeriodType
+    ) -> dict[uuid.UUID, uuid.UUID]:
+        """수강생 → 그 유형의 소속 팀."""
+        ...
+
+    async def list_by_students(self, student_ids: list[uuid.UUID]) -> list[MentoringTeam]: ...
+    async def list_by_mentor(self, mentor_id: uuid.UUID) -> list[MentoringTeam]: ...
