@@ -6,6 +6,8 @@
   GET  /me/mentoring/requests?status=         본인 1:1 + 소속 팀 신청
 멘토:
   GET  /me/mentor-requests?status=            받은 신청
+  POST /mentoring/requests/{id}/approve       희망 일시 하나를 골라 승인 → 세션 생성 (A43)
+  POST /mentoring/requests/{id}/reject        반려 (사유 필수)
 운영진 (mentoring.request.read, 기수 범위):
   GET  /admin/cohorts/{cohort_id}/mentoring/requests?status=&mentor_id=
 """
@@ -19,7 +21,9 @@ from pydantic import AwareDatetime, BaseModel, Field
 
 from app.contexts.access.presentation.dependencies import ApprovedUser, require_permission
 from app.contexts.audit.application.recorder import AuditRecorder
+from app.contexts.identity.application.auth_service import UserQueries
 from app.contexts.identity.domain.entities import User
+from app.contexts.mentoring.application.approval_service import MentoringApprovalService
 from app.contexts.mentoring.application.assignment_service import MentorDirectory
 from app.contexts.mentoring.application.request_service import (
     MentoringRequestService,
@@ -40,10 +44,12 @@ from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseBalanceTransactionRepository,
     TortoiseCohortMentoringSettingsRepository,
     TortoiseMentoringRequestRepository,
+    TortoiseMentoringSessionRepository,
     TortoiseMentoringTeamRepository,
 )
 from app.contexts.mentoring.presentation.availability_router import get_available_times_service
 from app.contexts.mentoring.presentation.presenters import NameBook
+from app.contexts.mentoring.presentation.session_router import SessionPresenter, SessionResponse
 from app.core.clock import Clock
 from app.core.dependencies import get_clock
 from app.core.pagination import Page
@@ -84,6 +90,28 @@ def get_request_service(
 ServiceDep = Annotated[MentoringRequestService, Depends(get_request_service)]
 
 
+def get_approval_service(
+    request: Request, clock: Annotated[Clock, Depends(get_clock)]
+) -> MentoringApprovalService:
+    state = request.app.state
+    return MentoringApprovalService(
+        requests=TortoiseMentoringRequestRepository(),
+        sessions=TortoiseMentoringSessionRepository(),
+        accounts=TortoiseBalanceAccountRepository(),
+        ledger=TortoiseBalanceTransactionRepository(),
+        teams=TortoiseMentoringTeamRepository(),
+        students=cast("StudentLookup", state.student_queries),
+        mentors=cast("MentorDirectory", state.mentor_queries),
+        users=cast("UserQueries", state.user_queries),
+        audit=cast("AuditRecorder", state.audit_recorder),
+        uow=UnitOfWork(),
+        clock=clock,
+    )
+
+
+ApprovalDep = Annotated[MentoringApprovalService, Depends(get_approval_service)]
+
+
 # ---------------------------------------------------------------- 스키마
 class RequestCreate(BaseModel):
     """1:1은 cohort_id·mentor_id, 팀은 team_id(담당 멘토에게 자동)."""
@@ -101,6 +129,10 @@ class RequestCreate(BaseModel):
 
 class CancelBody(BaseModel):
     reason: str = Field(min_length=1, max_length=REASON_MAX_LENGTH)
+
+
+class ApproveBody(BaseModel):
+    starts_at: AwareDatetime = Field(description="희망 일시 중 하나")
 
 
 class RequestResponse(BaseModel):
@@ -126,6 +158,11 @@ class RequestResponse(BaseModel):
 
 class AdminRequestResponse(RequestResponse):
     mentor_name: str = Field(description="멘토 실명 (운영진 응답에만)")
+
+
+class ApprovalResponse(BaseModel):
+    request: RequestResponse
+    session: SessionResponse
 
 
 class Presenter:
@@ -230,6 +267,36 @@ async def mentor_requests(
         user.id, status=status_, limit=limit, offset=offset
     )
     return Page(items=await presenter.public(items), total=total, limit=limit, offset=offset)
+
+
+@router.post("/{request_id}/approve", response_model=ApprovalResponse)
+async def approve_request(
+    request_id: uuid.UUID,
+    body: ApproveBody,
+    user: ApprovedUser,
+    service: ApprovalDep,
+    presenter: PresenterDep,
+    sessions: Annotated[SessionPresenter, Depends(SessionPresenter)],
+) -> ApprovalResponse:
+    """그 신청의 멘토만. 보류 시간을 사용으로 옮기고 세션을 만든다."""
+    approved, session = await service.approve(user.id, request_id, body.starts_at)
+    return ApprovalResponse(
+        request=(await presenter.public([approved]))[0],
+        session=(await sessions.public([session]))[0],
+    )
+
+
+@router.post("/{request_id}/reject", response_model=RequestResponse)
+async def reject_request(
+    request_id: uuid.UUID,
+    body: CancelBody,
+    user: ApprovedUser,
+    service: ApprovalDep,
+    presenter: PresenterDep,
+) -> RequestResponse:
+    """그 신청의 멘토만, 사유 필수. 보류 시간을 돌려준다."""
+    rejected = await service.reject(user.id, request_id, body.reason)
+    return (await presenter.public([rejected]))[0]
 
 
 # ---------------------------------------------------------------- 운영진

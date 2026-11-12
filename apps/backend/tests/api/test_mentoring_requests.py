@@ -177,3 +177,84 @@ async def test_create_rules_and_permissions(client: AsyncClient, settings: Setti
     assert (await client.get(ctx["admin_path"], headers=student_h)).status_code == 403
     not_mentor = await client.get("/api/v1/me/mentor-requests", headers=student_h)
     assert not_mentor.status_code == 404
+
+
+async def test_approve_reject_and_sessions(client: AsyncClient, settings: Settings) -> None:
+    ctx = await _setup(client, settings)
+    student_h, mentor_h, admin = ctx["student_h"], ctx["mentor_h"], ctx["admin"]
+    second = ctx["at"] + timedelta(hours=2)
+    request_id = (
+        await client.post(
+            URL,
+            json=_body(ctx, desired_times=[ctx["at"].isoformat(), second.isoformat()]),
+            headers=student_h,
+        )
+    ).json()["id"]
+    approve = f"{URL}/{request_id}/approve"
+
+    assert (
+        await client.post(approve, json={"starts_at": second.isoformat()}, headers=student_h)
+    ).status_code == 404  # 멘토 프로필 없음
+    not_desired = await client.post(
+        approve, json={"starts_at": (second + timedelta(hours=1)).isoformat()}, headers=mentor_h
+    )
+    assert not_desired.json()["error"]["code"] == "not_desired_time"
+    approved = await client.post(approve, json={"starts_at": second.isoformat()}, headers=mentor_h)
+    assert approved.status_code == 200, approved.text
+    body = approved.json()
+    assert body["request"]["status"] == "APPROVED"
+    session = body["session"]
+    assert session["status"] == "SCHEDULED"
+    assert session["title"].startswith("가수강 · ")
+    assert session["title"].endswith("멘토링 1회차")
+    assert datetime.fromisoformat(session["starts_at"]) == second
+    assert session["google_meet_url"] is None
+    assert "mentor_name" not in session
+    balances = (await client.get("/api/v1/me/balances", headers=student_h)).json()
+    assert [(a["remaining_minutes"], a["held_minutes"]) for a in balances] == [(120, 0)]
+    again = await client.post(approve, json={"starts_at": second.isoformat()}, headers=mentor_h)
+    assert again.json()["error"]["code"] == "request_not_pending"
+
+    # 반려
+    other_id = (await client.post(URL, json=_body(ctx), headers=student_h)).json()["id"]
+    no_reason = await client.post(f"{URL}/{other_id}/reject", json={"reason": ""}, headers=mentor_h)
+    assert no_reason.status_code == 422
+    rejected = await client.post(
+        f"{URL}/{other_id}/reject", json={"reason": "일정이 맞지 않음"}, headers=mentor_h
+    )
+    assert (rejected.json()["status"], rejected.json()["reject_reason"]) == (
+        "REJECTED",
+        "일정이 맞지 않음",
+    )
+
+    # 세션 조회
+    mine = (await client.get("/api/v1/me/mentoring/sessions", headers=student_h)).json()
+    assert [s["id"] for s in mine["items"]] == [session["id"]]
+    mentor_list = await client.get(
+        "/api/v1/me/mentor-sessions", params={"status": "SCHEDULED"}, headers=mentor_h
+    )
+    assert mentor_list.json()["total"] == 1
+    window = await client.get(
+        "/api/v1/me/mentoring/sessions",
+        params={"from": ctx["at"].isoformat(), "to": second.isoformat()},
+        headers=student_h,
+    )
+    assert window.json()["total"] == 0  # 시작 시각이 to와 같으면 제외
+    detail = await client.get(f"/api/v1/mentoring/sessions/{session['id']}", headers=student_h)
+    assert detail.json()["detail"] == "구조를 봐 주세요"
+    stranger = bearer(settings, await _approved())
+    hidden = await client.get(f"/api/v1/mentoring/sessions/{session['id']}", headers=stranger)
+    assert hidden.status_code == 404
+
+    admin_path = f"/api/v1/admin/cohorts/{ctx['cohort'].id}/mentoring/sessions"
+    staff = (await client.get(admin_path, headers=admin)).json()
+    assert staff["items"][0]["mentor_name"] == "김멘토"
+    one = await client.get(f"{admin_path}/{session['id']}", headers=admin)
+    assert one.json()["id"] == session["id"]
+    elsewhere = await create_cohort()
+    wrong = await client.get(
+        f"/api/v1/admin/cohorts/{elsewhere.id}/mentoring/sessions/{session['id']}", headers=admin
+    )
+    assert wrong.status_code == 404
+    assert (await client.get(admin_path, headers=student_h)).status_code == 403
+    assert (await client.get(admin_path)).status_code == 401
