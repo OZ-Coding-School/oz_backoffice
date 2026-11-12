@@ -116,3 +116,61 @@ def test_hold_and_release() -> None:
     )
     with pytest.raises(BusinessRuleViolation):
         account.release(30, request_id=request_id, reason="또")
+
+
+def test_approve_picks_desired_time_before_start() -> None:
+    request = _request(desired_times=[T, T + timedelta(hours=2)])
+    now = datetime(2026, 11, 20, 4, 59, tzinfo=UTC)  # 13:59 KST
+    with pytest.raises(BusinessRuleViolation) as other:
+        request.approve(T + timedelta(hours=1), now=now)
+    assert other.value.code == "not_desired_time"
+    with pytest.raises(BusinessRuleViolation) as naive:
+        request.approve(T.replace(tzinfo=None), now=now)
+    assert naive.value.code == "not_desired_time"
+    with pytest.raises(BusinessRuleViolation) as passed:  # 시작 시각과 같으면 지난 것
+        request.approve(T, now=T)
+    assert passed.value.code == "desired_time_passed"
+
+    starts, ends = request.approve(T + timedelta(hours=2), now=now)
+    assert (starts, ends - starts) == (T + timedelta(hours=2), timedelta(minutes=60))
+    assert request.status is MentoringRequestStatus.APPROVED
+    with pytest.raises(BusinessRuleViolation) as again:
+        request.approve(T, now=now)
+    assert again.value.code == "request_not_pending"
+    with pytest.raises(BusinessRuleViolation):
+        request.reject("늦음", now=now)
+
+
+def test_reject_requires_reason() -> None:
+    request = _request()
+    now = datetime(2026, 11, 11, tzinfo=UTC)
+    with pytest.raises(BusinessRuleViolation):
+        request.reject(" ", now=now)
+    assert request.status is MentoringRequestStatus.PENDING
+    request.reject(" 일정이 맞지 않음 ", now=now)
+    assert (request.status, request.reject_reason, request.rejected_at) == (
+        MentoringRequestStatus.REJECTED,
+        "일정이 맞지 않음",
+        now,
+    )
+    with pytest.raises(BusinessRuleViolation):
+        request.cancel("취소", now=now)
+
+
+def test_use_moves_held_to_used() -> None:
+    account = BalanceAccount(
+        student_id=new_id(), valid_from=date(2026, 11, 1), valid_until=date(2027, 4, 30)
+    )
+    account.grant(120, "지급", today=date(2026, 11, 11))
+    request_id = new_id()
+    account.hold(60, request_id=request_id, reason="신청")
+    entry = account.use(60, request_id=request_id, reason="승인")
+    assert (entry.type, entry.amount, entry.after_remaining, entry.after_held) == (
+        MentoringBalanceTransactionType.USING,
+        60,
+        60,
+        0,
+    )
+    assert (account.used_minutes, account.remaining_minutes) == (60, 60)
+    with pytest.raises(BusinessRuleViolation):
+        account.use(30, request_id=request_id, reason="승인")

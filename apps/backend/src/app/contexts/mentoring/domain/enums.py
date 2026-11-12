@@ -43,3 +43,21 @@ class MentoringRequestStatus(StrEnum):
     APPROVED = "APPROVED"  # 멘토 승인 (세션 생성)
     REJECTED = "REJECTED"  # 멘토 반려
     CANCELED = "CANCELED"  # 취소 (변경도 취소 후 새 신청)
+
+
+class MentoringSessionStatus(StrEnum):
+    SCHEDULED = "SCHEDULED"  # 예정
+    IN_PROGRESS = "IN_PROGRESS"  # 진행 중 (Meet 회의 시작, P12)
+    COMPLETED = "COMPLETED"  # 완료
+    NO_SHOW = "NO_SHOW"  # 노쇼
+    CANCELED = "CANCELED"  # 취소
+
+
+class RecordingStatus(StrEnum):
+    """Meet 자동 녹화 상태 (P12·P13에서 갱신)."""
+
+    PENDING = "PENDING"
+    STARTED = "STARTED"
+    ENDED = "ENDED"
+    FILE_GENERATED = "FILE_GENERATED"
+    FAILED = "FAILED"

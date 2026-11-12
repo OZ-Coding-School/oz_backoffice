@@ -4,6 +4,7 @@
 - 희망 일시 1~3개, 각각 30분 경계, 서로 겹치지 않는다. 신청 시간은 진행 단위의 배수, 최대 120분.
 - 주제 100자, 상세 내용 필수 2,000자. 반려·취소 사유 필수 300자.
 - 상태: PENDING → APPROVED / REJECTED / CANCELED (승인 후 취소는 P11-3).
+- 승인은 고른 희망 일시가 시작하기 전까지, 반려는 대기 중일 때 사유와 함께 (A42·A43).
 - 승인 가능한 희망 일시(시작 전)가 하나도 없으면 대기 만료 대상이다.
 """
 
@@ -117,12 +118,32 @@ class MentoringRequest(AggregateRoot):
     def is_stale(self, now: datetime) -> bool:
         return self.status is MentoringRequestStatus.PENDING and not self.approvable_times(now)
 
-    def cancel(self, reason: str, *, now: datetime) -> None:
+    def approve(self, starts_at: datetime, *, now: datetime) -> tuple[datetime, datetime]:
+        """희망 일시 하나를 골라 승인한다. (시작, 종료)를 돌려준다."""
+        self._ensure_pending("승인")
+        _rule(starts_at.tzinfo is not None, "일시에 시간대가 필요합니다.", "not_desired_time")
+        chosen = starts_at.astimezone(UTC)
+        _rule(chosen in self.desired_times, "희망 일시 중에서 골라 주세요.", "not_desired_time")
+        _rule(chosen > now, "이미 시작 시각이 지난 희망 일시입니다.", "desired_time_passed")
+        self.status = MentoringRequestStatus.APPROVED
+        return chosen, chosen + timedelta(minutes=self.duration)
+
+    def reject(self, reason: str, *, now: datetime) -> None:
+        self._ensure_pending("반려")
+        cleaned = clean_reason(reason)
+        self.status = MentoringRequestStatus.REJECTED
+        self.rejected_at = now
+        self.reject_reason = cleaned
+
+    def _ensure_pending(self, action: str) -> None:
         _rule(
             self.status is MentoringRequestStatus.PENDING,
-            "대기 중인 신청만 취소할 수 있습니다.",
+            f"대기 중인 신청만 {action}할 수 있습니다.",
             "request_not_pending",
         )
+
+    def cancel(self, reason: str, *, now: datetime) -> None:
+        self._ensure_pending("취소")
         cleaned = clean_reason(reason)  # 검증을 먼저 해 실패해도 상태가 바뀌지 않게 한다
         self.status = MentoringRequestStatus.CANCELED
         self.canceled_at = now
