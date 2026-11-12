@@ -1,6 +1,6 @@
 # 47. P12-1 Google Meet 공간 생성·막기
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-12 병합)
 - 관련 PR: #52
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P12 (P12-1)
 - 이전 기록: [46. P11-3b 신청 연동](46_p11_3b_mentoring_integrations.md)
@@ -39,6 +39,8 @@ Workspace 도메인 전체 위임에 Meet 범위가 아직 등록되지 않아 *
 - 단위: 어댑터(생성 요청 설정 OPEN·녹화·전사·스마트 메모 ON, 막기 요청의 update mask·RESTRICTED, 없는 공간·진행 중 회의 없음 무시, 오류 → `meet_unavailable`, disabled·설정 누락 시 클라이언트 없음), 서비스(한 번만 붙임, sync로 생성·막기·멱등, 실패 다음 주기 재시도, 생성 중 취소되면 새 공간 막기, disabled), 승인 후 공간 생성 요청, 작업(이름·스케줄, 재시도 후 포기)
 - 통합(PostgreSQL): 공간 필요·막기 대상 조회, 잠금·저장
 - API: 승인 직후 링크 없음 → sync 후 링크 → 운영진 취소 즉시 링크 숨김 → sync가 공간 막기
+- GitHub Actions (PR #52): backend 잡 통과, 748 passed
+- 사용자가 작업 완료를 확인했다(2026-11-12). 실제 Google 호출 확인은 위임 등록 후로 남았다
 - 전체 748 passed (compose `api` 컨테이너, ruff·ruff format·mypy·mypy tests·lint-imports 통과)
 - 코드 커밋 4개를 worktree에서 하나씩 검사했다. 모두 통과했다(736 → 739 → 745 → 748 passed)
 - **실제 Google 호출은 확인하지 못했다**(위임 미등록). 공간 설정 proto는 실제 라이브러리 타입으로 만들어 필드 값을 확인했다
