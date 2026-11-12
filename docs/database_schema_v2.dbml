@@ -664,7 +664,7 @@ Table mentoring_balance_transactions {
 
   id uuid [pk, note: "default=uuid7 사용"]
   account_id uuid [not null, ref: > mentoring_balance_accounts.id]
-  request_id uuid [null, ref: > mentoring_requests.id, note: "HOLD/RELEASE/USING/REFUND의 원인 신청 (운영진 지급/조정은 null). FK 제약은 mentoring_requests가 생기는 P11 마이그레이션에서 건다"]
+  request_id uuid [null, ref: > mentoring_requests.id, note: "HOLD/RELEASE/USING/REFUND의 원인 신청 (운영진 지급/조정은 null). FK는 마이그레이션 17에서 건다"]
   type MentoringBalanceTransactionType [not null, note: "변경 유형"]
   amount integer [not null, note: "대상 시간(분단위). STAFF_ADJUST만 음수 허용, 나머지는 양수"]
   after_remaining integer [not null, note: "변경 후 신청 가능 잔여 시간 (분단위)"]
@@ -719,24 +719,24 @@ Table mentoring_team_members {
 }
 
 Table mentoring_requests {
-  note: "멘토링 신청 관리 테이블. 변경 = 기존 신청 취소(RELEASE/REFUND) + 새 신청 생성(replaced_request_id). 수강생 본인만 신청 (대리 신청 없음)"
+  note: "멘토링 신청 관리 테이블 (decisions A42). 변경 = 기존 신청 취소(RELEASE/REFUND) + 새 신청 생성(replaced_request_id). 수강생 본인만 신청 (대리 신청 없음). 팀 신청은 팀원 누구나, 취소·변경은 신청자만. 희망 일시는 각각 신청 가능 구간 안·서로 겹침 금지(앱 검증). 승인 가능한 희망 일시가 없으면 대기 만료 작업이 취소(RELEASE)"
 
   id uuid [pk, note: "default=uuid7 사용"]
-  replaced_request_id uuid [null, unique, ref: - mentoring_requests.id, note: "변경으로 대체된 이전 신청"]
+  replaced_request_id uuid [null, unique, ref: - mentoring_requests.id, note: "변경으로 대체된 이전 신청 (자기 참조 FK는 raw SQL)"]
   team_id uuid [null, ref: > mentoring_teams.id, note: "null 이면 1대1 멘토링 신청 (팀 신청은 팀 담당 멘토에게만)"]
   requester_id uuid [not null, ref: > students.id]
   mentor_id uuid [not null, ref: > mentors.id]
-  topic varchar(300) [not null, note: "멘토링 신청 주제"]
-  detail text [not null, note: "멘토링 신청 내용 상세"]
+  topic varchar(100) [not null, note: "멘토링 신청 주제 (세션 주제와 같은 100자, A42)"]
+  detail text [not null, note: "멘토링 신청 내용 상세 (필수, 2,000자)"]
   desired_at_1 timestamptz [not null, note: "1순위 희망일시 (멘토 가능 시간 안에서만 선택, 앱 레벨 검증)"]
   desired_at_2 timestamptz [null, note: "2순위 희망일시"]
   desired_at_3 timestamptz [null, note: "3순위 희망일시"]
-  duration smallint [not null, note: "희망하는 멘토링 진행 시간(분), HOLD 시간과 동일. 기수 설정 allowed_duration의 배수인지는 앱 레벨 검증"]
+  duration smallint [not null, note: "희망하는 멘토링 진행 시간(분), HOLD 시간과 동일. 최대 120분. 기수 설정 allowed_duration의 배수인지는 앱 레벨 검증"]
   status MentoringRequestStatus [not null, default: "PENDING", note: "요청 상태 (채택 일시는 mentoring_sessions.starts_at/ends_at)"]
   rejected_at timestamptz [null, note: "반려 시각"]
-  reject_reason varchar(300) [null, note: "반려 사유(멘토작성)"]
+  reject_reason varchar(300) [null, note: "반려 사유(멘토작성, 필수)"]
   canceled_at timestamptz [null, note: "취소 시각"]
-  cancel_reason varchar(300) [null, note: "취소 사유"]
+  cancel_reason varchar(300) [null, note: "취소 사유 (필수, 대기 만료는 '승인 기한 지남')"]
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
 
@@ -744,11 +744,15 @@ Table mentoring_requests {
     (mentor_id, status)
     (requester_id, created_at)
     team_id
+    status [note: "대기 만료 작업"]
   }
   checks {
-    `duration > 0` [name: "check_request_duration"]
-    `(status = 'REJECTED') = (rejected_at IS NOT NULL)` [name: "check_request_rejected"]
-    `(status = 'CANCELED') = (canceled_at IS NOT NULL)` [name: "check_request_canceled"]
+    `status IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELED')` [name: "check_request_status"]
+    `duration > 0 AND duration <= 120 AND duration % 30 = 0` [name: "check_request_duration"]
+    `char_length(detail) BETWEEN 1 AND 2000` [name: "check_request_detail"]
+    `desired_at_3 IS NULL OR desired_at_2 IS NOT NULL` [name: "check_request_desired"]
+    `(status = 'REJECTED') = (rejected_at IS NOT NULL) AND (rejected_at IS NULL) = (reject_reason IS NULL)` [name: "check_request_rejected"]
+    `(status = 'CANCELED') = (canceled_at IS NOT NULL) AND (canceled_at IS NULL) = (cancel_reason IS NULL)` [name: "check_request_canceled"]
   }
 }
 

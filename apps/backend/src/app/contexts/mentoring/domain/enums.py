@@ -36,3 +36,10 @@ class MentoringBalanceTransactionType(StrEnum):
     RELEASE = "RELEASE"  # 승인 전 반려·취소: held -= d
     USING = "USING"  # 승인: held -= d, used += d
     REFUND = "REFUND"  # 승인 후 취소·노쇼: used -= d
+
+
+class MentoringRequestStatus(StrEnum):
+    PENDING = "PENDING"  # 대기 (시간 보류)
+    APPROVED = "APPROVED"  # 멘토 승인 (세션 생성)
+    REJECTED = "REJECTED"  # 멘토 반려
+    CANCELED = "CANCELED"  # 취소 (변경도 취소 후 새 신청)

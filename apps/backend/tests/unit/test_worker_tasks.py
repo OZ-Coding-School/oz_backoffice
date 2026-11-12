@@ -12,7 +12,9 @@ from app.workers.tasks.contracts import DAILY_0005_KST, expire_contracts
 from app.workers.tasks.mentoring import (
     build_assignment_service,
     build_enrollment_ended_service,
+    build_request_service,
     expire_assignments,
+    expire_requests,
     process_enrollment_ended,
 )
 from app.workers.tasks.roster import HOURLY, execute_roster_sync, scheduled_roster_sync
@@ -40,6 +42,12 @@ def test_assignment_expiry_runs_daily_at_midnight_kst() -> None:
         {"cron": "0 0 * * *", "cron_offset": "Asia/Seoul"}
     ]
     assert build_assignment_service() is not None
+
+
+def test_request_expiry_runs_every_10_minutes() -> None:
+    assert expire_requests.task_name == "mentoring.requests.expire"
+    assert expire_requests.labels["schedule"] == [{"cron": "*/10 * * * *"}]
+    assert build_request_service() is not None
 
 
 def test_broker_connection_has_no_read_timeout() -> None:

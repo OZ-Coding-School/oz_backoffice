@@ -1,9 +1,11 @@
 import uuid
-from datetime import date
+from datetime import date, datetime
 from typing import Protocol
 
 from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.balance import BalanceAccount, BalanceTransaction
+from app.contexts.mentoring.domain.enums import MentoringRequestStatus
+from app.contexts.mentoring.domain.request import MentoringRequest
 from app.contexts.mentoring.domain.schedule import MentorUnavailablePeriod
 from app.contexts.mentoring.domain.settings import (
     CohortMentoringSettings,
@@ -136,4 +138,49 @@ class BalanceTransactionRepository(Protocol):
         self, account_id: uuid.UUID, *, before: uuid.UUID | None, limit: int
     ) -> list[BalanceTransaction]:
         """최신순 (id = uuid7 커서)."""
+        ...
+
+
+class MentoringRequestRepository(Protocol):
+    async def add(self, request: MentoringRequest) -> None: ...
+    async def save(self, request: MentoringRequest) -> None: ...
+    async def get(self, request_id: uuid.UUID) -> MentoringRequest | None: ...
+    async def lock(self, request_id: uuid.UUID) -> MentoringRequest | None: ...
+    async def count_pending(
+        self, *, requester_id: uuid.UUID | None = None, team_id: uuid.UUID | None = None
+    ) -> int:
+        """1:1은 그 수강생의 대기 신청 수, 팀은 그 팀의 대기 신청 수."""
+        ...
+
+    async def list_for_participants(
+        self,
+        *,
+        student_ids: list[uuid.UUID],
+        team_ids: list[uuid.UUID],
+        status: MentoringRequestStatus | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[MentoringRequest], int]:
+        """본인 1:1 신청과 소속 팀 신청 (최신순)."""
+        ...
+
+    async def list_for_mentor(
+        self,
+        mentor_id: uuid.UUID,
+        *,
+        status: MentoringRequestStatus | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[MentoringRequest], int]: ...
+    async def list_by_cohort(
+        self,
+        cohort_id: uuid.UUID,
+        *,
+        status: MentoringRequestStatus | None,
+        mentor_id: uuid.UUID | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[MentoringRequest], int]: ...
+    async def list_stale(self, now: datetime) -> list[MentoringRequest]:
+        """대기 중이고 희망 일시가 모두 지난 신청."""
         ...

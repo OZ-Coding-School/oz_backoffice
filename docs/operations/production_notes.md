@@ -67,7 +67,7 @@
 app.workers.tasks.roster          # 명단 동기화 (매시간), 수동 동기화 실행
 app.workers.tasks.contracts       # 계약 만료 (매일 00:05 KST)
 app.workers.tasks.notifications   # 메일 발송 (재시도 3회)
-app.workers.tasks.mentoring       # 기수 멘토 배정 만료 (매일 00:00 KST)
+app.workers.tasks.mentoring       # 기수 멘토 배정 만료 (매일 00:00 KST), 대기 신청 만료 (10분마다), 수강 종료 처리
 ```
 - 로컬은 루트 `docker-compose.yml`에 반영돼 있다. 저장소 밖의 `docker-compose.prod.yml`(현재 빈 파일)에는 아직 없다.
 
@@ -138,8 +138,10 @@ app.workers.tasks.mentoring       # 기수 멘토 배정 만료 (매일 00:00 KS
 | `mentoring.assignments.expire` | 매일 00:00 | 종료일이 지난 기수 멘토 배정 비활성화 |
 | `educator.contracts.expire` | 매일 00:05 | 종료일이 지난 계약 ENDED |
 | `academy.roster_sync.scheduled` | 매시간 | Airtable 설정이 없으면 건너뜀 |
+| `mentoring.requests.expire` | 10분마다 | 승인 가능한 희망 일시가 남지 않은 대기 신청 취소·보류 시간 반환 |
 
-- 모두 멱등이라 scheduler가 멈췄다 다시 떠도 밀린 대상을 처리한다. 서버 시간대와 무관하게 `cron_offset=Asia/Seoul`로 동작한다.
+- 모두 멱등이라 scheduler가 멈췄다 다시 떠도 밀린 대상을 처리한다. 매일 작업은 서버 시간대와 무관하게 `cron_offset=Asia/Seoul`로 동작한다(10분마다·매시간 작업은 시간대와 무관).
 
 ## 6. 변경 이력
 - 2026-11-11: 문서 작성 (P8까지 반영)
+- 2026-11-12: 대기 신청 만료 작업 추가 (P11-1)

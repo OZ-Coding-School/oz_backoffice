@@ -99,8 +99,6 @@ class AvailableTimesService:
         viewer_id: uuid.UUID,
         viewer_is_staff: bool,
     ) -> AvailableTimes:
-        now = self._clock.now()
-        self._ensure_range(start, end, business_date(now))
         mentor = await self._mentors.get(mentor_id)
         if mentor is None:
             raise NotFoundError("멘토를 찾을 수 없습니다.", code="mentor_not_found")
@@ -112,6 +110,17 @@ class AvailableTimesService:
             raise PermissionDeniedError(
                 "이 기수의 수강생·운영진·멘토 본인만 볼 수 있습니다.", code="forbidden"
             )
+        return await self.times_for(mentor_id, cohort_id, start, end)
+
+    async def times_for(
+        self, mentor_id: uuid.UUID, cohort_id: uuid.UUID, start: date, end: date
+    ) -> AvailableTimes:
+        """조회자 확인 없이 계산한다 (신청 검증용, P11)."""
+        now = self._clock.now()
+        self._ensure_range(start, end, business_date(now))
+        mentor = await self._mentors.get(mentor_id)
+        if mentor is None:
+            raise NotFoundError("멘토를 찾을 수 없습니다.", code="mentor_not_found")
         settings = await self._settings.get_by_cohort(cohort_id)
         if settings is None:
             raise NotFoundError(
