@@ -1,7 +1,7 @@
 # 45. P11-3a 승인 후 취소·운영진 취소·변경
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #50
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P11 (P11-3a)
 - 이전 기록: [44. P11-2 멘토링 승인·반려·세션 생성](44_p11_2_mentoring_approval.md)
 
