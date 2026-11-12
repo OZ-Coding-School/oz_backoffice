@@ -37,6 +37,7 @@ from app.contexts.mentoring.domain.schedule import (
 from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseMentorUnavailablePeriodRepository,
 )
+from app.contexts.mentoring.presentation.cleanup import build_cleanup
 from app.core.clock import Clock
 from app.core.dependencies import get_clock
 from app.core.uow import UnitOfWork
@@ -60,6 +61,7 @@ def get_schedule_service(
         unavailable_periods=TortoiseMentorUnavailablePeriodRepository(),
         mentors=cast("MentorLookup", request.app.state.mentor_queries),
         conflicts=NoScheduleConflicts(),
+        cleanup=build_cleanup(request, clock),
         audit=cast("AuditRecorder", request.app.state.audit_recorder),
         uow=UnitOfWork(),
         clock=clock,
@@ -171,6 +173,9 @@ class AcceptingRequest(BaseModel):
 class AcceptingResponse(BaseModel):
     mentor_id: uuid.UUID
     accepting_requests: bool
+    canceled_pending_requests: int = Field(
+        default=0, description="자동 취소된 대기 신청 수 (A42·A45)"
+    )
 
 
 class ConflictResponse(BaseModel):
@@ -203,8 +208,14 @@ class ChangeResponse(BaseModel):
 async def _accepting(
     service: MentorScheduleService, mentor_id: uuid.UUID, body: AcceptingRequest, actor: uuid.UUID
 ) -> AcceptingResponse:
-    mentor = await service.set_accepting(mentor_id, body.accepting_requests, actor_id=actor)
-    return AcceptingResponse(mentor_id=mentor.id, accepting_requests=mentor.accepting_requests)
+    mentor, canceled = await service.set_accepting(
+        mentor_id, body.accepting_requests, actor_id=actor
+    )
+    return AcceptingResponse(
+        mentor_id=mentor.id,
+        accepting_requests=mentor.accepting_requests,
+        canceled_pending_requests=canceled,
+    )
 
 
 async def _create(

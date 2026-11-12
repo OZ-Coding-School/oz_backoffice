@@ -7,7 +7,8 @@
 - 불가 시간이 늘어나는 변경(등록·수정)은 대기 신청·승인 세션과 충돌하는지 먼저 본다. 충돌이 있으면
   `confirm=True`일 때만 저장하고 충돌 건을 정리한다. P9에서는 충돌 검사 포트가 항상 빈 목록을 준다
   — 실제 검사·반려·취소는 P11, 알림은 M24 결정 후.
-- 신청 받기를 끄면 새 신청만 막는다(기존 신청·세션 유지). 비활성 멘토는 켤 수 없다.
+- 신청 받기를 끄면 새 신청을 막고 대기 신청은 자동 취소한다(승인된 세션 유지, A42). 비활성 멘토는
+  켤 수 없다.
 모든 변경은 감사 로그를 남긴다.
 """
 
@@ -20,6 +21,10 @@ from typing import Any, Literal, Protocol
 
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.educator.domain.profiles import Mentor
+from app.contexts.mentoring.application.request_cleanup import (
+    ACCEPTING_OFF,
+    RequestCleanup,
+)
 from app.contexts.mentoring.domain.repositories import MentorUnavailablePeriodRepository
 from app.contexts.mentoring.domain.schedule import MentorUnavailablePeriod
 from app.core.clock import Clock
@@ -106,6 +111,7 @@ class MentorScheduleService:
         unavailable_periods: MentorUnavailablePeriodRepository,
         mentors: MentorLookup,
         conflicts: ScheduleConflictFinder,
+        cleanup: RequestCleanup,
         audit: AuditRecorder,
         uow: UnitOfWork,
         clock: Clock,
@@ -113,6 +119,7 @@ class MentorScheduleService:
         self._periods = unavailable_periods
         self._mentors = mentors
         self._conflicts = conflicts
+        self._cleanup = cleanup
         self._audit = audit
         self._uow = uow
         self._clock = clock
@@ -133,7 +140,11 @@ class MentorScheduleService:
         return MentorSchedule(mentor=mentor, unavailable=periods)
 
     # ------------------------------------------------------------------ 신청 받기
-    async def set_accepting(self, mentor_id: uuid.UUID, on: bool, *, actor_id: uuid.UUID) -> Mentor:
+    async def set_accepting(
+        self, mentor_id: uuid.UUID, on: bool, *, actor_id: uuid.UUID
+    ) -> tuple[Mentor, int]:
+        """끄면 그 멘토의 대기 신청을 자동 취소한다(A42) → (멘토, 취소 건수)."""
+        canceled = 0
         async with self._uow:
             mentor = _found(await self._mentors.lock(mentor_id))
             before = mentor.accepting_requests
@@ -147,7 +158,11 @@ class MentorScheduleService:
                     before={"accepting_requests": before},
                     after={"accepting_requests": on},
                 )
-        return mentor
+            if before and not on:
+                canceled = await self._cleanup.cancel_pending_where(
+                    ACCEPTING_OFF, actor_id=actor_id, mentor_id=mentor_id
+                )
+        return mentor, canceled
 
     # ------------------------------------------------------------------ 불가 시간
     async def create(

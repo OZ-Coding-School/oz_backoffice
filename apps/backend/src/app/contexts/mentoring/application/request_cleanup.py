@@ -9,6 +9,7 @@
 """
 
 import uuid
+from typing import Any
 
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.mentoring.domain.balance import BalanceAccount, BalanceTransaction
@@ -27,6 +28,13 @@ TARGET = "mentoring_request"
 RELEASE_REASON = "신청 자동 취소"
 REJECT_RELEASE_REASON = "신청 자동 반려"
 REFUND_REASON = "세션 자동 취소"
+MENTOR_DEACTIVATED = "멘토 비활성화로 자동 취소"
+ASSIGNMENT_DEACTIVATED = "기수 배정 종료로 자동 취소"
+ACCEPTING_OFF = "멘토가 신청 받기를 꺼 자동 취소"
+TEAM_MENTOR_CHANGED = "팀 담당 멘토 변경으로 자동 취소"
+LEFT_TEAM = "신청자가 팀에서 빠져 자동 취소"
+ENROLLMENT_ENDED = "수강 종료로 자동 취소"
+SCHEDULE_CONFLICT = "멘토 일정 변경"
 
 
 def _owner(request: MentoringRequest) -> tuple[uuid.UUID | None, uuid.UUID | None]:
@@ -51,6 +59,17 @@ class RequestCleanup:
         self._ledger = ledger
         self._audit = audit
         self._clock = clock
+
+    async def count_pending_where(self, **filters: Any) -> int:
+        """`list_pending` 조건으로 대기 신청 수 (미리보기용)."""
+        return len(await self._requests.list_pending(**filters))
+
+    async def cancel_pending_where(
+        self, reason: str, *, actor_id: uuid.UUID | None, **filters: Any
+    ) -> int:
+        """`list_pending` 조건에 맞는 대기 신청을 자동 취소한다."""
+        items = await self._requests.list_pending(**filters)
+        return await self.cancel_pending(items, reason, actor_id=actor_id)
 
     async def cancel_pending(
         self,

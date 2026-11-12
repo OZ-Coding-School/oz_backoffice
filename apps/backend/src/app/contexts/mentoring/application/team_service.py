@@ -16,6 +16,11 @@ from typing import Any, Protocol
 from app.contexts.academy.domain.entities import Student
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.educator.domain.profiles import Mentor
+from app.contexts.mentoring.application.request_cleanup import (
+    LEFT_TEAM,
+    TEAM_MENTOR_CHANGED,
+    RequestCleanup,
+)
 from app.contexts.mentoring.domain.repositories import (
     CohortMentoringSettingsRepository,
     CohortMentorRepository,
@@ -67,9 +72,11 @@ class MentoringTeamService:
         assignments: CohortMentorRepository,
         students: StudentLookup,
         mentors: MentorOfUser,
+        cleanup: RequestCleanup,
         audit: AuditRecorder,
         uow: UnitOfWork,
     ) -> None:
+        self._cleanup = cleanup
         self._teams = teams
         self._settings = settings
         self._assignments = assignments
@@ -143,8 +150,9 @@ class MentoringTeamService:
         changes: dict[str, Any],
         *,
         actor_id: uuid.UUID,
-    ) -> MentoringTeam:
-        """이름·담당 멘토를 바꾼다."""
+    ) -> tuple[MentoringTeam, int]:
+        """이름·담당 멘토를 바꾼다. 멘토가 바뀌면 팀 대기 신청을 자동 취소 → (팀, 취소 수)."""
+        canceled = 0
         async with self._uow:
             team = await self._get(cohort_id, team_id)
             before = _snapshot(team)
@@ -153,9 +161,12 @@ class MentoringTeamService:
             if "mentor_id" in changes and changes["mentor_id"] != team.mentor_id:
                 await self._ensure_assigned(changes["mentor_id"], cohort_id)
                 team.assign_mentor(changes["mentor_id"])
+                canceled = await self._cleanup.cancel_pending_where(
+                    TEAM_MENTOR_CHANGED, actor_id=actor_id, team_ids=[team.id]
+                )
             await self._teams.save(team)
             await self._record(actor_id, "update", team, before)
-        return team
+        return team, canceled
 
     async def delete(
         self, cohort_id: uuid.UUID, team_id: uuid.UUID, *, actor_id: uuid.UUID
@@ -195,14 +206,18 @@ class MentoringTeamService:
         student_id: uuid.UUID,
         *,
         actor_id: uuid.UUID,
-    ) -> MentoringTeam:
+    ) -> tuple[MentoringTeam, int]:
+        """팀원을 뺀다. 그 팀원이 신청한 팀 대기 신청은 자동 취소 → (팀, 취소 건수) (A45)."""
         async with self._uow:
             team = await self._get(cohort_id, team_id)
             before = _snapshot(team)
             team.remove_member(student_id)
             await self._teams.save(team)
             await self._record(actor_id, "member_remove", team, before)
-        return team
+            canceled = await self._cleanup.cancel_pending_where(
+                LEFT_TEAM, actor_id=actor_id, team_ids=[team.id], requester_ids=[student_id]
+            )
+        return team, canceled
 
     # ------------------------------------------------------------------ 내부
     async def _get(self, cohort_id: uuid.UUID, team_id: uuid.UUID) -> MentoringTeam:

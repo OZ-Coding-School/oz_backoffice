@@ -36,6 +36,7 @@ from app.contexts.mentoring.domain.enums import (
     PayUnit,
 )
 from app.contexts.mentoring.infrastructure.repositories import TortoiseCohortMentorRepository
+from app.contexts.mentoring.presentation.cleanup import build_cleanup
 from app.core.clock import Clock
 from app.core.dependencies import get_clock
 from app.core.uow import UnitOfWork
@@ -72,6 +73,7 @@ def get_assignment_service(
         assignments=TortoiseCohortMentorRepository(),
         mentors=_mentors(request),
         cohorts=cast("CohortLookup", request.app.state.academy_catalog),
+        cleanup=build_cleanup(request, clock),
         audit=cast("AuditRecorder", request.app.state.audit_recorder),
         uow=UnitOfWork(),
         clock=clock,
@@ -84,6 +86,7 @@ def get_activation_service(
     return MentorActivationService(
         mentors=_mentors(request),
         assignments=TortoiseCohortMentorRepository(),
+        cleanup=build_cleanup(request, clock),
         audit=cast("AuditRecorder", request.app.state.audit_recorder),
         uow=UnitOfWork(),
         clock=clock,
@@ -207,6 +210,15 @@ class MentorDeactivationResponse(BaseModel):
     applied: bool = Field(description="실제로 비활성화했는지 (confirm=false면 false)")
     notice: str = Field(description="안내 문구")
     assignments: list[AssignmentResponse] = Field(description="함께 비활성화되는 활성 배정")
+    pending_requests: int = Field(
+        description="자동 취소된(미리보기면 취소될) 대기 신청 수. 승인된 세션은 유지 (A45)"
+    )
+
+
+class AssignmentDeactivateResponse(AssignmentResponse):
+    canceled_pending_requests: int = Field(
+        default=0, description="자동 취소된 대기 신청 수 (A42·A45)"
+    )
 
 
 class MentorActivationResponse(BaseModel):
@@ -282,7 +294,8 @@ async def update_assignment(
 
 
 @admin_router.delete(
-    "/cohorts/{cohort_id}/mentor-assignments/{assignment_id}", response_model=AssignmentResponse
+    "/cohorts/{cohort_id}/mentor-assignments/{assignment_id}",
+    response_model=AssignmentDeactivateResponse,
 )
 async def deactivate_assignment(
     cohort_id: uuid.UUID,
@@ -290,9 +303,11 @@ async def deactivate_assignment(
     user: CohortManager,
     service: ServiceDep,
     presenter: PresenterDep,
-) -> AssignmentResponse:
-    """삭제 = 비활성화 (기록 보존, A35)."""
-    return await presenter.one(await service.deactivate(cohort_id, assignment_id, actor_id=user.id))
+) -> AssignmentDeactivateResponse:
+    """삭제 = 비활성화 (기록 보존, A35). 그 기수의 이 멘토 대기 신청은 자동 취소 (A42)."""
+    assignment, canceled = await service.deactivate(cohort_id, assignment_id, actor_id=user.id)
+    shown = await presenter.one(assignment)
+    return AssignmentDeactivateResponse(**shown.model_dump(), canceled_pending_requests=canceled)
 
 
 @admin_router.post(
@@ -321,9 +336,11 @@ async def deactivate_mentor(
     result = await service.deactivate(mentor_id, confirm=body.confirm, actor_id=user.id)
     count = len(result.assignments)
     notice = (
-        f"멘토를 비활성화하면서 기수 배정 {count}건도 함께 비활성화했습니다."
+        f"멘토를 비활성화하면서 기수 배정 {count}건도 함께 비활성화하고 "
+        f"대기 신청 {result.pending_requests}건을 취소했습니다."
         if result.applied
-        else f"멘토를 비활성화하면 활성 기수 배정 {count}건도 함께 비활성화됩니다. "
+        else f"멘토를 비활성화하면 활성 기수 배정 {count}건도 함께 비활성화되고 "
+        f"대기 신청 {result.pending_requests}건이 취소됩니다(승인된 세션은 유지). "
         "비활성화된 멘토는 새로 기수에 배정할 수 없습니다."
     )
     return MentorDeactivationResponse(
@@ -332,6 +349,7 @@ async def deactivate_mentor(
         applied=result.applied,
         notice=notice,
         assignments=await presenter.many(result.assignments),
+        pending_requests=result.pending_requests,
     )
 
 

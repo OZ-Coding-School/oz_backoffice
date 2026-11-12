@@ -338,3 +338,28 @@ async def test_cancel_change_and_staff_cancel(client: AsyncClient, settings: Set
     assert await balance() == (150, 0, 30)
     again = await client.post(staff_path, json={"reason": "다시"}, headers=admin)
     assert again.json()["error"]["code"] == "request_not_cancelable"
+
+
+async def test_mentor_changes_cancel_pending(client: AsyncClient, settings: Settings) -> None:
+    ctx = await _setup(client, settings)
+    student_h, mentor_h, admin = ctx["student_h"], ctx["mentor_h"], ctx["admin"]
+    first = (await client.post(URL, json=_body(ctx), headers=student_h)).json()["id"]
+    off = await client.put(
+        "/api/v1/me/mentor-schedule/accepting", json={"accepting_requests": False}, headers=mentor_h
+    )
+    assert off.json()["canceled_pending_requests"] == 1
+    mine = (await client.get("/api/v1/me/mentoring/requests", headers=student_h)).json()
+    assert {r["id"]: r["status"] for r in mine["items"]} == {first: "CANCELED"}
+    (balance,) = (await client.get("/api/v1/me/balances", headers=student_h)).json()
+    assert (balance["remaining_minutes"], balance["held_minutes"]) == (180, 0)
+
+    await client.put(
+        "/api/v1/me/mentor-schedule/accepting", json={"accepting_requests": True}, headers=mentor_h
+    )
+    second = (await client.post(URL, json=_body(ctx), headers=student_h)).json()["id"]
+    api = f"/api/v1/admin/cohorts/{ctx['cohort'].id}/mentor-assignments"
+    (assignment,) = (await client.get(api, headers=admin)).json()
+    removed = await client.delete(f"{api}/{assignment['id']}", headers=admin)
+    assert (removed.json()["is_active"], removed.json()["canceled_pending_requests"]) == (False, 1)
+    mine = (await client.get("/api/v1/me/mentoring/requests", headers=student_h)).json()
+    assert {r["id"]: r["status"] for r in mine["items"]}[second] == "CANCELED"

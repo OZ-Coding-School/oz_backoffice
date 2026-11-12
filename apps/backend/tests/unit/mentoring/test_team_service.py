@@ -13,6 +13,7 @@ from app.contexts.educator.domain.profiles import Mentor
 from app.contexts.mentoring.application.team_service import MentoringTeamService
 from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.enums import (
+    MentoringRequestStatus,
     MentoringSettlementPolicy,
     PayUnit,
 )
@@ -23,6 +24,7 @@ from app.shared.ids import new_id
 from tests.fakes.audit import InMemoryAuditLogRepository
 from tests.fakes.educator import InMemoryMentorRepository
 from tests.fakes.mentoring import (
+    CleanupStores,
     InMemoryCohortMentorRepository,
     InMemorySettingsRepository,
     InMemoryTeamRepository,
@@ -93,7 +95,10 @@ class Harness:
         self.teams = InMemoryTeamRepository()
         self.students = Students()
         self.audit_logs = InMemoryAuditLogRepository()
+        clock = FixedClock(datetime(2026, 11, 11, tzinfo=UTC))
+        self.stores = CleanupStores(AuditRecorder(self.audit_logs, clock), clock)
         self.service = MentoringTeamService(
+            cleanup=self.stores.cleanup,
             teams=self.teams,
             settings=self.settings,
             assignments=self.assignments,
@@ -164,18 +169,28 @@ async def test_create_rules(h: Harness) -> None:
 async def test_update_members_and_delete(h: Harness) -> None:
     a, b = h.students.add(h.cohort_id).id, h.students.add(h.cohort_id).id
     team_id = await h.create(a)
-    updated = await h.service.update(
+    pending = await h.stores.pending(mentor_id=h.mentor.id, requester_id=a, team_id=team_id)
+    updated, canceled = await h.service.update(
         h.cohort_id, team_id, {"name": "알파", "mentor_id": h.other_mentor.id}, actor_id=ACTOR
     )
-    assert (updated.name, updated.mentor_id) == ("알파", h.other_mentor.id)
+    assert (updated.name, updated.mentor_id, canceled) == ("알파", h.other_mentor.id, 1)
+    assert h.stores.status(pending) is MentoringRequestStatus.CANCELED
+    _, renamed_only = await h.service.update(h.cohort_id, team_id, {"name": "베타"}, actor_id=ACTOR)
+    assert renamed_only == 0
     with pytest.raises(BusinessRuleViolation):
         await h.service.update(h.cohort_id, team_id, {"mentor_id": new_id()}, actor_id=ACTOR)
 
     await h.service.add_member(h.cohort_id, team_id, b, actor_id=ACTOR)
     with pytest.raises(ConflictError):
         await h.service.add_member(h.cohort_id, team_id, b, actor_id=ACTOR)
-    removed = await h.service.remove_member(h.cohort_id, team_id, a, actor_id=ACTOR)
-    assert removed.member_ids == [b]
+    by_a = await h.stores.pending(mentor_id=h.other_mentor.id, requester_id=a, team_id=team_id)
+    by_b = await h.stores.pending(mentor_id=h.other_mentor.id, requester_id=b, team_id=team_id)
+    removed, canceled = await h.service.remove_member(h.cohort_id, team_id, a, actor_id=ACTOR)
+    assert (removed.member_ids, canceled) == ([b], 1)
+    assert (h.stores.status(by_a), h.stores.status(by_b)) == (
+        MentoringRequestStatus.CANCELED,
+        MentoringRequestStatus.PENDING,
+    )
     assert [s.id for s in await h.service.unassigned_students(h.cohort_id)] == [a]
 
     with pytest.raises(NotFoundError):

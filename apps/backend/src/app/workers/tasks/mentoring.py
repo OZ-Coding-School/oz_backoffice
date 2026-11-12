@@ -27,6 +27,7 @@ from app.contexts.mentoring.application.assignment_service import CohortMentorSe
 from app.contexts.mentoring.application.availability_service import AvailableTimesService
 from app.contexts.mentoring.application.calendar import BusinessCalendar
 from app.contexts.mentoring.application.enrollment_ended import EnrollmentEndedService
+from app.contexts.mentoring.application.request_cleanup import RequestCleanup
 from app.contexts.mentoring.application.request_service import MentoringRequestService
 from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseBalanceAccountRepository,
@@ -49,9 +50,21 @@ logger = logging.getLogger(__name__)
 DAILY_0000_KST = {"cron": "0 0 * * *", "cron_offset": "Asia/Seoul"}
 
 
+def build_cleanup(clock: SystemClock) -> RequestCleanup:
+    return RequestCleanup(
+        requests=TortoiseMentoringRequestRepository(),
+        sessions=TortoiseMentoringSessionRepository(),
+        accounts=TortoiseBalanceAccountRepository(),
+        ledger=TortoiseBalanceTransactionRepository(),
+        audit=AuditRecorder(TortoiseAuditLogRepository(), clock),
+        clock=clock,
+    )
+
+
 def build_assignment_service() -> CohortMentorService:
     clock = SystemClock()
     return CohortMentorService(
+        cleanup=build_cleanup(clock),
         assignments=TortoiseCohortMentorRepository(),
         mentors=MentorQueries(TortoiseMentorRepository()),
         cohorts=AcademyCatalog(TortoiseBootcampRepository(), TortoiseCohortRepository()),
