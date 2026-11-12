@@ -80,14 +80,14 @@ https://www.googleapis.com/auth/gmail.send,https://www.googleapis.com/auth/meeti
 | `https://www.googleapis.com/auth/meetings.space.readonly` | 회의 기록(참가·녹화·전사) 조회, Workspace Events 구독 |
 
 ### 2-2. 녹화 폴더 공유 (P13 전까지)
-1. 주최 계정(`GMAIL_SENDER`)으로 Google Drive에 들어가 **내 드라이브 → `Meet Recordings`** 폴더를 찾는다. 첫 녹화 전에는 없을 수 있으니 테스트 회의를 한 번 녹화하면 생긴다.
+1. 주최 계정(`GMAIL_SENDER`)으로 Google Drive에 들어가 **내 드라이브 → `Google Meet`** 폴더(회의마다 하위 폴더가 생김)를 찾는다. 첫 녹화 전에는 없을 수 있으니 테스트 회의를 한 번 녹화하면 생긴다.
 2. 폴더 → **공유** → 서비스 계정 이메일(`...@<PROJECT_ID>.iam.gserviceaccount.com`)을 **뷰어**로 추가한다(알림 메일은 끈다).
 3. 폴더 안에 새로 생기는 녹화·전사·메모 파일은 폴더 공유를 이어받는다.
 - 외부 공유 제한 정책이 서비스 계정 공유를 막으면 Workspace 관리자가 허용해야 한다.
 - 백엔드는 Drive API를 서비스 계정 자신의 자격 증명으로(위임 없이) 호출한다. 범위는 `drive.readonly`.
 
 ### 2-3. 함께 확인할 것
-- Meet 공간 주최 계정은 **`GMAIL_SENDER`** 다(A46). 녹화 파일은 이 계정의 Drive(`Meet Recordings` 폴더)에 쌓인다.
+- Meet 공간 주최 계정은 **`GMAIL_SENDER`** 다(A46). 녹화 파일은 이 계정 Drive의 `Google Meet` 폴더 아래 회의별 하위 폴더에 쌓인다(Google 도움말 기준, 위치는 바꿀 수 없음). 다른 저장소로 옮길지는 P13에서 정한다.
 - 그 계정의 **Workspace 버전이 Meet 녹화·전사를 지원**하는지 확인한다(Business Standard 이상 등). 관리 콘솔 → **앱 → Google Workspace → Google Meet → Meet 동영상 설정**에서 녹화가 허용돼 있어야 한다.
 - 자동 녹화·전사·스마트 메모(공간 설정으로 회의 시작 시 생성, A46)를 해당 버전에서 지원하는지 P12 전에 확인한다.
 

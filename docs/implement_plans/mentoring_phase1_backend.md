@@ -411,8 +411,9 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
 - **테스트:** 상태 전이표 전 항목, 동시 승인 경합, 마감 경계, 팀 신청 권한.
 
 ### P12. Google Meet 연동 🔒
+- PR을 둘로 나눈다(A48). **P12-1:** Meet 클라이언트·승인 후 공간 생성(재시도·10분 보완)·세션 응답 링크·취소 시 공간 막기. **P12-2:** Workspace Events 구독·갱신·Pub/Sub pull·이벤트 처리. 녹화 파일 행은 P13
 - **선행 준비:**
-  - Workspace 관리자: 서비스 계정 DWD 범위 등록(`gmail.send`, `meetings.space.created`, `meetings.space.readonly`). Drive는 위임 대신 주최 계정의 `Meet Recordings` 폴더를 서비스 계정에 공유(P13 전, A47)
+  - Workspace 관리자: 서비스 계정 DWD 범위 등록(`gmail.send`, `meetings.space.created`, `meetings.space.readonly`). Drive는 위임 대신 주최 계정 Drive의 `Google Meet` 폴더를 서비스 계정에 공유(P13 전, A47)
   - GCP 프로젝트: Pub/Sub 토픽, **pull 구독**, Workspace Events가 토픽에 발행할 권한
 - **작업:**
   - 승인 커밋 후(`uow.on_commit`) taskiq로 Meet Space 생성을 enqueue한다. 실패하면 백오프 재시도하고, 성공하면 `google_space_name` / `google_meet_url`을 저장한다
@@ -536,6 +537,8 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
   - [x] P11-3a 승인 후 취소·운영진 취소·변경·신청 가능 시간에서 세션 제외 (구현 기록 45, A44)
   - [x] P11-3b 불가 시간 충돌·멘토 변화·수강 종료 연동 (구현 기록 46, A45)
 - [ ] P12 Google Meet 연동
+  - [ ] P12-1 Meet 공간 생성·막기·링크 응답 (A46~A48)
+  - [ ] P12-2 Workspace Events 구독·Pub/Sub pull·이벤트 처리 (A48)
 - [ ] P13 기록·내부 메모·녹화 수집·중계
 - [ ] P14 정산
 - [ ] P15 채팅
