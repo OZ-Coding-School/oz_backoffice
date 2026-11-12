@@ -5,7 +5,7 @@
 - `mentoring.requests.expire`: 10분마다, 승인 가능한 희망 일시가 남지 않은 대기 신청을 취소하고
   보류 시간을 돌려준다(decisions A42, 멱등).
 - `mentoring.enrollment_ended.process`: 명단 동기화가 성공하면 보낸다(roster 작업). 수강 중이 아닌
-  수강생을 팀에서 빼고 1:1 잔여를 회수한다(decisions A39, 멱등).
+  수강생을 팀에서 빼고 대기 신청·시작 전 1:1 세션을 취소한 뒤 1:1 잔여를 회수한다(A39·A45, 멱등).
 
 이 모듈은 composition root라 여러 컨텍스트의 infrastructure를 직접 조립한다.
 """
@@ -81,13 +81,18 @@ async def expire_assignments() -> None:
 
 
 def build_enrollment_ended_service() -> EnrollmentEndedService:
+    clock = SystemClock()
     return EnrollmentEndedService(
         teams=TortoiseMentoringTeamRepository(),
         accounts=TortoiseBalanceAccountRepository(),
         ledger=TortoiseBalanceTransactionRepository(),
+        requests=TortoiseMentoringRequestRepository(),
+        sessions=TortoiseMentoringSessionRepository(),
+        cleanup=build_cleanup(clock),
         students=StudentQueries(TortoiseStudentRepository()),
-        audit=AuditRecorder(TortoiseAuditLogRepository(), SystemClock()),
+        audit=AuditRecorder(TortoiseAuditLogRepository(), clock),
         uow=UnitOfWork(),
+        clock=clock,
     )
 
 
@@ -95,8 +100,11 @@ def build_enrollment_ended_service() -> EnrollmentEndedService:
 async def process_enrollment_ended() -> None:
     result = await build_enrollment_ended_service().process()
     logger.info(
-        "수강 종료 처리: 팀원 %d명 제외, 1:1 계좌 %d개에서 %d분 회수",
+        "수강 종료 처리: 팀원 %d명 제외, 대기 신청 %d건·1:1 세션 %d건 취소, "
+        "1:1 계좌 %d개에서 %d분 회수",
         result.removed_members,
+        result.canceled_requests,
+        result.canceled_sessions,
         result.revoked_accounts,
         result.revoked_minutes,
     )
