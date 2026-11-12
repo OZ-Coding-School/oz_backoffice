@@ -11,6 +11,7 @@ from app.contexts.mentoring.infrastructure.models.balance import (
 )
 from app.contexts.mentoring.infrastructure.models.request import MentoringRequestModel
 from app.contexts.mentoring.infrastructure.models.schedule import MentorUnavailablePeriodModel
+from app.contexts.mentoring.infrastructure.models.session import MentoringSessionModel
 from app.contexts.mentoring.infrastructure.models.settings import (
     CohortMentoringBlockTimeModel,
     CohortMentoringSettingsModel,
@@ -30,6 +31,7 @@ __all__ = [
     "MentoringBalanceTransactionModel",
     "MentoringHolidayModel",
     "MentoringRequestModel",
+    "MentoringSessionModel",
     "MentoringTeamMemberModel",
     "MentoringTeamModel",
 ]

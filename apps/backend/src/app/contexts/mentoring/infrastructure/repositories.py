@@ -9,13 +9,14 @@ from tortoise.expressions import Q
 
 from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.balance import BalanceAccount, BalanceTransaction
-from app.contexts.mentoring.domain.enums import MentoringRequestStatus
+from app.contexts.mentoring.domain.enums import MentoringRequestStatus, MentoringSessionStatus
 from app.contexts.mentoring.domain.request import MentoringRequest
 from app.contexts.mentoring.domain.schedule import (
     MentorUnavailablePeriod,
     mask_to_weekdays,
     weekdays_to_mask,
 )
+from app.contexts.mentoring.domain.session import MentoringSession, SessionQuery
 from app.contexts.mentoring.domain.settings import (
     CohortMentoringSettings,
     MentoringBlockTime,
@@ -31,6 +32,7 @@ from app.contexts.mentoring.infrastructure.models import (
     MentoringBalanceTransactionModel,
     MentoringHolidayModel,
     MentoringRequestModel,
+    MentoringSessionModel,
     MentoringTeamMemberModel,
     MentoringTeamModel,
     MentorUnavailablePeriodModel,
@@ -568,6 +570,12 @@ class TortoiseMentoringRequestRepository:
         row = await MentoringRequestModel.select_for_update().get_or_none(id=request_id)
         return self._entity(row) if row else None
 
+    async def get_many(self, request_ids: list[uuid.UUID]) -> dict[uuid.UUID, MentoringRequest]:
+        if not request_ids:
+            return {}
+        rows = await MentoringRequestModel.filter(id__in=request_ids)
+        return {row.id: self._entity(row) for row in rows}
+
     async def count_pending(
         self, *, requester_id: uuid.UUID | None = None, team_id: uuid.UUID | None = None
     ) -> int:
@@ -637,3 +645,132 @@ class TortoiseMentoringRequestRepository:
             & (Q(desired_at_3__isnull=True) | Q(desired_at_3__lte=now))
         ).order_by("id")
         return [self._entity(row) for row in rows]
+
+
+SESSION_EXCLUDE = "excl_session_mentor_overlap"
+_SESSION_FIELDS = (
+    "status",
+    "starts_at",
+    "ends_at",
+    "title",
+    "topic",
+    "body",
+    "record_duration_minutes",
+    "recorded_at",
+    "google_space_name",
+    "google_meet_url",
+    "google_conference_record_name",
+    "actual_started_at",
+    "actual_ended_at",
+    "recording_status",
+    "recording_started_at",
+    "recording_ended_at",
+)
+
+
+def _participants(student_ids: list[uuid.UUID], team_ids: list[uuid.UUID]) -> Q:
+    """1:1은 신청 수강생, 팀은 신청의 팀으로 고른다 (팀 신청의 신청자는 팀원 한 명뿐이다)."""
+    return Q(request__requester_id__in=student_ids, request__team_id__isnull=True) | Q(
+        request__team_id__in=team_ids
+    )
+
+
+class TortoiseMentoringSessionRepository:
+    @staticmethod
+    def _entity(row: MentoringSessionModel) -> MentoringSession:
+        values = {name: getattr(row, name) for name in _SESSION_FIELDS}
+        return MentoringSession(
+            id=row.id,
+            mentor_id=row.mentor_id,  # type: ignore[attr-defined]  # FK 컬럼 속성
+            request_id=row.request_id,  # type: ignore[attr-defined]
+            created_at=row.created_at,
+            updated_at=row.updated_at,
+            **values,
+        )
+
+    async def add(self, session: MentoringSession) -> None:
+        values = {name: getattr(session, name) for name in _SESSION_FIELDS}
+        try:
+            await MentoringSessionModel.create(
+                id=session.id,
+                mentor_id=session.mentor_id,
+                request_id=session.request_id,
+                **values,
+            )
+        except IntegrityError as exc:
+            if SESSION_EXCLUDE not in str(exc):
+                raise
+            raise ConflictError(
+                "멘토의 다른 멘토링 일정과 겹칩니다.", code="mentor_schedule_conflict"
+            ) from exc
+
+    async def get(self, session_id: uuid.UUID) -> MentoringSession | None:
+        row = await MentoringSessionModel.get_or_none(id=session_id)
+        return self._entity(row) if row else None
+
+    @staticmethod
+    def _active() -> Any:
+        return MentoringSessionModel.exclude(status=MentoringSessionStatus.CANCELED)
+
+    async def count_for_pair(
+        self, mentor_id: uuid.UUID, *, requester_id: uuid.UUID | None, team_id: uuid.UUID | None
+    ) -> int:
+        query = self._active().filter(mentor_id=mentor_id)
+        if team_id is not None:
+            return int(await query.filter(request__team_id=team_id).count())
+        return int(
+            await query.filter(
+                request__requester_id=requester_id, request__team_id__isnull=True
+            ).count()
+        )
+
+    async def has_participant_overlap(
+        self,
+        *,
+        student_ids: list[uuid.UUID],
+        team_ids: list[uuid.UUID],
+        starts_at: datetime,
+        ends_at: datetime,
+    ) -> bool:
+        if not student_ids and not team_ids:
+            return False
+        return bool(
+            await self._active()
+            .filter(
+                _participants(student_ids, team_ids), starts_at__lt=ends_at, ends_at__gt=starts_at
+            )
+            .exists()
+        )
+
+    async def _page(self, query: Any, q: SessionQuery) -> tuple[list[MentoringSession], int]:
+        if q.status is not None:
+            query = query.filter(status=q.status)
+        if q.starts_from is not None:
+            query = query.filter(starts_at__gte=q.starts_from)
+        if q.starts_before is not None:
+            query = query.filter(starts_at__lt=q.starts_before)
+        total = await query.count()
+        rows = await query.order_by("-starts_at", "-id").offset(q.offset).limit(q.limit)
+        return [self._entity(row) for row in rows], total
+
+    async def list_for_participants(
+        self, *, student_ids: list[uuid.UUID], team_ids: list[uuid.UUID], query: SessionQuery
+    ) -> tuple[list[MentoringSession], int]:
+        if not student_ids and not team_ids:
+            return [], 0
+        return await self._page(
+            MentoringSessionModel.filter(_participants(student_ids, team_ids)), query
+        )
+
+    async def list_for_mentor(
+        self, mentor_id: uuid.UUID, query: SessionQuery
+    ) -> tuple[list[MentoringSession], int]:
+        return await self._page(MentoringSessionModel.filter(mentor_id=mentor_id), query)
+
+    async def list_by_cohort(
+        self, cohort_id: uuid.UUID, *, mentor_id: uuid.UUID | None, query: SessionQuery
+    ) -> tuple[list[MentoringSession], int]:
+        base = MentoringSessionModel.filter(request__requester__cohort_id=cohort_id)
+        if mentor_id is not None:
+            base = base.filter(mentor_id=mentor_id)
+        return await self._page(base, query)

@@ -7,6 +7,7 @@ from app.contexts.mentoring.domain.balance import BalanceAccount, BalanceTransac
 from app.contexts.mentoring.domain.enums import MentoringRequestStatus
 from app.contexts.mentoring.domain.request import MentoringRequest
 from app.contexts.mentoring.domain.schedule import MentorUnavailablePeriod
+from app.contexts.mentoring.domain.session import MentoringSession, SessionQuery
 from app.contexts.mentoring.domain.settings import (
     CohortMentoringSettings,
     MentoringBlockTime,
@@ -146,6 +147,7 @@ class MentoringRequestRepository(Protocol):
     async def save(self, request: MentoringRequest) -> None: ...
     async def get(self, request_id: uuid.UUID) -> MentoringRequest | None: ...
     async def lock(self, request_id: uuid.UUID) -> MentoringRequest | None: ...
+    async def get_many(self, request_ids: list[uuid.UUID]) -> dict[uuid.UUID, MentoringRequest]: ...
     async def count_pending(
         self, *, requester_id: uuid.UUID | None = None, team_id: uuid.UUID | None = None
     ) -> int:
@@ -184,3 +186,37 @@ class MentoringRequestRepository(Protocol):
     async def list_stale(self, now: datetime) -> list[MentoringRequest]:
         """대기 중이고 희망 일시가 모두 지난 신청."""
         ...
+
+
+class MentoringSessionRepository(Protocol):
+    async def add(self, session: MentoringSession) -> None:
+        """멘토 일정이 겹치면(취소 제외, DB EXCLUDE) ConflictError(mentor_schedule_conflict)."""
+        ...
+
+    async def get(self, session_id: uuid.UUID) -> MentoringSession | None: ...
+    async def count_for_pair(
+        self, mentor_id: uuid.UUID, *, requester_id: uuid.UUID | None, team_id: uuid.UUID | None
+    ) -> int:
+        """같은 멘토·같은 신청자(1:1은 수강생, 팀은 팀)의 취소되지 않은 세션 수 (회차 번호)."""
+        ...
+
+    async def has_participant_overlap(
+        self,
+        *,
+        student_ids: list[uuid.UUID],
+        team_ids: list[uuid.UUID],
+        starts_at: datetime,
+        ends_at: datetime,
+    ) -> bool:
+        """그 수강생들의 1:1 세션이나 그 팀들의 세션 중 시간이 겹치는 것이 있는지 (취소 제외)."""
+        ...
+
+    async def list_for_participants(
+        self, *, student_ids: list[uuid.UUID], team_ids: list[uuid.UUID], query: SessionQuery
+    ) -> tuple[list[MentoringSession], int]: ...
+    async def list_for_mentor(
+        self, mentor_id: uuid.UUID, query: SessionQuery
+    ) -> tuple[list[MentoringSession], int]: ...
+    async def list_by_cohort(
+        self, cohort_id: uuid.UUID, *, mentor_id: uuid.UUID | None, query: SessionQuery
+    ) -> tuple[list[MentoringSession], int]: ...

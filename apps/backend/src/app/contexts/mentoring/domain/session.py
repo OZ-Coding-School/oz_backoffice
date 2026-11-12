@@ -17,6 +17,17 @@ from app.shared.domain import AggregateRoot
 TITLE_MAX_LENGTH = 100
 
 
+@dataclass(frozen=True, slots=True)
+class SessionQuery:
+    """세션 목록 조건 (시작 시각 최신순)."""
+
+    status: MentoringSessionStatus | None = None
+    starts_from: datetime | None = None  # 포함
+    starts_before: datetime | None = None  # 미포함
+    limit: int = 20
+    offset: int = 0
+
+
 def session_title(requester_label: str, mentor_label: str, number: int) -> str:
     suffix = f" 멘토링 {number}회차"
     head = f"{requester_label} · {mentor_label}"

@@ -261,6 +261,9 @@ class InMemoryRequestRepository:
     async def lock(self, request_id: uuid.UUID) -> MentoringRequest | None:
         return await self.get(request_id)
 
+    async def get_many(self, request_ids: list[uuid.UUID]) -> dict[uuid.UUID, MentoringRequest]:
+        return {i: self._copy(self.items[i]) for i in request_ids if i in self.items}
+
     async def count_pending(
         self, *, requester_id: uuid.UUID | None = None, team_id: uuid.UUID | None = None
     ) -> int:

@@ -757,7 +757,7 @@ Table mentoring_requests {
 }
 
 Table mentoring_sessions {
-  note: "멘토링 진행 세션 기록 관리 테이블. 멘토 일정 겹침 방지: EXCLUDE USING gist (mentor_id WITH =, tstzrange(starts_at, ends_at) WITH &&) WHERE (status <> 'CANCELED') — raw SQL 마이그레이션"
+  note: "멘토링 진행 세션 기록 관리 테이블 (마이그레이션 18, A42·A43). 승인된 신청 하나에 세션 하나. 멘토 일정 겹침 방지: EXCLUDE USING gist (mentor_id WITH =, tstzrange(starts_at, ends_at) WITH &&) WHERE (status <> 'CANCELED') — raw SQL 마이그레이션(excl_session_mentor_overlap, 위반 시 409 mentor_schedule_conflict). 신청자 일정 겹침(1:1 수강생·팀)은 앱 검증(409 participant_schedule_conflict)"
 
   id uuid [pk, note: "default=uuid7 사용"]
   mentor_id uuid [not null, ref: > mentors.id, note: "비정규화 (멘토별 일정 조회, 정산, 겹침 방지)"]
