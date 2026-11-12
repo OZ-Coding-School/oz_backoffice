@@ -74,6 +74,7 @@ def get_request_service(
     state = request.app.state
     return MentoringRequestService(
         requests=TortoiseMentoringRequestRepository(),
+        sessions=TortoiseMentoringSessionRepository(),
         accounts=TortoiseBalanceAccountRepository(),
         ledger=TortoiseBalanceTransactionRepository(),
         teams=TortoiseMentoringTeamRepository(),

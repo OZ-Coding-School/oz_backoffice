@@ -8,9 +8,15 @@
 - 희망 일시는 각각 멘토의 신청 가능 구간(P9 계산) 안이어야 한다.
 - 계좌(1:1은 수강생, 팀은 팀)가 있어야 하고, 사용 기간 안의 날짜여야 하며, 대기 신청 수가 기수 설정
   (`max_pending_requests`, 1:1 수강생당·팀 팀당)보다 적어야 한다. 신청 시간만큼 보류(HOLD)한다.
-취소(승인 전): 신청자만, 사유 필수 → 보류 해제(RELEASE). 승인 후 취소·운영진 취소는 P11-3.
+취소 (사유 필수):
+- 대기 중: 신청자만 → 보류 해제(RELEASE).
+- 승인 후: 신청자·담당 멘토, 시작 `min_lead_hours` 전까지 → 세션 취소 + 전액 환불(REFUND, M26).
+- 운영진(기수 범위): 언제든. 대기 신청은 RELEASE, 승인된 신청은 예정 세션만 취소하고 환불 여부를
+  고른다(환불 안 함이면 USING 유지) (A42·A44).
+변경 (신청자만, 취소할 수 있을 때): 한 트랜잭션에서 기존 신청 취소 + 같은 대상의 새 신청
+  (`replaced_request_id`). 새 신청이 검사에 실패하면 취소도 되돌린다 (M3·A42·A44).
 대기 만료: 승인 가능한 희망 일시(시작 전)가 남지 않은 대기 신청을 주기 작업이 취소하고 RELEASE.
-계좌 → 신청 순서로 잠근다. 모든 변경은 감사 로그를 남긴다.
+계좌 → 신청 → 세션 순서로 잠근다. 모든 변경은 감사 로그를 남긴다.
 """
 
 import uuid
@@ -29,9 +35,16 @@ from app.contexts.mentoring.domain.repositories import (
     BalanceTransactionRepository,
     CohortMentoringSettingsRepository,
     MentoringRequestRepository,
+    MentoringSessionRepository,
     MentoringTeamRepository,
 )
-from app.contexts.mentoring.domain.request import EXPIRED_REASON, MentoringRequest
+from app.contexts.mentoring.domain.request import (
+    EXPIRED_REASON,
+    MentoringRequest,
+    ensure_before_deadline,
+)
+from app.contexts.mentoring.domain.session import MentoringSession
+from app.contexts.mentoring.domain.settings import CohortMentoringSettings
 from app.core.clock import Clock
 from app.core.uow import UnitOfWork
 from app.shared.errors import BusinessRuleViolation, NotFoundError, PermissionDeniedError
@@ -40,6 +53,8 @@ from app.shared.time import business_date
 TARGET = "mentoring_request"
 HOLD_REASON = "멘토링 신청"
 RELEASE_REASON = "신청 취소"
+REFUND_REASON = "승인 후 취소"
+CHANGE_REASON = "신청 변경"
 
 
 class StudentLookup(Protocol):
@@ -59,7 +74,13 @@ class AvailableTimesLookup(Protocol):
     """mentoring `AvailableTimesService`."""
 
     async def times_for(
-        self, mentor_id: uuid.UUID, cohort_id: uuid.UUID, start: date, end: date
+        self,
+        mentor_id: uuid.UUID,
+        cohort_id: uuid.UUID,
+        start: date,
+        end: date,
+        *,
+        exclude_request_id: uuid.UUID | None = None,
     ) -> AvailableTimes: ...
 
 
@@ -72,6 +93,25 @@ class RequestInput:
     cohort_id: uuid.UUID | None = None  # 1:1
     mentor_id: uuid.UUID | None = None  # 1:1
     team_id: uuid.UUID | None = None  # 팀
+
+
+@dataclass(frozen=True, slots=True)
+class ChangeInput:
+    """변경은 같은 대상(멘토, 1:1/팀)에서 내용만 바꾼다 (A44)."""
+
+    topic: str
+    detail: str
+    desired_times: list[datetime]
+    duration: int
+
+
+@dataclass(frozen=True, slots=True)
+class Prepared:
+    """트랜잭션 전에 검사를 마친 새 신청."""
+
+    request: MentoringRequest
+    settings: CohortMentoringSettings
+    days: list[date]
 
 
 def _active(student: Student) -> bool:
@@ -88,6 +128,7 @@ class MentoringRequestService:
         self,
         *,
         requests: MentoringRequestRepository,
+        sessions: MentoringSessionRepository,
         accounts: BalanceAccountRepository,
         ledger: BalanceTransactionRepository,
         teams: MentoringTeamRepository,
@@ -100,6 +141,7 @@ class MentoringRequestService:
         clock: Clock,
     ) -> None:
         self._requests = requests
+        self._sessions = sessions
         self._accounts = accounts
         self._ledger = ledger
         self._teams = teams
@@ -114,72 +156,101 @@ class MentoringRequestService:
     # ------------------------------------------------------------------ 신청
     async def create(self, user_id: uuid.UUID, data: RequestInput) -> MentoringRequest:
         requester, cohort_id, mentor_id, team_id = await self._resolve(user_id, data)
-        settings = await self._settings.get_by_cohort(cohort_id)
-        if settings is None:
-            raise NotFoundError(
-                "이 기수의 멘토링 설정이 아직 없습니다.", code="mentoring_settings_not_configured"
-            )
-        _rule(
-            settings.allow_team_mentoring if team_id else settings.allow_1_on_1,
-            "이 기수에서 허용하지 않는 멘토링 방식입니다.",
-            "mentoring_mode_not_allowed",
-        )
-        request = MentoringRequest(
-            requester_id=requester.id,
-            mentor_id=mentor_id,
-            team_id=team_id,
-            topic=data.topic,
-            detail=data.detail,
-            desired_times=data.desired_times,
-            duration=data.duration,
-        )
-        request.ensure_duration_unit(settings.allowed_duration)
-        await self._ensure_available(request, cohort_id)
-        days = [business_date(start) for start, _ in request.slots()]
-
+        prepared = await self._prepare(requester, cohort_id, mentor_id, team_id, data)
         async with self._uow:
-            account = await self._locked_account(request)
-            if account is None:
-                raise BusinessRuleViolation(
-                    "지급된 멘토링 시간이 없습니다.", code="balance_account_missing"
-                )
-            _rule(
-                all(account.valid_from <= d <= account.valid_until for d in days),
-                "희망 일시가 멘토링 시간 사용 기간 밖입니다.",
-                "desired_time_outside_validity",
-            )
-            pending = await self._requests.count_pending(
-                requester_id=None if team_id else requester.id, team_id=team_id
-            )
-            _rule(
-                pending < settings.max_pending_requests,
-                f"대기 중인 신청은 {settings.max_pending_requests}건까지입니다.",
-                "too_many_pending_requests",
-            )
-            entry = account.hold(request.duration, request_id=request.id, reason=HOLD_REASON)
-            await self._requests.add(request)
-            await self._accounts.save(account)
-            await self._ledger.add_many([entry])
-            await self._record(user_id, "create", request)
-        return request
+            account = await self._locked_account(prepared.request)
+            await self._place(prepared, account)
+            await self._record(user_id, "create", prepared.request)
+        return prepared.request
 
-    # ------------------------------------------------------------------ 취소·만료
+    # ------------------------------------------------------------------ 취소·변경
     async def cancel(
         self, user_id: uuid.UUID, request_id: uuid.UUID, reason: str
     ) -> MentoringRequest:
-        """승인 전 취소 (신청자만, A42)."""
+        """대기 중은 신청자만, 승인 후는 신청자·담당 멘토가 마감 전까지 (A42·M26)."""
         request = await self._get(request_id)
-        requester = (await self._students.get_many([request.requester_id])).get(
-            request.requester_id
-        )
-        if requester is None or requester.user_id != user_id:
+        requester = await self._requester(request)
+        is_requester = requester is not None and requester.user_id == user_id
+        if request.status is MentoringRequestStatus.APPROVED:
+            mentor = await self._mentors.get_by_user(user_id)
+            if not (is_requester or (mentor is not None and mentor.id == request.mentor_id)):
+                raise PermissionDeniedError(
+                    "신청자나 담당 멘토만 취소할 수 있습니다.", code="not_request_party"
+                )
+        elif not is_requester:
             raise PermissionDeniedError("신청한 사람만 취소할 수 있습니다.", code="not_requester")
+        approved = request.status is MentoringRequestStatus.APPROVED
+        lead = await self._lead_hours(requester) if approved else 0
         async with self._uow:
             account, request = await self._lock_pair(request)
-            entry = self._cancel(request, account, reason)
-            await self._persist(request, account, entry)
+            session = await self._sessions.lock_by_request(request.id)
+            if request.status is MentoringRequestStatus.APPROVED and session is not None:
+                ensure_before_deadline(
+                    session.starts_at, min_lead_hours=lead, now=self._clock.now()
+                )
+            entries = self._cancel(request, account, session, reason, refund=True)
+            await self._persist(request, account, entries, session)
             await self._record(user_id, "cancel", request)
         return request
+
+    async def staff_cancel(
+        self,
+        cohort_id: uuid.UUID,
+        request_id: uuid.UUID,
+        reason: str,
+        *,
+        refund: bool,
+        actor_id: uuid.UUID,
+    ) -> MentoringRequest:
+        """운영진 취소: 마감과 무관, 대기 신청은 RELEASE, 승인된 신청은 환불 선택 (A42·A44)."""
+        request = await self._get(request_id)
+        requester = await self._requester(request)
+        if requester is None or requester.cohort_id != cohort_id:
+            raise NotFoundError("신청을 찾을 수 없습니다.", code="request_not_found")
+        async with self._uow:
+            account, request = await self._lock_pair(request)
+            session = await self._sessions.lock_by_request(request.id)
+            entries = self._cancel(request, account, session, reason, refund=refund)
+            await self._persist(request, account, entries, session)
+            await self._record(actor_id, "staff_cancel", request, refund=refund)
+        return request
+
+    async def change(
+        self, user_id: uuid.UUID, request_id: uuid.UUID, data: ChangeInput
+    ) -> MentoringRequest:
+        """기존 신청 취소 + 같은 대상의 새 신청 (신청자만, 취소할 수 있을 때)."""
+        old = await self._get(request_id)
+        requester = await self._requester(old)
+        if requester is None or requester.user_id != user_id:
+            raise PermissionDeniedError("신청한 사람만 변경할 수 있습니다.", code="not_requester")
+        _rule(_active(requester), "수강 중인 수강생만 신청할 수 있습니다.", "student_not_enrolled")
+        prepared = await self._prepare(
+            requester,
+            requester.cohort_id,
+            old.mentor_id,
+            old.team_id,
+            RequestInput(
+                topic=data.topic,
+                detail=data.detail,
+                desired_times=data.desired_times,
+                duration=data.duration,
+            ),
+            replaced=old,
+        )
+        async with self._uow:
+            account, old = await self._lock_pair(old)
+            session = await self._sessions.lock_by_request(old.id)
+            if old.status is MentoringRequestStatus.APPROVED and session is not None:
+                ensure_before_deadline(
+                    session.starts_at,
+                    min_lead_hours=prepared.settings.min_lead_hours,
+                    now=self._clock.now(),
+                )
+            entries = self._cancel(old, account, session, CHANGE_REASON, refund=True)
+            await self._persist(old, account, entries, session)
+            await self._place(prepared, account)
+            await self._record(user_id, "change", prepared.request)
+        return prepared.request
 
     async def expire_stale(self) -> int:
         """승인 가능한 희망 일시가 없는 대기 신청을 취소한다 (주기 작업, 멱등)."""
@@ -190,8 +261,8 @@ class MentoringRequestService:
                 account, request = await self._lock_pair(stale)
                 if not request.is_stale(now):  # 잠그는 사이 처리됐다
                     continue
-                entry = self._cancel(request, account, EXPIRED_REASON)
-                await self._persist(request, account, entry)
+                entries = self._cancel(request, account, None, EXPIRED_REASON, refund=True)
+                await self._persist(request, account, entries, None)
                 await self._record(None, "expire", request)
                 expired += 1
         return expired
@@ -264,11 +335,83 @@ class MentoringRequestService:
         _rule(_active(requester), "수강 중인 수강생만 신청할 수 있습니다.", "student_not_enrolled")
         return requester, cohort_id, mentor_id, data.team_id
 
-    async def _ensure_available(self, request: MentoringRequest, cohort_id: uuid.UUID) -> None:
+    async def _prepare(
+        self,
+        requester: Student,
+        cohort_id: uuid.UUID,
+        mentor_id: uuid.UUID,
+        team_id: uuid.UUID | None,
+        data: RequestInput,
+        *,
+        replaced: MentoringRequest | None = None,
+    ) -> Prepared:
+        """설정·허용 방식·진행 단위·신청 가능 구간 검사 (트랜잭션 밖)."""
+        settings = await self._settings.get_by_cohort(cohort_id)
+        if settings is None:
+            raise NotFoundError(
+                "이 기수의 멘토링 설정이 아직 없습니다.", code="mentoring_settings_not_configured"
+            )
+        _rule(
+            settings.allow_team_mentoring if team_id else settings.allow_1_on_1,
+            "이 기수에서 허용하지 않는 멘토링 방식입니다.",
+            "mentoring_mode_not_allowed",
+        )
+        request = MentoringRequest(
+            requester_id=requester.id,
+            mentor_id=mentor_id,
+            team_id=team_id,
+            topic=data.topic,
+            detail=data.detail,
+            desired_times=data.desired_times,
+            duration=data.duration,
+            replaced_request_id=replaced.id if replaced else None,
+        )
+        request.ensure_duration_unit(settings.allowed_duration)
+        await self._ensure_available(
+            request, cohort_id, exclude_request_id=replaced.id if replaced else None
+        )
+        days = [business_date(start) for start, _ in request.slots()]
+        return Prepared(request=request, settings=settings, days=days)
+
+    async def _place(self, prepared: Prepared, account: BalanceAccount | None) -> None:
+        """잠긴 계좌로 사용 기간·대기 수를 보고 보류한 뒤 저장한다 (트랜잭션 안)."""
+        request, settings = prepared.request, prepared.settings
+        if account is None:
+            raise BusinessRuleViolation(
+                "지급된 멘토링 시간이 없습니다.", code="balance_account_missing"
+            )
+        _rule(
+            all(account.valid_from <= d <= account.valid_until for d in prepared.days),
+            "희망 일시가 멘토링 시간 사용 기간 밖입니다.",
+            "desired_time_outside_validity",
+        )
+        pending = await self._requests.count_pending(
+            requester_id=None if request.team_id else request.requester_id,
+            team_id=request.team_id,
+        )
+        _rule(
+            pending < settings.max_pending_requests,
+            f"대기 중인 신청은 {settings.max_pending_requests}건까지입니다.",
+            "too_many_pending_requests",
+        )
+        entry = account.hold(request.duration, request_id=request.id, reason=HOLD_REASON)
+        await self._requests.add(request)
+        await self._accounts.save(account)
+        await self._ledger.add_many([entry])
+
+    async def _ensure_available(
+        self,
+        request: MentoringRequest,
+        cohort_id: uuid.UUID,
+        *,
+        exclude_request_id: uuid.UUID | None = None,
+    ) -> None:
         slots = request.slots()
         start = min(business_date(s) for s, _ in slots)
         end = max(business_date(e - timedelta(microseconds=1)) for _, e in slots)
-        times = await self._availability.times_for(request.mentor_id, cohort_id, start, end)
+        times = await self._availability.times_for(
+            request.mentor_id, cohort_id, start, end, exclude_request_id=exclude_request_id
+        )
         _rule(
             times.accepting_requests, "지금은 신청을 받지 않는 멘토입니다.", "mentor_not_accepting"
         )
@@ -297,17 +440,50 @@ class MentoringRequestService:
         return account, locked
 
     def _cancel(
-        self, request: MentoringRequest, account: BalanceAccount, reason: str
-    ) -> BalanceTransaction:
+        self,
+        request: MentoringRequest,
+        account: BalanceAccount,
+        session: MentoringSession | None,
+        reason: str,
+        *,
+        refund: bool,
+    ) -> list[BalanceTransaction]:
+        """대기 → RELEASE, 승인 → 세션 취소 + (환불이면) REFUND."""
+        approved = request.status is MentoringRequestStatus.APPROVED
         request.cancel(reason, now=self._clock.now())
-        return account.release(request.duration, request_id=request.id, reason=RELEASE_REASON)
+        if not approved:
+            return [account.release(request.duration, request_id=request.id, reason=RELEASE_REASON)]
+        if session is None:
+            raise NotFoundError("세션을 찾을 수 없습니다.", code="session_not_found")
+        session.cancel()
+        if not refund:
+            return []
+        return [account.refund(request.duration, request_id=request.id, reason=REFUND_REASON)]
 
     async def _persist(
-        self, request: MentoringRequest, account: BalanceAccount, entry: BalanceTransaction
+        self,
+        request: MentoringRequest,
+        account: BalanceAccount,
+        entries: list[BalanceTransaction],
+        session: MentoringSession | None,
     ) -> None:
         await self._requests.save(request)
-        await self._accounts.save(account)
-        await self._ledger.add_many([entry])
+        if session is not None:
+            await self._sessions.save(session)
+        if entries:
+            await self._accounts.save(account)
+            await self._ledger.add_many(entries)
+
+    async def _requester(self, request: MentoringRequest) -> Student | None:
+        return (await self._students.get_many([request.requester_id])).get(request.requester_id)
+
+    async def _lead_hours(self, requester: Student | None) -> int:
+        settings = await self._settings.get_by_cohort(requester.cohort_id) if requester else None
+        if settings is None:
+            raise NotFoundError(
+                "이 기수의 멘토링 설정이 아직 없습니다.", code="mentoring_settings_not_configured"
+            )
+        return settings.min_lead_hours
 
     async def _get(self, request_id: uuid.UUID) -> MentoringRequest:
         request = await self._requests.get(request_id)
@@ -316,7 +492,12 @@ class MentoringRequestService:
         return request
 
     async def _record(
-        self, actor_id: uuid.UUID | None, action: str, request: MentoringRequest
+        self,
+        actor_id: uuid.UUID | None,
+        action: str,
+        request: MentoringRequest,
+        *,
+        refund: bool | None = None,
     ) -> None:
         await self._audit.record(
             actor_user_id=actor_id,
@@ -329,5 +510,9 @@ class MentoringRequestService:
                 "team_id": str(request.team_id) if request.team_id else None,
                 "duration": request.duration,
                 "cancel_reason": request.cancel_reason,
+                "replaced_request_id": (
+                    str(request.replaced_request_id) if request.replaced_request_id else None
+                ),
+                "refund": refund,
             },
         )

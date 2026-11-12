@@ -18,7 +18,6 @@ from app.contexts.access.presentation.dependencies import ApprovedUser, Permissi
 from app.contexts.mentoring.application.availability_service import (
     AvailableTimesService,
     EnrollmentLookup,
-    NoBusySchedule,
 )
 from app.contexts.mentoring.application.calendar import BusinessCalendar
 from app.contexts.mentoring.application.schedule_service import MentorLookup
@@ -27,6 +26,7 @@ from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseCohortMentorRepository,
     TortoiseMentoringBlockTimeRepository,
     TortoiseMentoringHolidayRepository,
+    TortoiseMentoringSessionRepository,
     TortoiseMentorUnavailablePeriodRepository,
 )
 from app.core.clock import Clock
@@ -46,7 +46,7 @@ def get_available_times_service(
         calendar=BusinessCalendar(TortoiseMentoringHolidayRepository()),
         mentors=cast("MentorLookup", request.app.state.mentor_queries),
         enrollments=cast("EnrollmentLookup", request.app.state.student_queries),
-        busy=NoBusySchedule(),
+        busy=TortoiseMentoringSessionRepository(),
         clock=clock,
     )
 

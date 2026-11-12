@@ -24,10 +24,7 @@ from app.contexts.audit.infrastructure.repositories import TortoiseAuditLogRepos
 from app.contexts.educator.application.mentor_queries import MentorQueries
 from app.contexts.educator.infrastructure.repositories import TortoiseMentorRepository
 from app.contexts.mentoring.application.assignment_service import CohortMentorService
-from app.contexts.mentoring.application.availability_service import (
-    AvailableTimesService,
-    NoBusySchedule,
-)
+from app.contexts.mentoring.application.availability_service import AvailableTimesService
 from app.contexts.mentoring.application.calendar import BusinessCalendar
 from app.contexts.mentoring.application.enrollment_ended import EnrollmentEndedService
 from app.contexts.mentoring.application.request_service import MentoringRequestService
@@ -39,6 +36,7 @@ from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseMentoringBlockTimeRepository,
     TortoiseMentoringHolidayRepository,
     TortoiseMentoringRequestRepository,
+    TortoiseMentoringSessionRepository,
     TortoiseMentoringTeamRepository,
     TortoiseMentorUnavailablePeriodRepository,
 )
@@ -106,11 +104,12 @@ def build_request_service() -> MentoringRequestService:
         calendar=BusinessCalendar(TortoiseMentoringHolidayRepository()),
         mentors=mentors,
         enrollments=students,
-        busy=NoBusySchedule(),
+        busy=TortoiseMentoringSessionRepository(),
         clock=clock,
     )
     return MentoringRequestService(
         requests=TortoiseMentoringRequestRepository(),
+        sessions=TortoiseMentoringSessionRepository(),
         accounts=TortoiseBalanceAccountRepository(),
         ledger=TortoiseBalanceTransactionRepository(),
         teams=TortoiseMentoringTeamRepository(),
