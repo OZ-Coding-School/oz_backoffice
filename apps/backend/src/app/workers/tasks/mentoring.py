@@ -2,6 +2,8 @@
 
 - `mentoring.assignments.expire`: 매일 00:00 KST, 종료일이 지난 활성 기수 멘토 배정을 비활성화한다
   (decisions A35, 사유 EXPIRED). 멱등이라 워커가 멈췄다가 다시 돌아도 밀린 배정을 모두 처리한다.
+- `mentoring.requests.expire`: 10분마다, 승인 가능한 희망 일시가 남지 않은 대기 신청을 취소하고
+  보류 시간을 돌려준다(decisions A42, 멱등).
 - `mentoring.enrollment_ended.process`: 명단 동기화가 성공하면 보낸다(roster 작업). 수강 중이 아닌
   수강생을 팀에서 빼고 1:1 잔여를 회수한다(decisions A39, 멱등).
 
@@ -22,12 +24,23 @@ from app.contexts.audit.infrastructure.repositories import TortoiseAuditLogRepos
 from app.contexts.educator.application.mentor_queries import MentorQueries
 from app.contexts.educator.infrastructure.repositories import TortoiseMentorRepository
 from app.contexts.mentoring.application.assignment_service import CohortMentorService
+from app.contexts.mentoring.application.availability_service import (
+    AvailableTimesService,
+    NoBusySchedule,
+)
+from app.contexts.mentoring.application.calendar import BusinessCalendar
 from app.contexts.mentoring.application.enrollment_ended import EnrollmentEndedService
+from app.contexts.mentoring.application.request_service import MentoringRequestService
 from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseBalanceAccountRepository,
     TortoiseBalanceTransactionRepository,
+    TortoiseCohortMentoringSettingsRepository,
     TortoiseCohortMentorRepository,
+    TortoiseMentoringBlockTimeRepository,
+    TortoiseMentoringHolidayRepository,
+    TortoiseMentoringRequestRepository,
     TortoiseMentoringTeamRepository,
+    TortoiseMentorUnavailablePeriodRepository,
 )
 from app.core.clock import SystemClock
 from app.core.uow import UnitOfWork
@@ -76,3 +89,43 @@ async def process_enrollment_ended() -> None:
         result.revoked_accounts,
         result.revoked_minutes,
     )
+
+
+EVERY_10_MINUTES = {"cron": "*/10 * * * *"}
+
+
+def build_request_service() -> MentoringRequestService:
+    clock = SystemClock()
+    mentors = MentorQueries(TortoiseMentorRepository())
+    students = StudentQueries(TortoiseStudentRepository())
+    availability = AvailableTimesService(
+        settings=TortoiseCohortMentoringSettingsRepository(),
+        assignments=TortoiseCohortMentorRepository(),
+        unavailable_periods=TortoiseMentorUnavailablePeriodRepository(),
+        blocks=TortoiseMentoringBlockTimeRepository(),
+        calendar=BusinessCalendar(TortoiseMentoringHolidayRepository()),
+        mentors=mentors,
+        enrollments=students,
+        busy=NoBusySchedule(),
+        clock=clock,
+    )
+    return MentoringRequestService(
+        requests=TortoiseMentoringRequestRepository(),
+        accounts=TortoiseBalanceAccountRepository(),
+        ledger=TortoiseBalanceTransactionRepository(),
+        teams=TortoiseMentoringTeamRepository(),
+        settings=TortoiseCohortMentoringSettingsRepository(),
+        students=students,
+        mentors=mentors,
+        availability=availability,
+        audit=AuditRecorder(TortoiseAuditLogRepository(), clock),
+        uow=UnitOfWork(),
+        clock=clock,
+    )
+
+
+@broker.task(task_name="mentoring.requests.expire", schedule=[EVERY_10_MINUTES])
+async def expire_requests() -> None:
+    count = await build_request_service().expire_stale()
+    if count:
+        logger.info("승인 기한이 지난 대기 신청 %d건을 취소했습니다.", count)
