@@ -8,6 +8,7 @@ from tortoise.exceptions import IntegrityError
 from tortoise.expressions import Q
 
 from app.contexts.mentoring.domain.assignment import CohortMentor
+from app.contexts.mentoring.domain.availability import Interval
 from app.contexts.mentoring.domain.balance import BalanceAccount, BalanceTransaction
 from app.contexts.mentoring.domain.enums import MentoringRequestStatus, MentoringSessionStatus
 from app.contexts.mentoring.domain.request import MentoringRequest
@@ -707,6 +708,32 @@ class TortoiseMentoringSessionRepository:
     async def get(self, session_id: uuid.UUID) -> MentoringSession | None:
         row = await MentoringSessionModel.get_or_none(id=session_id)
         return self._entity(row) if row else None
+
+    async def save(self, session: MentoringSession) -> None:
+        values = {name: getattr(session, name) for name in _SESSION_FIELDS}
+        await MentoringSessionModel.filter(id=session.id).update(**values)
+
+    async def get_by_request(self, request_id: uuid.UUID) -> MentoringSession | None:
+        row = await MentoringSessionModel.get_or_none(request_id=request_id)
+        return self._entity(row) if row else None
+
+    async def lock_by_request(self, request_id: uuid.UUID) -> MentoringSession | None:
+        row = await MentoringSessionModel.select_for_update().get_or_none(request_id=request_id)
+        return self._entity(row) if row else None
+
+    async def busy(
+        self,
+        mentor_id: uuid.UUID,
+        start: datetime,
+        end: datetime,
+        *,
+        exclude_request_id: uuid.UUID | None = None,
+    ) -> list[Interval]:
+        query = self._active().filter(mentor_id=mentor_id, starts_at__lt=end, ends_at__gt=start)
+        if exclude_request_id is not None:
+            query = query.exclude(request_id=exclude_request_id)
+        rows = await query.order_by("starts_at").values_list("starts_at", "ends_at")
+        return [Interval(s.astimezone(UTC), e.astimezone(UTC)) for s, e in rows]
 
     @staticmethod
     def _active() -> Any:

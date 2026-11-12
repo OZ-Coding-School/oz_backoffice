@@ -258,3 +258,83 @@ async def test_approve_reject_and_sessions(client: AsyncClient, settings: Settin
     assert wrong.status_code == 404
     assert (await client.get(admin_path, headers=student_h)).status_code == 403
     assert (await client.get(admin_path)).status_code == 401
+
+
+async def test_cancel_change_and_staff_cancel(client: AsyncClient, settings: Settings) -> None:
+    ctx = await _setup(client, settings)
+    student_h, mentor_h, admin = ctx["student_h"], ctx["mentor_h"], ctx["admin"]
+    at = ctx["at"]
+
+    async def balance() -> tuple[int, int, int]:
+        (a,) = (await client.get("/api/v1/me/balances", headers=student_h)).json()
+        return a["remaining_minutes"], a["held_minutes"], a["used_minutes"]
+
+    first = (await client.post(URL, json=_body(ctx), headers=student_h)).json()["id"]
+    approved = await client.post(
+        f"{URL}/{first}/approve", json={"starts_at": at.isoformat()}, headers=mentor_h
+    )
+    session_id = approved.json()["session"]["id"]
+    assert await balance() == (120, 0, 60)
+
+    # 잡힌 세션은 신청 가능 시간에서 빠진다
+    times = await client.get(
+        f"/api/v1/mentors/{ctx['mentor'].id}/available-times",
+        params={"cohort_id": str(ctx["cohort"].id), "from": str(at.date()), "to": str(at.date())},
+        headers=student_h,
+    )
+    spans = [
+        (datetime.fromisoformat(i["starts_at"]), datetime.fromisoformat(i["ends_at"]))
+        for i in times.json()["intervals"]
+    ]
+    assert not any(s < at + timedelta(hours=1) and at < e for s, e in spans)
+
+    later = at + timedelta(hours=2)
+    second = (
+        await client.post(
+            URL, json=_body(ctx, desired_times=[later.isoformat()], duration=120), headers=student_h
+        )
+    ).json()["id"]
+    assert await balance() == (0, 120, 60)
+
+    # 새 신청이 트랜잭션 안에서 실패하면(잔여 부족) 기존 신청 취소도 되돌린다
+    change = {"topic": "새 주제", "detail": "새 내용", "desired_times": [at.isoformat()]}
+    failed = await client.post(
+        f"{URL}/{first}/change", json={**change, "duration": 120}, headers=student_h
+    )
+    assert failed.json()["error"]["code"] == "insufficient_balance"
+    session = await client.get(f"/api/v1/mentoring/sessions/{session_id}", headers=student_h)
+    assert session.json()["status"] == "SCHEDULED"
+    assert await balance() == (0, 120, 60)
+
+    await client.post(f"{URL}/{second}/cancel", json={"reason": "필요 없음"}, headers=student_h)
+    assert (
+        await client.post(
+            f"{URL}/{first}/change", json={**change, "duration": 30}, headers=mentor_h
+        )
+    ).status_code == 403
+    changed = await client.post(
+        f"{URL}/{first}/change", json={**change, "duration": 30}, headers=student_h
+    )
+    assert changed.status_code == 201, changed.text
+    new = changed.json()
+    assert (new["replaced_request_id"], new["status"], new["duration"]) == (first, "PENDING", 30)
+    assert await balance() == (150, 30, 0)
+    session = await client.get(f"/api/v1/mentoring/sessions/{session_id}", headers=student_h)
+    assert session.json()["status"] == "CANCELED"
+
+    # 운영진 취소: 승인된 신청, 환불 안 함 → 사용 유지
+    await client.post(
+        f"{URL}/{new['id']}/approve", json={"starts_at": at.isoformat()}, headers=mentor_h
+    )
+    staff_path = f"{ctx['admin_path']}/{new['id']}/cancel"
+    assert (
+        await client.post(staff_path, json={"reason": "정리"}, headers=student_h)
+    ).status_code == 403
+    staff = await client.post(
+        staff_path, json={"reason": "운영 정리", "refund": False}, headers=admin
+    )
+    assert staff.status_code == 200, staff.text
+    assert (staff.json()["status"], staff.json()["cancel_reason"]) == ("CANCELED", "운영 정리")
+    assert await balance() == (150, 0, 30)
+    again = await client.post(staff_path, json={"reason": "다시"}, headers=admin)
+    assert again.json()["error"]["code"] == "request_not_cancelable"

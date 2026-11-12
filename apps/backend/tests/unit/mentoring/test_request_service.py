@@ -13,6 +13,7 @@ from app.contexts.educator.application.mentor_queries import MentorQueries
 from app.contexts.educator.domain.profiles import Mentor
 from app.contexts.mentoring.application.availability_service import AvailableTimes
 from app.contexts.mentoring.application.request_service import (
+    ChangeInput,
     MentoringRequestService,
     RequestInput,
 )
@@ -21,7 +22,9 @@ from app.contexts.mentoring.domain.balance import BalanceAccount
 from app.contexts.mentoring.domain.enums import (
     MentoringBalanceTransactionType,
     MentoringRequestStatus,
+    MentoringSessionStatus,
 )
+from app.contexts.mentoring.domain.session import MentoringSession
 from app.contexts.mentoring.domain.settings import CohortMentoringSettings
 from app.contexts.mentoring.domain.team import MentoringTeam
 from app.core.clock import FixedClock
@@ -34,6 +37,7 @@ from tests.fakes.mentoring import (
     InMemoryBalanceAccountRepository,
     InMemoryBalanceLedger,
     InMemoryRequestRepository,
+    InMemorySessionRepository,
     InMemorySettingsRepository,
     InMemoryTeamRepository,
 )
@@ -83,7 +87,13 @@ class Availability:
         ]
 
     async def times_for(
-        self, mentor_id: uuid.UUID, cohort_id: uuid.UUID, start: date, end: date
+        self,
+        mentor_id: uuid.UUID,
+        cohort_id: uuid.UUID,
+        start: date,
+        end: date,
+        *,
+        exclude_request_id: uuid.UUID | None = None,
     ) -> AvailableTimes:
         return AvailableTimes(
             mentor_id=mentor_id,
@@ -105,6 +115,7 @@ class Harness:
         self.accounts = InMemoryBalanceAccountRepository()
         self.ledger = InMemoryBalanceLedger()
         self.requests = InMemoryRequestRepository()
+        self.sessions = InMemorySessionRepository(self.requests)
         self.settings = InMemorySettingsRepository(
             CohortMentoringSettings(
                 cohort_id=self.cohort_id,
@@ -118,6 +129,7 @@ class Harness:
         self.audit_logs = InMemoryAuditLogRepository()
         self.service = MentoringRequestService(
             requests=self.requests,
+            sessions=self.sessions,
             accounts=self.accounts,
             ledger=self.ledger,
             teams=self.teams,
@@ -154,6 +166,34 @@ class Harness:
         }
         values.update(overrides)
         return RequestInput(**values)
+
+    async def approved(self, at: datetime = T, **overrides: Any) -> tuple[Any, MentoringSession]:
+        """신청 → 승인 (승인 서비스와 같은 저장 결과를 직접 만든다)."""
+        request = await self.create(**overrides)
+        stored = self.requests.items[request.id]
+        start, end = stored.approve(at, now=self.clock.now())
+        session = MentoringSession(
+            mentor_id=stored.mentor_id,
+            request_id=stored.id,
+            starts_at=start,
+            ends_at=end,
+            title="제목",
+            topic=stored.topic,
+        )
+        await self.sessions.add(session)
+        account = next(
+            a
+            for a in self.accounts.items.values()
+            if (
+                a.team_id == stored.team_id
+                if stored.team_id
+                else a.student_id == stored.requester_id
+            )
+        )
+        await self.ledger.add_many(
+            [account.use(stored.duration, request_id=stored.id, reason="승인")]
+        )
+        return stored, session
 
     async def create(self, **overrides: Any) -> Any:
         user = overrides.pop("user", self.student.user_id)
@@ -299,3 +339,95 @@ async def test_mentor_list(h: Harness) -> None:
     with pytest.raises(NotFoundError):
         await h.service.list_for_mentor(new_id(), status=None, limit=10, offset=0)
     assert len(items) == 1
+
+
+async def test_cancel_after_approval(h: Harness) -> None:
+    account = await h.fund(student_id=h.student.id)
+    request, session = await h.approved()
+    user = h.student.user_id
+    assert user is not None
+    with pytest.raises(PermissionDeniedError) as stranger:
+        await h.service.cancel(new_id(), request.id, "남")
+    assert stranger.value.code == "not_request_party"
+
+    h.clock.set(T - timedelta(hours=23))  # 마감(24시간 전) 지남
+    with pytest.raises(BusinessRuleViolation) as late:
+        await h.service.cancel(user, request.id, "늦은 취소")
+    assert late.value.code == "cancel_deadline_passed"
+
+    h.clock.set(T - timedelta(hours=24))
+    canceled = await h.service.cancel(h.mentor.user_id, request.id, "멘토 사정")  # 멘토도 가능
+    assert canceled.status is MentoringRequestStatus.CANCELED
+    assert h.sessions.items[session.id].status is MentoringSessionStatus.CANCELED
+    stored = h.accounts.items[account.id]
+    assert (stored.used_minutes, stored.remaining_minutes) == (0, 180)
+    assert h.ledger.entries[-1].type is MentoringBalanceTransactionType.REFUND
+
+
+async def test_staff_cancel(h: Harness) -> None:
+    account = await h.fund(student_id=h.student.id, minutes=240)
+    pending = await h.create(desired_times=[T + timedelta(hours=3)])
+    request, session = await h.approved()
+    h.clock.set(T + timedelta(hours=2))  # 시작이 지났어도 기록 전이면 운영진은 취소
+    with pytest.raises(NotFoundError):  # 다른 기수
+        await h.service.staff_cancel(new_id(), request.id, "정리", refund=True, actor_id=new_id())
+    no_refund = await h.service.staff_cancel(
+        h.cohort_id, request.id, "노쇼 정리", refund=False, actor_id=new_id()
+    )
+    assert no_refund.status is MentoringRequestStatus.CANCELED
+    assert h.sessions.items[session.id].status is MentoringSessionStatus.CANCELED
+    assert h.accounts.items[account.id].used_minutes == 60  # 환불 안 함 → USING 유지
+
+    released = await h.service.staff_cancel(  # 대기 신청은 환불 선택과 무관하게 해제
+        h.cohort_id, pending.id, "운영 정리", refund=False, actor_id=new_id()
+    )
+    assert released.status is MentoringRequestStatus.CANCELED
+    stored = h.accounts.items[account.id]
+    assert (stored.held_minutes, stored.remaining_minutes) == (0, 180)
+    assert [log.action for log in h.audit_logs.logs][-1] == "mentoring.request.staff_cancel"
+
+    other, other_session = await h.approved(
+        desired_times=[T + timedelta(hours=4)], at=T + timedelta(hours=4)
+    )
+    h.sessions.items[other_session.id].status = MentoringSessionStatus.COMPLETED
+    with pytest.raises(BusinessRuleViolation) as done:
+        await h.service.staff_cancel(
+            h.cohort_id, other.id, "완료됨", refund=True, actor_id=new_id()
+        )
+    assert done.value.code == "session_not_cancelable"
+
+
+async def test_change(h: Harness) -> None:
+    account = await h.fund(student_id=h.student.id)
+    request, session = await h.approved()
+    user = h.student.user_id
+    assert user is not None
+    data = ChangeInput(topic="새 주제", detail="새 내용", desired_times=[T], duration=30)
+    with pytest.raises(PermissionDeniedError):
+        await h.service.change(h.mentor.user_id, request.id, data)  # 멘토는 변경 불가
+
+    changed = await h.service.change(user, request.id, data)  # 기존 세션 시각도 다시 고를 수 있다
+    assert (changed.replaced_request_id, changed.mentor_id, changed.status) == (
+        request.id,
+        h.mentor.id,
+        MentoringRequestStatus.PENDING,
+    )
+    assert h.requests.items[request.id].status is MentoringRequestStatus.CANCELED
+    assert h.sessions.items[session.id].status is MentoringSessionStatus.CANCELED
+    stored = h.accounts.items[account.id]
+    assert (stored.used_minutes, stored.held_minutes, stored.remaining_minutes) == (0, 30, 150)
+    assert [e.type for e in h.ledger.entries][-2:] == [
+        MentoringBalanceTransactionType.REFUND,
+        MentoringBalanceTransactionType.HOLD,
+    ]
+
+    # 새 신청이 검사에 실패하면 기존 신청은 그대로 (검사가 트랜잭션 전에 끝난다)
+    bad = ChangeInput(topic="x", detail="y", desired_times=[T.replace(hour=9)], duration=30)
+    with pytest.raises(BusinessRuleViolation) as unavailable:
+        await h.service.change(user, changed.id, bad)
+    assert unavailable.value.code == "desired_time_unavailable"
+    assert h.requests.items[changed.id].status is MentoringRequestStatus.PENDING
+    too_long = ChangeInput(topic="x", detail="y", desired_times=[T], duration=240)
+    with pytest.raises(BusinessRuleViolation):
+        await h.service.change(user, changed.id, too_long)
+    assert h.requests.items[changed.id].status is MentoringRequestStatus.PENDING

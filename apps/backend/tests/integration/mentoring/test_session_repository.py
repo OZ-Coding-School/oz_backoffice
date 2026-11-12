@@ -18,6 +18,7 @@ from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseMentoringTeamRepository,
 )
 from app.shared.errors import ConflictError
+from app.shared.ids import new_id
 from app.shared.time import KST
 from tests.factories.academy import create_cohort, make_student
 from tests.factories.educator import create_mentor
@@ -142,3 +143,36 @@ async def test_session_round_trip_overlap_and_lists() -> None:
     assert taken is not None
     with pytest.raises(IntegrityError):  # 신청 하나에 세션 하나
         await sessions.add(_session(taken, T + timedelta(days=1)))
+
+
+async def test_save_lock_and_busy() -> None:
+    cohort = await create_cohort()
+    student = make_student(cohort_id=cohort.id)
+    await TortoiseStudentRepository().add(student)
+    mentor = await create_mentor()
+    first = _session(await _approved(mentor.id, student.id))
+    second = _session(await _approved(mentor.id, student.id), T + timedelta(hours=3))
+    for s in (first, second):
+        await sessions.add(s)
+
+    locked = await sessions.lock_by_request(first.request_id)
+    assert locked is not None
+    assert locked.id == first.id
+    assert (await sessions.get_by_request(new_id())) is None
+
+    day_end = T + timedelta(hours=10)
+    busy = await sessions.busy(mentor.id, T - timedelta(hours=1), day_end)
+    assert [(i.start, i.end) for i in busy] == [
+        (T, T + timedelta(hours=1)),
+        (T + timedelta(hours=3), T + timedelta(hours=4)),
+    ]
+    without = await sessions.busy(mentor.id, T, day_end, exclude_request_id=second.request_id)
+    assert len(without) == 1
+    assert await sessions.busy(mentor.id, T + timedelta(hours=1), T + timedelta(hours=3)) == []
+
+    locked.cancel()
+    await sessions.save(locked)
+    stored = await sessions.get(first.id)
+    assert stored is not None
+    assert stored.status is MentoringSessionStatus.CANCELED
+    assert len(await sessions.busy(mentor.id, T, day_end)) == 1

@@ -43,15 +43,31 @@ class EnrollmentLookup(Protocol):
 
 
 class BusySchedule(Protocol):
-    async def busy(self, mentor_id: uuid.UUID, start: datetime, end: datetime) -> list[Interval]:
-        """그 멘토의 이미 잡힌 세션 (취소 제외)."""
+    """mentoring 세션 리포지토리 `busy`."""
+
+    async def busy(
+        self,
+        mentor_id: uuid.UUID,
+        start: datetime,
+        end: datetime,
+        *,
+        exclude_request_id: uuid.UUID | None = None,
+    ) -> list[Interval]:
+        """그 멘토의 이미 잡힌 세션 (취소 제외, 변경 중인 신청의 세션 제외)."""
         ...
 
 
 class NoBusySchedule:
-    """세션(P11)이 생기기 전: 잡힌 일정 없음."""
+    """잡힌 일정 없음 (단위 테스트용)."""
 
-    async def busy(self, mentor_id: uuid.UUID, start: datetime, end: datetime) -> list[Interval]:
+    async def busy(
+        self,
+        mentor_id: uuid.UUID,
+        start: datetime,
+        end: datetime,
+        *,
+        exclude_request_id: uuid.UUID | None = None,
+    ) -> list[Interval]:
         return []
 
 
@@ -113,9 +129,15 @@ class AvailableTimesService:
         return await self.times_for(mentor_id, cohort_id, start, end)
 
     async def times_for(
-        self, mentor_id: uuid.UUID, cohort_id: uuid.UUID, start: date, end: date
+        self,
+        mentor_id: uuid.UUID,
+        cohort_id: uuid.UUID,
+        start: date,
+        end: date,
+        *,
+        exclude_request_id: uuid.UUID | None = None,
     ) -> AvailableTimes:
-        """조회자 확인 없이 계산한다 (신청 검증용, P11)."""
+        """조회자 확인 없이 계산한다 (신청 검증용, P11). 변경은 기존 신청의 세션을 빼고 본다."""
         now = self._clock.now()
         self._ensure_range(start, end, business_date(now))
         mentor = await self._mentors.get(mentor_id)
@@ -154,7 +176,9 @@ class AvailableTimesService:
             assignments=[AssignmentRange(a.start_date, a.end_date) for a in active],
             unavailable=await self._periods.list_by_mentor(mentor_id),
             blocks=await self._blocks.list_by_cohort(cohort_id),
-            busy=await self._busy.busy(mentor_id, window_start, window_end),
+            busy=await self._busy.busy(
+                mentor_id, window_start, window_end, exclude_request_id=exclude_request_id
+            ),
             now=now,
         )
         return dataclasses.replace(result, intervals=intervals)
