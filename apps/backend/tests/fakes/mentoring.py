@@ -19,6 +19,7 @@ from app.shared.errors import ConflictError
 if TYPE_CHECKING:
     from app.contexts.audit.application.recorder import AuditRecorder
     from app.core.clock import Clock
+    from app.integrations.google.meet import MeetSpace
 
 
 class InMemoryCohortMentorRepository:
@@ -398,6 +399,19 @@ class InMemorySessionRepository:
             and (solo is None or (self._requests.items[s.request_id].team_id is None) == solo)
         ]
 
+    async def lock(self, session_id: uuid.UUID) -> MentoringSession | None:
+        return await self.get(session_id)
+
+    async def list_needing_space(self, after: datetime) -> list[MentoringSession]:
+        return [
+            dataclasses.replace(s)
+            for s in sorted(self.items.values(), key=lambda s: (s.starts_at, s.id))
+            if s.needs_space and s.starts_at > after
+        ]
+
+    async def list_needing_close(self) -> list[MentoringSession]:
+        return [dataclasses.replace(s) for s in self.items.values() if s.needs_space_closed]
+
     async def get_by_request(self, request_id: uuid.UUID) -> MentoringSession | None:
         found = next((s for s in self.items.values() if s.request_id == request_id), None)
         return dataclasses.replace(found) if found else None
@@ -555,3 +569,40 @@ class CleanupStores:
 
     def status(self, request: MentoringRequest) -> MentoringRequestStatus:
         return self.requests.items[request.id].status
+
+
+class RecordingMeetScheduler:
+    """승인 커밋 후 보낼 Meet 공간 생성 요청을 모은다 (TaskiqMeetScheduler 대신)."""
+
+    def __init__(self) -> None:
+        self.needed: list[uuid.UUID] = []
+
+    async def space_needed(self, session_id: uuid.UUID) -> None:
+        self.needed.append(session_id)
+
+
+class FakeMeetClient:
+    """만든 공간·막은 공간을 기록한다. fail_create/fail_restrict로 실패를 흉내 낸다."""
+
+    def __init__(self) -> None:
+        self.created: list[str] = []
+        self.restricted: list[str] = []
+        self.fail_create = 0  # 남은 실패 횟수
+        self.fail_restrict = False
+
+    async def create_space(self) -> "MeetSpace":
+        from app.integrations.google.meet import MeetSpace, MeetUnavailableError
+
+        if self.fail_create:
+            self.fail_create -= 1
+            raise MeetUnavailableError()
+        name = f"spaces/s{len(self.created) + 1}"
+        self.created.append(name)
+        return MeetSpace(name=name, meeting_uri=f"https://meet.google.com/{name[7:]}")
+
+    async def restrict_space(self, space_name: str) -> None:
+        from app.integrations.google.meet import MeetUnavailableError
+
+        if self.fail_restrict:
+            raise MeetUnavailableError()
+        self.restricted.append(space_name)

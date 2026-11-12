@@ -735,6 +735,24 @@ class TortoiseMentoringSessionRepository:
         values = {name: getattr(session, name) for name in _SESSION_FIELDS}
         await MentoringSessionModel.filter(id=session.id).update(**values)
 
+    async def lock(self, session_id: uuid.UUID) -> MentoringSession | None:
+        row = await MentoringSessionModel.select_for_update().get_or_none(id=session_id)
+        return self._entity(row) if row else None
+
+    async def list_needing_space(self, after: datetime) -> list[MentoringSession]:
+        rows = await MentoringSessionModel.filter(
+            status=MentoringSessionStatus.SCHEDULED,
+            starts_at__gt=after,
+            google_space_name__isnull=True,
+        ).order_by("starts_at", "id")
+        return [self._entity(row) for row in rows]
+
+    async def list_needing_close(self) -> list[MentoringSession]:
+        rows = await MentoringSessionModel.filter(
+            status=MentoringSessionStatus.CANCELED, google_meet_url__isnull=False
+        ).order_by("id")
+        return [self._entity(row) for row in rows]
+
     async def get_by_request(self, request_id: uuid.UUID) -> MentoringSession | None:
         row = await MentoringSessionModel.get_or_none(request_id=request_id)
         return self._entity(row) if row else None

@@ -1,0 +1,112 @@
+"""멘토링 세션의 Google Meet 공간 (decisions A46·A48, P12-1).
+
+- 승인 커밋 후 작업이 공간을 만든다(`ensure_space`, 작업이 재시도).
+- 10분마다 `sync`가 빠진 공간을 채우고(시작 전 예정 세션), 취소된 세션의 공간을 막는다.
+- Meet 설정이 없으면(클라이언트 None) 아무것도 하지 않는다. 설정이 갖춰지면 `sync`가 채운다.
+외부 호출은 트랜잭션 밖에서 하고, 저장할 때만 세션을 잠근다. 잠그는 사이 다른 작업이 먼저 공간을
+붙였으면 방금 만든 공간은 막아 둔다(고아 공간 방지).
+"""
+
+import logging
+import uuid
+from collections.abc import Awaitable, Callable
+from typing import Protocol
+
+from app.contexts.mentoring.domain.repositories import MentoringSessionRepository
+from app.core.clock import Clock
+from app.core.uow import UnitOfWork
+from app.integrations.google.meet import MeetSpace, MeetUnavailableError
+
+logger = logging.getLogger(__name__)
+
+
+class MeetClient(Protocol):
+    async def create_space(self) -> MeetSpace: ...
+    async def restrict_space(self, space_name: str) -> None: ...
+
+
+class MeetSpaceScheduler(Protocol):
+    """승인 커밋 후 공간 생성을 워커로 보낸다 (app.state.meet_scheduler)."""
+
+    async def space_needed(self, session_id: uuid.UUID) -> None: ...
+
+
+class NoMeetScheduler:
+    """보내지 않는다 (단위 테스트·주기 작업만 쓰는 곳)."""
+
+    async def space_needed(self, session_id: uuid.UUID) -> None:
+        return None
+
+
+class MeetSpaceService:
+    def __init__(
+        self,
+        *,
+        sessions: MentoringSessionRepository,
+        meet: MeetClient | None,
+        uow: UnitOfWork,
+        clock: Clock,
+    ) -> None:
+        self._sessions = sessions
+        self._meet = meet
+        self._uow = uow
+        self._clock = clock
+
+    @property
+    def enabled(self) -> bool:
+        return self._meet is not None
+
+    async def ensure_space(self, session_id: uuid.UUID) -> bool:
+        """공간이 필요하면 만들어 붙인다. 붙였으면 True. 실패는 MeetUnavailableError."""
+        if self._meet is None:
+            return False
+        session = await self._sessions.get(session_id)
+        if session is None or not session.needs_space:
+            return False
+        space = await self._meet.create_space()
+        async with self._uow:
+            locked = await self._sessions.lock(session_id)
+            attached = locked is not None and locked.needs_space
+            if locked is not None and attached:
+                locked.attach_space(space.name, space.meeting_uri)
+                await self._sessions.save(locked)
+        if not attached:  # 잠그는 사이 취소됐거나 다른 작업이 먼저 붙였다
+            await self._meet.restrict_space(space.name)
+        return attached
+
+    async def close_space(self, session_id: uuid.UUID) -> bool:
+        """취소된 세션의 공간을 막고 링크를 지운다. 막았으면 True."""
+        if self._meet is None:
+            return False
+        session = await self._sessions.get(session_id)
+        if session is None or not session.needs_space_closed or not session.google_space_name:
+            return False
+        await self._meet.restrict_space(session.google_space_name)
+        async with self._uow:
+            locked = await self._sessions.lock(session_id)
+            if locked is not None and locked.needs_space_closed:
+                locked.space_closed()
+                await self._sessions.save(locked)
+        return True
+
+    async def sync(self) -> tuple[int, int]:
+        """(만든 공간 수, 막은 공간 수). 건별 실패는 로그만 남기고 다음 주기에 다시 한다."""
+        if self._meet is None:
+            return 0, 0
+        created = closed = 0
+        for session in await self._sessions.list_needing_space(self._clock.now()):
+            created += await self._try(self.ensure_space, session.id, "생성")
+        for session in await self._sessions.list_needing_close():
+            closed += await self._try(self.close_space, session.id, "막기")
+        return created, closed
+
+    @staticmethod
+    async def _try(
+        action: Callable[[uuid.UUID], Awaitable[bool]], session_id: uuid.UUID, label: str
+    ) -> int:
+        try:
+            done = await action(session_id)
+        except MeetUnavailableError:
+            logger.warning("Meet 공간 %s 실패 (세션 %s), 다음 주기에 다시 한다", label, session_id)
+            return 0
+        return 1 if done else 0

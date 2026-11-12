@@ -231,3 +231,30 @@ async def test_list_pending_and_upcoming() -> None:
     upcoming = await sessions.list_upcoming(T, mentor_id=mentor.id)
     assert [s.id for s in upcoming] == [future.id, team_future.id]
     assert [s.id for s in await sessions.list_upcoming(T, solo=True)] == [future.id]
+
+
+async def test_meet_space_queries() -> None:
+    cohort = await create_cohort()
+    student = make_student(cohort_id=cohort.id)
+    await TortoiseStudentRepository().add(student)
+    mentor = await create_mentor()
+    past = _session(await _approved(mentor.id, student.id), T - timedelta(days=1))
+    upcoming = _session(await _approved(mentor.id, student.id), T + timedelta(hours=2))
+    canceled = _session(await _approved(mentor.id, student.id), T + timedelta(hours=4))
+    for session in (past, upcoming, canceled):
+        await sessions.add(session)
+    assert [s.id for s in await sessions.list_needing_space(T)] == [upcoming.id, canceled.id]
+
+    locked = await sessions.lock(canceled.id)
+    assert locked is not None
+    locked.attach_space("spaces/abc", "https://meet.google.com/abc")
+    locked.cancel()
+    await sessions.save(locked)
+    assert [s.id for s in await sessions.list_needing_space(T)] == [upcoming.id]
+    assert [s.id for s in await sessions.list_needing_close()] == [canceled.id]
+    locked.space_closed()
+    await sessions.save(locked)
+    assert await sessions.list_needing_close() == []
+    stored = await sessions.get(canceled.id)
+    assert stored is not None
+    assert (stored.google_space_name, stored.google_meet_url) == ("spaces/abc", None)
