@@ -2,14 +2,18 @@
 
 수강생(승인된 회원):
   POST /mentoring/requests                    1:1(cohort_id·mentor_id) 또는 팀(team_id) 신청
-  POST /mentoring/requests/{id}/cancel        승인 전 취소 (신청자만, 사유 필수)
+  POST /mentoring/requests/{id}/cancel        취소 (사유 필수): 대기는 신청자, 승인 후는 신청자·담당
+                                              멘토가 시작 min_lead_hours 전까지 (M26)
+  POST /mentoring/requests/{id}/change        변경: 같은 대상으로 기존 취소 + 새 신청 (A44)
   GET  /me/mentoring/requests?status=         본인 1:1 + 소속 팀 신청
 멘토:
   GET  /me/mentor-requests?status=            받은 신청
   POST /mentoring/requests/{id}/approve       희망 일시 하나를 골라 승인 → 세션 생성 (A43)
   POST /mentoring/requests/{id}/reject        반려 (사유 필수)
-운영진 (mentoring.request.read, 기수 범위):
-  GET  /admin/cohorts/{cohort_id}/mentoring/requests?status=&mentor_id=
+운영진 (기수 범위):
+  GET  /admin/cohorts/{cohort_id}/mentoring/requests?status=&mentor_id=   mentoring.request.read
+  POST /admin/cohorts/{cohort_id}/mentoring/requests/{id}/cancel          mentoring.request.cancel
+       {reason, refund}: 마감과 무관, 대기는 보류 해제, 승인은 예정 세션만·환불 선택 (A44)
 """
 
 import uuid
@@ -26,6 +30,7 @@ from app.contexts.identity.domain.entities import User
 from app.contexts.mentoring.application.approval_service import MentoringApprovalService
 from app.contexts.mentoring.application.assignment_service import MentorDirectory
 from app.contexts.mentoring.application.request_service import (
+    ChangeInput,
     MentoringRequestService,
     RequestInput,
     StudentLookup,
@@ -63,6 +68,9 @@ admin_router = APIRouter(
 
 RequestReader = Annotated[
     User, Depends(require_permission("mentoring.request.read", cohort_param="cohort_id"))
+]
+RequestCanceler = Annotated[
+    User, Depends(require_permission("mentoring.request.cancel", cohort_param="cohort_id"))
 ]
 Limit = Annotated[int, Query(ge=1, le=100)]
 Offset = Annotated[int, Query(ge=0)]
@@ -130,6 +138,20 @@ class RequestCreate(BaseModel):
 
 class CancelBody(BaseModel):
     reason: str = Field(min_length=1, max_length=REASON_MAX_LENGTH)
+
+
+class ChangeBody(BaseModel):
+    """같은 멘토·같은 방식(1:1/팀)에서 내용만 바꾼다."""
+
+    topic: str = Field(min_length=1, max_length=TOPIC_MAX_LENGTH)
+    detail: str = Field(min_length=1, max_length=DETAIL_MAX_LENGTH)
+    desired_times: list[AwareDatetime] = Field(min_length=1, max_length=MAX_DESIRED)
+    duration: int = Field(gt=0, le=MAX_DURATION_MINUTES)
+
+
+class StaffCancelBody(BaseModel):
+    reason: str = Field(min_length=1, max_length=REASON_MAX_LENGTH)
+    refund: bool = Field(default=True, description="승인된 신청만 적용 (대기 신청은 항상 해제)")
 
 
 class ApproveBody(BaseModel):
@@ -236,9 +258,33 @@ async def cancel_request(
     service: ServiceDep,
     presenter: PresenterDep,
 ) -> RequestResponse:
-    """승인 전 취소 (신청자만). 보류 시간을 돌려준다."""
+    """대기는 신청자만(보류 해제), 승인 후는 신청자·담당 멘토가 마감 전까지(전액 환불)."""
     canceled = await service.cancel(user.id, request_id, body.reason)
     return (await presenter.public([canceled]))[0]
+
+
+@router.post(
+    "/{request_id}/change", response_model=RequestResponse, status_code=status.HTTP_201_CREATED
+)
+async def change_request(
+    request_id: uuid.UUID,
+    body: ChangeBody,
+    user: ApprovedUser,
+    service: ServiceDep,
+    presenter: PresenterDep,
+) -> RequestResponse:
+    """신청자만. 응답은 새 신청(replaced_request_id = 기존 신청)."""
+    created = await service.change(
+        user.id,
+        request_id,
+        ChangeInput(
+            topic=body.topic,
+            detail=body.detail,
+            desired_times=list(body.desired_times),
+            duration=body.duration,
+        ),
+    )
+    return (await presenter.public([created]))[0]
 
 
 @me_router.get("/mentoring/requests", response_model=Page[RequestResponse])
@@ -316,3 +362,18 @@ async def cohort_requests(
         cohort_id, status=status_, mentor_id=mentor_id, limit=limit, offset=offset
     )
     return Page(items=await presenter.admin(items), total=total, limit=limit, offset=offset)
+
+
+@admin_router.post("/{request_id}/cancel", response_model=AdminRequestResponse)
+async def staff_cancel_request(
+    cohort_id: uuid.UUID,
+    request_id: uuid.UUID,
+    body: StaffCancelBody,
+    actor: RequestCanceler,
+    service: ServiceDep,
+    presenter: PresenterDep,
+) -> AdminRequestResponse:
+    canceled = await service.staff_cancel(
+        cohort_id, request_id, body.reason, refund=body.refund, actor_id=actor.id
+    )
+    return (await presenter.admin([canceled]))[0]
