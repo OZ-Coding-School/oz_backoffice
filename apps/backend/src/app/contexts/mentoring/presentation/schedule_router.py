@@ -21,11 +21,11 @@ from pydantic import AwareDatetime, BaseModel, Field, model_validator
 from app.contexts.access.presentation.dependencies import ApprovedUser, require_permission
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.identity.domain.entities import User
+from app.contexts.mentoring.application.schedule_conflicts import SessionScheduleConflicts
 from app.contexts.mentoring.application.schedule_service import (
     MentorLookup,
     MentorSchedule,
     MentorScheduleService,
-    NoScheduleConflicts,
     ScheduleChange,
 )
 from app.contexts.mentoring.domain.enums import UnavailableRepeat
@@ -35,6 +35,8 @@ from app.contexts.mentoring.domain.schedule import (
     MentorUnavailablePeriod,
 )
 from app.contexts.mentoring.infrastructure.repositories import (
+    TortoiseMentoringRequestRepository,
+    TortoiseMentoringSessionRepository,
     TortoiseMentorUnavailablePeriodRepository,
 )
 from app.contexts.mentoring.presentation.cleanup import build_cleanup
@@ -49,7 +51,8 @@ admin_router = APIRouter(
 
 MentorManager = Annotated[User, Depends(require_permission("mentor.manage", any_scope=True))]
 Confirm = Annotated[
-    bool, Query(description="충돌하는 신청·세션이 있어도 저장한다 (충돌 건은 반려·취소, P11)")
+    bool,
+    Query(description="충돌하는 신청·세션이 있어도 저장한다 (대기 신청 반려, 세션 취소·전액 환불)"),
 ]
 IncludePast = Annotated[bool, Query(description="끝난 불가 시간도 포함")]
 
@@ -57,11 +60,17 @@ IncludePast = Annotated[bool, Query(description="끝난 불가 시간도 포함"
 def get_schedule_service(
     request: Request, clock: Annotated[Clock, Depends(get_clock)]
 ) -> MentorScheduleService:
+    cleanup = build_cleanup(request, clock)
     return MentorScheduleService(
         unavailable_periods=TortoiseMentorUnavailablePeriodRepository(),
         mentors=cast("MentorLookup", request.app.state.mentor_queries),
-        conflicts=NoScheduleConflicts(),
-        cleanup=build_cleanup(request, clock),
+        conflicts=SessionScheduleConflicts(
+            requests=TortoiseMentoringRequestRepository(),
+            sessions=TortoiseMentoringSessionRepository(),
+            cleanup=cleanup,
+            clock=clock,
+        ),
+        cleanup=cleanup,
         audit=cast("AuditRecorder", request.app.state.audit_recorder),
         uow=UnitOfWork(),
         clock=clock,

@@ -37,12 +37,16 @@ class FixedConflicts:
     def __init__(self) -> None:
         self.found: list[ScheduleConflict] = []
         self.seen: list[list[MentorUnavailablePeriod]] = []
+        self.resolved: list[list[ScheduleConflict]] = []
 
     async def find(
         self, mentor_id: uuid.UUID, unavailable: list[MentorUnavailablePeriod]
     ) -> list[ScheduleConflict]:
         self.seen.append(unavailable)
         return list(self.found)
+
+    async def resolve(self, conflicts: list[ScheduleConflict], *, actor_id: uuid.UUID) -> None:
+        self.resolved.append(conflicts)
 
 
 class Harness:
@@ -156,8 +160,10 @@ async def test_conflicts_need_confirm(h: Harness) -> None:
     assert h.periods.items == {}  # 미리보기는 저장하지 않는다
     assert [p.category for p in h.conflicts.seen[-1]] == ["근무"]  # 변경 후 불가 시간 전체
 
+    assert h.conflicts.resolved == []  # 미리보기는 정리하지 않는다
     applied = await h.service.create(h.work(), confirm=True, actor_id=ACTOR)
     assert applied.applied
+    assert h.conflicts.resolved == [[conflict]]
     preview_update = await h.service.update(
         h.mentor.id,
         applied.period.id,
