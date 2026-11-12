@@ -1,7 +1,7 @@
 # 47. P12-1 Google Meet 공간 생성·막기
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #52
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P12 (P12-1)
 - 이전 기록: [46. P11-3b 신청 연동](46_p11_3b_mentoring_integrations.md)
 
