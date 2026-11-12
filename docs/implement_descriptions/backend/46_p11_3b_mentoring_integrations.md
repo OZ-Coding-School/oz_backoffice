@@ -1,6 +1,6 @@
 # 46. P11-3b 신청 연동 (불가 시간 충돌·멘토 변화·수강 종료)
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-12 병합)
 - 관련 PR: #51
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P11 (P11-3b)
 - 이전 기록: [45. P11-3a 승인 후 취소·운영진 취소·변경](45_p11_3a_mentoring_cancel_change.md)
@@ -50,6 +50,8 @@ P11의 마지막 PR이다. 앞선 PR에서 미뤄 둔 연동을 붙인다. 멘�
 - 단위: 자동 정리(취소·반려·세션 환불/미환불·멱등·감사 actor), 신청 받기 끄기, 팀 멘토 변경·팀원 제거, 배정 비활성화·만료(그 기수만), 멘토 비활성화 미리보기 건수·실행, 수강 종료(1:1 대기·팀 이탈자 팀 대기 취소, 남은 팀원 신청 유지, 시작 전 1:1 세션 환불 없이 취소, 팀 세션 유지, 회수, 멱등), 불가 시간 충돌(일부 희망 일시만 막힘은 제외, 다른 멘토 제외, 반려·세션 취소·환불), 미리보기는 정리하지 않음
 - 통합(PostgreSQL): `list_pending` 조건 조합, `list_upcoming`(시작 전·1:1만), 수강 종료 처리(새 조립)
 - API: 신청 받기 끄기·배정 비활성화로 대기 신청 취소와 잔여 반환, 불가 시간 미리보기 충돌 목록 → confirm → 반려·세션 취소·전액 환불
+- GitHub Actions (PR #51): backend 잡 통과, 736 passed
+- 사용자가 작업 완료를 확인했다(2026-11-12)
 - 전체 736 passed (compose `api` 컨테이너, ruff·ruff format·mypy·mypy tests·lint-imports 통과)
 - 코드 커밋 4개를 worktree에서 하나씩 검사했다(ruff, ruff format, mypy, mypy tests, lint-imports, pytest). 모두 통과했다(729 → 733 → 734 → 736 passed)
 - 스키마 변경 없음
