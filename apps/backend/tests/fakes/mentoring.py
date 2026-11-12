@@ -402,6 +402,10 @@ class InMemorySessionRepository:
     async def lock(self, session_id: uuid.UUID) -> MentoringSession | None:
         return await self.get(session_id)
 
+    async def get_by_space(self, space_name: str) -> MentoringSession | None:
+        found = next((s for s in self.items.values() if s.google_space_name == space_name), None)
+        return dataclasses.replace(found) if found else None
+
     async def list_needing_space(self, after: datetime) -> list[MentoringSession]:
         return [
             dataclasses.replace(s)

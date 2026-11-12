@@ -252,6 +252,10 @@ async def test_meet_space_queries() -> None:
     await sessions.save(locked)
     assert [s.id for s in await sessions.list_needing_space(T)] == [upcoming.id]
     assert [s.id for s in await sessions.list_needing_close()] == [canceled.id]
+    found = await sessions.get_by_space("spaces/abc")
+    assert found is not None
+    assert found.id == canceled.id
+    assert await sessions.get_by_space("spaces/none") is None
     locked.space_closed()
     await sessions.save(locked)
     assert await sessions.list_needing_close() == []
