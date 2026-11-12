@@ -1,6 +1,6 @@
 # 45. P11-3a 승인 후 취소·운영진 취소·변경
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-12 병합)
 - 관련 PR: #50
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P11 (P11-3a)
 - 이전 기록: [44. P11-2 멘토링 승인·반려·세션 생성](44_p11_2_mentoring_approval.md)
@@ -49,6 +49,8 @@ P11-3은 둘로 나눴다(A44). 이번 PR(P11-3a)은 승인된 신청의 취소(
 - 단위: 도메인(승인 후 취소, 마감 경계: 정확히 24시간 전 허용·1분 늦으면 거부, REFUND, 예정 세션만 취소), 서비스(승인 후 취소: 권한·마감·멘토 취소·환불, 운영진 취소: 다른 기수 404·환불 안 함·대기 해제·완료 세션 거부, 변경: 멘토 거부·같은 시각 재선택·REFUND → HOLD·검사 실패 시 기존 유지)
 - 통합(PostgreSQL): 세션 요청별 잠금·저장, 바쁜 구간(정렬·제외·취소 제외)
 - API: 잡힌 세션이 신청 가능 시간에서 빠짐, 변경이 트랜잭션 안에서 실패하면 기존 신청·세션 유지, 멘토 변경 403, 변경 성공(새 신청·기존 세션 취소·잔여), 운영진 취소(수강생 403, 환불 안 함 → 사용 유지, 두 번 취소)
+- GitHub Actions (PR #50): backend 잡 통과, 725 passed. 첫 실행은 테스트는 모두 통과했으나 `tests/unit/test_worker_tasks.py` 한 테스트의 정리 단계에서 DB 연결이 끊겨(ConnectionDoesNotExistError) 실패했고, 변경과 무관해 실패한 잡만 다시 실행해 통과했다
+- 사용자가 작업 완료를 확인했다(2026-11-12)
 - 전체 725 passed (compose `api` 컨테이너, ruff·ruff format·mypy·mypy tests·lint-imports 통과)
 - 코드 커밋 4개를 worktree에서 하나씩 검사했다(ruff, ruff format, mypy, mypy tests, lint-imports, pytest). 모두 통과했다(720 → 721 → 724 → 725 passed)
 - 스키마 변경 없음
