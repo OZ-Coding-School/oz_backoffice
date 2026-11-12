@@ -639,6 +639,28 @@ class TortoiseMentoringRequestRepository:
             query = query.filter(mentor_id=mentor_id)
         return await self._page(query, limit, offset)
 
+    async def list_pending(
+        self,
+        *,
+        mentor_id: uuid.UUID | None = None,
+        cohort_id: uuid.UUID | None = None,
+        team_ids: list[uuid.UUID] | None = None,
+        requester_ids: list[uuid.UUID] | None = None,
+        solo: bool | None = None,
+    ) -> list[MentoringRequest]:
+        query = MentoringRequestModel.filter(status=MentoringRequestStatus.PENDING)
+        if mentor_id is not None:
+            query = query.filter(mentor_id=mentor_id)
+        if cohort_id is not None:
+            query = query.filter(requester__cohort_id=cohort_id)
+        if team_ids is not None:
+            query = query.filter(team_id__in=team_ids)
+        if requester_ids is not None:
+            query = query.filter(requester_id__in=requester_ids)
+        if solo is not None:
+            query = query.filter(team_id__isnull=solo)
+        return [self._entity(row) for row in await query.order_by("id")]
+
     async def list_stale(self, now: datetime) -> list[MentoringRequest]:
         rows = await MentoringRequestModel.filter(
             Q(status=MentoringRequestStatus.PENDING, desired_at_1__lte=now)
@@ -738,6 +760,22 @@ class TortoiseMentoringSessionRepository:
     @staticmethod
     def _active() -> Any:
         return MentoringSessionModel.exclude(status=MentoringSessionStatus.CANCELED)
+
+    async def list_upcoming(
+        self,
+        after: datetime,
+        *,
+        mentor_id: uuid.UUID | None = None,
+        solo: bool | None = None,
+    ) -> list[MentoringSession]:
+        query = MentoringSessionModel.filter(
+            status=MentoringSessionStatus.SCHEDULED, starts_at__gt=after
+        )
+        if mentor_id is not None:
+            query = query.filter(mentor_id=mentor_id)
+        if solo is not None:
+            query = query.filter(request__team_id__isnull=solo)
+        return [self._entity(row) for row in await query.order_by("starts_at", "id")]
 
     async def count_for_pair(
         self, mentor_id: uuid.UUID, *, requester_id: uuid.UUID | None, team_id: uuid.UUID | None

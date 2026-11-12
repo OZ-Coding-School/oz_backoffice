@@ -2,7 +2,8 @@
 
 import dataclasses
 import uuid
-from datetime import date, datetime
+from datetime import UTC, date, datetime
+from typing import TYPE_CHECKING
 
 from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.availability import Interval
@@ -14,6 +15,10 @@ from app.contexts.mentoring.domain.session import MentoringSession, SessionQuery
 from app.contexts.mentoring.domain.settings import CohortMentoringSettings, MentoringBlockTime
 from app.contexts.mentoring.domain.team import MentoringTeam
 from app.shared.errors import ConflictError
+
+if TYPE_CHECKING:
+    from app.contexts.audit.application.recorder import AuditRecorder
+    from app.core.clock import Clock
 
 
 class InMemoryCohortMentorRepository:
@@ -246,6 +251,7 @@ class InMemoryBalanceLedger:
 class InMemoryRequestRepository:
     def __init__(self) -> None:
         self.items: dict[uuid.UUID, MentoringRequest] = {}
+        self.cohort_of_student: dict[uuid.UUID, uuid.UUID] = {}  # list_pending(cohort_id=)용
 
     def _copy(self, request: MentoringRequest) -> MentoringRequest:
         return dataclasses.replace(request, desired_times=list(request.desired_times))
@@ -265,6 +271,27 @@ class InMemoryRequestRepository:
 
     async def get_many(self, request_ids: list[uuid.UUID]) -> dict[uuid.UUID, MentoringRequest]:
         return {i: self._copy(self.items[i]) for i in request_ids if i in self.items}
+
+    async def list_pending(
+        self,
+        *,
+        mentor_id: uuid.UUID | None = None,
+        cohort_id: uuid.UUID | None = None,
+        team_ids: list[uuid.UUID] | None = None,
+        requester_ids: list[uuid.UUID] | None = None,
+        solo: bool | None = None,
+    ) -> list[MentoringRequest]:
+        cohorts = self.cohort_of_student
+        return [
+            self._copy(r)
+            for r in sorted(self.items.values(), key=lambda r: r.id)
+            if r.status is MentoringRequestStatus.PENDING
+            and (mentor_id is None or r.mentor_id == mentor_id)
+            and (cohort_id is None or cohorts.get(r.requester_id) == cohort_id)
+            and (team_ids is None or r.team_id in team_ids)
+            and (requester_ids is None or r.requester_id in requester_ids)
+            and (solo is None or (r.team_id is None) == solo)
+        ]
 
     async def count_pending(
         self, *, requester_id: uuid.UUID | None = None, team_id: uuid.UUID | None = None
@@ -354,6 +381,22 @@ class InMemorySessionRepository:
 
     async def save(self, session: MentoringSession) -> None:
         self.items[session.id] = dataclasses.replace(session)
+
+    async def list_upcoming(
+        self,
+        after: datetime,
+        *,
+        mentor_id: uuid.UUID | None = None,
+        solo: bool | None = None,
+    ) -> list[MentoringSession]:
+        return [
+            dataclasses.replace(s)
+            for s in sorted(self.items.values(), key=lambda s: (s.starts_at, s.id))
+            if s.status is MentoringSessionStatus.SCHEDULED
+            and s.starts_at > after
+            and (mentor_id is None or s.mentor_id == mentor_id)
+            and (solo is None or (self._requests.items[s.request_id].team_id is None) == solo)
+        ]
 
     async def get_by_request(self, request_id: uuid.UUID) -> MentoringSession | None:
         found = next((s for s in self.items.values() if s.request_id == request_id), None)
@@ -451,3 +494,64 @@ class InMemorySessionRepository:
             and (mentor_id is None or s.mentor_id == mentor_id)
         ]
         return self._page(found, query)
+
+
+class CleanupStores:
+    """자동 정리(RequestCleanup)에 필요한 인메모리 저장소 묶음."""
+
+    def __init__(self, audit: "AuditRecorder", clock: "Clock") -> None:
+        from app.contexts.mentoring.application.request_cleanup import RequestCleanup
+
+        self.requests = InMemoryRequestRepository()
+        self.sessions = InMemorySessionRepository(self.requests)
+        self.accounts = InMemoryBalanceAccountRepository()
+        self.ledger = InMemoryBalanceLedger()
+        self.cleanup = RequestCleanup(
+            requests=self.requests,
+            sessions=self.sessions,
+            accounts=self.accounts,
+            ledger=self.ledger,
+            audit=audit,
+            clock=clock,
+        )
+
+    async def pending(
+        self,
+        *,
+        mentor_id: uuid.UUID,
+        requester_id: uuid.UUID | None = None,
+        team_id: uuid.UUID | None = None,
+        at: datetime = datetime(2026, 11, 20, 5, tzinfo=UTC),
+    ) -> MentoringRequest:
+        """계좌(없으면 만들어 지급)에서 60분 보류한 대기 신청."""
+        requester = requester_id or uuid.uuid4()
+        found = await self.accounts.find_by_owners(
+            student_ids=[] if team_id else [requester], team_ids=[team_id] if team_id else []
+        )
+        if found:
+            account = self.accounts.items[found[0].id]
+        else:
+            account = BalanceAccount(
+                student_id=None if team_id else requester,
+                team_id=team_id,
+                valid_from=date(2026, 11, 1),
+                valid_until=date(2027, 4, 30),
+            )
+            account.grant(600, "지급", today=date(2026, 11, 1))
+            await self.accounts.add(account)
+            account = self.accounts.items[account.id]
+        request = MentoringRequest(
+            requester_id=requester,
+            mentor_id=mentor_id,
+            team_id=team_id,
+            topic="주제",
+            detail="내용",
+            desired_times=[at],
+            duration=60,
+        )
+        account.hold(60, request_id=request.id, reason="신청")
+        await self.requests.add(request)
+        return request
+
+    def status(self, request: MentoringRequest) -> MentoringRequestStatus:
+        return self.requests.items[request.id].status

@@ -15,6 +15,7 @@ from app.contexts.mentoring.application.mentor_activation import MentorActivatio
 from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.enums import (
     CohortMentorDeactivationReason,
+    MentoringRequestStatus,
     MentoringSettlementPolicy,
     PayUnit,
 )
@@ -23,7 +24,7 @@ from app.shared.errors import BusinessRuleViolation, ConflictError, NotFoundErro
 from app.shared.ids import new_id
 from tests.fakes.audit import InMemoryAuditLogRepository
 from tests.fakes.educator import InMemoryMentorRepository
-from tests.fakes.mentoring import InMemoryCohortMentorRepository
+from tests.fakes.mentoring import CleanupStores, InMemoryCohortMentorRepository
 from tests.fakes.uow import FakeUnitOfWork
 
 pytestmark = pytest.mark.unit
@@ -74,7 +75,9 @@ class Harness:
         self.clock = FixedClock(NOW)
         audit = AuditRecorder(self.audit_logs, self.clock)
         mentors = MentorQueries(self.mentor_repo)
+        self.stores = CleanupStores(audit, self.clock)
         self.service = CohortMentorService(
+            cleanup=self.stores.cleanup,
             assignments=self.repo,
             mentors=mentors,
             cohorts=Cohorts(self.cohort, self.other_cohort),
@@ -83,6 +86,7 @@ class Harness:
             clock=self.clock,
         )
         self.activation = MentorActivationService(
+            cleanup=self.stores.cleanup,
             mentors=mentors,
             assignments=self.repo,
             audit=audit,
@@ -149,7 +153,7 @@ async def test_update_deactivate_reactivate(h: Harness) -> None:
     with pytest.raises(NotFoundError):
         await h.service.update(new_id(), created.id, {"pay_rate": 1}, actor_id=ACTOR)
 
-    off = await h.service.deactivate(h.cohort.id, created.id, actor_id=ACTOR)
+    off, _ = await h.service.deactivate(h.cohort.id, created.id, actor_id=ACTOR)
     assert off.deactivation_reason is CohortMentorDeactivationReason.MANUAL
     replacement = await h.assign()
     with pytest.raises(ConflictError):  # 같은 키의 활성 배정이 있으면 재활성화 불가
@@ -242,3 +246,34 @@ async def test_bulk_skips_manual_and_duplicate_keys(h: Harness) -> None:
         "assignment_already_exists",
         "assignment_already_active",
     ]
+
+
+async def test_deactivations_cancel_pending(h: Harness) -> None:
+    here, there = new_id(), new_id()
+    h.stores.requests.cohort_of_student = {here: h.cohort.id, there: h.other_cohort.id}
+    assignment = await h.assign()
+    other = await h.assign(other=True, end_date=date(2026, 11, 9))
+    in_cohort = await h.stores.pending(mentor_id=h.mentor.id, requester_id=here)
+    elsewhere = await h.stores.pending(mentor_id=h.mentor.id, requester_id=there)
+
+    _, canceled = await h.service.deactivate(h.cohort.id, assignment.id, actor_id=ACTOR)
+    assert canceled == 1
+    assert h.stores.status(in_cohort) is MentoringRequestStatus.CANCELED
+    assert h.stores.status(elsewhere) is MentoringRequestStatus.PENDING
+
+    assert await h.service.expire_ended() == 1  # 만료도 그 기수 대기 신청을 취소
+    assert h.stores.status(elsewhere) is MentoringRequestStatus.CANCELED
+    assert other.id in {
+        a.id for a in await h.repo.list_by_mentor(h.mentor.id, include_inactive=True)
+    }
+
+
+async def test_mentor_deactivation_counts_and_cancels_pending(h: Harness) -> None:
+    await h.assign()
+    request = await h.stores.pending(mentor_id=h.mentor.id)
+    preview = await h.activation.deactivate(h.mentor.id, confirm=False, actor_id=ACTOR)
+    assert (preview.applied, preview.pending_requests) == (False, 1)
+    assert h.stores.status(request) is MentoringRequestStatus.PENDING
+    done = await h.activation.deactivate(h.mentor.id, confirm=True, actor_id=ACTOR)
+    assert (done.applied, done.pending_requests) == (True, 1)
+    assert h.stores.status(request) is MentoringRequestStatus.CANCELED

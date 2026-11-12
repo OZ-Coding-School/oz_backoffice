@@ -47,3 +47,4 @@
 | 43 | [P11-1 멘토링 신청·시간 보류·조회·승인 전 취소·대기 만료](43_p11_1_mentoring_requests.md) | 완료 (#48) |
 | 44 | [P11-2 멘토링 승인·반려·세션 생성](44_p11_2_mentoring_approval.md) | 완료 (#49) |
 | 45 | [P11-3a 승인 후 취소·운영진 취소·변경](45_p11_3a_mentoring_cancel_change.md) | 완료 (#50) |
+| 46 | [P11-3b 신청 연동 (불가 시간 충돌·멘토 변화·수강 종료)](46_p11_3b_mentoring_integrations.md) | 완료 (#51) |

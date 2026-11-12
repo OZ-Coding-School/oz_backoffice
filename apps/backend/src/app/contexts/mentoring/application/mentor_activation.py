@@ -19,6 +19,10 @@ from app.contexts.mentoring.application.assignment_service import (
     record_change,
     snapshot,
 )
+from app.contexts.mentoring.application.request_cleanup import (
+    MENTOR_DEACTIVATED,
+    RequestCleanup,
+)
 from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.enums import CohortMentorDeactivationReason
 from app.contexts.mentoring.domain.repositories import CohortMentorRepository
@@ -35,6 +39,7 @@ class MentorDeactivation:
     mentor: Mentor
     assignments: list[CohortMentor]  # 함께 꺼지는(confirm=False면 꺼질) 활성 배정
     applied: bool
+    pending_requests: int = 0  # 자동 취소된(confirm=False면 취소될) 대기 신청 수 (A45)
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,12 +82,14 @@ class MentorActivationService:
         *,
         mentors: MentorDirectory,
         assignments: CohortMentorRepository,
+        cleanup: RequestCleanup,
         audit: AuditRecorder,
         uow: UnitOfWork,
         clock: Clock,
     ) -> None:
         self._mentors = mentors
         self._assignments = assignments
+        self._cleanup = cleanup
         self._audit = audit
         self._uow = uow
         self._clock = clock
@@ -93,7 +100,10 @@ class MentorActivationService:
         if not confirm:
             mentor = await self._mentor(await self._mentors.get(mentor_id))
             active = await self._assignments.list_by_mentor(mentor_id, include_inactive=False)
-            return MentorDeactivation(mentor=mentor, assignments=active, applied=False)
+            pending = await self._cleanup.count_pending_where(mentor_id=mentor_id)
+            return MentorDeactivation(
+                mentor=mentor, assignments=active, applied=False, pending_requests=pending
+            )
         now = self._clock.now()
         async with self._uow:
             mentor = await self._mentor(await self._mentors.lock(mentor_id))
@@ -105,7 +115,12 @@ class MentorActivationService:
                 await self._assignments.save(assignment)
                 await record_change(self._audit, actor_id, "deactivate", assignment, before)
             await self._record_mentor(actor_id, "deactivate", mentor, len(active))
-        return MentorDeactivation(mentor=mentor, assignments=active, applied=True)
+            canceled = await self._cleanup.cancel_pending_where(
+                MENTOR_DEACTIVATED, actor_id=actor_id, mentor_id=mentor_id
+            )
+        return MentorDeactivation(
+            mentor=mentor, assignments=active, applied=True, pending_requests=canceled
+        )
 
     async def activate(self, mentor_id: uuid.UUID, *, actor_id: uuid.UUID) -> MentorActivation:
         async with self._uow:

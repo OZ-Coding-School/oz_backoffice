@@ -14,7 +14,7 @@ from app.contexts.mentoring.application.schedule_service import (
     NoScheduleConflicts,
     ScheduleConflict,
 )
-from app.contexts.mentoring.domain.enums import UnavailableRepeat
+from app.contexts.mentoring.domain.enums import MentoringRequestStatus, UnavailableRepeat
 from app.contexts.mentoring.domain.schedule import MentorUnavailablePeriod
 from app.core.clock import FixedClock
 from app.shared.errors import BusinessRuleViolation, NotFoundError
@@ -22,7 +22,7 @@ from app.shared.ids import new_id
 from app.shared.time import KST
 from tests.fakes.audit import InMemoryAuditLogRepository
 from tests.fakes.educator import InMemoryMentorRepository
-from tests.fakes.mentoring import InMemoryUnavailablePeriodRepository
+from tests.fakes.mentoring import CleanupStores, InMemoryUnavailablePeriodRepository
 from tests.fakes.uow import FakeUnitOfWork
 
 pytestmark = pytest.mark.unit
@@ -37,12 +37,16 @@ class FixedConflicts:
     def __init__(self) -> None:
         self.found: list[ScheduleConflict] = []
         self.seen: list[list[MentorUnavailablePeriod]] = []
+        self.resolved: list[list[ScheduleConflict]] = []
 
     async def find(
         self, mentor_id: uuid.UUID, unavailable: list[MentorUnavailablePeriod]
     ) -> list[ScheduleConflict]:
         self.seen.append(unavailable)
         return list(self.found)
+
+    async def resolve(self, conflicts: list[ScheduleConflict], *, actor_id: uuid.UUID) -> None:
+        self.resolved.append(conflicts)
 
 
 class Harness:
@@ -53,10 +57,12 @@ class Harness:
         self.conflicts = FixedConflicts()
         self.audit_logs = InMemoryAuditLogRepository()
         self.clock = FixedClock(NOW)
+        self.stores = CleanupStores(AuditRecorder(self.audit_logs, self.clock), self.clock)
         self.service = MentorScheduleService(
             unavailable_periods=self.periods,
             mentors=MentorQueries(self.mentors),
             conflicts=self.conflicts,
+            cleanup=self.stores.cleanup,
             audit=AuditRecorder(self.audit_logs, self.clock),
             uow=FakeUnitOfWork(),
             clock=self.clock,
@@ -154,8 +160,10 @@ async def test_conflicts_need_confirm(h: Harness) -> None:
     assert h.periods.items == {}  # 미리보기는 저장하지 않는다
     assert [p.category for p in h.conflicts.seen[-1]] == ["근무"]  # 변경 후 불가 시간 전체
 
+    assert h.conflicts.resolved == []  # 미리보기는 정리하지 않는다
     applied = await h.service.create(h.work(), confirm=True, actor_id=ACTOR)
     assert applied.applied
+    assert h.conflicts.resolved == [[conflict]]
     preview_update = await h.service.update(
         h.mentor.id,
         applied.period.id,
@@ -173,8 +181,8 @@ async def test_conflicts_need_confirm(h: Harness) -> None:
 
 
 async def test_accepting_switch_and_view(h: Harness) -> None:
-    mentor = await h.service.set_accepting(h.mentor.id, True, actor_id=ACTOR)
-    assert mentor.accepting_requests
+    mentor, canceled = await h.service.set_accepting(h.mentor.id, True, actor_id=ACTOR)
+    assert (mentor.accepting_requests, canceled) == (True, 0)
     await h.service.set_accepting(h.mentor.id, True, actor_id=ACTOR)  # 같은 값은 기록 안 함
     assert [log.action for log in h.audit_logs.logs] == ["educator.mentor.accepting_requests"]
 
@@ -198,3 +206,17 @@ async def test_mentor_lookup(h: Harness) -> None:
         await h.service.mentor_of_user(new_id())
     assert missing.value.code == "mentor_profile_not_found"
     assert await NoScheduleConflicts().find(new_id(), []) == []
+
+
+async def test_accepting_off_cancels_pending(h: Harness) -> None:
+    await h.service.set_accepting(h.mentor.id, True, actor_id=ACTOR)
+    mine = await h.stores.pending(mentor_id=h.mentor.id)
+    other = await h.stores.pending(mentor_id=new_id())
+    _, canceled = await h.service.set_accepting(h.mentor.id, False, actor_id=ACTOR)
+    assert canceled == 1
+    assert (h.stores.status(mine), h.stores.status(other)) == (
+        MentoringRequestStatus.CANCELED,
+        MentoringRequestStatus.PENDING,
+    )
+    _, again = await h.service.set_accepting(h.mentor.id, False, actor_id=ACTOR)  # 이미 꺼짐
+    assert again == 0

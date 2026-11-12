@@ -134,7 +134,11 @@ async def test_accepting_switch(
 ) -> None:
     mentor, h = await _mentor(settings)
     on = await client.put(f"{ME}/accepting", json={"accepting_requests": True}, headers=h)
-    assert on.json() == {"mentor_id": str(mentor.id), "accepting_requests": True}
+    assert on.json() == {
+        "mentor_id": str(mentor.id),
+        "accepting_requests": True,
+        "canceled_pending_requests": 0,
+    }
     assert (await client.get(ME, headers=h)).json()["accepting_requests"] is True
 
     await client.post(

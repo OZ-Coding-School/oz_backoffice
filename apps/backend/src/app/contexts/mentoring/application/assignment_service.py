@@ -17,6 +17,10 @@ from typing import Any, Protocol
 from app.contexts.academy.domain.entities import Cohort
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.educator.domain.profiles import Mentor
+from app.contexts.mentoring.application.request_cleanup import (
+    ASSIGNMENT_DEACTIVATED,
+    RequestCleanup,
+)
 from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.enums import CohortMentorDeactivationReason
 from app.contexts.mentoring.domain.repositories import CohortMentorRepository
@@ -107,6 +111,7 @@ class CohortMentorService:
         assignments: CohortMentorRepository,
         mentors: MentorDirectory,
         cohorts: CohortLookup,
+        cleanup: RequestCleanup,
         audit: AuditRecorder,
         uow: UnitOfWork,
         clock: Clock,
@@ -114,6 +119,7 @@ class CohortMentorService:
         self._assignments = assignments
         self._mentors = mentors
         self._cohorts = cohorts
+        self._cleanup = cleanup
         self._audit = audit
         self._uow = uow
         self._clock = clock
@@ -165,15 +171,21 @@ class CohortMentorService:
 
     async def deactivate(
         self, cohort_id: uuid.UUID, assignment_id: uuid.UUID, *, actor_id: uuid.UUID
-    ) -> CohortMentor:
-        """삭제 = 비활성화 (기록 보존)."""
+    ) -> tuple[CohortMentor, int]:
+        """삭제 = 비활성화 (기록 보존). 그 기수의 멘토 대기 신청은 자동 취소 → (배정, 취소 수)."""
         async with self._uow:
             assignment = await self._get(cohort_id, assignment_id)
             before = snapshot(assignment)
             assignment.deactivate(CohortMentorDeactivationReason.MANUAL, now=self._clock.now())
             await self._assignments.save(assignment)
             await record_change(self._audit, actor_id, "deactivate", assignment, before)
-        return assignment
+            canceled = await self._cleanup.cancel_pending_where(
+                ASSIGNMENT_DEACTIVATED,
+                actor_id=actor_id,
+                mentor_id=assignment.mentor_id,
+                cohort_id=cohort_id,
+            )
+        return assignment, canceled
 
     async def reactivate(
         self, cohort_id: uuid.UUID, assignment_id: uuid.UUID, *, actor_id: uuid.UUID
@@ -198,6 +210,12 @@ class CohortMentorService:
                 assignment.deactivate(CohortMentorDeactivationReason.EXPIRED, now=now)
                 await self._assignments.save(assignment)
                 await record_change(self._audit, None, "expire", assignment, before)
+                await self._cleanup.cancel_pending_where(
+                    ASSIGNMENT_DEACTIVATED,
+                    actor_id=None,
+                    mentor_id=assignment.mentor_id,
+                    cohort_id=assignment.cohort_id,
+                )
         return len(expired)
 
     # ------------------------------------------------------------------ 내부

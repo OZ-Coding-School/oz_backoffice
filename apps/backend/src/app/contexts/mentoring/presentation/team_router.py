@@ -34,6 +34,9 @@ from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseCohortMentorRepository,
     TortoiseMentoringTeamRepository,
 )
+from app.contexts.mentoring.presentation.cleanup import build_cleanup
+from app.core.clock import Clock
+from app.core.dependencies import get_clock
 from app.core.uow import UnitOfWork
 
 admin_router = APIRouter(
@@ -46,9 +49,12 @@ TeamManager = Annotated[
 ]
 
 
-def get_team_service(request: Request) -> MentoringTeamService:
+def get_team_service(
+    request: Request, clock: Annotated[Clock, Depends(get_clock)]
+) -> MentoringTeamService:
     state = request.app.state
     return MentoringTeamService(
+        cleanup=build_cleanup(request, clock),
         teams=TortoiseMentoringTeamRepository(),
         settings=TortoiseCohortMentoringSettingsRepository(),
         assignments=TortoiseCohortMentorRepository(),
@@ -115,6 +121,12 @@ class StudentTeamMentor(BaseModel):
 class StudentTeamMember(BaseModel):
     student_id: uuid.UUID
     name: str
+
+
+class TeamChangeResponse(TeamResponse):
+    canceled_pending_requests: int = Field(
+        default=0, description="자동 취소된 대기 신청 수 (A42·A45)"
+    )
 
 
 class StudentTeamResponse(BaseModel):
@@ -235,7 +247,7 @@ async def create_team(
     return await presenter.team(team)
 
 
-@admin_router.patch("/{team_id}", response_model=TeamResponse)
+@admin_router.patch("/{team_id}", response_model=TeamChangeResponse)
 async def update_team(
     cohort_id: uuid.UUID,
     team_id: uuid.UUID,
@@ -243,12 +255,14 @@ async def update_team(
     user: TeamManager,
     service: ServiceDep,
     presenter: PresenterDep,
-) -> TeamResponse:
+) -> TeamChangeResponse:
+    """담당 멘토를 바꾸면 그 팀의 대기 신청은 자동 취소 (A42)."""
     changes = body.model_dump(exclude_unset=True)
     if changes.get("mentor_id", "") is None:
         del changes["mentor_id"]  # 담당 멘토는 비울 수 없다
-    team = await service.update(cohort_id, team_id, changes, actor_id=user.id)
-    return await presenter.team(team)
+    team, canceled = await service.update(cohort_id, team_id, changes, actor_id=user.id)
+    shown = await presenter.team(team)
+    return TeamChangeResponse(**shown.model_dump(), canceled_pending_requests=canceled)
 
 
 @admin_router.delete("/{team_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -273,7 +287,7 @@ async def add_member(
     return await presenter.team(team)
 
 
-@admin_router.delete("/{team_id}/members/{student_id}", response_model=TeamResponse)
+@admin_router.delete("/{team_id}/members/{student_id}", response_model=TeamChangeResponse)
 async def remove_member(
     cohort_id: uuid.UUID,
     team_id: uuid.UUID,
@@ -281,9 +295,11 @@ async def remove_member(
     user: TeamManager,
     service: ServiceDep,
     presenter: PresenterDep,
-) -> TeamResponse:
-    team = await service.remove_member(cohort_id, team_id, student_id, actor_id=user.id)
-    return await presenter.team(team)
+) -> TeamChangeResponse:
+    """그 팀원이 신청한 팀 대기 신청은 자동 취소 (A45)."""
+    team, canceled = await service.remove_member(cohort_id, team_id, student_id, actor_id=user.id)
+    shown = await presenter.team(team)
+    return TeamChangeResponse(**shown.model_dump(), canceled_pending_requests=canceled)
 
 
 # ---------------------------------------------------------------- 본인

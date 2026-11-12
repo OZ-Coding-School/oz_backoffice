@@ -16,11 +16,14 @@ from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.audit.infrastructure.repositories import TortoiseAuditLogRepository
 from app.contexts.mentoring.application.balance_service import BalanceService, GrantTarget
 from app.contexts.mentoring.application.enrollment_ended import EnrollmentEndedService
+from app.contexts.mentoring.application.request_cleanup import RequestCleanup
 from app.contexts.mentoring.domain.team import MentoringTeam
 from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseBalanceAccountRepository,
     TortoiseBalanceTransactionRepository,
     TortoiseCohortMentoringSettingsRepository,
+    TortoiseMentoringRequestRepository,
+    TortoiseMentoringSessionRepository,
     TortoiseMentoringTeamRepository,
 )
 from app.core.clock import FixedClock
@@ -76,13 +79,25 @@ async def test_process_on_real_db() -> None:
     dropped.status = EnrollmentStatus.DROPPED  # 동기화가 상태를 바꿨다고 가정
     await repo.save(dropped)
 
+    requests, sessions = TortoiseMentoringRequestRepository(), TortoiseMentoringSessionRepository()
     service = EnrollmentEndedService(
         teams=teams,
         accounts=accounts,
         ledger=ledger,
+        requests=requests,
+        sessions=sessions,
+        cleanup=RequestCleanup(
+            requests=requests,
+            sessions=sessions,
+            accounts=accounts,
+            ledger=ledger,
+            audit=audit,
+            clock=CLOCK,
+        ),
         students=students,
         audit=audit,
         uow=UnitOfWork(),
+        clock=CLOCK,
     )
     result = await service.process()
     assert (result.removed_members, result.revoked_accounts, result.revoked_minutes) == (1, 1, 120)
