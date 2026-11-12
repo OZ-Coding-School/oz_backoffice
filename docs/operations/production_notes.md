@@ -41,6 +41,8 @@
 | `MAIL_DRIVER` | `gmail` | |
 | `GMAIL_SENDER`, `GOOGLE_SERVICE_ACCOUNT_JSON` | 운영 발신 계정, 서비스 계정 키 JSON(한 줄) | |
 | `MEET_DRIVER` | `google` | 위임에 Meet 범위가 등록된 뒤 켠다. `GMAIL_SENDER`가 Meet 공간 주최자가 된다(A46·A47) |
+| `MEET_PUBSUB_TOPIC`, `MEET_PUBSUB_SUBSCRIPTION` | `projects/<ID>/topics/<토픽>`, `projects/<ID>/subscriptions/<구독>` | 운영용 토픽·구독을 따로 만든다. worker가 구독을 실시간 수신한다(A50) |
+| `MEET_ORGANIZER_USER_ID` | 비워 둠 | 비우면 위임 토큰으로 주최 계정 ID를 찾는다. 찾지 못하면 값을 넣는다 |
 | `SMS_DRIVER` | 업체 어댑터 값 | 업체 확정 전에는 `console` → SMS 503 |
 
 ### 1-1. 비밀 값
@@ -68,8 +70,10 @@
 app.workers.tasks.roster          # 명단 동기화 (매시간), 수동 동기화 실행
 app.workers.tasks.contracts       # 계약 만료 (매일 00:05 KST)
 app.workers.tasks.notifications   # 메일 발송 (재시도 3회)
-app.workers.tasks.mentoring       # 배정 만료(매일 00:00 KST), 대기 신청 만료·Meet 공간 보완(10분마다), 수강 종료 처리, Meet 공간 생성
+app.workers.tasks.mentoring       # 배정 만료(매일 00:00 KST), 대기 신청 만료·Meet 공간 보완(10분마다), 수강 종료 처리, Meet 공간 생성,
+                                  # Meet 이벤트 구독 갱신(6시간마다)·처리, worker 시작 시 Meet 이벤트 실시간 수신
 ```
+- Meet 이벤트 실시간 수신(Pub/Sub streaming pull)은 **worker 프로세스 안에서** 돈다(A50). worker를 여러 대 띄우면 수신기도 여러 개가 되지만 Pub/Sub가 메시지를 나눠 주고 중복은 Redis로 거른다. 별도 컨테이너나 공개 주소는 필요 없다.
 - 로컬은 루트 `docker-compose.yml`에 반영돼 있다. 저장소 밖의 `docker-compose.prod.yml`(현재 빈 파일)에는 아직 없다.
 
 ### 2-2. nginx
@@ -140,10 +144,11 @@ app.workers.tasks.mentoring       # 배정 만료(매일 00:00 KST), 대기 신�
 | `educator.contracts.expire` | 매일 00:05 | 종료일이 지난 계약 ENDED |
 | `academy.roster_sync.scheduled` | 매시간 | Airtable 설정이 없으면 건너뜀 |
 | `mentoring.requests.expire` | 10분마다 | 승인 가능한 희망 일시가 남지 않은 대기 신청 취소·보류 시간 반환 |
+| `mentoring.meet.events.subscribe` | 6시간마다 | 주최 계정 Meet 이벤트 구독 생성·갱신. 설정이 없으면 건너뜀 |
 | `mentoring.meet.sync` | 10분마다 | 공간 없는 시작 전 예정 세션에 Meet 공간 생성, 취소된 세션 공간 막기. `MEET_DRIVER=disabled`면 건너뜀 |
 
 - 모두 멱등이라 scheduler가 멈췄다 다시 떠도 밀린 대상을 처리한다. 매일 작업은 서버 시간대와 무관하게 `cron_offset=Asia/Seoul`로 동작한다(10분마다·매시간 작업은 시간대와 무관).
 
 ## 6. 변경 이력
 - 2026-11-11: 문서 작성 (P8까지 반영)
-- 2026-11-12: 대기 신청 만료 작업 추가 (P11-1), Meet 공간 생성·보완 작업과 `MEET_DRIVER` 추가 (P12-1)
+- 2026-11-12: 대기 신청 만료 작업 추가 (P11-1), Meet 공간 생성·보완 작업과 `MEET_DRIVER` 추가 (P12-1), Meet 이벤트 구독·실시간 수신과 `MEET_PUBSUB_*` 추가 (P12-2)

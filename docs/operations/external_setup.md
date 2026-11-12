@@ -114,7 +114,8 @@ gcloud pubsub subscriptions create oz-meet-events-pull \
   --message-retention-duration=7d \
   --expiration-period=never
 ```
-- 이름은 예시다. 정한 이름은 P12에서 설정 키(토픽·구독 이름)로 넣는다.
+- 이름은 예시다. `.env`에 전체 경로로 넣는다: `MEET_PUBSUB_TOPIC=projects/<PROJECT_ID>/topics/oz-meet-events`, `MEET_PUBSUB_SUBSCRIPTION=projects/<PROJECT_ID>/subscriptions/oz-meet-events-pull`, `MEET_DRIVER=google`.
+- 구독 방식은 pull 그대로다. 백엔드 worker가 이 구독을 **streaming pull**로 실시간 수신한다(A50).
 - 로컬·운영을 나누려면 토픽·구독을 환경별로 따로 만든다(예: `oz-meet-events-local`).
 
 ### 3-3. 권한
@@ -131,10 +132,11 @@ gcloud pubsub subscriptions create oz-meet-events-pull \
      --role="roles/pubsub.subscriber"
    ```
    - Pub/Sub은 위임이 아니라 **서비스 계정 자신의 IAM 권한**으로 호출한다.
-3. Workspace Events 구독 생성은 Meet 공간 소유 계정을 대신해(위임, 2번의 Meet 범위) 백엔드가 한다. 별도 콘솔 작업은 없다.
+3. Workspace Events 구독은 백엔드가 **주최 계정(`GMAIL_SENDER`) 하나를 대상으로** 만들고 6시간마다 갱신한다(위임, 2번의 Meet 범위, A49). 별도 콘솔 작업은 없다.
 
 ### 3-4. 확인 (P12 구현 후)
-- 테스트 공간에서 회의를 열고 닫은 뒤 `gcloud pubsub subscriptions pull oz-meet-events-pull --limit=5`로 메시지가 오는지 본다(확인 후에는 백엔드가 가져가도록 ack하지 않는다).
+- 위임 등록 후 worker 로그에 `Meet 이벤트 구독: created`와 `Meet 이벤트 실시간 수신 시작`이 보이는지 확인한다(구독 작업은 6시간마다라 처음에는 수동으로 한 번 실행한다).
+- 멘토링 세션 공간에서 회의를 열고 닫은 뒤 세션 응답의 진행 상태·실제 시각이 바뀌는지 본다. worker를 멈춘 상태라면 `gcloud pubsub subscriptions pull oz-meet-events-pull --limit=5`로 메시지가 쌓이는지 볼 수 있다(ack하지 않는다).
 
 ---
 
