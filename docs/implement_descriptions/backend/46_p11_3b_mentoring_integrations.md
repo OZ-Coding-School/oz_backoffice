@@ -1,7 +1,7 @@
 # 46. P11-3b 신청 연동 (불가 시간 충돌·멘토 변화·수강 종료)
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #51
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P11 (P11-3b)
 - 이전 기록: [45. P11-3a 승인 후 취소·운영진 취소·변경](45_p11_3a_mentoring_cancel_change.md)
 
