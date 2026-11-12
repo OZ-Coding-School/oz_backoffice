@@ -246,6 +246,7 @@ class InMemoryBalanceLedger:
 class InMemoryRequestRepository:
     def __init__(self) -> None:
         self.items: dict[uuid.UUID, MentoringRequest] = {}
+        self.cohort_of_student: dict[uuid.UUID, uuid.UUID] = {}  # list_pending(cohort_id=)용
 
     def _copy(self, request: MentoringRequest) -> MentoringRequest:
         return dataclasses.replace(request, desired_times=list(request.desired_times))
@@ -265,6 +266,27 @@ class InMemoryRequestRepository:
 
     async def get_many(self, request_ids: list[uuid.UUID]) -> dict[uuid.UUID, MentoringRequest]:
         return {i: self._copy(self.items[i]) for i in request_ids if i in self.items}
+
+    async def list_pending(
+        self,
+        *,
+        mentor_id: uuid.UUID | None = None,
+        cohort_id: uuid.UUID | None = None,
+        team_ids: list[uuid.UUID] | None = None,
+        requester_ids: list[uuid.UUID] | None = None,
+        solo: bool | None = None,
+    ) -> list[MentoringRequest]:
+        cohorts = self.cohort_of_student
+        return [
+            self._copy(r)
+            for r in sorted(self.items.values(), key=lambda r: r.id)
+            if r.status is MentoringRequestStatus.PENDING
+            and (mentor_id is None or r.mentor_id == mentor_id)
+            and (cohort_id is None or cohorts.get(r.requester_id) == cohort_id)
+            and (team_ids is None or r.team_id in team_ids)
+            and (requester_ids is None or r.requester_id in requester_ids)
+            and (solo is None or (r.team_id is None) == solo)
+        ]
 
     async def count_pending(
         self, *, requester_id: uuid.UUID | None = None, team_id: uuid.UUID | None = None
@@ -354,6 +376,22 @@ class InMemorySessionRepository:
 
     async def save(self, session: MentoringSession) -> None:
         self.items[session.id] = dataclasses.replace(session)
+
+    async def list_upcoming(
+        self,
+        after: datetime,
+        *,
+        mentor_id: uuid.UUID | None = None,
+        solo: bool | None = None,
+    ) -> list[MentoringSession]:
+        return [
+            dataclasses.replace(s)
+            for s in sorted(self.items.values(), key=lambda s: (s.starts_at, s.id))
+            if s.status is MentoringSessionStatus.SCHEDULED
+            and s.starts_at > after
+            and (mentor_id is None or s.mentor_id == mentor_id)
+            and (solo is None or (self._requests.items[s.request_id].team_id is None) == solo)
+        ]
 
     async def get_by_request(self, request_id: uuid.UUID) -> MentoringSession | None:
         found = next((s for s in self.items.values() if s.request_id == request_id), None)

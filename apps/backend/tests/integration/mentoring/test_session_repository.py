@@ -176,3 +176,58 @@ async def test_save_lock_and_busy() -> None:
     assert stored is not None
     assert stored.status is MentoringSessionStatus.CANCELED
     assert len(await sessions.busy(mentor.id, T, day_end)) == 1
+
+
+async def test_list_pending_and_upcoming() -> None:
+    cohort, other_cohort = await create_cohort(), await create_cohort()
+    student = make_student(cohort_id=cohort.id)
+    outsider = make_student(cohort_id=other_cohort.id)
+    for s in (student, outsider):
+        await TortoiseStudentRepository().add(s)
+    mentor = await create_mentor()
+    team = MentoringTeam(
+        cohort_id=cohort.id, team_number=1, mentor_id=mentor.id, member_ids=[student.id]
+    )
+    await TortoiseMentoringTeamRepository().add(team)
+
+    def pending(requester: Any, team_id: Any = None) -> MentoringRequest:
+        return MentoringRequest(
+            requester_id=requester,
+            mentor_id=mentor.id,
+            team_id=team_id,
+            topic="리뷰",
+            detail="내용",
+            desired_times=[T],
+            duration=60,
+        )
+
+    solo, team_request, elsewhere = (
+        pending(student.id),
+        pending(student.id, team.id),
+        pending(outsider.id),
+    )
+    for r in (solo, team_request, elsewhere):
+        await requests.add(r)
+
+    def ids(items: list[MentoringRequest]) -> set[Any]:
+        return {r.id for r in items}
+
+    assert ids(await requests.list_pending(mentor_id=mentor.id)) == ids(
+        [solo, team_request, elsewhere]
+    )
+    assert ids(await requests.list_pending(mentor_id=mentor.id, cohort_id=cohort.id)) == ids(
+        [solo, team_request]
+    )
+    assert ids(await requests.list_pending(team_ids=[team.id], requester_ids=[student.id])) == ids(
+        [team_request]
+    )
+    assert ids(await requests.list_pending(requester_ids=[student.id], solo=True)) == ids([solo])
+
+    past = _session(await _approved(mentor.id, student.id), T - timedelta(days=1))
+    future = _session(await _approved(mentor.id, student.id), T + timedelta(hours=2))
+    team_future = _session(await _approved(mentor.id, student.id, team.id), T + timedelta(hours=4))
+    for session in (past, future, team_future):
+        await sessions.add(session)
+    upcoming = await sessions.list_upcoming(T, mentor_id=mentor.id)
+    assert [s.id for s in upcoming] == [future.id, team_future.id]
+    assert [s.id for s in await sessions.list_upcoming(T, solo=True)] == [future.id]

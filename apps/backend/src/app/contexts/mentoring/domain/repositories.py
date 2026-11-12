@@ -188,6 +188,18 @@ class MentoringRequestRepository(Protocol):
         """대기 중이고 희망 일시가 모두 지난 신청."""
         ...
 
+    async def list_pending(
+        self,
+        *,
+        mentor_id: uuid.UUID | None = None,
+        cohort_id: uuid.UUID | None = None,
+        team_ids: list[uuid.UUID] | None = None,
+        requester_ids: list[uuid.UUID] | None = None,
+        solo: bool | None = None,
+    ) -> list[MentoringRequest]:
+        """조건을 모두 만족하는 대기 신청 (id 순). cohort_id는 신청자의 기수, solo=True는 1:1만."""
+        ...
+
 
 class MentoringSessionRepository(Protocol):
     async def add(self, session: MentoringSession) -> None:
@@ -207,6 +219,16 @@ class MentoringSessionRepository(Protocol):
         exclude_request_id: uuid.UUID | None = None,
     ) -> list[Interval]:
         """그 멘토의 취소되지 않은 세션 중 [start, end)와 겹치는 구간 (변경 중인 신청은 뺀다)."""
+        ...
+
+    async def list_upcoming(
+        self,
+        after: datetime,
+        *,
+        mentor_id: uuid.UUID | None = None,
+        solo: bool | None = None,
+    ) -> list[MentoringSession]:
+        """시작 시각이 after보다 늦은 예정(SCHEDULED) 세션 (시작 순). solo=True는 1:1만."""
         ...
 
     async def count_for_pair(
