@@ -2,10 +2,12 @@
 
 import dataclasses
 import uuid
-from datetime import date
+from datetime import date, datetime
 
 from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.balance import BalanceAccount, BalanceTransaction
+from app.contexts.mentoring.domain.enums import MentoringRequestStatus
+from app.contexts.mentoring.domain.request import MentoringRequest
 from app.contexts.mentoring.domain.schedule import MentorUnavailablePeriod
 from app.contexts.mentoring.domain.settings import CohortMentoringSettings, MentoringBlockTime
 from app.contexts.mentoring.domain.team import MentoringTeam
@@ -237,3 +239,84 @@ class InMemoryBalanceLedger:
             if e.account_id == account_id and (before is None or e.id < before)
         ]
         return found[:limit]
+
+
+class InMemoryRequestRepository:
+    def __init__(self) -> None:
+        self.items: dict[uuid.UUID, MentoringRequest] = {}
+
+    def _copy(self, request: MentoringRequest) -> MentoringRequest:
+        return dataclasses.replace(request, desired_times=list(request.desired_times))
+
+    async def add(self, request: MentoringRequest) -> None:
+        self.items[request.id] = self._copy(request)
+
+    async def save(self, request: MentoringRequest) -> None:
+        self.items[request.id] = self._copy(request)
+
+    async def get(self, request_id: uuid.UUID) -> MentoringRequest | None:
+        found = self.items.get(request_id)
+        return self._copy(found) if found else None
+
+    async def lock(self, request_id: uuid.UUID) -> MentoringRequest | None:
+        return await self.get(request_id)
+
+    async def count_pending(
+        self, *, requester_id: uuid.UUID | None = None, team_id: uuid.UUID | None = None
+    ) -> int:
+        pending = [r for r in self.items.values() if r.status is MentoringRequestStatus.PENDING]
+        if team_id is not None:
+            return sum(1 for r in pending if r.team_id == team_id)
+        return sum(1 for r in pending if r.requester_id == requester_id and r.team_id is None)
+
+    def _page(
+        self, found: list[MentoringRequest], limit: int, offset: int
+    ) -> tuple[list[MentoringRequest], int]:
+        ordered = sorted(found, key=lambda r: r.id, reverse=True)
+        return [self._copy(r) for r in ordered[offset : offset + limit]], len(ordered)
+
+    async def list_for_participants(
+        self,
+        *,
+        student_ids: list[uuid.UUID],
+        team_ids: list[uuid.UUID],
+        status: MentoringRequestStatus | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[MentoringRequest], int]:
+        found = [
+            r
+            for r in self.items.values()
+            if ((r.team_id is None and r.requester_id in student_ids) or r.team_id in team_ids)
+            and (status is None or r.status is status)
+        ]
+        return self._page(found, limit, offset)
+
+    async def list_for_mentor(
+        self,
+        mentor_id: uuid.UUID,
+        *,
+        status: MentoringRequestStatus | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[MentoringRequest], int]:
+        found = [
+            r
+            for r in self.items.values()
+            if r.mentor_id == mentor_id and (status is None or r.status is status)
+        ]
+        return self._page(found, limit, offset)
+
+    async def list_by_cohort(
+        self,
+        cohort_id: uuid.UUID,
+        *,
+        status: MentoringRequestStatus | None,
+        mentor_id: uuid.UUID | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[MentoringRequest], int]:
+        return self._page(list(self.items.values()), limit, offset)
+
+    async def list_stale(self, now: datetime) -> list[MentoringRequest]:
+        return [self._copy(r) for r in self.items.values() if r.is_stale(now)]
