@@ -5,9 +5,7 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
 
-import httpx
 import pytest
-import respx
 from fakeredis import FakeAsyncRedis
 from google.api_core import exceptions as google_exceptions
 from google.apps import events_subscriptions_v1 as events
@@ -20,11 +18,9 @@ from app.integrations.google.meet import MeetUnavailableError
 from app.integrations.google.meet_events import (
     CONFERENCE_STARTED,
     EVENT_TYPES,
-    TOKENINFO_URL,
     GoogleMeetEvents,
     MeetEventListener,
     parse_message,
-    resolve_user_id,
 )
 
 pytestmark = pytest.mark.unit
@@ -189,18 +185,6 @@ async def test_listener_acks_after_handler() -> None:
     assert subscriber.closed
 
 
-@respx.mock
-async def test_resolve_user_id() -> None:
-    credentials = SimpleNamespace(token="t", refresh=lambda _request: None)
-    respx.get(TOKENINFO_URL).mock(return_value=httpx.Response(200, json={"sub": "1077"}))
-    async with httpx.AsyncClient() as http:
-        assert await resolve_user_id(credentials, http) == "1077"
-    respx.get(TOKENINFO_URL).mock(return_value=httpx.Response(400, json={}))
-    async with httpx.AsyncClient() as http:
-        with pytest.raises(MeetUnavailableError):
-            await resolve_user_id(credentials, http)
-
-
 async def test_redis_processed_events() -> None:
     redis = FakeAsyncRedis(decode_responses=True)
     processed = RedisProcessedEvents(redis)
@@ -214,7 +198,7 @@ async def test_redis_processed_events() -> None:
 async def test_events_client_needs_settings(settings: Settings) -> None:
     assert await build_meet_events_client(settings) is None
     on = settings.model_copy(update={"meet_driver": "google"})
-    assert await build_meet_events_client(on) is None  # 키·토픽 없음
+    assert await build_meet_events_client(on) is None  # 키·토픽·주최 계정 ID 없음
 
     async def handler(event: Any) -> None:
         return None

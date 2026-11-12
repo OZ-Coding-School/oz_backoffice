@@ -6,7 +6,7 @@
 | # | 준비물 | 필요한 단계 | 담당 | 상태 (2026-11-12) |
 | --- | --- | --- | --- | --- |
 | 1 | Google 서비스 계정 + 도메인 전체 위임(DWD) — Gmail 발송 | P7 (구현 완료, 실발송 미확인) | GCP 관리자 + Workspace 관리자 | **위임 확인(11-12)**: `gmail.send` 위임 토큰 발급 성공(1-5). 실발송(`send-test-mail`)은 미확인 |
-| 2 | DWD에 Meet 범위 추가 + 녹화 폴더 공유 | P12, P13 | Workspace 관리자 | **필요**: Meet 두 범위 미등록(11-12). 폴더 공유는 P13 전까지 |
+| 2 | DWD에 Meet 범위 추가 + 녹화 폴더 공유 | P12, P13 | Workspace 관리자 | **위임 확인(11-12)**: Meet 두 범위 위임 토큰 발급 성공. 폴더 공유는 P13 전까지 |
 | 3 | Google Cloud API 사용 설정 + Pub/Sub 토픽·구독 | P12 | GCP 관리자 | 미착수 |
 | 4 | SMS 발송 업체 계약·발신번호 등록 | P7 어댑터(별도 PR) | 사용자 | 업체 미정 (현재 console 드라이버) |
 | 5 | Google OAuth 클라이언트 (운영진 로그인) | P2 (구현 완료) | GCP 관리자 | 로컬 등록 완료, 운영 URI는 배포 때 |
@@ -114,7 +114,7 @@ gcloud pubsub subscriptions create oz-meet-events-pull \
   --message-retention-duration=7d \
   --expiration-period=never
 ```
-- 이름은 예시다. `.env`에 전체 경로로 넣는다: `MEET_PUBSUB_TOPIC=projects/<PROJECT_ID>/topics/oz-meet-events`, `MEET_PUBSUB_SUBSCRIPTION=projects/<PROJECT_ID>/subscriptions/oz-meet-events-pull`, `MEET_DRIVER=google`.
+- 이름은 예시다. `.env`에 전체 경로로 넣는다: `MEET_PUBSUB_TOPIC=projects/<PROJECT_ID>/topics/oz-meet-events`, `MEET_PUBSUB_SUBSCRIPTION=projects/<PROJECT_ID>/subscriptions/oz-meet-events-pull`, `MEET_DRIVER=google`, `MEET_ORGANIZER_USER_ID=<주최 계정 사용자 ID>`(관리 콘솔 → 디렉터리 → 사용자 → `GMAIL_SENDER` 계정 → 주소창 `admin.google.com/ac/users/<숫자>`의 숫자, A51).
 - 구독 방식은 pull 그대로다. 백엔드 worker가 이 구독을 **streaming pull**로 실시간 수신한다(A50).
 - 로컬·운영을 나누려면 토픽·구독을 환경별로 따로 만든다(예: `oz-meet-events-local`).
 

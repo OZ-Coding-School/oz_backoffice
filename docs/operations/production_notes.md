@@ -42,7 +42,7 @@
 | `GMAIL_SENDER`, `GOOGLE_SERVICE_ACCOUNT_JSON` | 운영 발신 계정, 서비스 계정 키 JSON(한 줄) | |
 | `MEET_DRIVER` | `google` | 위임에 Meet 범위가 등록된 뒤 켠다. `GMAIL_SENDER`가 Meet 공간 주최자가 된다(A46·A47) |
 | `MEET_PUBSUB_TOPIC`, `MEET_PUBSUB_SUBSCRIPTION` | `projects/<ID>/topics/<토픽>`, `projects/<ID>/subscriptions/<구독>` | 운영용 토픽·구독을 따로 만든다. worker가 구독을 실시간 수신한다(A50) |
-| `MEET_ORGANIZER_USER_ID` | 비워 둠 | 비우면 위임 토큰으로 주최 계정 ID를 찾는다. 찾지 못하면 값을 넣는다 |
+| `MEET_ORGANIZER_USER_ID` | 주최 계정(`GMAIL_SENDER`) 사용자 ID | 관리 콘솔 → 디렉터리 → 사용자 → 그 계정 주소의 숫자(A51). 없으면 이벤트 구독을 하지 않는다 |
 | `SMS_DRIVER` | 업체 어댑터 값 | 업체 확정 전에는 `console` → SMS 503 |
 
 ### 1-1. 비밀 값

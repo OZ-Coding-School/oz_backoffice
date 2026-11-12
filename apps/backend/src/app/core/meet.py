@@ -38,9 +38,15 @@ async def build_meet_events_client(settings: Settings) -> GoogleMeetEvents | Non
     if settings.meet_driver != "google":
         return None
     info = parse_service_account_json(settings.google_service_account_json.get_secret_value())
-    if info is None or not settings.gmail_sender or not settings.meet_pubsub_topic:
+    if (
+        info is None
+        or not settings.gmail_sender
+        or not settings.meet_pubsub_topic
+        or not settings.meet_organizer_user_id
+    ):
         logger.warning(
-            "Meet 이벤트 구독 비활성: 서비스 계정 키·GMAIL_SENDER·MEET_PUBSUB_TOPIC이 필요합니다."
+            "Meet 이벤트 구독 비활성: 서비스 계정 키·GMAIL_SENDER·MEET_PUBSUB_TOPIC·"
+            "MEET_ORGANIZER_USER_ID가 필요합니다."
         )
         return None
     return await build_meet_events(

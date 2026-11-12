@@ -7,7 +7,8 @@
 - 회의 기록: 이벤트 본문에는 회의 기록 이름만 있어 공간·시작·종료 시각을 다시 조회한다.
 - 수신: Pub/Sub streaming pull(`MeetEventListener`)을 worker 프로세스에서 연다(A50). 서비스 계정
   자신의 IAM 권한(위임 아님). 받은 이벤트는 콜백(작업 등록)이 성공하면 ack, 실패하면 nack한다.
-주최 계정 사용자 ID는 설정(`MEET_ORGANIZER_USER_ID`)이 없으면 위임 토큰의 tokeninfo `sub`로 찾는다.
+주최 계정 사용자 ID는 설정(`MEET_ORGANIZER_USER_ID`)으로 받는다
+(위임 토큰의 tokeninfo에는 사용자 ID가 없다, A51).
 """
 
 import asyncio
@@ -18,12 +19,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Protocol
 
-import httpx
 from google.api_core import exceptions as google_exceptions
 from google.apps import events_subscriptions_v1 as events
 from google.apps.meet_v2 import ConferenceRecordsServiceAsyncClient
 from google.apps.meet_v2 import types as meet
-from google.auth.transport.requests import Request as AuthRequest
 from google.cloud import pubsub_v1  # type: ignore[import-untyped]  # 고수준 구독 클라이언트는 타입이 없다
 from google.oauth2 import service_account
 
@@ -33,7 +32,6 @@ logger = logging.getLogger(__name__)
 
 MEET_READONLY_SCOPE = "https://www.googleapis.com/auth/meetings.space.readonly"
 PUBSUB_SCOPE = "https://www.googleapis.com/auth/pubsub"
-TOKENINFO_URL = "https://oauth2.googleapis.com/tokeninfo"
 
 CONFERENCE_STARTED = "google.workspace.meet.conference.v2.started"
 CONFERENCE_ENDED = "google.workspace.meet.conference.v2.ended"
@@ -172,29 +170,16 @@ class GoogleMeetEvents:
         )
 
 
-async def resolve_user_id(credentials: Any, http: httpx.AsyncClient) -> str:
-    """위임 토큰의 tokeninfo `sub` = 주최 계정 사용자 ID."""
-    await asyncio.to_thread(credentials.refresh, AuthRequest())  # 동기 토큰 요청은 스레드에서
-    response = await http.get(TOKENINFO_URL, params={"access_token": credentials.token})
-    sub = response.json().get("sub") if response.status_code == 200 else None
-    if not isinstance(sub, str) or not sub:
-        raise MeetUnavailableError("주최 계정 사용자 ID를 찾지 못했습니다.")
-    return sub
-
-
 async def build_meet_events(
     service_account_info: dict[str, Any],
     organizer: str,
     *,
     topic: str,
-    organizer_user_id: str = "",
+    organizer_user_id: str,
 ) -> GoogleMeetEvents:
     delegated = service_account.Credentials.from_service_account_info(  # type: ignore[no-untyped-call]  # google-auth 타입 없음
         service_account_info, scopes=[MEET_READONLY_SCOPE], subject=organizer
     )
-    if not organizer_user_id:
-        async with httpx.AsyncClient(timeout=10) as http:
-            organizer_user_id = await resolve_user_id(delegated, http)
     return GoogleMeetEvents(
         subscriptions=events.SubscriptionsServiceAsyncClient(credentials=delegated),
         conferences=ConferenceRecordsServiceAsyncClient(credentials=delegated),

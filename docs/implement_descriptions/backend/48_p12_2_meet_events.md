@@ -29,7 +29,7 @@ P12의 두 번째 PR이다. Meet 회의 시작·종료와 녹화 생성 이벤�
 - **멱등:** 같은 이벤트를 다시 받아도 Redis 기록으로 거르고, Redis가 비어도 반영 자체가 최솟값·최댓값·처음 값만 남기는 방식이라 결과가 같다. 이벤트 순서가 뒤바뀌어도(종료가 먼저) 같다.
 - **진행 상태:** 회의 이벤트는 예정(SCHEDULED)을 진행 중(IN_PROGRESS)으로만 바꾼다. 완료·노쇼는 멘토 기록(P13)으로만 정하며(M27), 기록 후 들어온 이벤트는 시각만 갱신한다.
 - **무시하는 것:** 멘토링 세션이 아닌 공간(주최 계정의 다른 회의), 취소된 세션, 사라진 회의 기록, 모르는 형식의 메시지(바로 ack). 전사·스마트 메모 생성 이벤트는 받되 P13에서 처리한다(로그만).
-- **구독 대상:** `//cloudidentity.googleapis.com/users/<주최 계정 ID>`. ID는 `MEET_ORGANIZER_USER_ID`가 없으면 위임 토큰의 tokeninfo `sub`로 찾는다(실제 동작은 위임 등록 후 확인, 안 되면 설정값으로 넣는다).
+- **구독 대상:** `//cloudidentity.googleapis.com/users/<주최 계정 ID>`. ID는 설정 `MEET_ORGANIZER_USER_ID`로 받는다(A51). 처음에는 위임 토큰의 tokeninfo `sub`로 찾게 했으나, 위임 등록 후 확인해 보니 tokeninfo에 사용자 ID가 없어(`access_type, aud, azp, exp, expires_in, scope`만 옴) 자동 찾기를 없앴다.
 - **구독 갱신 주기(6시간):** A49는 "주기적으로 갱신"만 정했다. 구독 만료 전에 충분히 여러 번 갱신하도록 6시간으로 두었다(갱신은 ttl=0으로 최대 기간 연장). 사용자 확인 대상.
 - **worker가 여러 개일 때:** 수신기도 여러 개가 되지만 Pub/Sub가 메시지를 나눠 준다.
 
@@ -37,10 +37,11 @@ P12의 두 번째 PR이다. Meet 회의 시작·종료와 녹화 생성 이벤�
 - **CI의 세션 끝 테스트 DB 삭제 실패:** CI에서 테스트는 모두 통과했지만 세션 종료 때 `DROP DATABASE ... WITH (FORCE)`를 실행하던 관리자 연결이 끊겨(`ConnectionDoesNotExistError`) 잡이 실패했다. PR #50에서도 같은 현상이 있었다(그때는 다시 실행해 통과). 관리자 연결은 `postgres` DB에 붙어 있어 FORCE가 끊는 대상이 아니고 로컬에서는 재현되지 않는다. 이 단계는 정리일 뿐이고 다음 세션이 시작할 때 DB를 지우고 새로 만들므로, 세션 끝 삭제가 연결 오류면 한 번 다시 시도하고 그래도 실패하면 경고만 남기게 했다(`tests/conftest.py`, 별도 `test:` 커밋). 테스트 실패를 숨기는 변경은 아니다.
 
 ## 검증
+- 위임 재확인(11-12): `gmail.send`·`meetings.space.created`·`meetings.space.readonly` 위임 토큰 발급 성공. 공간 생성·구독·수신 실제 호출은 아직 하지 않았다
 - 단위: 도메인(순서 뒤바뀜·여러 회의·중복, 완료 후 상태 유지, 취소 세션 무시, 녹화 상태), 서비스(반영·중복·무시 대상·Google 오류 시 예외로 재시도), 어댑터(메시지 파싱, 구독 생성 요청 필드·활성 구독 갱신 update mask, 회의 기록 조회·없음, 수신기 ack/nack·다른 스레드 콜백·종료, tokeninfo, Redis TTL, 설정 누락 시 비활성), 작업(이름·스케줄, 재시도, 설정 없으면 처리 안 함)
 - 통합(PostgreSQL): 공간 이름으로 세션 조회
 - worker 재시작 후 오류 없이 기동(설정 없음 → 수신 시작 안 함)
-- 전체 758 passed (compose `api` 컨테이너, ruff·ruff format·mypy·mypy tests·lint-imports 통과)
+- 전체 757 passed(자동 찾기 테스트 제거 후) (compose `api` 컨테이너, ruff·ruff format·mypy·mypy tests·lint-imports 통과)
 - 코드 커밋 4개를 worktree에서 하나씩 검사했다(748 → 755 → 757 → 758 passed)
 - **실제 Google 호출(구독·회의 기록·Pub/Sub)은 확인하지 못했다**(위임 미등록)
 - 스키마 변경 없음
