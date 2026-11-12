@@ -13,6 +13,7 @@ from datetime import datetime
 
 from app.contexts.mentoring.domain.enums import MentoringSessionStatus, RecordingStatus
 from app.shared.domain import AggregateRoot
+from app.shared.errors import BusinessRuleViolation
 
 TITLE_MAX_LENGTH = 100
 
@@ -56,3 +57,11 @@ class MentoringSession(AggregateRoot):
     recording_ended_at: datetime | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
+
+    def cancel(self) -> None:
+        """예정 세션만 취소한다(시작 시각이 지났어도 기록 전이면 가능, A44)."""
+        if self.status is not MentoringSessionStatus.SCHEDULED:
+            raise BusinessRuleViolation(
+                "예정된 세션만 취소할 수 있습니다.", code="session_not_cancelable"
+            )
+        self.status = MentoringSessionStatus.CANCELED

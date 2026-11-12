@@ -3,7 +3,7 @@
 - 수강생 본인만 신청한다(대리 신청 없음). 팀 신청은 팀원 누구나, 취소·변경은 신청자만.
 - 희망 일시 1~3개, 각각 30분 경계, 서로 겹치지 않는다. 신청 시간은 진행 단위의 배수, 최대 120분.
 - 주제 100자, 상세 내용 필수 2,000자. 반려·취소 사유 필수 300자.
-- 상태: PENDING → APPROVED / REJECTED / CANCELED (승인 후 취소는 P11-3).
+- 상태: PENDING → APPROVED / REJECTED / CANCELED, APPROVED → CANCELED (승인 후 취소, M26).
 - 승인은 고른 희망 일시가 시작하기 전까지, 반려는 대기 중일 때 사유와 함께 (A42·A43).
 - 승인 가능한 희망 일시(시작 전)가 하나도 없으면 대기 만료 대상이다.
 """
@@ -143,8 +143,22 @@ class MentoringRequest(AggregateRoot):
         )
 
     def cancel(self, reason: str, *, now: datetime) -> None:
-        self._ensure_pending("취소")
+        """대기 중이거나 승인된 신청을 취소한다. 마감·권한은 서비스가 본다."""
+        _rule(
+            self.status in (MentoringRequestStatus.PENDING, MentoringRequestStatus.APPROVED),
+            "대기 중이거나 승인된 신청만 취소할 수 있습니다.",
+            "request_not_cancelable",
+        )
         cleaned = clean_reason(reason)  # 검증을 먼저 해 실패해도 상태가 바뀌지 않게 한다
         self.status = MentoringRequestStatus.CANCELED
         self.canceled_at = now
         self.cancel_reason = cleaned
+
+
+def ensure_before_deadline(starts_at: datetime, *, min_lead_hours: int, now: datetime) -> None:
+    """수강생·멘토의 승인 후 취소·변경은 시작 min_lead_hours 전까지 (M26)."""
+    _rule(
+        now <= starts_at - timedelta(hours=min_lead_hours),
+        f"시작 {min_lead_hours}시간 전까지만 취소·변경할 수 있습니다. 운영진에게 문의해 주세요.",
+        "cancel_deadline_passed",
+    )

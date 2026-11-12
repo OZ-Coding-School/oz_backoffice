@@ -10,7 +10,7 @@ from app.contexts.mentoring.domain.enums import (
     MentoringBalanceTransactionType,
     MentoringRequestStatus,
 )
-from app.contexts.mentoring.domain.request import MentoringRequest
+from app.contexts.mentoring.domain.request import MentoringRequest, ensure_before_deadline
 from app.shared.errors import BusinessRuleViolation
 from app.shared.ids import new_id
 from app.shared.time import KST
@@ -89,7 +89,7 @@ def test_cancel_and_stale() -> None:
     assert not request.is_stale(T + timedelta(days=2))
     with pytest.raises(BusinessRuleViolation) as twice:
         request.cancel("다시", now=T)
-    assert twice.value.code == "request_not_pending"
+    assert twice.value.code == "request_not_cancelable"
 
 
 def test_hold_and_release() -> None:
@@ -174,3 +174,34 @@ def test_use_moves_held_to_used() -> None:
     assert (account.used_minutes, account.remaining_minutes) == (60, 60)
     with pytest.raises(BusinessRuleViolation):
         account.use(30, request_id=request_id, reason="승인")
+
+
+def test_cancel_approved_and_deadline() -> None:
+    request = _request()
+    now = datetime(2026, 11, 11, tzinfo=UTC)
+    request.approve(T, now=now)
+    request.cancel("사정이 생김", now=now)
+    assert request.status is MentoringRequestStatus.CANCELED
+
+    ensure_before_deadline(T, min_lead_hours=24, now=T - timedelta(hours=24))  # 경계는 허용
+    with pytest.raises(BusinessRuleViolation) as late:
+        ensure_before_deadline(T, min_lead_hours=24, now=T - timedelta(hours=23, minutes=59))
+    assert late.value.code == "cancel_deadline_passed"
+
+
+def test_refund_moves_used_back() -> None:
+    account = BalanceAccount(
+        student_id=new_id(), valid_from=date(2026, 11, 1), valid_until=date(2027, 4, 30)
+    )
+    account.grant(120, "지급", today=date(2026, 11, 11))
+    request_id = new_id()
+    account.hold(60, request_id=request_id, reason="신청")
+    account.use(60, request_id=request_id, reason="승인")
+    entry = account.refund(60, request_id=request_id, reason="취소")
+    assert (entry.type, account.used_minutes, account.remaining_minutes) == (
+        MentoringBalanceTransactionType.REFUND,
+        0,
+        120,
+    )
+    with pytest.raises(BusinessRuleViolation):
+        account.refund(30, request_id=request_id, reason="취소")
