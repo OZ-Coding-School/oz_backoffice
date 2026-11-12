@@ -29,6 +29,7 @@ from app.contexts.identity.application.auth_service import UserQueries
 from app.contexts.identity.domain.entities import User
 from app.contexts.mentoring.application.approval_service import MentoringApprovalService
 from app.contexts.mentoring.application.assignment_service import MentorDirectory
+from app.contexts.mentoring.application.meet_service import MeetSpaceScheduler
 from app.contexts.mentoring.application.request_service import (
     ChangeInput,
     MentoringRequestService,
@@ -112,6 +113,7 @@ def get_approval_service(
         students=cast("StudentLookup", state.student_queries),
         mentors=cast("MentorDirectory", state.mentor_queries),
         users=cast("UserQueries", state.user_queries),
+        meet=cast("MeetSpaceScheduler", state.meet_scheduler),
         audit=cast("AuditRecorder", state.audit_recorder),
         uow=UnitOfWork(),
         clock=clock,

@@ -42,6 +42,7 @@ from app.core.notifications import build_mail_sender, build_sms_sender
 from app.core.redis import create_redis
 from app.core.storage import build_s3_storage
 from app.workers.broker import broker
+from app.workers.tasks.mentoring import TaskiqMeetScheduler
 from app.workers.tasks.notifications import TaskiqMailDispatcher
 from app.workers.tasks.roster import TaskiqRosterSyncDispatcher
 
@@ -86,6 +87,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.roster_sync_dispatcher = TaskiqRosterSyncDispatcher()
     app.state.employee_queries = EmployeeQueries(TortoiseEmployeeRepository())
     app.state.mail_dispatcher = TaskiqMailDispatcher()
+    app.state.meet_scheduler = TaskiqMeetScheduler()
     # 가입 자동 매칭(A31)·승인(A33): academy·educator·access 공개 서비스를 가입 트랜잭션 안에서 쓴다
     app.state.student_claims = StudentClaims(TortoiseStudentRepository())
     app.state.mentor_onboarding = MentorOnboarding(

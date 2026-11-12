@@ -31,6 +31,7 @@ from app.core.config import Settings
 from app.core.database import MODEL_APP, build_tortoise_config
 from app.core.redis import get_redis
 from app.main import create_app
+from tests.fakes.mentoring import RecordingMeetScheduler
 from tests.fakes.notifications import InMemoryMailDispatcher
 from tests.s3_bucket import provision_test_bucket
 
@@ -98,6 +99,9 @@ def app(settings: Settings, fake_redis: FakeAsyncRedis) -> Iterator[FastAPI]:
 
     # 알림 메일을 실제 워커 큐로 보내지 않는다
     application.state.mail_dispatcher = InMemoryMailDispatcher()
+    application.state.meet_scheduler = (
+        RecordingMeetScheduler()
+    )  # Meet 공간 생성 작업도 보내지 않는다
     application.dependency_overrides[get_redis] = lambda: fake_redis
     application.dependency_overrides[get_database_probe] = lambda: _db_ok
     yield application

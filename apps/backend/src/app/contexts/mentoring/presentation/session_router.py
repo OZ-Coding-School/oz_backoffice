@@ -90,7 +90,9 @@ class SessionResponse(BaseModel):
     requester_name: str
     mentor_id: uuid.UUID
     mentor_display_name: str
-    google_meet_url: str | None = Field(description="Meet 연동(P12) 전에는 null")
+    google_meet_url: str | None = Field(
+        description="Meet 링크. 공간을 만들기 전이거나 취소된 세션은 null (A48)"
+    )
     created_at: datetime | None
 
 
@@ -127,7 +129,9 @@ class SessionPresenter:
                     mentor_id=s.mentor_id,
                     mentor_display_name=n.mentor_display_name,
                     mentor_name=n.mentor_name,
-                    google_meet_url=s.google_meet_url,
+                    google_meet_url=(
+                        None if s.status is MentoringSessionStatus.CANCELED else s.google_meet_url
+                    ),
                     created_at=s.created_at,
                 )
             )

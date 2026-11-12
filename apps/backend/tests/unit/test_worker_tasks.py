@@ -12,10 +12,14 @@ from app.workers.tasks.contracts import DAILY_0005_KST, expire_contracts
 from app.workers.tasks.mentoring import (
     build_assignment_service,
     build_enrollment_ended_service,
+    build_meet_service,
     build_request_service,
+    create_meet_space,
+    create_space_with_retry,
     expire_assignments,
     expire_requests,
     process_enrollment_ended,
+    sync_meet_spaces,
 )
 from app.workers.tasks.roster import HOURLY, execute_roster_sync, scheduled_roster_sync
 from tests.fakes.audit import InMemoryAuditLogRepository
@@ -107,3 +111,34 @@ async def test_enrollment_ended_runs_after_successful_sync(monkeypatch: pytest.M
         run.status = status
         await roster._after_sync(run)
         assert len(sent) == expected
+
+
+def test_meet_tasks_registered() -> None:
+    assert create_meet_space.task_name == "mentoring.meet.create_space"
+    assert sync_meet_spaces.task_name == "mentoring.meet.sync"
+    assert sync_meet_spaces.labels["schedule"] == [{"cron": "*/10 * * * *"}]
+    assert not build_meet_service().enabled  # 기본 MEET_DRIVER=disabled
+
+
+async def test_create_space_retries_then_gives_up() -> None:
+    import uuid
+
+    from app.integrations.google.meet import MeetUnavailableError
+
+    class Flaky:
+        def __init__(self, failures: int) -> None:
+            self.calls = 0
+            self.failures = failures
+
+        async def ensure_space(self, session_id: uuid.UUID) -> bool:
+            self.calls += 1
+            if self.calls <= self.failures:
+                raise MeetUnavailableError()
+            return True
+
+    recovering = Flaky(failures=2)
+    assert await create_space_with_retry(uuid.uuid4(), service=recovering, delays=(0, 0))  # type: ignore[arg-type]  # ensure_space만 쓴다
+    assert recovering.calls == 3
+    broken = Flaky(failures=5)
+    assert not await create_space_with_retry(uuid.uuid4(), service=broken, delays=(0, 0))  # type: ignore[arg-type]
+    assert broken.calls == 3  # 이후는 주기 작업(sync)이 다시 만든다
