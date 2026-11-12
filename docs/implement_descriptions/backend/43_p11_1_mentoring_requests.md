@@ -1,7 +1,7 @@
 # 43. P11-1 멘토링 신청·시간 보류·조회·승인 전 취소·대기 만료
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #48
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P11 (P11-1)
 - 이전 기록: [42. 멘토링 유형(평시/프로젝트) 제거](42_remove_mentoring_period_type.md)
 
