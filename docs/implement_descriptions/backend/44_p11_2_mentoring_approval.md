@@ -1,7 +1,7 @@
 # 44. P11-2 멘토링 승인·반려·세션 생성
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #49
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P11 (P11-2)
 - 이전 기록: [43. P11-1 멘토링 신청·시간 보류·조회·승인 전 취소·대기 만료](43_p11_1_mentoring_requests.md)
 
