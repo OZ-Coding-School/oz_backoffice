@@ -3,10 +3,10 @@
 개발에 필요한 외부 서비스 설정을 모았다. 운영 서버 배포 설정은 [`production_notes.md`](production_notes.md)에 따로 정리한다.
 값(키·시크릿)은 이 문서나 저장소에 적지 않는다. `apps/backend/.env`(로컬)나 운영 비밀 저장소에만 넣는다.
 
-| # | 준비물 | 필요한 단계 | 담당 | 상태 (2026-11-11) |
+| # | 준비물 | 필요한 단계 | 담당 | 상태 (2026-11-12) |
 | --- | --- | --- | --- | --- |
-| 1 | Google 서비스 계정 + 도메인 전체 위임(DWD) — Gmail 발송 | P7 (구현 완료, 실발송 미확인) | GCP 관리자 + Workspace 관리자 | **진행 중**: 키는 유효, 위임 단계에서 `unauthorized_client` |
-| 2 | DWD에 Meet·Drive 범위 추가 | P12, P13 | Workspace 관리자 | 미착수 |
+| 1 | Google 서비스 계정 + 도메인 전체 위임(DWD) — Gmail 발송 | P7 (구현 완료, 실발송 미확인) | GCP 관리자 + Workspace 관리자 | **위임 확인(11-12)**: `gmail.send` 위임 토큰 발급 성공(1-5). 실발송(`send-test-mail`)은 미확인 |
+| 2 | DWD에 Meet 범위 추가 + 녹화 폴더 공유 | P12, P13 | Workspace 관리자 | **필요**: Meet 두 범위 미등록(11-12). 폴더 공유는 P13 전까지 |
 | 3 | Google Cloud API 사용 설정 + Pub/Sub 토픽·구독 | P12 | GCP 관리자 | 미착수 |
 | 4 | SMS 발송 업체 계약·발신번호 등록 | P7 어댑터(별도 PR) | 사용자 | 업체 미정 (현재 console 드라이버) |
 | 5 | Google OAuth 클라이언트 (운영진 로그인) | P2 (구현 완료) | GCP 관리자 | 로컬 등록 완료, 운영 URI는 배포 때 |
@@ -49,7 +49,11 @@ docker compose exec api python -m app.cli send-test-mail <받는주소>
 ```
 - `MAIL_DRIVER=gmail`, `GMAIL_SENDER`, `GOOGLE_SERVICE_ACCOUNT_JSON`이 있어야 한다.
 
-### 1-5. `unauthorized_client`가 날 때 확인할 것 (현재 상태)
+### 1-5. `unauthorized_client`가 날 때 확인할 것
+**2026-11-12 진단:** 범위별로 위임 토큰만 발급해 봤다(메일 발송 없음, 키 값 출력 없음).
+- 처음에는 `.env`에 다른 프로젝트의 키가 들어 있어 네 범위 모두 `unauthorized_client`였다. 범위가 하나도 통과하지 않으면 범위 오타보다 **키(클라이언트 ID)가 위임 등록과 다른 경우**를 먼저 의심한다.
+- 키 교체 후(프로젝트 `ozcodingschool-web-developer`, 고유 ID 끝 6자리 `835476`) `gmail.send`는 **성공**했다. `meetings.space.created`·`meetings.space.readonly`·`drive.readonly`는 아직 `unauthorized_client`다 → 2번대로 같은 클라이언트 ID에 Meet 두 범위를 추가한다(Drive는 위임 대신 폴더 공유, A47).
+
 이 오류는 키는 맞지만 **위임이 등록·반영되지 않았다**는 뜻이다. 아래를 차례로 확인한다.
 1. 1-2에 넣은 클라이언트 ID가 **지금 쓰는 키 파일의 `client_id`** 와 같은가. 키 JSON의 `client_id` 값과 관리 콘솔에 등록된 ID를 비교한다. 서비스 계정을 새로 만들었다면 ID가 바뀐다.
 2. 범위 문자열이 정확히 `https://www.googleapis.com/auth/gmail.send`인가. 앞뒤 공백, 쉼표 구분, `http` 오타가 흔하다. 코드가 요청하는 범위와 **완전히 같아야** 한다(등록 범위보다 많이 요청하면 거부된다).
@@ -59,21 +63,33 @@ docker compose exec api python -m app.cli send-test-mail <받는주소>
 
 ---
 
-## 2. 도메인 전체 위임에 Meet·Drive 범위 추가 (P12·P13)
+## 2. 도메인 전체 위임에 Meet 범위 추가 + 녹화 폴더 공유 (P12·P13)
 
-1-2에서 등록한 같은 클라이언트 ID의 범위를 **편집**해 아래를 추가한다(쉼표로 구분해 한 줄로 넣는다).
+Meet REST API는 사용자 인증만 지원해 서비스 계정은 위임으로만 호출할 수 있다. Drive 파일은 위임 없이 **폴더 공유**로 서비스 계정 자신의 권한으로 읽는다(decisions A47).
+
+### 2-1. 위임 범위 (P12)
+1-2에서 등록한 같은 클라이언트 ID의 범위를 **편집**해 아래 세 개를 쉼표로 구분해 한 줄로 넣는다.
+```text
+https://www.googleapis.com/auth/gmail.send,https://www.googleapis.com/auth/meetings.space.created,https://www.googleapis.com/auth/meetings.space.readonly
+```
 
 | 범위 | 용도 |
 | --- | --- |
 | `https://www.googleapis.com/auth/gmail.send` | 메일 발송 (기존) |
 | `https://www.googleapis.com/auth/meetings.space.created` | 멘토링 세션용 Meet 공간 생성·설정 |
 | `https://www.googleapis.com/auth/meetings.space.readonly` | 회의 기록(참가·녹화·전사) 조회, Workspace Events 구독 |
-| `https://www.googleapis.com/auth/drive.readonly` | Drive에 저장된 녹화·전사 파일 조회·스트리밍 중계 |
 
-함께 확인할 것:
-- **Meet 공간을 만드는 계정**(대신할 회사 계정)을 정해야 한다. 녹화 파일은 이 계정의 Drive(`Meet Recordings` 폴더)에 쌓인다. P12 시작 때 결정한다.
+### 2-2. 녹화 폴더 공유 (P13 전까지)
+1. 주최 계정(`GMAIL_SENDER`)으로 Google Drive에 들어가 **내 드라이브 → `Google Meet`** 폴더(회의마다 하위 폴더가 생김)를 찾는다. 첫 녹화 전에는 없을 수 있으니 테스트 회의를 한 번 녹화하면 생긴다.
+2. 폴더 → **공유** → 서비스 계정 이메일(`...@<PROJECT_ID>.iam.gserviceaccount.com`)을 **뷰어**로 추가한다(알림 메일은 끈다).
+3. 폴더 안에 새로 생기는 녹화·전사·메모 파일은 폴더 공유를 이어받는다.
+- 외부 공유 제한 정책이 서비스 계정 공유를 막으면 Workspace 관리자가 허용해야 한다.
+- 백엔드는 Drive API를 서비스 계정 자신의 자격 증명으로(위임 없이) 호출한다. 범위는 `drive.readonly`.
+
+### 2-3. 함께 확인할 것
+- Meet 공간 주최 계정은 **`GMAIL_SENDER`** 다(A46). 녹화 파일은 이 계정 Drive의 `Google Meet` 폴더 아래 회의별 하위 폴더에 쌓인다(Google 도움말 기준, 위치는 바꿀 수 없음). 다른 저장소로 옮길지는 P13에서 정한다.
 - 그 계정의 **Workspace 버전이 Meet 녹화·전사를 지원**하는지 확인한다(Business Standard 이상 등). 관리 콘솔 → **앱 → Google Workspace → Google Meet → Meet 동영상 설정**에서 녹화가 허용돼 있어야 한다.
-- 자동 녹화(공간 설정으로 회의 시작 시 녹화)를 쓰려면 해당 버전에서 지원하는지 P12 전에 확인한다.
+- 자동 녹화·전사·스마트 메모(공간 설정으로 회의 시작 시 생성, A46)를 해당 버전에서 지원하는지 P12 전에 확인한다.
 
 ---
 
@@ -81,7 +97,7 @@ docker compose exec api python -m app.cli send-test-mail <받는주소>
 
 Meet 회의 시작·종료·녹화 생성 이벤트를 Workspace Events API → Pub/Sub 토픽으로 받고, 워커가 **pull 구독**으로 가져온다(구현 계획 P12).
 
-### 3-1. API 사용 설정 (1-1과 같은 프로젝트)
+### 3-1. API 사용 설정 (1-1과 같은 프로젝트, 현재 `ozcodingschool-web-developer`)
 **API 및 서비스 → 라이브러리**에서 다음을 사용 설정한다.
 - Google Meet REST API
 - Google Workspace Events API

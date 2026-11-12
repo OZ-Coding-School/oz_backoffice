@@ -8,6 +8,7 @@
 - 멘토 일정이 겹치면 DB EXCLUDE가 막는다 → 409 `mentor_schedule_conflict`.
 - 보류를 사용으로 옮기고(USING) 세션(SCHEDULED)을 만든다. 제목은 자동(회차 = 같은 신청자·같은 멘토의
   취소되지 않은 세션 순서).
+- 커밋 후 Meet 공간 생성을 워커로 보낸다(A48).
 반려 (그 신청의 멘토만, 대기 중, 사유 필수): 보류 해제(RELEASE).
 
 잠금: 참여자(신청자·팀원·팀)의 계좌를 id 순서로 잠근 뒤 신청을 잠근다(계좌 → 신청 → 세션). 같은
@@ -23,6 +24,7 @@ from app.contexts.academy.domain.entities import Student
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.educator.domain.profiles import Mentor
 from app.contexts.identity.domain.entities import User
+from app.contexts.mentoring.application.meet_service import MeetSpaceScheduler
 from app.contexts.mentoring.domain.balance import BalanceAccount
 from app.contexts.mentoring.domain.repositories import (
     BalanceAccountRepository,
@@ -81,6 +83,7 @@ class MentoringApprovalService:
         students: StudentLookup,
         mentors: MentorLookup,
         users: UserLookup,
+        meet: MeetSpaceScheduler,
         audit: AuditRecorder,
         uow: UnitOfWork,
         clock: Clock,
@@ -93,6 +96,7 @@ class MentoringApprovalService:
         self._students = students
         self._mentors = mentors
         self._users = users
+        self._meet = meet
         self._audit = audit
         self._uow = uow
         self._clock = clock
@@ -136,6 +140,8 @@ class MentoringApprovalService:
             await self._accounts.save(account)
             await self._ledger.add_many([entry])
             await self._record(user_id, "approve", request, session)
+            session_id = session.id
+            self._uow.on_commit(lambda: self._meet.space_needed(session_id))
         return request, session
 
     async def reject(

@@ -48,3 +48,4 @@
 | 44 | [P11-2 멘토링 승인·반려·세션 생성](44_p11_2_mentoring_approval.md) | 완료 (#49) |
 | 45 | [P11-3a 승인 후 취소·운영진 취소·변경](45_p11_3a_mentoring_cancel_change.md) | 완료 (#50) |
 | 46 | [P11-3b 신청 연동 (불가 시간 충돌·멘토 변화·수강 종료)](46_p11_3b_mentoring_integrations.md) | 완료 (#51) |
+| 47 | [P12-1 Google Meet 공간 생성·막기](47_p12_1_meet_spaces.md) | 완료 (#52) |

@@ -89,6 +89,9 @@ class Settings(BaseSettings):
     gmail_sender: str = ""
     # 서비스 계정 키 JSON 원문 (한 줄). 도메인 전체 위임이 설정된 서비스 계정이어야 한다
     google_service_account_json: SecretStr = SecretStr("")
+    # Google Meet (decisions A46·A48). disabled면 공간을 만들지 않는다(주기 작업이 설정 후 채운다).
+    # google이면 서비스 계정이 위임(meetings.space.created)으로 GMAIL_SENDER를 대신해 공간을 만든다
+    meet_driver: Literal["disabled", "google"] = "disabled"
 
     # 업무상 날짜 경계 기준 타임존
     business_timezone: str = "Asia/Seoul"

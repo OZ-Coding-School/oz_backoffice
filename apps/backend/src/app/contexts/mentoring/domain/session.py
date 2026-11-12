@@ -4,7 +4,8 @@
 - 제목은 자동: "신청자(팀 이름 또는 수강생 이름) · 멘토 표시 이름 멘토링 N회차"(100자),
   N은 같은 신청자·같은 멘토의 취소되지 않은 세션 순서. 주제는 신청 주제.
 - 멘토 일정 겹침은 DB EXCLUDE가, 신청자 일정 겹침은 서비스가 막는다.
-- 진행·기록·Meet·녹화 필드는 P12·P13에서 채운다.
+- Meet 공간은 승인 후 만들고(링크 = `google_meet_url`), 취소되면 막고 링크를 지운다(A48).
+- 진행·기록·녹화 필드는 P12-2·P13에서 채운다.
 """
 
 import uuid
@@ -65,3 +66,23 @@ class MentoringSession(AggregateRoot):
                 "예정된 세션만 취소할 수 있습니다.", code="session_not_cancelable"
             )
         self.status = MentoringSessionStatus.CANCELED
+
+    @property
+    def needs_space(self) -> bool:
+        """Meet 공간을 만들어야 하는 세션 (예정이고 아직 공간이 없음, A48)."""
+        return self.status is MentoringSessionStatus.SCHEDULED and self.google_space_name is None
+
+    @property
+    def needs_space_closed(self) -> bool:
+        """취소됐는데 아직 링크가 살아 있는 세션 (공간을 막아야 함)."""
+        return self.status is MentoringSessionStatus.CANCELED and self.google_meet_url is not None
+
+    def attach_space(self, name: str, meeting_uri: str) -> None:
+        if self.google_space_name is not None:
+            raise BusinessRuleViolation("이미 Meet 공간이 있습니다.", code="meet_space_exists")
+        self.google_space_name = name
+        self.google_meet_url = meeting_uri
+
+    def space_closed(self) -> None:
+        """공간을 막았다: 링크를 지운다(공간 이름은 기록으로 남긴다)."""
+        self.google_meet_url = None

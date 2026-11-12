@@ -9,6 +9,7 @@ dependencies = [
     "argon2-cffi>=25.1.0",
     "fastapi>=0.162.0",
     "google-api-python-client>=2.201.0",
+    "google-apps-meet>=0.5.2",
     "google-auth>=2.62.1",
     "holidays>=0.108",
     "httpx>=0.28.1",

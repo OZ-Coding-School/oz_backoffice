@@ -42,6 +42,7 @@ from tests.fakes.mentoring import (
     InMemoryRequestRepository,
     InMemorySessionRepository,
     InMemoryTeamRepository,
+    RecordingMeetScheduler,
 )
 from tests.fakes.uow import FakeUnitOfWork
 
@@ -102,6 +103,7 @@ class Harness:
         self.sessions.cohort_of_student = {self.student.id: self.cohort_id}
         self.clock = FixedClock(NOW)
         self.audit_logs = InMemoryAuditLogRepository()
+        self.meet = RecordingMeetScheduler()
         mentors = MentorQueries(InMemoryMentorRepository(self.mentor, self.other_mentor))
         self.service = MentoringApprovalService(
             requests=self.requests,
@@ -112,6 +114,7 @@ class Harness:
             students=self.students,
             mentors=mentors,
             users=Users(mentor_user, other_user),
+            meet=self.meet,
             audit=AuditRecorder(self.audit_logs, self.clock),
             uow=FakeUnitOfWork(),
             clock=self.clock,
@@ -191,6 +194,7 @@ async def test_approve_creates_session_and_uses_time(h: Harness) -> None:
     assert (account.held_minutes, account.used_minutes, account.remaining_minutes) == (0, 60, 540)
     assert h.ledger.entries[-1].type is MentoringBalanceTransactionType.USING
     assert [log.action for log in h.audit_logs.logs] == ["mentoring.request.approve"]
+    assert h.meet.needed == [session.id]  # 커밋 후 Meet 공간 생성을 보낸다
 
     second = await h.pending(times=[T + timedelta(days=1)])
     _, next_session = await h.approve(second, T + timedelta(days=1))

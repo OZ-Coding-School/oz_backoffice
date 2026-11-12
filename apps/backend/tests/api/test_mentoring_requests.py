@@ -407,3 +407,50 @@ async def test_unavailable_conflicts_reject_and_cancel(
         0,
         0,
     )
+
+
+async def test_meet_link_shown_then_hidden_after_cancel(
+    client: AsyncClient, settings: Settings
+) -> None:
+    from app.contexts.mentoring.application.meet_service import MeetSpaceService
+    from app.contexts.mentoring.infrastructure.repositories import (
+        TortoiseMentoringSessionRepository,
+    )
+    from app.core.clock import SystemClock
+    from app.core.uow import UnitOfWork
+    from tests.fakes.mentoring import FakeMeetClient
+
+    ctx = await _setup(client, settings)
+    student_h, mentor_h, admin = ctx["student_h"], ctx["mentor_h"], ctx["admin"]
+    request_id = (await client.post(URL, json=_body(ctx), headers=student_h)).json()["id"]
+    session = (
+        await client.post(
+            f"{URL}/{request_id}/approve",
+            json={"starts_at": ctx["at"].isoformat()},
+            headers=mentor_h,
+        )
+    ).json()["session"]
+    assert session["google_meet_url"] is None  # 공간은 커밋 후 작업이 만든다
+
+    meet = FakeMeetClient()
+    service = MeetSpaceService(
+        sessions=TortoiseMentoringSessionRepository(),
+        meet=meet,
+        uow=UnitOfWork(),
+        clock=SystemClock(),
+    )
+    assert await service.sync() == (1, 0)
+    shown = (
+        await client.get(f"/api/v1/mentoring/sessions/{session['id']}", headers=student_h)
+    ).json()
+    assert shown["google_meet_url"] == "https://meet.google.com/s1"
+
+    await client.post(
+        f"{ctx['admin_path']}/{request_id}/cancel", json={"reason": "정리"}, headers=admin
+    )
+    hidden = (
+        await client.get(f"/api/v1/mentoring/sessions/{session['id']}", headers=student_h)
+    ).json()
+    assert hidden["google_meet_url"] is None  # 취소되면 바로 숨긴다
+    assert await service.sync() == (0, 1)
+    assert meet.restricted == ["spaces/s1"]
