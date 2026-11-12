@@ -3,6 +3,7 @@ from datetime import date, datetime
 from typing import Protocol
 
 from app.contexts.mentoring.domain.assignment import CohortMentor
+from app.contexts.mentoring.domain.availability import Interval
 from app.contexts.mentoring.domain.balance import BalanceAccount, BalanceTransaction
 from app.contexts.mentoring.domain.enums import MentoringRequestStatus
 from app.contexts.mentoring.domain.request import MentoringRequest
@@ -194,6 +195,20 @@ class MentoringSessionRepository(Protocol):
         ...
 
     async def get(self, session_id: uuid.UUID) -> MentoringSession | None: ...
+    async def save(self, session: MentoringSession) -> None: ...
+    async def get_by_request(self, request_id: uuid.UUID) -> MentoringSession | None: ...
+    async def lock_by_request(self, request_id: uuid.UUID) -> MentoringSession | None: ...
+    async def busy(
+        self,
+        mentor_id: uuid.UUID,
+        start: datetime,
+        end: datetime,
+        *,
+        exclude_request_id: uuid.UUID | None = None,
+    ) -> list[Interval]:
+        """그 멘토의 취소되지 않은 세션 중 [start, end)와 겹치는 구간 (변경 중인 신청은 뺀다)."""
+        ...
+
     async def count_for_pair(
         self, mentor_id: uuid.UUID, *, requester_id: uuid.UUID | None, team_id: uuid.UUID | None
     ) -> int:

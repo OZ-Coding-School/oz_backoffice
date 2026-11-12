@@ -5,6 +5,7 @@ import uuid
 from datetime import date, datetime
 
 from app.contexts.mentoring.domain.assignment import CohortMentor
+from app.contexts.mentoring.domain.availability import Interval
 from app.contexts.mentoring.domain.balance import BalanceAccount, BalanceTransaction
 from app.contexts.mentoring.domain.enums import MentoringRequestStatus, MentoringSessionStatus
 from app.contexts.mentoring.domain.request import MentoringRequest
@@ -350,6 +351,36 @@ class InMemorySessionRepository:
     async def get(self, session_id: uuid.UUID) -> MentoringSession | None:
         found = self.items.get(session_id)
         return dataclasses.replace(found) if found else None
+
+    async def save(self, session: MentoringSession) -> None:
+        self.items[session.id] = dataclasses.replace(session)
+
+    async def get_by_request(self, request_id: uuid.UUID) -> MentoringSession | None:
+        found = next((s for s in self.items.values() if s.request_id == request_id), None)
+        return dataclasses.replace(found) if found else None
+
+    async def lock_by_request(self, request_id: uuid.UUID) -> MentoringSession | None:
+        return await self.get_by_request(request_id)
+
+    async def busy(
+        self,
+        mentor_id: uuid.UUID,
+        start: datetime,
+        end: datetime,
+        *,
+        exclude_request_id: uuid.UUID | None = None,
+    ) -> list[Interval]:
+        return sorted(
+            (
+                Interval(s.starts_at, s.ends_at)
+                for s in self._active()
+                if s.mentor_id == mentor_id
+                and s.starts_at < end
+                and start < s.ends_at
+                and s.request_id != exclude_request_id
+            ),
+            key=lambda i: i.start,
+        )
 
     def _matches(
         self, session: MentoringSession, student_ids: list[uuid.UUID], team_ids: list[uuid.UUID]
