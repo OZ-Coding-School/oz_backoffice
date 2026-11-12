@@ -45,3 +45,4 @@
 | 41 | [P10-2b 명단 동기화 후 수강 종료 처리](41_p10_2b_enrollment_ended.md) | 완료 (#46) |
 | 42 | [멘토링 유형(평시/프로젝트) 제거](42_remove_mentoring_period_type.md) | 완료 (#47) |
 | 43 | [P11-1 멘토링 신청·시간 보류·조회·승인 전 취소·대기 만료](43_p11_1_mentoring_requests.md) | 완료 (#48) |
+| 44 | [P11-2 멘토링 승인·반려·세션 생성](44_p11_2_mentoring_approval.md) | 완료 (#49) |

@@ -6,9 +6,10 @@ from datetime import date, datetime
 
 from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.balance import BalanceAccount, BalanceTransaction
-from app.contexts.mentoring.domain.enums import MentoringRequestStatus
+from app.contexts.mentoring.domain.enums import MentoringRequestStatus, MentoringSessionStatus
 from app.contexts.mentoring.domain.request import MentoringRequest
 from app.contexts.mentoring.domain.schedule import MentorUnavailablePeriod
+from app.contexts.mentoring.domain.session import MentoringSession, SessionQuery
 from app.contexts.mentoring.domain.settings import CohortMentoringSettings, MentoringBlockTime
 from app.contexts.mentoring.domain.team import MentoringTeam
 from app.shared.errors import ConflictError
@@ -261,6 +262,9 @@ class InMemoryRequestRepository:
     async def lock(self, request_id: uuid.UUID) -> MentoringRequest | None:
         return await self.get(request_id)
 
+    async def get_many(self, request_ids: list[uuid.UUID]) -> dict[uuid.UUID, MentoringRequest]:
+        return {i: self._copy(self.items[i]) for i in request_ids if i in self.items}
+
     async def count_pending(
         self, *, requester_id: uuid.UUID | None = None, team_id: uuid.UUID | None = None
     ) -> int:
@@ -320,3 +324,99 @@ class InMemoryRequestRepository:
 
     async def list_stale(self, now: datetime) -> list[MentoringRequest]:
         return [self._copy(r) for r in self.items.values() if r.is_stale(now)]
+
+
+class InMemorySessionRepository:
+    """참여자 판정에 신청이 필요해 신청 리포지토리를 함께 받는다."""
+
+    def __init__(self, requests: InMemoryRequestRepository) -> None:
+        self.items: dict[uuid.UUID, MentoringSession] = {}
+        self._requests = requests
+        self.cohort_of_student: dict[uuid.UUID, uuid.UUID] = {}
+
+    def _active(self) -> list[MentoringSession]:
+        return [s for s in self.items.values() if s.status is not MentoringSessionStatus.CANCELED]
+
+    async def add(self, session: MentoringSession) -> None:
+        if any(
+            s.mentor_id == session.mentor_id
+            and s.starts_at < session.ends_at
+            and session.starts_at < s.ends_at
+            for s in self._active()
+        ):
+            raise ConflictError("멘토 일정 겹침", code="mentor_schedule_conflict")
+        self.items[session.id] = dataclasses.replace(session)
+
+    async def get(self, session_id: uuid.UUID) -> MentoringSession | None:
+        found = self.items.get(session_id)
+        return dataclasses.replace(found) if found else None
+
+    def _matches(
+        self, session: MentoringSession, student_ids: list[uuid.UUID], team_ids: list[uuid.UUID]
+    ) -> bool:
+        request = self._requests.items[session.request_id]
+        if request.team_id is not None:
+            return request.team_id in team_ids
+        return request.requester_id in student_ids
+
+    async def count_for_pair(
+        self, mentor_id: uuid.UUID, *, requester_id: uuid.UUID | None, team_id: uuid.UUID | None
+    ) -> int:
+        return sum(
+            1
+            for s in self._active()
+            if s.mentor_id == mentor_id
+            and self._matches(
+                s, [requester_id] if requester_id else [], [team_id] if team_id else []
+            )
+        )
+
+    async def has_participant_overlap(
+        self,
+        *,
+        student_ids: list[uuid.UUID],
+        team_ids: list[uuid.UUID],
+        starts_at: datetime,
+        ends_at: datetime,
+    ) -> bool:
+        return any(
+            s.starts_at < ends_at
+            and starts_at < s.ends_at
+            and self._matches(s, student_ids, team_ids)
+            for s in self._active()
+        )
+
+    @staticmethod
+    def _page(found: list[MentoringSession], q: SessionQuery) -> tuple[list[MentoringSession], int]:
+        found = [
+            s
+            for s in found
+            if (q.status is None or s.status is q.status)
+            and (q.starts_from is None or s.starts_at >= q.starts_from)
+            and (q.starts_before is None or s.starts_at < q.starts_before)
+        ]
+        found.sort(key=lambda s: (s.starts_at, s.id), reverse=True)
+        return found[q.offset : q.offset + q.limit], len(found)
+
+    async def list_for_participants(
+        self, *, student_ids: list[uuid.UUID], team_ids: list[uuid.UUID], query: SessionQuery
+    ) -> tuple[list[MentoringSession], int]:
+        found = [s for s in self.items.values() if self._matches(s, student_ids, team_ids)]
+        return self._page(found, query)
+
+    async def list_for_mentor(
+        self, mentor_id: uuid.UUID, query: SessionQuery
+    ) -> tuple[list[MentoringSession], int]:
+        return self._page([s for s in self.items.values() if s.mentor_id == mentor_id], query)
+
+    async def list_by_cohort(
+        self, cohort_id: uuid.UUID, *, mentor_id: uuid.UUID | None, query: SessionQuery
+    ) -> tuple[list[MentoringSession], int]:
+        found = [
+            s
+            for s in self.items.values()
+            if self.cohort_of_student.get(self._requests.items[s.request_id].requester_id)
+            == cohort_id
+            and (mentor_id is None or s.mentor_id == mentor_id)
+        ]
+        return self._page(found, query)

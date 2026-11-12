@@ -6,6 +6,8 @@
   GET  /me/mentoring/requests?status=         본인 1:1 + 소속 팀 신청
 멘토:
   GET  /me/mentor-requests?status=            받은 신청
+  POST /mentoring/requests/{id}/approve       희망 일시 하나를 골라 승인 → 세션 생성 (A43)
+  POST /mentoring/requests/{id}/reject        반려 (사유 필수)
 운영진 (mentoring.request.read, 기수 범위):
   GET  /admin/cohorts/{cohort_id}/mentoring/requests?status=&mentor_id=
 """
@@ -21,6 +23,7 @@ from app.contexts.access.presentation.dependencies import ApprovedUser, require_
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.identity.application.auth_service import UserQueries
 from app.contexts.identity.domain.entities import User
+from app.contexts.mentoring.application.approval_service import MentoringApprovalService
 from app.contexts.mentoring.application.assignment_service import MentorDirectory
 from app.contexts.mentoring.application.request_service import (
     MentoringRequestService,
@@ -41,9 +44,12 @@ from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseBalanceTransactionRepository,
     TortoiseCohortMentoringSettingsRepository,
     TortoiseMentoringRequestRepository,
+    TortoiseMentoringSessionRepository,
     TortoiseMentoringTeamRepository,
 )
 from app.contexts.mentoring.presentation.availability_router import get_available_times_service
+from app.contexts.mentoring.presentation.presenters import NameBook
+from app.contexts.mentoring.presentation.session_router import SessionPresenter, SessionResponse
 from app.core.clock import Clock
 from app.core.dependencies import get_clock
 from app.core.pagination import Page
@@ -84,6 +90,28 @@ def get_request_service(
 ServiceDep = Annotated[MentoringRequestService, Depends(get_request_service)]
 
 
+def get_approval_service(
+    request: Request, clock: Annotated[Clock, Depends(get_clock)]
+) -> MentoringApprovalService:
+    state = request.app.state
+    return MentoringApprovalService(
+        requests=TortoiseMentoringRequestRepository(),
+        sessions=TortoiseMentoringSessionRepository(),
+        accounts=TortoiseBalanceAccountRepository(),
+        ledger=TortoiseBalanceTransactionRepository(),
+        teams=TortoiseMentoringTeamRepository(),
+        students=cast("StudentLookup", state.student_queries),
+        mentors=cast("MentorDirectory", state.mentor_queries),
+        users=cast("UserQueries", state.user_queries),
+        audit=cast("AuditRecorder", state.audit_recorder),
+        uow=UnitOfWork(),
+        clock=clock,
+    )
+
+
+ApprovalDep = Annotated[MentoringApprovalService, Depends(get_approval_service)]
+
+
 # ---------------------------------------------------------------- 스키마
 class RequestCreate(BaseModel):
     """1:1은 cohort_id·mentor_id, 팀은 team_id(담당 멘토에게 자동)."""
@@ -101,6 +129,10 @@ class RequestCreate(BaseModel):
 
 class CancelBody(BaseModel):
     reason: str = Field(min_length=1, max_length=REASON_MAX_LENGTH)
+
+
+class ApproveBody(BaseModel):
+    starts_at: AwareDatetime = Field(description="희망 일시 중 하나")
 
 
 class RequestResponse(BaseModel):
@@ -128,55 +160,41 @@ class AdminRequestResponse(RequestResponse):
     mentor_name: str = Field(description="멘토 실명 (운영진 응답에만)")
 
 
-class Presenter:
-    """신청자 이름·팀 이름·멘토 이름을 붙인다 (각각 한 번씩 묶어 조회)."""
+class ApprovalResponse(BaseModel):
+    request: RequestResponse
+    session: SessionResponse
 
+
+class Presenter:
     def __init__(self, request: Request) -> None:
-        state = request.app.state
-        self._students = cast("StudentLookup", state.student_queries)
-        self._mentors = cast("MentorDirectory", state.mentor_queries)
-        self._users = cast("UserQueries", state.user_queries)
-        self._teams = TortoiseMentoringTeamRepository()
+        self._names = NameBook(request)
 
     async def admin(self, items: list[MentoringRequest]) -> list[AdminRequestResponse]:
-        students = await self._students.get_many(list({r.requester_id for r in items}))
-        teams = {
-            t.id: t
-            for t in await self._teams.list_by_ids(list({r.team_id for r in items if r.team_id}))
-        }
-        mentors = await self._mentors.get_many(list({r.mentor_id for r in items}))
-        users = await self._users.get_many([m.user_id for m in mentors.values()])
-        result = []
-        for r in items:
-            mentor = mentors.get(r.mentor_id)
-            user = users.get(mentor.user_id) if mentor else None
-            real = user.name if user else ""
-            student = students.get(r.requester_id)
-            team = teams.get(r.team_id) if r.team_id else None
-            result.append(
-                AdminRequestResponse(
-                    id=r.id,
-                    status=r.status,
-                    team_id=r.team_id,
-                    team_label=team.label if team else None,
-                    requester_id=r.requester_id,
-                    requester_name=student.name if student else "",
-                    mentor_id=r.mentor_id,
-                    mentor_display_name=mentor.display_name(real) if mentor else "",
-                    mentor_name=real,
-                    topic=r.topic,
-                    detail=r.detail,
-                    desired_times=r.desired_times,
-                    duration=r.duration,
-                    reject_reason=r.reject_reason,
-                    rejected_at=r.rejected_at,
-                    cancel_reason=r.cancel_reason,
-                    canceled_at=r.canceled_at,
-                    replaced_request_id=r.replaced_request_id,
-                    created_at=r.created_at,
-                )
+        names = await self._names.of(items)
+        return [
+            AdminRequestResponse(
+                id=r.id,
+                status=r.status,
+                team_id=r.team_id,
+                team_label=names[r.id].team_label,
+                requester_id=r.requester_id,
+                requester_name=names[r.id].requester_name,
+                mentor_id=r.mentor_id,
+                mentor_display_name=names[r.id].mentor_display_name,
+                mentor_name=names[r.id].mentor_name,
+                topic=r.topic,
+                detail=r.detail,
+                desired_times=r.desired_times,
+                duration=r.duration,
+                reject_reason=r.reject_reason,
+                rejected_at=r.rejected_at,
+                cancel_reason=r.cancel_reason,
+                canceled_at=r.canceled_at,
+                replaced_request_id=r.replaced_request_id,
+                created_at=r.created_at,
             )
-        return result
+            for r in items
+        ]
 
     async def public(self, items: list[MentoringRequest]) -> list[RequestResponse]:
         """수강생·멘토용 (멘토 실명 제외)."""
@@ -187,7 +205,6 @@ class Presenter:
 
 
 PresenterDep = Annotated[Presenter, Depends(Presenter)]
-StatusFilter = Annotated[MentoringRequestStatus | None, Query()]
 
 
 # ---------------------------------------------------------------- 수강생
@@ -250,6 +267,36 @@ async def mentor_requests(
         user.id, status=status_, limit=limit, offset=offset
     )
     return Page(items=await presenter.public(items), total=total, limit=limit, offset=offset)
+
+
+@router.post("/{request_id}/approve", response_model=ApprovalResponse)
+async def approve_request(
+    request_id: uuid.UUID,
+    body: ApproveBody,
+    user: ApprovedUser,
+    service: ApprovalDep,
+    presenter: PresenterDep,
+    sessions: Annotated[SessionPresenter, Depends(SessionPresenter)],
+) -> ApprovalResponse:
+    """그 신청의 멘토만. 보류 시간을 사용으로 옮기고 세션을 만든다."""
+    approved, session = await service.approve(user.id, request_id, body.starts_at)
+    return ApprovalResponse(
+        request=(await presenter.public([approved]))[0],
+        session=(await sessions.public([session]))[0],
+    )
+
+
+@router.post("/{request_id}/reject", response_model=RequestResponse)
+async def reject_request(
+    request_id: uuid.UUID,
+    body: CancelBody,
+    user: ApprovedUser,
+    service: ApprovalDep,
+    presenter: PresenterDep,
+) -> RequestResponse:
+    """그 신청의 멘토만, 사유 필수. 보류 시간을 돌려준다."""
+    rejected = await service.reject(user.id, request_id, body.reason)
+    return (await presenter.public([rejected]))[0]
 
 
 # ---------------------------------------------------------------- 운영진

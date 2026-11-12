@@ -148,6 +148,17 @@ class BalanceAccount(AggregateRoot):
         self.held_minutes -= minutes
         return self._entry(MentoringBalanceTransactionType.RELEASE, minutes, reason, request_id)
 
+    def use(self, minutes: int, *, request_id: uuid.UUID, reason: str) -> BalanceTransaction:
+        """승인: 보류를 사용으로 옮긴다 (M9)."""
+        _rule(
+            0 < minutes <= self.held_minutes,
+            "사용할 보류 시간이 없습니다.",
+            "invalid_balance_minutes",
+        )
+        self.held_minutes -= minutes
+        self.used_minutes += minutes
+        return self._entry(MentoringBalanceTransactionType.USING, minutes, reason, request_id)
+
     def revoke_remaining(self, reason: str) -> BalanceTransaction | None:
         """수강 종료 회수: 잔여 전부를 줄인다(단위·사용 기간과 무관, A39). 잔여가 없으면 None."""
         if self.remaining_minutes <= 0:

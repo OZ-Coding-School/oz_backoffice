@@ -1,0 +1,55 @@
+"""신청·세션 응답에 이름을 붙인다 (신청자·팀·멘토, 각각 IN 쿼리 한 번).
+
+수강생·멘토 응답에는 멘토 표시 이름만, 운영진 응답에만 멘토 실명을 넣는다(A28 표시 이름).
+"""
+
+import uuid
+from dataclasses import dataclass
+from typing import cast
+
+from fastapi import Request
+
+from app.contexts.identity.application.auth_service import UserQueries
+from app.contexts.mentoring.application.assignment_service import MentorDirectory
+from app.contexts.mentoring.application.request_service import StudentLookup
+from app.contexts.mentoring.domain.request import MentoringRequest
+from app.contexts.mentoring.infrastructure.repositories import TortoiseMentoringTeamRepository
+
+
+@dataclass(frozen=True, slots=True)
+class Names:
+    team_label: str | None
+    requester_name: str
+    mentor_display_name: str
+    mentor_name: str
+
+
+class NameBook:
+    def __init__(self, request: Request) -> None:
+        state = request.app.state
+        self._students = cast("StudentLookup", state.student_queries)
+        self._mentors = cast("MentorDirectory", state.mentor_queries)
+        self._users = cast("UserQueries", state.user_queries)
+        self._teams = TortoiseMentoringTeamRepository()
+
+    async def of(self, items: list[MentoringRequest]) -> dict[uuid.UUID, Names]:
+        """신청 id → 이름."""
+        students = await self._students.get_many(list({r.requester_id for r in items}))
+        team_ids = list({r.team_id for r in items if r.team_id})
+        teams = {t.id: t for t in await self._teams.list_by_ids(team_ids)}
+        mentors = await self._mentors.get_many(list({r.mentor_id for r in items}))
+        users = await self._users.get_many([m.user_id for m in mentors.values()])
+        result: dict[uuid.UUID, Names] = {}
+        for r in items:
+            mentor = mentors.get(r.mentor_id)
+            user = users.get(mentor.user_id) if mentor else None
+            real = user.name if user else ""
+            student = students.get(r.requester_id)
+            team = teams.get(r.team_id) if r.team_id else None
+            result[r.id] = Names(
+                team_label=team.label if team else None,
+                requester_name=student.name if student else "",
+                mentor_display_name=mentor.display_name(real) if mentor else "",
+                mentor_name=real,
+            )
+        return result
