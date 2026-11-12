@@ -19,7 +19,6 @@ from pydantic import AwareDatetime, BaseModel, Field
 
 from app.contexts.access.presentation.dependencies import ApprovedUser, require_permission
 from app.contexts.audit.application.recorder import AuditRecorder
-from app.contexts.identity.application.auth_service import UserQueries
 from app.contexts.identity.domain.entities import User
 from app.contexts.mentoring.application.assignment_service import MentorDirectory
 from app.contexts.mentoring.application.request_service import (
@@ -44,6 +43,7 @@ from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseMentoringTeamRepository,
 )
 from app.contexts.mentoring.presentation.availability_router import get_available_times_service
+from app.contexts.mentoring.presentation.presenters import NameBook
 from app.core.clock import Clock
 from app.core.dependencies import get_clock
 from app.core.pagination import Page
@@ -129,54 +129,35 @@ class AdminRequestResponse(RequestResponse):
 
 
 class Presenter:
-    """신청자 이름·팀 이름·멘토 이름을 붙인다 (각각 한 번씩 묶어 조회)."""
-
     def __init__(self, request: Request) -> None:
-        state = request.app.state
-        self._students = cast("StudentLookup", state.student_queries)
-        self._mentors = cast("MentorDirectory", state.mentor_queries)
-        self._users = cast("UserQueries", state.user_queries)
-        self._teams = TortoiseMentoringTeamRepository()
+        self._names = NameBook(request)
 
     async def admin(self, items: list[MentoringRequest]) -> list[AdminRequestResponse]:
-        students = await self._students.get_many(list({r.requester_id for r in items}))
-        teams = {
-            t.id: t
-            for t in await self._teams.list_by_ids(list({r.team_id for r in items if r.team_id}))
-        }
-        mentors = await self._mentors.get_many(list({r.mentor_id for r in items}))
-        users = await self._users.get_many([m.user_id for m in mentors.values()])
-        result = []
-        for r in items:
-            mentor = mentors.get(r.mentor_id)
-            user = users.get(mentor.user_id) if mentor else None
-            real = user.name if user else ""
-            student = students.get(r.requester_id)
-            team = teams.get(r.team_id) if r.team_id else None
-            result.append(
-                AdminRequestResponse(
-                    id=r.id,
-                    status=r.status,
-                    team_id=r.team_id,
-                    team_label=team.label if team else None,
-                    requester_id=r.requester_id,
-                    requester_name=student.name if student else "",
-                    mentor_id=r.mentor_id,
-                    mentor_display_name=mentor.display_name(real) if mentor else "",
-                    mentor_name=real,
-                    topic=r.topic,
-                    detail=r.detail,
-                    desired_times=r.desired_times,
-                    duration=r.duration,
-                    reject_reason=r.reject_reason,
-                    rejected_at=r.rejected_at,
-                    cancel_reason=r.cancel_reason,
-                    canceled_at=r.canceled_at,
-                    replaced_request_id=r.replaced_request_id,
-                    created_at=r.created_at,
-                )
+        names = await self._names.of(items)
+        return [
+            AdminRequestResponse(
+                id=r.id,
+                status=r.status,
+                team_id=r.team_id,
+                team_label=names[r.id].team_label,
+                requester_id=r.requester_id,
+                requester_name=names[r.id].requester_name,
+                mentor_id=r.mentor_id,
+                mentor_display_name=names[r.id].mentor_display_name,
+                mentor_name=names[r.id].mentor_name,
+                topic=r.topic,
+                detail=r.detail,
+                desired_times=r.desired_times,
+                duration=r.duration,
+                reject_reason=r.reject_reason,
+                rejected_at=r.rejected_at,
+                cancel_reason=r.cancel_reason,
+                canceled_at=r.canceled_at,
+                replaced_request_id=r.replaced_request_id,
+                created_at=r.created_at,
             )
-        return result
+            for r in items
+        ]
 
     async def public(self, items: list[MentoringRequest]) -> list[RequestResponse]:
         """수강생·멘토용 (멘토 실명 제외)."""
@@ -187,7 +168,6 @@ class Presenter:
 
 
 PresenterDep = Annotated[Presenter, Depends(Presenter)]
-StatusFilter = Annotated[MentoringRequestStatus | None, Query()]
 
 
 # ---------------------------------------------------------------- 수강생
