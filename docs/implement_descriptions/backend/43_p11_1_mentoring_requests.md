@@ -1,6 +1,6 @@
 # 43. P11-1 멘토링 신청·시간 보류·조회·승인 전 취소·대기 만료
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-12 병합)
 - 관련 PR: #48
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P11 (P11-1)
 - 이전 기록: [42. 멘토링 유형(평시/프로젝트) 제거](42_remove_mentoring_period_type.md)
@@ -47,14 +47,16 @@ P11은 PR 3개로 나눴다(A42). 이번 PR은 그 첫 번째로, 수강생이 �
 - **조회 쿼리:** 목록 1회 + 개수 1회 + 이름 붙이기(수강생·팀·멘토·회원 각각 IN 쿼리 1회)로, 건수와 무관하게 쿼리 수가 일정하다.
 - **에러 코드:** `balance_account_missing`, `insufficient_balance`, `desired_time_unavailable`, `desired_time_outside_validity`, `too_many_pending_requests`, `mentor_not_accepting`, `mentoring_mode_not_allowed`, `invalid_request_duration`, `request_target_required`, `student_not_enrolled`, `not_cohort_student`, `not_team_member`, `not_requester`.
 
-## 확인이 필요한 사항
-- 대기 만료 작업 주기를 **10분**으로 두었다. A42는 "주기 작업"으로만 정했으므로 주기 값은 사용자 확인이 필요하다.
+## 대기 만료 주기
+- 대기 만료 작업 주기는 **10분**이다. A42는 "주기 작업"으로만 정했고, 사용자가 변경 요청 없이 병합을 확인해 10분으로 유지했다.
 
 ## 검증
 - 단위: 도메인 규칙 15개(경계값: 0·120·150분, 30분 경계, 겹침, 시간대, 사유), 서비스 7개(보류, 검증 규칙, 진행 단위·허용 방식·수강 상태, 대기 수·사용 기간, 팀 신청, 취소·만료 멱등, 멘토 목록)
 - 통합(PostgreSQL): 저장·조회 왕복, CHECK 제약(상태별 필드, 희망 일시 순서), 목록 필터, 만료 대상 조회
 - API: 신청 → 보류 확인 → 수강생·멘토·운영진 목록 → 취소(사유 누락 422, 남의 신청 403) → 반환 확인, 규칙 위반 코드, 비로그인 401·다른 기수 회원 403·수강생의 운영진 API 403·멘토 아님 404
 - 작업: 작업 이름·스케줄·서비스 조립
+- GitHub Actions (PR #48): backend 잡 통과, 705 passed
+- 사용자가 작업 완료를 확인했다(2026-11-12)
 - 전체 705 passed (compose `api` 컨테이너, ruff·ruff format·mypy·mypy tests·lint-imports 통과)
 - 코드 커밋 3개를 worktree에서 하나씩 검사했다(ruff, ruff format, mypy, mypy tests, lint-imports, pytest). 모두 통과했다(695 → 702 → 705 passed)
 - 마이그레이션 17: `upgrade` → `migrate`("No changes detected") → `downgrade -v 17` → `upgrade` 확인
