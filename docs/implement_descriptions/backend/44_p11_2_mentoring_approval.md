@@ -1,6 +1,6 @@
 # 44. P11-2 멘토링 승인·반려·세션 생성
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-12 병합)
 - 관련 PR: #49
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P11 (P11-2)
 - 이전 기록: [43. P11-1 멘토링 신청·시간 보류·조회·승인 전 취소·대기 만료](43_p11_1_mentoring_requests.md)
@@ -54,6 +54,8 @@ P11의 두 번째 PR이다(A42). 멘토가 대기 신청의 희망 일시 하나
 - 단위: 도메인(승인: 희망 일시 아님·시간대 없음·시작 시각과 같음·두 번 승인, 반려 사유, USING, 제목 길이), 서비스 6개(승인·회차, 권한·규칙, 멘토/신청자 겹침과 실패 시 보류 유지, 팀원 1:1·팀 세션 겹침, 반려, 세션 조회 권한)
 - 통합(PostgreSQL): 저장·조회 왕복, EXCLUDE 위반 409·이어지는 세션 허용·다른 멘토 허용·취소 세션 제외, 회차 수, 신청자 겹침(1:1·팀), 목록 정렬·기간·멘토·기수 필터, CHECK 위반, 신청당 세션 하나
 - API: 승인(멘토 아님 404, 희망 일시 아님, 성공 → 잔여·보류, 두 번 승인), 반려(사유 누락 422, 성공), 세션 목록·기간 필터·단건(참여자 아님 404)·운영진 목록·단건(다른 기수 404)·403·401
+- GitHub Actions (PR #49): backend 잡 통과, 717 passed
+- 사용자가 작업 완료를 확인했다(2026-11-12)
 - 전체 717 passed (compose `api` 컨테이너, ruff·ruff format·mypy·mypy tests·lint-imports 통과)
 - 커밋 5개(refactor 포함)를 worktree에서 하나씩 검사했다(ruff, ruff format, mypy, mypy tests, lint-imports, pytest). 모두 통과했다(709 → 710 → 716 → 716 → 717 passed)
 - 마이그레이션 18: `upgrade` → `migrate`("No changes detected") → `downgrade -v 18` → `upgrade` 확인, DBML 파서 검증
