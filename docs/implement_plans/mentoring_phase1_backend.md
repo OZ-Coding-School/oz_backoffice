@@ -412,7 +412,7 @@ P8 기수 설정·멘토 배정 ─ P9 멘토 일정 ─ P10 팀·시간 계좌 
 
 ### P12. Google Meet 연동 🔒
 - **선행 준비:**
-  - Workspace 관리자: 서비스 계정 DWD 범위 등록(`meetings.space.created`, `meetings.space.readonly`, `drive.readonly`, `gmail.send`)
+  - Workspace 관리자: 서비스 계정 DWD 범위 등록(`gmail.send`, `meetings.space.created`, `meetings.space.readonly`). Drive는 위임 대신 주최 계정의 `Meet Recordings` 폴더를 서비스 계정에 공유(P13 전, A47)
   - GCP 프로젝트: Pub/Sub 토픽, **pull 구독**, Workspace Events가 토픽에 발행할 권한
 - **작업:**
   - 승인 커밋 후(`uow.on_commit`) taskiq로 Meet Space 생성을 enqueue한다. 실패하면 백오프 재시도하고, 성공하면 `google_space_name` / `google_meet_url`을 저장한다
