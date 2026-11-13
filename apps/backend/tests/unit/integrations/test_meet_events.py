@@ -51,6 +51,41 @@ class FakeApis:
     async def update_subscription(self, *, request: Any) -> Any:
         self._record("update", request)
 
+    async def _aiter(self, items: list[Any]) -> Any:
+        for item in items:
+            yield item
+
+    async def list_conference_records(self, *, request: Any) -> Any:
+        self._record("records", request)
+        return self._aiter([meet.ConferenceRecord(name="conferenceRecords/c1")])
+
+    async def list_recordings(self, *, request: Any) -> Any:
+        state = meet.Recording.State
+        return self._aiter(
+            [
+                meet.Recording(state=state.FILE_GENERATED, drive_destination={"file": "v1"}),
+                meet.Recording(state=state.ENDED, drive_destination={"file": "v2"}),  # 아직
+            ]
+        )
+
+    async def list_transcripts(self, *, request: Any) -> Any:
+        return self._aiter(
+            [
+                meet.Transcript(
+                    state=meet.Transcript.State.FILE_GENERATED, docs_destination={"document": "t1"}
+                )
+            ]
+        )
+
+    async def list_smart_notes(self, *, request: Any) -> Any:
+        return self._aiter(
+            [
+                meet.SmartNote(
+                    state=meet.SmartNote.State.FILE_GENERATED, docs_destination={"document": "n1"}
+                )
+            ]
+        )
+
     async def get_conference_record(self, *, request: Any) -> Any:
         self._record("record", request)
         return meet.ConferenceRecord(
@@ -207,3 +242,17 @@ async def test_events_client_needs_settings(settings: Settings) -> None:
     assert build_meet_listener(on, handler) is None  # 구독 없음
     with_sub = on.model_copy(update={"meet_pubsub_subscription": "projects/p/subscriptions/s"})
     assert build_meet_listener(with_sub, handler) is None  # 키 없음
+
+
+async def test_session_files() -> None:
+    apis = FakeApis()
+    files = await _client(apis).session_files("spaces/a")
+    assert [(f.kind, f.file_id) for f in files] == [
+        ("VIDEO", "v1"),
+        ("TRANSCRIPT", "t1"),
+        ("SUMMARY", "n1"),
+    ]  # 생성이 끝난 파일만
+    assert apis.calls[-1][1].filter == 'space.name="spaces/a"'
+    apis.errors["records"] = _error(google_exceptions.PermissionDenied, "권한")
+    with pytest.raises(MeetUnavailableError):
+        await _client(apis).session_files("spaces/a")

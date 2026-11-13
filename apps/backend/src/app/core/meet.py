@@ -7,6 +7,7 @@ None이면 건너뛰고, 설정이 갖춰지면 주기 작업이 빠진 공간�
 import logging
 
 from app.core.config import Settings
+from app.integrations.google.drive import GoogleDriveArchive, build_drive_archive
 from app.integrations.google.meet import GoogleMeetClient, build_spaces_api
 from app.integrations.google.meet_events import (
     EventHandler,
@@ -66,3 +67,14 @@ def build_meet_listener(settings: Settings, handler: EventHandler) -> MeetEventL
         logger.warning("Meet 이벤트 수신 비활성: 서비스 계정 키가 없습니다.")
         return None
     return build_listener(info, settings.meet_pubsub_subscription, handler)
+
+
+def build_drive_archive_client(settings: Settings) -> GoogleDriveArchive | None:
+    """녹화 정리·중계용 Drive 클라이언트 (A54). Meet이 꺼져 있거나 폴더 ID가 없으면 None."""
+    if settings.meet_driver != "google" or not settings.meet_recordings_folder_id:
+        return None
+    info = parse_service_account_json(settings.google_service_account_json.get_secret_value())
+    if info is None or not settings.gmail_sender:
+        logger.warning("녹화 정리 비활성: 서비스 계정 키·GMAIL_SENDER가 필요합니다.")
+        return None
+    return build_drive_archive(info, settings.gmail_sender, settings.meet_recordings_folder_id)

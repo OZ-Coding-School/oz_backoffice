@@ -97,6 +97,8 @@ class Settings(BaseSettings):
     meet_pubsub_subscription: str = ""  # projects/<PROJECT_ID>/subscriptions/<SUBSCRIPTION>
     # 주최 계정(GMAIL_SENDER) Google 사용자 ID (관리 콘솔 사용자 주소의 숫자, A51). 구독 대상
     meet_organizer_user_id: str = ""
+    # 녹화 정리 최상위 폴더(공유 드라이브 `멘토링 녹화`) ID (A54). 비우면 수집·정리를 하지 않는다
+    meet_recordings_folder_id: str = ""
 
     # 업무상 날짜 경계 기준 타임존
     business_timezone: str = "Asia/Seoul"
