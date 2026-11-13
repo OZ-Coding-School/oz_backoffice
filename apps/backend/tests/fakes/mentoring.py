@@ -415,6 +415,15 @@ class InMemorySessionRepository:
             if s.needs_space and s.starts_at > after
         ]
 
+    async def list_recent_with_space(
+        self, since: datetime, until: datetime
+    ) -> list[MentoringSession]:
+        return [
+            dataclasses.replace(s)
+            for s in self._active()
+            if s.google_space_name is not None and since <= s.ends_at <= until
+        ]
+
     async def list_needing_close(self) -> list[MentoringSession]:
         return [dataclasses.replace(s) for s in self.items.values() if s.needs_space_closed]
 

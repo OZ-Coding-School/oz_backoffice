@@ -759,6 +759,16 @@ class TortoiseMentoringSessionRepository:
         ).order_by("starts_at", "id")
         return [self._entity(row) for row in rows]
 
+    async def list_recent_with_space(
+        self, since: datetime, until: datetime
+    ) -> list[MentoringSession]:
+        rows = (
+            await self._active()
+            .filter(google_space_name__isnull=False, ends_at__gte=since, ends_at__lte=until)
+            .order_by("ends_at", "id")
+        )
+        return [self._entity(row) for row in rows]
+
     async def list_needing_close(self) -> list[MentoringSession]:
         rows = await MentoringSessionModel.filter(
             status=MentoringSessionStatus.CANCELED, google_meet_url__isnull=False

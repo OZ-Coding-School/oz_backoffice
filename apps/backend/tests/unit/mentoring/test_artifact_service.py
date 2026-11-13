@@ -1,0 +1,246 @@
+"""녹화·전사·요약 수집·정리·열람 서비스 (인메모리 + 가짜 Meet·Drive, A53·A54)."""
+
+import uuid
+from collections.abc import AsyncIterator, Iterable
+from dataclasses import dataclass
+from datetime import UTC, date, datetime, timedelta
+from typing import Any
+
+import pytest
+
+from app.contexts.academy.domain.entities import Student
+from app.contexts.academy.domain.enums import StudentStatus
+from app.contexts.educator.application.mentor_queries import MentorQueries
+from app.contexts.educator.domain.profiles import Mentor
+from app.contexts.identity.domain.entities import User
+from app.contexts.mentoring.application.artifact_service import ArtifactService
+from app.contexts.mentoring.application.session_service import MentoringSessionQueries
+from app.contexts.mentoring.domain.enums import MentoringArtifactStatus, MentoringArtifactType
+from app.contexts.mentoring.domain.request import MentoringRequest
+from app.contexts.mentoring.domain.session import MentoringSession
+from app.core.clock import FixedClock
+from app.integrations.google.drive import DriveFile, DriveStream, DriveUnavailableError
+from app.integrations.google.meet_events import MeetFile
+from app.shared.errors import NotFoundError
+from app.shared.ids import new_id
+from tests.factories.identity import make_user
+from tests.fakes.educator import InMemoryMentorRepository
+from tests.fakes.mentoring import (
+    InMemoryArtifactRepository,
+    InMemoryRequestRepository,
+    InMemorySessionRepository,
+    InMemoryTeamRepository,
+)
+
+pytestmark = pytest.mark.unit
+
+START = datetime(2026, 11, 19, 15, 30, tzinfo=UTC)  # 11-20 00:30 KST → 2026-11 폴더
+
+
+@dataclass
+class Label:
+    bootcamp_name: str
+    cohort_number: int
+
+
+class Cohorts:
+    def __init__(self, cohort_id: uuid.UUID) -> None:
+        self.cohort_id = cohort_id
+
+    async def cohort_labels(self, cohort_ids: Iterable[uuid.UUID]) -> dict[uuid.UUID, Any]:
+        return {self.cohort_id: Label("BX 디자이너", 4)}
+
+
+class Students:
+    def __init__(self, *students: Student) -> None:
+        self.items = {s.id: s for s in students}
+
+    async def get_many(self, ids: list[uuid.UUID]) -> dict[uuid.UUID, Student]:
+        return {i: self.items[i] for i in ids if i in self.items}
+
+    async def of_user(self, user_id: uuid.UUID) -> list[Student]:
+        return [s for s in self.items.values() if s.user_id == user_id]
+
+
+class Users:
+    def __init__(self, *users: User) -> None:
+        self.items = {u.id: u for u in users}
+
+    async def get_many(self, ids: list[uuid.UUID]) -> dict[uuid.UUID, User]:
+        return {i: self.items[i] for i in ids if i in self.items}
+
+
+class FakeSource:
+    def __init__(self) -> None:
+        self.files: list[MeetFile] = []
+
+    async def session_files(self, space_name: str) -> list[MeetFile]:
+        return list(self.files)
+
+
+class FakeArchive:
+    def __init__(self) -> None:
+        self.folders: list[list[str]] = []
+        self.moved: list[tuple[str, str]] = []
+        self.fail = False
+        self.streamed: list[tuple[str, bool, str | None]] = []
+
+    async def ensure_folder(self, path: list[str]) -> str:
+        if self.fail:
+            raise DriveUnavailableError()
+        self.folders.append(path)
+        return "folder-1"
+
+    async def move(self, file_id: str, folder_id: str) -> None:
+        self.moved.append((file_id, folder_id))
+
+    async def describe(self, file_id: str) -> DriveFile:
+        return DriveFile(name=f"{file_id}.bin", mime_type="video/mp4", size=10)
+
+    async def stream(
+        self, file_id: str, *, export_pdf: bool, range_header: str | None
+    ) -> DriveStream:
+        self.streamed.append((file_id, export_pdf, range_header))
+
+        async def chunks() -> AsyncIterator[bytes]:
+            yield b"x"
+
+        return DriveStream(200, {}, chunks())
+
+
+class Harness:
+    def __init__(self) -> None:
+        self.cohort_id = new_id()
+        self.student = Student(
+            cohort_id=self.cohort_id,
+            name="가수강",
+            hrd_net_status=StudentStatus.TRAINING,
+            enrolled_at=date(2026, 11, 1),
+            user_id=new_id(),
+        )
+        mentor_user = make_user(name="김멘토")
+        self.mentor = Mentor(user_id=mentor_user.id)
+        self.requests = InMemoryRequestRepository()
+        self.sessions = InMemorySessionRepository(self.requests)
+        self.artifacts = InMemoryArtifactRepository()
+        self.source = FakeSource()
+        self.archive = FakeArchive()
+        self.clock = FixedClock(START + timedelta(hours=2))
+        students = Students(self.student)
+        mentors = MentorQueries(InMemoryMentorRepository(self.mentor))
+        self.service = ArtifactService(
+            sessions=self.sessions,
+            requests=self.requests,
+            artifacts=self.artifacts,
+            access=MentoringSessionQueries(
+                sessions=self.sessions,
+                requests=self.requests,
+                teams=InMemoryTeamRepository(),
+                students=students,
+                mentors=mentors,
+            ),
+            source=self.source,
+            archive=self.archive,
+            students=students,
+            cohorts=Cohorts(self.cohort_id),
+            mentors=mentors,
+            users=Users(mentor_user),
+            clock=self.clock,
+        )
+
+    async def session(self, hours: int = 0) -> MentoringSession:
+        start = START + timedelta(hours=hours)
+        request = MentoringRequest(
+            requester_id=self.student.id,
+            mentor_id=self.mentor.id,
+            topic="주제",
+            detail="내용",
+            desired_times=[start],
+            duration=60,
+        )
+        await self.requests.add(request)
+        session = MentoringSession(
+            mentor_id=self.mentor.id,
+            request_id=request.id,
+            starts_at=start,
+            ends_at=start + timedelta(hours=1),
+            title="제목",
+            topic="주제",
+        )
+        session.attach_space("spaces/a", "https://meet.google.com/a")
+        await self.sessions.add(session)
+        return session
+
+
+@pytest.fixture
+def h() -> Harness:
+    return Harness()
+
+
+async def test_collect_archives_into_folder(h: Harness) -> None:
+    session = await h.session()
+    h.source.files = [
+        MeetFile("VIDEO", "v1"),
+        MeetFile("TRANSCRIPT", "t1"),
+        MeetFile("SUMMARY", "n1"),
+    ]
+    assert await h.service.collect(session.id) == 3
+    assert await h.service.collect(session.id) == 0  # 중복 수집 없음
+    assert h.archive.folders[0] == ["BX 디자이너", "4기", "김멘토", "2026-11"]  # KST 시작일
+    assert sorted(f for f, _ in h.archive.moved) == ["n1", "t1", "v1"]
+    stored = list(h.artifacts.items.values())
+    assert {a.status for a in stored} == {MentoringArtifactStatus.COMPLETED}
+    assert {a.artifact_type for a in stored} == set(MentoringArtifactType)
+
+
+async def test_failures_retry_then_fail_after_7_days(h: Harness) -> None:
+    session = await h.session()
+    h.source.files = [MeetFile("VIDEO", "v1")]
+    h.archive.fail = True
+    assert await h.service.collect(session.id) == 1
+    (artifact,) = h.artifacts.items.values()
+    assert artifact.status is MentoringArtifactStatus.PENDING  # 다음 주기에 다시
+    h.archive.fail = False
+    assert await h.service.sync() == (0, 1)
+    assert next(iter(h.artifacts.items.values())).status is MentoringArtifactStatus.COMPLETED
+
+    other = await h.session(hours=3)
+    h.source.files = [MeetFile("VIDEO", "v2")]
+    h.archive.fail = True
+    await h.service.collect(other.id)
+    h.clock.set(other.ends_at + timedelta(days=7, minutes=1))
+    await h.service.sync()
+    failed = [a for a in h.artifacts.items.values() if a.drive_file_id == "v2"]
+    assert failed[0].status is MentoringArtifactStatus.FAILED
+
+
+async def test_view_and_stream_permissions(h: Harness) -> None:
+    session = await h.session()
+    h.source.files = [MeetFile("VIDEO", "v1"), MeetFile("TRANSCRIPT", "t1")]
+    await h.service.collect(session.id)
+    student_user = h.student.user_id
+    assert student_user is not None
+    items = await h.service.list_for_user(student_user, session.id)
+    assert len(items) == 2
+    assert len(await h.service.list_for_user(h.mentor.user_id, session.id)) == 2
+    assert len(await h.service.list_for_cohort(h.cohort_id, session.id)) == 2
+    with pytest.raises(NotFoundError):
+        await h.service.list_for_user(new_id(), session.id)  # 참여자가 아님
+
+    video = next(a for a in items if a.artifact_type is MentoringArtifactType.VIDEO)
+    doc = next(a for a in items if a.is_document)
+    await h.service.open_for_user(student_user, session.id, video.id, "bytes=0-9")
+    await h.service.open_for_cohort(h.cohort_id, session.id, doc.id, None)
+    assert h.archive.streamed == [("v1", False, "bytes=0-9"), ("t1", True, None)]
+    with pytest.raises(NotFoundError):
+        await h.service.open_for_user(student_user, session.id, new_id(), None)
+
+
+async def test_disabled_and_canceled(h: Harness) -> None:
+    session = await h.session()
+    h.sessions.items[session.id].status = h.sessions.items[session.id].status.CANCELED
+    h.source.files = [MeetFile("VIDEO", "v1")]
+    assert await h.service.collect(session.id) == 0
+    h.service._source = None
+    assert not h.service.enabled
+    assert await h.service.sync() == (0, 0)

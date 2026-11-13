@@ -216,6 +216,12 @@ class MentoringSessionRepository(Protocol):
         """시작 전(after 이후) 예정 세션 중 Meet 공간이 없는 것 (시작 순)."""
         ...
 
+    async def list_recent_with_space(
+        self, since: datetime, until: datetime
+    ) -> list[MentoringSession]:
+        """Meet 공간이 있고 since~until에 끝난(예정 종료) 취소되지 않은 세션 (녹화 보완 수집)."""
+        ...
+
     async def list_needing_close(self) -> list[MentoringSession]:
         """취소됐는데 Meet 링크가 남은 세션."""
         ...
