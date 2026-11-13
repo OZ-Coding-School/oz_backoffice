@@ -742,6 +742,12 @@ class TortoiseMentoringSessionRepository:
         row = await MentoringSessionModel.get_or_none(id=session_id)
         return self._entity(row) if row else None
 
+    async def get_many(self, session_ids: list[uuid.UUID]) -> dict[uuid.UUID, MentoringSession]:
+        if not session_ids:
+            return {}
+        rows = await MentoringSessionModel.filter(id__in=session_ids)
+        return {row.id: self._entity(row) for row in rows}
+
     async def save(self, session: MentoringSession) -> None:
         values = {name: getattr(session, name) for name in _SESSION_FIELDS}
         await MentoringSessionModel.filter(id=session.id).update(**values)

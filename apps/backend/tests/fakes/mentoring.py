@@ -383,6 +383,9 @@ class InMemorySessionRepository:
         found = self.items.get(session_id)
         return dataclasses.replace(found) if found else None
 
+    async def get_many(self, session_ids: list[uuid.UUID]) -> dict[uuid.UUID, MentoringSession]:
+        return {i: dataclasses.replace(self.items[i]) for i in session_ids if i in self.items}
+
     async def save(self, session: MentoringSession) -> None:
         self.items[session.id] = dataclasses.replace(session)
 

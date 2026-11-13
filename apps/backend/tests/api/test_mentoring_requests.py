@@ -654,3 +654,68 @@ async def test_artifact_list_and_stream(app: Any, client: AsyncClient, settings:
     )
     assert len((await client.get(admin_base, headers=admin)).json()) == 2
     assert (await client.get(admin_base, headers=student_h)).status_code == 403
+
+
+async def test_settlement_aggregate_detail_close(
+    app: Any, client: AsyncClient, settings: Settings
+) -> None:
+    from app.core.clock import FixedClock
+
+    ctx = await _setup(client, settings)
+    student_h, mentor_h, admin = ctx["student_h"], ctx["mentor_h"], ctx["admin"]
+    at = ctx["at"]
+    ids = []
+    for offset in (0, 3):
+        rid = (
+            await client.post(
+                URL,
+                json=_body(ctx, desired_times=[(at + timedelta(hours=offset)).isoformat()]),
+                headers=student_h,
+            )
+        ).json()["id"]
+        session = (
+            await client.post(
+                f"{URL}/{rid}/approve",
+                json={"starts_at": (at + timedelta(hours=offset)).isoformat()},
+                headers=mentor_h,
+            )
+        ).json()["session"]
+        ids.append(session["id"])
+    app.state.clock = FixedClock(at + timedelta(hours=5))
+    await client.post(
+        f"/api/v1/mentoring/sessions/{ids[0]}/record",
+        json={"status": "COMPLETED", "duration": 90, "summary": "요약"},
+        headers=mentor_h,
+    )  # 두 번째 세션은 미제출
+
+    base = f"/api/v1/admin/cohorts/{ctx['cohort'].id}/mentoring/settlements"
+    month = at.strftime("%Y-%m")
+    bad = await client.post(f"{base}/aggregate", json={"month": "2026-13"}, headers=admin)
+    assert bad.status_code == 422
+    assert (
+        await client.post(f"{base}/aggregate", json={"month": month}, headers=student_h)
+    ).status_code == 403
+    agg = (await client.post(f"{base}/aggregate", json={"month": month}, headers=admin)).json()
+    (summary,) = agg["settlements"]
+    assert (summary["session_count"], summary["total_minutes"], summary["total_amount"]) == (
+        1,
+        90,
+        45000,  # 실제 진행 기준, 시급 30000 × 90분
+    )
+    assert summary["mentor_name"] == "김멘토"
+    listed = (await client.get(base, params={"month": month}, headers=admin)).json()
+    assert [s["id"] for s in listed] == [summary["id"]]
+    detail = (await client.get(f"{base}/{summary['id']}", headers=admin)).json()
+    assert [(i["session_id"], i["amount"]) for i in detail["items"]] == [(ids[0], 45000)]
+
+    preview = (await client.post(f"{base}/{summary['id']}/close", json={}, headers=admin)).json()
+    assert (preview["applied"], [u["session_id"] for u in preview["unrecorded"]]) == (
+        False,
+        [ids[1]],
+    )
+    closed = (
+        await client.post(f"{base}/{summary['id']}/close", json={"confirm": True}, headers=admin)
+    ).json()
+    assert (closed["applied"], closed["settlement"]["status"]) == (True, "CLOSED")
+    again = await client.post(f"{base}/aggregate", json={"month": month}, headers=admin)
+    assert again.json()["closed"] == [summary["id"]]
