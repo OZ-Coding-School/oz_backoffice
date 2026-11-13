@@ -26,6 +26,10 @@ from app.contexts.mentoring.presentation.balance_router import (
     admin_router as balance_admin_router,
 )
 from app.contexts.mentoring.presentation.balance_router import me_router as balance_me_router
+from app.contexts.mentoring.presentation.record_router import (
+    admin_router as record_admin_router,
+)
+from app.contexts.mentoring.presentation.record_router import router as record_router
 from app.contexts.mentoring.presentation.request_router import (
     admin_router as request_admin_router,
 )
@@ -82,6 +86,8 @@ router.include_router(balance_me_router)
 router.include_router(request_router)
 router.include_router(request_me_router)
 router.include_router(request_admin_router)
+router.include_router(record_router)  # 세션 라우터의 /{session_id}보다 먼저
+router.include_router(record_admin_router)
 router.include_router(session_router)
 router.include_router(session_me_router)
 router.include_router(session_admin_router)
