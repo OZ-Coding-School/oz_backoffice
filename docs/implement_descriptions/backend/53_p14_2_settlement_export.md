@@ -1,6 +1,6 @@
 # 53. P14-2 정산 CSV 내보내기·멘토 정산 조회
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-13 병합)
 - 관련 PR: #58
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P14 (P14-2)
 - 이전 기록: [52. P14-1 정산 집계·조회·마감](52_p14_1_settlements.md)
@@ -43,6 +43,8 @@ P14의 두 번째 PR이다(A55). 운영진의 정산 CSV 내보내기와 멘토 
 ## 검증
 - 단위: 멘토 본인 조회(집계 중 숨김 → 마감 후 목록·명세, 프로필 없음 404)
 - API: 기수·월 CSV(BOM·헤더 선택 열·멘토·신청자·금액·쉼표 요약·정산 상태), 잘못된 열 422, 정산서별 CSV 기본 14열, 수강생 403, 멘토 조회 마감 전 빈 목록 → 마감 후 목록·명세, 멘토가 아니면 404
+- GitHub Actions (PR #58): backend 잡 통과
+- 사용자가 작업 완료를 확인했다(2026-11-13)
 - 전체 798 passed (compose `api` 컨테이너, ruff·ruff format·mypy·mypy tests·lint-imports 통과)
 - 코드 커밋을 worktree에서 검사했다(798 passed)
 - 스키마 변경 없음
