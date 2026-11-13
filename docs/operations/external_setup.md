@@ -87,6 +87,7 @@ https://www.googleapis.com/auth/gmail.send,https://www.googleapis.com/auth/meeti
 - 백엔드는 Drive API를 서비스 계정 자신의 자격 증명으로(위임 없이) 호출한다. 범위는 `drive.readonly`.
 
 ### 2-3. 함께 확인할 것
+- **자동 녹화 조건(2026-11-13 확인):** 자동 녹화·전사·메모는 주최자나 공동 주최자가 웹으로 들어와야 시작된다. 백엔드가 공간을 만들 때 주최자 관리를 켜고 담당 멘토의 가입 이메일을 공동 주최자로 등록한다(A52). 멘토는 그 이메일의 Google 계정으로 로그인해 들어와야 한다.
 - Meet 공간 주최 계정은 **`GMAIL_SENDER`** 다(A46). 녹화 파일은 이 계정 Drive의 `Google Meet` 폴더 아래 회의별 하위 폴더에 쌓인다(Google 도움말 기준, 위치는 바꿀 수 없음). 다른 저장소로 옮길지는 P13에서 정한다.
 - 그 계정의 **Workspace 버전이 Meet 녹화·전사를 지원**하는지 확인한다(Business Standard 이상 등). 관리 콘솔 → **앱 → Google Workspace → Google Meet → Meet 동영상 설정**에서 녹화가 허용돼 있어야 한다.
 - 자동 녹화·전사·스마트 메모(공간 설정으로 회의 시작 시 생성, A46)를 해당 버전에서 지원하는지 P12 전에 확인한다.

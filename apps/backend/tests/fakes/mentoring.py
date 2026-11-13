@@ -591,8 +591,10 @@ class FakeMeetClient:
     def __init__(self) -> None:
         self.created: list[str] = []
         self.restricted: list[str] = []
+        self.cohosts: list[tuple[str, str]] = []
         self.fail_create = 0  # 남은 실패 횟수
         self.fail_restrict = False
+        self.fail_cohost = False
 
     async def create_space(self) -> "MeetSpace":
         from app.integrations.google.meet import MeetSpace, MeetUnavailableError
@@ -603,6 +605,13 @@ class FakeMeetClient:
         name = f"spaces/s{len(self.created) + 1}"
         self.created.append(name)
         return MeetSpace(name=name, meeting_uri=f"https://meet.google.com/{name[7:]}")
+
+    async def add_cohost(self, space_name: str, email: str) -> None:
+        from app.integrations.google.meet import MeetUnavailableError
+
+        if self.fail_cohost:
+            raise MeetUnavailableError()
+        self.cohosts.append((space_name, email))
 
     async def restrict_space(self, space_name: str) -> None:
         from app.integrations.google.meet import MeetUnavailableError

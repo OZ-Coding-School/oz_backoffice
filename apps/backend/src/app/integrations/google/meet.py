@@ -1,7 +1,9 @@
 """Google Meet REST API 어댑터 (decisions A8·A46·A47·A48).
 
 서비스 계정이 도메인 전체 위임으로 주최 계정(`GMAIL_SENDER`)을 대신해 공간을 만든다.
-- 생성: 링크가 있으면 바로 입장(OPEN), 녹화·전사·스마트 메모 자동 생성(라이선스가 지원하는 것만).
+- 생성: 링크가 있으면 바로 입장(OPEN), 녹화·전사·스마트 메모 자동 생성(라이선스가 지원하는 것만),
+  주최자 관리 켜기(공동 주최자 역할이 적용되게, 참가자 제한은 없음, A52).
+- 공동 주최자: 멘토 이메일을 COHOST로 등록한다. 자동 녹화는 주최자·공동 주최자가 들어와야 시작된다.
 - 막기: 취소된 세션의 공간을 입장 제한(RESTRICTED)으로 바꾸고 진행 중인 회의를 끝낸다.
 공식 라이브러리(`google-apps-meet`)의 비동기 클라이언트를 쓴다.
 실패는 `MeetUnavailableError`(503)로 바꾼다.
@@ -40,14 +42,23 @@ class SpacesApi(Protocol):
     async def create_space(self, *, request: Any) -> Any: ...
     async def update_space(self, *, request: Any) -> Any: ...
     async def end_active_conference(self, *, request: Any) -> Any: ...
+    async def create_member(self, *, request: Any) -> Any: ...
 
 
 def _new_space_config() -> meet.SpaceConfig:
     auto = meet.SpaceConfig.ArtifactConfig
     on = meet.SpaceConfig.ArtifactConfig.AutoGenerationType.ON
+    free = meet.SpaceConfig.ModerationRestrictions.RestrictionType.NO_RESTRICTION
     return meet.SpaceConfig(
         access_type=meet.SpaceConfig.AccessType.OPEN,
         entry_point_access=meet.SpaceConfig.EntryPointAccess.ALL,
+        moderation=meet.SpaceConfig.Moderation.ON,
+        moderation_restrictions=meet.SpaceConfig.ModerationRestrictions(
+            chat_restriction=free,
+            reaction_restriction=free,
+            present_restriction=free,
+            default_join_as_viewer_type=meet.SpaceConfig.ModerationRestrictions.DefaultJoinAsViewerType.OFF,
+        ),
         artifact_config=auto(
             recording_config=auto.RecordingConfig(auto_recording_generation=on),
             transcription_config=auto.TranscriptionConfig(auto_transcription_generation=on),
@@ -75,6 +86,20 @@ class GoogleMeetClient:
             logger.warning("Meet 공간 생성 실패: %s", type(exc).__name__)
             raise MeetUnavailableError() from exc
         return MeetSpace(name=space.name, meeting_uri=space.meeting_uri)
+
+    async def add_cohost(self, space_name: str, email: str) -> None:
+        """공동 주최자로 등록한다. 이미 등록돼 있으면 무시."""
+        request = meet.CreateMemberRequest(
+            parent=space_name,
+            member=meet.Member(email=email, role=meet.Member.Role.COHOST),
+        )
+        try:
+            await self._api.create_member(request=request)
+        except google_exceptions.AlreadyExists:
+            return
+        except google_exceptions.GoogleAPICallError as exc:
+            logger.warning("Meet 공동 주최자 등록 실패(%s): %s", space_name, type(exc).__name__)
+            raise MeetUnavailableError() from exc
 
     async def restrict_space(self, space_name: str) -> None:
         """입장 제한으로 바꾸고 진행 중인 회의가 있으면 끝낸다 (없으면 무시)."""
