@@ -116,3 +116,39 @@ async def test_request_round_trip_queries_and_constraints() -> None:
     )
     with pytest.raises(IntegrityError):  # 원장 request_id → 신청 FK
         await TortoiseBalanceTransactionRepository().add_many([hold])
+
+
+async def test_overtime_ledger_type_is_allowed_once_per_request() -> None:
+    cohort = await create_cohort()
+    student = make_student(cohort_id=cohort.id)
+    await TortoiseStudentRepository().add(student)
+    mentor = await create_mentor()
+    request = MentoringRequest(
+        requester_id=student.id,
+        mentor_id=mentor.id,
+        topic="리뷰",
+        detail="내용",
+        desired_times=[T],
+        duration=60,
+    )
+    await repo.add(request)
+    account = BalanceAccount(
+        student_id=student.id, valid_from=date(2026, 11, 1), valid_until=date(2027, 4, 30)
+    )
+    await TortoiseBalanceAccountRepository().add(account)
+    ledger = TortoiseBalanceTransactionRepository()
+
+    def overtime() -> BalanceTransaction:
+        return BalanceTransaction(
+            account_id=account.id,
+            type=MentoringBalanceTransactionType.OVERTIME,
+            amount=30,
+            after_remaining=0,
+            after_held=0,
+            reason="초과 진행",
+            request_id=request.id,
+        )
+
+    await ledger.add_many([overtime()])
+    with pytest.raises(IntegrityError):  # 신청당 하나
+        await ledger.add_many([overtime()])

@@ -674,10 +674,10 @@ Table mentoring_balance_transactions {
 
   indexes {
     (account_id, created_at)
-    (request_id, type) [unique, note: "request_id IS NOT NULL 부분 유니크 — 같은 신청의 중복 HOLD/USING/RELEASE/REFUND 방지"]
+    (request_id, type) [unique, note: "request_id IS NOT NULL 부분 유니크 — 같은 신청의 중복 HOLD/USING/RELEASE/REFUND/OVERTIME 방지 (기록은 한 번만 제출, A53)"]
   }
   checks {
-    `type IN ('STAFF_GRANT', 'STAFF_ADJUST', 'HOLD', 'RELEASE', 'USING', 'REFUND')` [name: "check_transaction_type"]
+    `type IN ('STAFF_GRANT', 'STAFF_ADJUST', 'HOLD', 'RELEASE', 'USING', 'REFUND', 'OVERTIME')` [name: "check_transaction_type"]
     `type = 'STAFF_ADJUST' OR amount > 0` [name: "check_transaction_amount"]
     `(type IN ('STAFF_GRANT', 'STAFF_ADJUST')) = (request_id IS NULL)` [name: "check_transaction_request"]
   }
@@ -811,7 +811,7 @@ Table mentoring_artifacts {
   }
 }
 Table mentoring_session_notes {
-  note: "멘토 전용 내부 메모, 세션당 1개 (수강생 응답 스키마에서 제외, 작성/수정자는 audit_logs로 추적)"
+  note: "멘토 전용 내부 메모, 세션당 1개 (마이그레이션 19, M22·A53). 담당 멘토만 작성, 멘토·운영진만 조회(수강생 응답 스키마에서 제외), 작성/수정자는 audit_logs로 추적. check: char_length(body) BETWEEN 1 AND 5000 (check_session_note_body)"
 
   id uuid [pk, note: "default=uuid7 사용"]
   session_id uuid [not null, unique, ref: - mentoring_sessions.id]
@@ -1130,6 +1130,7 @@ Enum MentoringBalanceTransactionType {
   RELEASE [note: "승인 전 반려/취소로 보류 해제"]
   USING [note: "멘토 승인 + 세션 생성으로 보류분 사용 확정"]
   REFUND [note: "승인 이후 취소로 인한 환불"]
+  OVERTIME [note: "신청보다 길게 진행한 초과분 (A53)"]
 }
 
 Enum MentoringSessionStatus {

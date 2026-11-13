@@ -18,6 +18,7 @@ from app.shared.errors import ConflictError
 
 if TYPE_CHECKING:
     from app.contexts.audit.application.recorder import AuditRecorder
+    from app.contexts.mentoring.domain.note import MentoringSessionNote
     from app.core.clock import Clock
     from app.integrations.google.meet import MeetSpace
 
@@ -501,6 +502,23 @@ class InMemorySessionRepository:
     ) -> tuple[list[MentoringSession], int]:
         return self._page([s for s in self.items.values() if s.mentor_id == mentor_id], query)
 
+    async def list_unrecorded(
+        self, cohort_id: uuid.UUID, *, before: datetime, limit: int, offset: int
+    ) -> tuple[list[MentoringSession], int]:
+        found = sorted(
+            (
+                s
+                for s in self.items.values()
+                if self.cohort_of_student.get(self._requests.items[s.request_id].requester_id)
+                == cohort_id
+                and s.status
+                in (MentoringSessionStatus.SCHEDULED, MentoringSessionStatus.IN_PROGRESS)
+                and s.starts_at < before
+            ),
+            key=lambda s: (s.starts_at, s.id),
+        )
+        return [dataclasses.replace(s) for s in found[offset : offset + limit]], len(found)
+
     async def list_by_cohort(
         self, cohort_id: uuid.UUID, *, mentor_id: uuid.UUID | None, query: SessionQuery
     ) -> tuple[list[MentoringSession], int]:
@@ -619,3 +637,18 @@ class FakeMeetClient:
         if self.fail_restrict:
             raise MeetUnavailableError()
         self.restricted.append(space_name)
+
+
+class InMemoryNoteRepository:
+    def __init__(self) -> None:
+        self.items: dict[uuid.UUID, MentoringSessionNote] = {}
+
+    async def get_by_session(self, session_id: uuid.UUID) -> "MentoringSessionNote | None":
+        found = next((n for n in self.items.values() if n.session_id == session_id), None)
+        return dataclasses.replace(found) if found else None
+
+    async def add(self, note: "MentoringSessionNote") -> None:
+        self.items[note.id] = dataclasses.replace(note)
+
+    async def save(self, note: "MentoringSessionNote") -> None:
+        self.items[note.id] = dataclasses.replace(note)

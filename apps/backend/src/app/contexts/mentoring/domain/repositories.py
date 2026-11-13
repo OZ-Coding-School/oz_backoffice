@@ -6,6 +6,7 @@ from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.availability import Interval
 from app.contexts.mentoring.domain.balance import BalanceAccount, BalanceTransaction
 from app.contexts.mentoring.domain.enums import MentoringRequestStatus
+from app.contexts.mentoring.domain.note import MentoringSessionNote
 from app.contexts.mentoring.domain.request import MentoringRequest
 from app.contexts.mentoring.domain.schedule import MentorUnavailablePeriod
 from app.contexts.mentoring.domain.session import MentoringSession, SessionQuery
@@ -267,3 +268,14 @@ class MentoringSessionRepository(Protocol):
     async def list_by_cohort(
         self, cohort_id: uuid.UUID, *, mentor_id: uuid.UUID | None, query: SessionQuery
     ) -> tuple[list[MentoringSession], int]: ...
+    async def list_unrecorded(
+        self, cohort_id: uuid.UUID, *, before: datetime, limit: int, offset: int
+    ) -> tuple[list[MentoringSession], int]:
+        """예정 시작이 before 이전인데 기록이 없는 세션(예정·진행 중), 시작 오래된 순."""
+        ...
+
+
+class MentoringSessionNoteRepository(Protocol):
+    async def get_by_session(self, session_id: uuid.UUID) -> MentoringSessionNote | None: ...
+    async def add(self, note: MentoringSessionNote) -> None: ...
+    async def save(self, note: MentoringSessionNote) -> None: ...

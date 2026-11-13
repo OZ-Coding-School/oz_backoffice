@@ -9,6 +9,7 @@ from app.contexts.mentoring.infrastructure.models.balance import (
     MentoringBalanceAccountModel,
     MentoringBalanceTransactionModel,
 )
+from app.contexts.mentoring.infrastructure.models.note import MentoringSessionNoteModel
 from app.contexts.mentoring.infrastructure.models.request import MentoringRequestModel
 from app.contexts.mentoring.infrastructure.models.schedule import MentorUnavailablePeriodModel
 from app.contexts.mentoring.infrastructure.models.session import MentoringSessionModel
@@ -32,6 +33,7 @@ __all__ = [
     "MentoringHolidayModel",
     "MentoringRequestModel",
     "MentoringSessionModel",
+    "MentoringSessionNoteModel",
     "MentoringTeamMemberModel",
     "MentoringTeamModel",
 ]

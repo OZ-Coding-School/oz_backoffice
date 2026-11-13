@@ -11,6 +11,7 @@ from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.availability import Interval
 from app.contexts.mentoring.domain.balance import BalanceAccount, BalanceTransaction
 from app.contexts.mentoring.domain.enums import MentoringRequestStatus, MentoringSessionStatus
+from app.contexts.mentoring.domain.note import MentoringSessionNote
 from app.contexts.mentoring.domain.request import MentoringRequest
 from app.contexts.mentoring.domain.schedule import (
     MentorUnavailablePeriod,
@@ -34,6 +35,7 @@ from app.contexts.mentoring.infrastructure.models import (
     MentoringHolidayModel,
     MentoringRequestModel,
     MentoringSessionModel,
+    MentoringSessionNoteModel,
     MentoringTeamMemberModel,
     MentoringTeamModel,
     MentorUnavailablePeriodModel,
@@ -861,3 +863,41 @@ class TortoiseMentoringSessionRepository:
         if mentor_id is not None:
             base = base.filter(mentor_id=mentor_id)
         return await self._page(base, query)
+
+    async def list_unrecorded(
+        self, cohort_id: uuid.UUID, *, before: datetime, limit: int, offset: int
+    ) -> tuple[list[MentoringSession], int]:
+        query = MentoringSessionModel.filter(
+            request__requester__cohort_id=cohort_id,
+            status__in=[MentoringSessionStatus.SCHEDULED, MentoringSessionStatus.IN_PROGRESS],
+            starts_at__lt=before,
+        )
+        total = await query.count()
+        rows = await query.order_by("starts_at", "id").offset(offset).limit(limit)
+        return [self._entity(row) for row in rows], total
+
+
+class TortoiseMentoringSessionNoteRepository:
+    @staticmethod
+    def _entity(row: MentoringSessionNoteModel) -> MentoringSessionNote:
+        return MentoringSessionNote(
+            id=row.id,
+            session_id=row.session_id,  # type: ignore[attr-defined]  # FK 컬럼 속성
+            body=row.body,
+            created_at=row.created_at,
+            updated_at=row.updated_at,
+        )
+
+    async def get_by_session(self, session_id: uuid.UUID) -> MentoringSessionNote | None:
+        row = await MentoringSessionNoteModel.get_or_none(session_id=session_id)
+        return self._entity(row) if row else None
+
+    async def add(self, note: MentoringSessionNote) -> None:
+        await MentoringSessionNoteModel.create(
+            id=note.id, session_id=note.session_id, body=note.body
+        )
+
+    async def save(self, note: MentoringSessionNote) -> None:
+        row = await MentoringSessionNoteModel.get(id=note.id)
+        row.body = note.body
+        await row.save()
