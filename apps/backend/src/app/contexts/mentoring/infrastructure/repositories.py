@@ -739,6 +739,10 @@ class TortoiseMentoringSessionRepository:
         row = await MentoringSessionModel.select_for_update().get_or_none(id=session_id)
         return self._entity(row) if row else None
 
+    async def get_by_space(self, space_name: str) -> MentoringSession | None:
+        row = await MentoringSessionModel.get_or_none(google_space_name=space_name)
+        return self._entity(row) if row else None
+
     async def list_needing_space(self, after: datetime) -> list[MentoringSession]:
         rows = await MentoringSessionModel.filter(
             status=MentoringSessionStatus.SCHEDULED,

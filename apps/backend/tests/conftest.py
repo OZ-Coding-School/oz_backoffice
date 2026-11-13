@@ -9,6 +9,7 @@ DB는 모든 테스트에 autouse로 준비한다(세션당 1회 생성·마이�
 테스트 DB 주소는 TEST_DATABASE_URL(compose·CI가 설정), 없으면 로컬 compose의 postgres를 쓴다.
 """
 
+import asyncio
 import importlib.util
 import os
 import warnings
@@ -153,6 +154,21 @@ async def _drop_test_database() -> None:
     await _admin_execute('DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
 
 
+async def _drop_test_database_at_exit() -> None:
+    """세션 끝 정리. CI의 PostgreSQL이 DROP 도중 연결을 끊는 일이 가끔 있어(테스트 결과와 무관)
+    한 번 다시 시도하고, 그래도 연결 오류면 경고만 남긴다. 다음 세션은 시작할 때 DB를 지우고
+    새로 만들므로 남은 DB가 결과에 섞이지 않는다."""
+    for attempt in (1, 2):
+        try:
+            await _drop_test_database()
+            return
+        except (asyncpg.InterfaceError, asyncpg.PostgresConnectionError, OSError) as exc:
+            if attempt == 2:
+                warnings.warn(f"테스트 DB 정리 실패(다음 세션이 지움): {exc!r}", stacklevel=1)
+                return
+            await asyncio.sleep(1)
+
+
 async def _create_test_database() -> None:
     await _admin_execute('CREATE DATABASE "{name}"')
 
@@ -207,7 +223,7 @@ async def tortoise_db() -> AsyncIterator[TortoiseContext]:
             await ctx.init(config=build_tortoise_config(TEST_DATABASE_URL, with_aerich=False))
             await _apply_migrations()
             yield ctx
-    await _drop_test_database()
+    await _drop_test_database_at_exit()
 
 
 @pytest.fixture(autouse=True)

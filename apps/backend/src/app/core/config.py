@@ -92,6 +92,11 @@ class Settings(BaseSettings):
     # Google Meet (decisions A46·A48). disabled면 공간을 만들지 않는다(주기 작업이 설정 후 채운다).
     # google이면 서비스 계정이 위임(meetings.space.created)으로 GMAIL_SENDER를 대신해 공간을 만든다
     meet_driver: Literal["disabled", "google"] = "disabled"
+    # Meet 이벤트 (A49): Workspace Events가 발행할 토픽, 워커가 pull할 구독 (전체 경로)
+    meet_pubsub_topic: str = ""  # projects/<PROJECT_ID>/topics/<TOPIC>
+    meet_pubsub_subscription: str = ""  # projects/<PROJECT_ID>/subscriptions/<SUBSCRIPTION>
+    # 주최 계정(GMAIL_SENDER) Google 사용자 ID (관리 콘솔 사용자 주소의 숫자, A51). 구독 대상
+    meet_organizer_user_id: str = ""
 
     # 업무상 날짜 경계 기준 타임존
     business_timezone: str = "Asia/Seoul"

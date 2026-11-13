@@ -142,3 +142,32 @@ async def test_create_space_retries_then_gives_up() -> None:
     broken = Flaky(failures=5)
     assert not await create_space_with_retry(uuid.uuid4(), service=broken, delays=(0, 0))  # type: ignore[arg-type]
     assert broken.calls == 3  # 이후는 주기 작업(sync)이 다시 만든다
+
+
+async def test_meet_event_tasks() -> None:
+    from app.integrations.google.meet import MeetUnavailableError
+    from app.integrations.google.meet_events import CONFERENCE_STARTED, MeetEvent
+    from app.workers.tasks.mentoring import (
+        handle_event_with_retry,
+        handle_meet_event,
+        subscribe_meet_events,
+    )
+
+    assert handle_meet_event.task_name == "mentoring.meet.events.handle"
+    assert subscribe_meet_events.labels["schedule"] == [{"cron": "0 */6 * * *"}]
+    event = MeetEvent("e1", CONFERENCE_STARTED, "conferenceRecords/c1")
+    assert not await handle_event_with_retry(event)  # 기본 설정(disabled)이면 처리하지 않는다
+
+    class Flaky:
+        calls = 0
+
+        async def handle(self, _: MeetEvent) -> bool:
+            self.calls += 1
+            if self.calls < 3:
+                raise MeetUnavailableError()
+            return True
+
+    flaky = Flaky()
+    assert await handle_event_with_retry(event, service=flaky, delays=(0, 0))  # type: ignore[arg-type]  # handle만 쓴다
+    assert flaky.calls == 3
+    await subscribe_meet_events.original_func()  # 설정이 없으면 아무것도 하지 않는다

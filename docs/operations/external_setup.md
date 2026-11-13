@@ -6,7 +6,7 @@
 | # | 준비물 | 필요한 단계 | 담당 | 상태 (2026-11-12) |
 | --- | --- | --- | --- | --- |
 | 1 | Google 서비스 계정 + 도메인 전체 위임(DWD) — Gmail 발송 | P7 (구현 완료, 실발송 미확인) | GCP 관리자 + Workspace 관리자 | **위임 확인(11-12)**: `gmail.send` 위임 토큰 발급 성공(1-5). 실발송(`send-test-mail`)은 미확인 |
-| 2 | DWD에 Meet 범위 추가 + 녹화 폴더 공유 | P12, P13 | Workspace 관리자 | **필요**: Meet 두 범위 미등록(11-12). 폴더 공유는 P13 전까지 |
+| 2 | DWD에 Meet 범위 추가 + 녹화 폴더 공유 | P12, P13 | Workspace 관리자 | **위임 확인(11-12)**: Meet 두 범위 위임 토큰 발급 성공. 폴더 공유는 P13 전까지 |
 | 3 | Google Cloud API 사용 설정 + Pub/Sub 토픽·구독 | P12 | GCP 관리자 | 미착수 |
 | 4 | SMS 발송 업체 계약·발신번호 등록 | P7 어댑터(별도 PR) | 사용자 | 업체 미정 (현재 console 드라이버) |
 | 5 | Google OAuth 클라이언트 (운영진 로그인) | P2 (구현 완료) | GCP 관리자 | 로컬 등록 완료, 운영 URI는 배포 때 |
@@ -114,7 +114,8 @@ gcloud pubsub subscriptions create oz-meet-events-pull \
   --message-retention-duration=7d \
   --expiration-period=never
 ```
-- 이름은 예시다. 정한 이름은 P12에서 설정 키(토픽·구독 이름)로 넣는다.
+- 이름은 예시다. `.env`에 전체 경로로 넣는다: `MEET_PUBSUB_TOPIC=projects/<PROJECT_ID>/topics/oz-meet-events`, `MEET_PUBSUB_SUBSCRIPTION=projects/<PROJECT_ID>/subscriptions/oz-meet-events-pull`, `MEET_DRIVER=google`, `MEET_ORGANIZER_USER_ID=<주최 계정 사용자 ID>`(관리 콘솔 → 디렉터리 → 사용자 → `GMAIL_SENDER` 계정 → 주소창 `admin.google.com/ac/users/<숫자>`의 숫자, A51).
+- 구독 방식은 pull 그대로다. 백엔드 worker가 이 구독을 **streaming pull**로 실시간 수신한다(A50).
 - 로컬·운영을 나누려면 토픽·구독을 환경별로 따로 만든다(예: `oz-meet-events-local`).
 
 ### 3-3. 권한
@@ -131,10 +132,19 @@ gcloud pubsub subscriptions create oz-meet-events-pull \
      --role="roles/pubsub.subscriber"
    ```
    - Pub/Sub은 위임이 아니라 **서비스 계정 자신의 IAM 권한**으로 호출한다.
-3. Workspace Events 구독 생성은 Meet 공간 소유 계정을 대신해(위임, 2번의 Meet 범위) 백엔드가 한다. 별도 콘솔 작업은 없다.
+3. Workspace Events 구독은 백엔드가 **주최 계정(`GMAIL_SENDER`) 하나를 대상으로** 만들고 6시간마다 갱신한다(위임, 2번의 Meet 범위, A49). 별도 콘솔 작업은 없다.
+
+### 3-3a. 콘솔 화면으로 만들기 (명령어 대신)
+3-2·3-3과 같은 결과를 Google Cloud 콘솔에서 만든다(프로젝트 선택 후).
+1. **Pub/Sub → 주제 → 주제 만들기**: 주제 ID `oz-meet-events`, "기본 구독 추가"는 해제 → 만들기.
+2. 만든 주제 → **권한 → 주 구성원 추가**: `meet-api-event-push@system.gserviceaccount.com`, 역할 **Pub/Sub 게시자** → 저장.
+3. **Pub/Sub → 구독 → 구독 만들기**: 구독 ID `oz-meet-events-pull`, 주제는 1번, 전송 유형 **가져오기(Pull)**, 확인 기한 60초, 메시지 보관 7일, 만료 기간 **만료되지 않음** → 만들기.
+4. 만든 구독 → **권한 → 주 구성원 추가**: 백엔드 서비스 계정 이메일(`…@<PROJECT_ID>.iam.gserviceaccount.com`), 역할 **Pub/Sub 구독자** → 저장.
+5. `.env`에 전체 경로로 넣는다(3-2 참고).
 
 ### 3-4. 확인 (P12 구현 후)
-- 테스트 공간에서 회의를 열고 닫은 뒤 `gcloud pubsub subscriptions pull oz-meet-events-pull --limit=5`로 메시지가 오는지 본다(확인 후에는 백엔드가 가져가도록 ack하지 않는다).
+- 위임 등록 후 worker 로그에 `Meet 이벤트 구독: created`와 `Meet 이벤트 실시간 수신 시작`이 보이는지 확인한다(구독 작업은 6시간마다라 처음에는 수동으로 한 번 실행한다).
+- 멘토링 세션 공간에서 회의를 열고 닫은 뒤 세션 응답의 진행 상태·실제 시각이 바뀌는지 본다. worker를 멈춘 상태라면 `gcloud pubsub subscriptions pull oz-meet-events-pull --limit=5`로 메시지가 쌓이는지 볼 수 있다(ack하지 않는다).
 
 ---
 

@@ -86,3 +86,55 @@ class MentoringSession(AggregateRoot):
     def space_closed(self) -> None:
         """공간을 막았다: 링크를 지운다(공간 이름은 기록으로 남긴다)."""
         self.google_meet_url = None
+
+    def conference_started(self, record_name: str, at: datetime | None) -> bool:
+        """Meet 회의 시작 이벤트 (A49): 처음 시작 시각, 첫 회의 기록 이름. 바뀌었으면 True."""
+        return self._conference(record_name, started=at)
+
+    def conference_ended(self, record_name: str, at: datetime | None) -> bool:
+        """Meet 회의 종료 이벤트 (A49): 마지막 종료 시각. 바뀌었으면 True."""
+        return self._conference(record_name, ended=at)
+
+    def recording_generated(self) -> bool:
+        if self.status is MentoringSessionStatus.CANCELED:
+            return False
+        if self.recording_status is RecordingStatus.FILE_GENERATED:
+            return False
+        self.recording_status = RecordingStatus.FILE_GENERATED
+        return True
+
+    def _conference(
+        self,
+        record_name: str,
+        *,
+        started: datetime | None = None,
+        ended: datetime | None = None,
+    ) -> bool:
+        """취소된 세션은 무시. 진행 상태는 IN_PROGRESS까지만(완료·노쇼는 멘토 기록, M27).
+
+        이벤트 순서가 뒤바뀌거나 중복돼도 결과가 같다(최솟값·최댓값만 남김).
+        """
+        if self.status is MentoringSessionStatus.CANCELED:
+            return False
+        before = (
+            self.status,
+            self.actual_started_at,
+            self.actual_ended_at,
+            self.google_conference_record_name,
+        )
+        if self.status is MentoringSessionStatus.SCHEDULED:
+            self.status = MentoringSessionStatus.IN_PROGRESS
+        if self.google_conference_record_name is None:
+            self.google_conference_record_name = record_name
+        if started is not None and (
+            self.actual_started_at is None or started < self.actual_started_at
+        ):
+            self.actual_started_at = started
+        if ended is not None and (self.actual_ended_at is None or ended > self.actual_ended_at):
+            self.actual_ended_at = ended
+        return before != (
+            self.status,
+            self.actual_started_at,
+            self.actual_ended_at,
+            self.google_conference_record_name,
+        )
