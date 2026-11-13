@@ -1,15 +1,21 @@
 """세션 Meet 공간 생성·막기·주기 보완 (인메모리 + 가짜 Meet, A48)."""
 
+import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from app.contexts.educator.application.mentor_queries import MentorQueries
+from app.contexts.educator.domain.profiles import Mentor
+from app.contexts.identity.domain.entities import User
 from app.contexts.mentoring.application.meet_service import MeetSpaceService
 from app.contexts.mentoring.domain.enums import MentoringSessionStatus
 from app.contexts.mentoring.domain.session import MentoringSession
 from app.core.clock import FixedClock
-from app.integrations.google.meet import MeetSpace
+from app.integrations.google.meet import MeetSpace, MeetUnavailableError
 from app.shared.ids import new_id
+from tests.factories.identity import make_user
+from tests.fakes.educator import InMemoryMentorRepository
 from tests.fakes.mentoring import (
     FakeMeetClient,
     InMemoryRequestRepository,
@@ -22,18 +28,35 @@ pytestmark = pytest.mark.unit
 NOW = datetime(2026, 11, 11, 3, tzinfo=UTC)
 
 
+class Users:
+    def __init__(self, *users: User) -> None:
+        self.items = {u.id: u for u in users}
+
+    async def get_many(self, user_ids: list[uuid.UUID]) -> dict[uuid.UUID, User]:
+        return {i: self.items[i] for i in user_ids if i in self.items}
+
+
 class Harness:
     def __init__(self) -> None:
         self.sessions = InMemorySessionRepository(InMemoryRequestRepository())
         self.meet = FakeMeetClient()
+        self.user = make_user(email="mentor@example.com")
+        self.mentor = Mentor(user_id=self.user.id)
+        self.mentors = MentorQueries(InMemoryMentorRepository(self.mentor))
+        self.users = Users(self.user)
         self.service = MeetSpaceService(
-            sessions=self.sessions, meet=self.meet, uow=FakeUnitOfWork(), clock=FixedClock(NOW)
+            sessions=self.sessions,
+            meet=self.meet,
+            mentors=self.mentors,
+            users=self.users,
+            uow=FakeUnitOfWork(),
+            clock=FixedClock(NOW),
         )
 
     async def session(self, hours: int = 24) -> MentoringSession:
         start = NOW + timedelta(hours=hours)
         session = MentoringSession(
-            mentor_id=new_id(),
+            mentor_id=self.mentor.id,
             request_id=new_id(),
             starts_at=start,
             ends_at=start + timedelta(hours=1),
@@ -60,6 +83,7 @@ async def test_ensure_space_attaches_once(h: Harness) -> None:
     assert not await h.service.ensure_space(session.id)  # 이미 있음
     assert not await h.service.ensure_space(new_id())
     assert h.meet.created == ["spaces/s1"]
+    assert h.meet.cohosts == [("spaces/s1", "mentor@example.com")]  # 담당 멘토가 공동 주최자 (A52)
 
 
 async def test_close_space_and_sync(h: Harness) -> None:
@@ -104,7 +128,31 @@ async def test_canceled_while_creating_restricts_orphan(h: Harness) -> None:
 async def test_disabled_does_nothing(h: Harness) -> None:
     await h.session()
     service = MeetSpaceService(
-        sessions=h.sessions, meet=None, uow=FakeUnitOfWork(), clock=FixedClock(NOW)
+        sessions=h.sessions,
+        meet=None,
+        mentors=h.mentors,
+        users=h.users,
+        uow=FakeUnitOfWork(),
+        clock=FixedClock(NOW),
     )
     assert not service.enabled
     assert await service.sync() == (0, 0)
+
+
+async def test_cohost_failure_restricts_space_and_retries(h: Harness) -> None:
+    session = await h.session()
+    h.meet.fail_cohost = True
+    with pytest.raises(MeetUnavailableError):
+        await h.service.ensure_space(session.id)
+    assert h.meet.restricted == ["spaces/s1"]  # 공동 주최자 없는 공간은 막는다
+    assert h.sessions.items[session.id].google_space_name is None
+    h.meet.fail_cohost = False
+    assert await h.service.sync() == (1, 0)  # 다음 주기에 새 공간으로
+    assert h.sessions.items[session.id].google_space_name == "spaces/s2"
+
+
+async def test_missing_mentor_email_still_attaches(h: Harness) -> None:
+    session = await h.session()
+    h.sessions.items[session.id].mentor_id = new_id()  # 멘토 정보 없음
+    assert await h.service.ensure_space(session.id)
+    assert h.meet.cohosts == []

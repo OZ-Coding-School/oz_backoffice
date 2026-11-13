@@ -35,6 +35,8 @@ from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.audit.infrastructure.repositories import TortoiseAuditLogRepository
 from app.contexts.educator.application.mentor_queries import MentorQueries
 from app.contexts.educator.infrastructure.repositories import TortoiseMentorRepository
+from app.contexts.identity.application.auth_service import UserQueries
+from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
 from app.contexts.mentoring.application.assignment_service import CohortMentorService
 from app.contexts.mentoring.application.availability_service import AvailableTimesService
 from app.contexts.mentoring.application.calendar import BusinessCalendar
@@ -179,6 +181,8 @@ def build_meet_service() -> MeetSpaceService:
     return MeetSpaceService(
         sessions=TortoiseMentoringSessionRepository(),
         meet=build_meet_client(get_settings()),
+        mentors=MentorQueries(TortoiseMentorRepository()),
+        users=UserQueries(TortoiseUserRepository()),
         uow=UnitOfWork(),
         clock=SystemClock(),
     )

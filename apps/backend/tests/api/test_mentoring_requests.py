@@ -412,6 +412,9 @@ async def test_unavailable_conflicts_reject_and_cancel(
 async def test_meet_link_shown_then_hidden_after_cancel(
     client: AsyncClient, settings: Settings
 ) -> None:
+    from app.contexts.educator.application.mentor_queries import MentorQueries
+    from app.contexts.educator.infrastructure.repositories import TortoiseMentorRepository
+    from app.contexts.identity.application.auth_service import UserQueries
     from app.contexts.mentoring.application.meet_service import MeetSpaceService
     from app.contexts.mentoring.infrastructure.repositories import (
         TortoiseMentoringSessionRepository,
@@ -436,10 +439,13 @@ async def test_meet_link_shown_then_hidden_after_cancel(
     service = MeetSpaceService(
         sessions=TortoiseMentoringSessionRepository(),
         meet=meet,
+        mentors=MentorQueries(TortoiseMentorRepository()),
+        users=UserQueries(TortoiseUserRepository()),
         uow=UnitOfWork(),
         clock=SystemClock(),
     )
     assert await service.sync() == (1, 0)
+    assert len(meet.cohosts) == 1  # 담당 멘토의 가입 이메일이 공동 주최자 (A52)
     shown = (
         await client.get(f"/api/v1/mentoring/sessions/{session['id']}", headers=student_h)
     ).json()
