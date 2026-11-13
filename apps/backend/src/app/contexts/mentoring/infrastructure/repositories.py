@@ -15,6 +15,7 @@ from app.contexts.mentoring.domain.enums import (
     MentoringArtifactStatus,
     MentoringRequestStatus,
     MentoringSessionStatus,
+    MentoringSettlementStatus,
 )
 from app.contexts.mentoring.domain.note import MentoringSessionNote
 from app.contexts.mentoring.domain.request import MentoringRequest
@@ -1095,12 +1096,25 @@ class TortoiseMentoringSettlementRepository:
             )
 
     async def list_by_cohort(
-        self, cohort_id: uuid.UUID, *, month: date | None
+        self, cohort_id: uuid.UUID, *, month: date | None, with_items: bool = False
     ) -> list[MentoringSettlement]:
         query = MentoringSettlementModel.filter(cohort_id=cohort_id)
         if month is not None:
             query = query.filter(settlement_month=month)
         rows = await query.order_by("-settlement_month", "id")
+        if not with_items or not rows:
+            return [self._entity(row) for row in rows]
+        items: dict[uuid.UUID, list[MentoringSettlementItemModel]] = {row.id: [] for row in rows}
+        for item in await MentoringSettlementItemModel.filter(
+            settlement_id__in=list(items)
+        ).order_by("created_at", "id"):
+            items[item.settlement_id].append(item)  # type: ignore[attr-defined]  # FK 컬럼 속성
+        return [self._entity(row, items[row.id]) for row in rows]
+
+    async def list_closed_by_mentor(self, mentor_id: uuid.UUID) -> list[MentoringSettlement]:
+        rows = await MentoringSettlementModel.filter(
+            mentor_id=mentor_id, status=MentoringSettlementStatus.CLOSED
+        ).order_by("-settlement_month", "id")
         return [self._entity(row) for row in rows]
 
     async def settled_session_ids(

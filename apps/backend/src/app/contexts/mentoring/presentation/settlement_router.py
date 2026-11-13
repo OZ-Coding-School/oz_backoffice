@@ -8,19 +8,31 @@ GET  /admin/cohorts/{cohort_id}/mentoring/settlements/{id}        상세(명세)
 POST /admin/cohorts/{cohort_id}/mentoring/settlements/{id}/close  {confirm} 마감
 """
 
+import csv
+import io
 import re
 import uuid
 from datetime import date, datetime
 from typing import Annotated, cast
+from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, Response
 from pydantic import BaseModel, Field, field_validator
 
-from app.contexts.access.presentation.dependencies import require_permission
+from app.contexts.access.presentation.dependencies import ApprovedUser, require_permission
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.identity.application.auth_service import UserQueries
 from app.contexts.identity.domain.entities import User
 from app.contexts.mentoring.application.assignment_service import MentorDirectory
+from app.contexts.mentoring.application.settlement_export import (
+    OPTIONAL_COLUMNS,
+    CohortLabels,
+    SettlementExporter,
+    header,
+)
+from app.contexts.mentoring.application.settlement_export import (
+    StudentLookup as ExportStudents,
+)
 from app.contexts.mentoring.application.settlement_service import SettlementService
 from app.contexts.mentoring.domain.enums import (
     MentoringSettlementPolicy,
@@ -35,10 +47,12 @@ from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseMentoringRequestRepository,
     TortoiseMentoringSessionRepository,
     TortoiseMentoringSettlementRepository,
+    TortoiseMentoringTeamRepository,
 )
 from app.core.clock import Clock
 from app.core.dependencies import get_clock
 from app.core.uow import UnitOfWork
+from app.shared.errors import BusinessRuleViolation
 
 admin_router = APIRouter(
     prefix="/admin/cohorts/{cohort_id}/mentoring/settlements", tags=["admin-mentoring-settlements"]
@@ -65,6 +79,7 @@ def get_settlement_service(
         sessions=TortoiseMentoringSessionRepository(),
         requests=TortoiseMentoringRequestRepository(),
         assignments=TortoiseCohortMentorRepository(),
+        mentors=cast("MentorDirectory", request.app.state.mentor_queries),
         audit=cast("AuditRecorder", request.app.state.audit_recorder),
         uow=UnitOfWork(),
         clock=clock,
@@ -72,6 +87,56 @@ def get_settlement_service(
 
 
 ServiceDep = Annotated[SettlementService, Depends(get_settlement_service)]
+me_router = APIRouter(prefix="/me/mentor-settlements", tags=["mentor-settlements"])
+
+
+def get_exporter(request: Request) -> SettlementExporter:
+    state = request.app.state
+    return SettlementExporter(
+        sessions=TortoiseMentoringSessionRepository(),
+        requests=TortoiseMentoringRequestRepository(),
+        teams=TortoiseMentoringTeamRepository(),
+        students=cast("ExportStudents", state.student_queries),
+        mentors=cast("MentorDirectory", state.mentor_queries),
+        users=cast("UserQueries", state.user_queries),
+        cohorts=cast("CohortLabels", state.academy_catalog),
+    )
+
+
+ExporterDep = Annotated[SettlementExporter, Depends(get_exporter)]
+
+
+def _columns(value: str | None) -> list[str]:
+    picked = [c.strip() for c in (value or "").split(",") if c.strip()]
+    unknown = [c for c in picked if c not in OPTIONAL_COLUMNS]
+    if unknown:
+        raise BusinessRuleViolation(
+            f"알 수 없는 열입니다: {', '.join(unknown)} (가능: {', '.join(OPTIONAL_COLUMNS)})",
+            code="invalid_export_columns",
+        )
+    return list(dict.fromkeys(picked))
+
+
+ColumnsQuery = Annotated[
+    str | None,
+    Query(description="선택 열, 쉼표 구분: " + ", ".join(OPTIONAL_COLUMNS)),
+]
+
+
+def _csv_response(rows: list[list[str]], columns: list[str], filename: str) -> Response:
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(header(columns))
+    writer.writerows(rows)
+    body = "\ufeff" + buffer.getvalue()  # 엑셀이 UTF-8로 읽도록 BOM
+    return Response(
+        content=body.encode("utf-8"),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "content-disposition": f"attachment; filename*=UTF-8''{quote(filename)}",
+            "cache-control": "private, no-store",
+        },
+    )
 
 
 class MonthBody(BaseModel):
@@ -240,6 +305,42 @@ async def list_settlements(
     return await presenter.summaries(items)
 
 
+@admin_router.get("/export.csv", response_class=Response)
+async def export_cohort_month(
+    cohort_id: uuid.UUID,
+    _: SettlementManager,
+    service: ServiceDep,
+    exporter: ExporterDep,
+    month: Annotated[str, Query(pattern=MONTH.pattern, description="YYYY-MM")],
+    columns: ColumnsQuery = None,
+) -> Response:
+    """그 기수·월의 모든 정산서 명세 (집계 중·마감 모두, 정산 상태 열로 구분)."""
+    picked = _columns(columns)
+    settlements = await service.list_by_cohort(
+        cohort_id, month=_parse_month(month), with_items=True
+    )
+    rows = await exporter.rows(settlements, picked)
+    return _csv_response(rows, picked, f"멘토링정산_{month}.csv")
+
+
+@admin_router.get("/{settlement_id}/export.csv", response_class=Response)
+async def export_settlement(
+    cohort_id: uuid.UUID,
+    settlement_id: uuid.UUID,
+    _: SettlementManager,
+    service: ServiceDep,
+    exporter: ExporterDep,
+    presenter: PresenterDep,
+    columns: ColumnsQuery = None,
+) -> Response:
+    picked = _columns(columns)
+    settlement = await service.get(cohort_id, settlement_id)
+    rows = await exporter.rows([settlement], picked)
+    (summary,) = await presenter.summaries([settlement])
+    name = f"멘토링정산_{summary.month}_{summary.mentor_name or settlement.mentor_id}.csv"
+    return _csv_response(rows, picked, name)
+
+
 @admin_router.get("/{settlement_id}", response_model=SettlementDetail)
 async def get_settlement(
     cohort_id: uuid.UUID,
@@ -267,3 +368,19 @@ async def close_settlement(
         settlement=summary,
         unrecorded=presenter.unrecorded(result.unrecorded),
     )
+
+
+# ---------------------------------------------------------------- 멘토 본인
+@me_router.get("", response_model=list[SettlementSummary])
+async def my_settlements(
+    user: ApprovedUser, service: ServiceDep, presenter: PresenterDep
+) -> list[SettlementSummary]:
+    """마감된 정산만 (A55)."""
+    return await presenter.summaries(await service.list_for_mentor(user.id))
+
+
+@me_router.get("/{settlement_id}", response_model=SettlementDetail)
+async def my_settlement(
+    settlement_id: uuid.UUID, user: ApprovedUser, service: ServiceDep, presenter: PresenterDep
+) -> SettlementDetail:
+    return await presenter.detail(await service.get_for_mentor(user.id, settlement_id))

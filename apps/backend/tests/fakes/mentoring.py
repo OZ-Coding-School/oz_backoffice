@@ -748,13 +748,24 @@ class InMemorySettlementRepository:
         self.items[settlement.id] = self._copy(settlement)
 
     async def list_by_cohort(
-        self, cohort_id: uuid.UUID, *, month: date | None
+        self, cohort_id: uuid.UUID, *, month: date | None, with_items: bool = False
     ) -> list["MentoringSettlement"]:
         return [
             self._copy(s)
             for s in self.items.values()
             if s.cohort_id == cohort_id and (month is None or s.settlement_month == month)
         ]
+
+    async def list_closed_by_mentor(self, mentor_id: uuid.UUID) -> list["MentoringSettlement"]:
+        return sorted(
+            (
+                self._copy(s)
+                for s in self.items.values()
+                if s.mentor_id == mentor_id and s.is_closed
+            ),
+            key=lambda s: s.settlement_month,
+            reverse=True,
+        )
 
     async def settled_session_ids(
         self, session_ids: list[uuid.UUID], *, exclude_settlement_id: uuid.UUID | None

@@ -13,8 +13,10 @@ import uuid
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
+from typing import Protocol
 
 from app.contexts.audit.application.recorder import AuditRecorder
+from app.contexts.educator.domain.profiles import Mentor
 from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.enums import MentoringSessionStatus, SettlementItemType
 from app.contexts.mentoring.domain.repositories import (
@@ -83,6 +85,12 @@ def _assignment_for(
     return max(covering, key=lambda a: a.start_date, default=None)
 
 
+class MentorLookup(Protocol):
+    """educator `MentorQueries`."""
+
+    async def get_by_user(self, user_id: uuid.UUID) -> Mentor | None: ...
+
+
 class SettlementService:
     def __init__(
         self,
@@ -91,6 +99,7 @@ class SettlementService:
         sessions: MentoringSessionRepository,
         requests: MentoringRequestRepository,
         assignments: CohortMentorRepository,
+        mentors: MentorLookup,
         audit: AuditRecorder,
         uow: UnitOfWork,
         clock: Clock,
@@ -99,6 +108,7 @@ class SettlementService:
         self._sessions = sessions
         self._requests = requests
         self._assignments = assignments
+        self._mentors = mentors
         self._audit = audit
         self._uow = uow
         self._clock = clock
@@ -192,10 +202,10 @@ class SettlementService:
 
     # ------------------------------------------------------------------ 조회·마감
     async def list_by_cohort(
-        self, cohort_id: uuid.UUID, *, month: date | None
+        self, cohort_id: uuid.UUID, *, month: date | None, with_items: bool = False
     ) -> list[MentoringSettlement]:
         return await self._settlements.list_by_cohort(
-            cohort_id, month=month_start(month) if month else None
+            cohort_id, month=month_start(month) if month else None, with_items=with_items
         )
 
     async def get(self, cohort_id: uuid.UUID, settlement_id: uuid.UUID) -> MentoringSettlement:
@@ -203,6 +213,25 @@ class SettlementService:
         if settlement is None or settlement.cohort_id != cohort_id:
             raise NotFoundError("정산을 찾을 수 없습니다.", code="settlement_not_found")
         return settlement
+
+    async def list_for_mentor(self, user_id: uuid.UUID) -> list[MentoringSettlement]:
+        """멘토 본인: 마감된 정산만 (A55)."""
+        return await self._settlements.list_closed_by_mentor(await self._mentor_id(user_id))
+
+    async def get_for_mentor(
+        self, user_id: uuid.UUID, settlement_id: uuid.UUID
+    ) -> MentoringSettlement:
+        mentor_id = await self._mentor_id(user_id)
+        settlement = await self._settlements.get(settlement_id)
+        if settlement is None or settlement.mentor_id != mentor_id or not settlement.is_closed:
+            raise NotFoundError("정산을 찾을 수 없습니다.", code="settlement_not_found")
+        return settlement
+
+    async def _mentor_id(self, user_id: uuid.UUID) -> uuid.UUID:
+        mentor = await self._mentors.get_by_user(user_id)
+        if mentor is None:
+            raise NotFoundError("멘토 프로필이 없습니다.", code="mentor_profile_not_found")
+        return mentor.id
 
     async def close(
         self,
