@@ -28,7 +28,7 @@ from tortoise.context import TortoiseContext
 from tortoise.warnings import TortoiseLoopSwitchWarning
 
 from app.api.health import get_database_probe
-from app.core.config import Settings
+from app.core.config import Settings, get_settings
 from app.core.database import MODEL_APP, build_tortoise_config
 from app.core.redis import get_redis
 from app.main import create_app
@@ -89,6 +89,20 @@ async def fake_redis() -> AsyncIterator[FakeAsyncRedis]:
     yield redis
     await redis.flushall()
     await redis.aclose()
+
+
+@pytest.fixture(autouse=True)
+def _no_external_services(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """로컬 .env에 실제 Google 설정이 있어도 테스트가 외부 API를 부르지 않게 한다.
+
+    작업(worker) 코드는 get_settings()로 .env를 읽으므로, 환경 변수로 개발용 드라이버를 강제하고
+    캐시를 비운다(환경 변수가 .env보다 우선).
+    """
+    monkeypatch.setenv("MEET_DRIVER", "disabled")
+    monkeypatch.setenv("MAIL_DRIVER", "console")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 @pytest.fixture
