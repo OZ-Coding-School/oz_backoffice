@@ -62,3 +62,16 @@ class RecordingStatus(StrEnum):
     ENDED = "ENDED"
     FILE_GENERATED = "FILE_GENERATED"
     FAILED = "FAILED"
+
+
+class MentoringArtifactType(StrEnum):
+    VIDEO = "VIDEO"  # 녹화 영상 (mp4)
+    TRANSCRIPT = "TRANSCRIPT"  # 전사본 (Google 문서)
+    SUMMARY = "SUMMARY"  # 스마트 메모 요약 (Google 문서)
+
+
+class MentoringArtifactStatus(StrEnum):
+    PENDING = "PENDING"  # 수집됨, 정리 전
+    PROCESSING = "PROCESSING"  # (예비)
+    COMPLETED = "COMPLETED"  # 폴더 정리·메타데이터 완료, 열람 가능
+    FAILED = "FAILED"  # 7일 동안 정리하지 못함

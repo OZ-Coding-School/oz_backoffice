@@ -171,3 +171,35 @@ async def test_meet_event_tasks() -> None:
     assert await handle_event_with_retry(event, service=flaky, delays=(0, 0))  # type: ignore[arg-type]  # handle만 쓴다
     assert flaky.calls == 3
     await subscribe_meet_events.original_func()  # 설정이 없으면 아무것도 하지 않는다
+
+
+async def test_artifact_tasks() -> None:
+    import uuid
+
+    from app.integrations.google.meet import MeetUnavailableError
+    from app.workers.tasks.mentoring import (
+        build_artifact_service,
+        collect_meet_artifacts,
+        collect_with_retry,
+        sync_meet_artifacts,
+    )
+
+    assert collect_meet_artifacts.task_name == "mentoring.meet.artifacts.collect"
+    assert sync_meet_artifacts.labels["schedule"] == [{"cron": "0 * * * *"}]
+    assert not (await build_artifact_service()).enabled  # 기본 설정(disabled)
+    assert not await collect_with_retry(uuid.uuid4())
+
+    class Flaky:
+        enabled = True
+        calls = 0
+
+        async def collect(self, _: uuid.UUID) -> int:
+            self.calls += 1
+            if self.calls < 2:
+                raise MeetUnavailableError()
+            return 1
+
+    flaky = Flaky()
+    assert await collect_with_retry(uuid.uuid4(), service=flaky, delays=(0, 0))  # type: ignore[arg-type]  # collect만 쓴다
+    assert flaky.calls == 2
+    await sync_meet_artifacts.original_func()  # 설정이 없으면 아무것도 하지 않는다

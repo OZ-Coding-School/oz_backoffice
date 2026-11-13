@@ -83,6 +83,17 @@ def parse_message(attributes: dict[str, str], data: bytes) -> MeetEvent | None:
     return None
 
 
+@dataclass(frozen=True, slots=True)
+class MeetFile:
+    """회의 기록에서 생성이 끝난 파일.
+
+    kind: VIDEO(녹화) / TRANSCRIPT(전사) / SUMMARY(스마트 메모).
+    """
+
+    kind: str
+    file_id: str
+
+
 class SubscriptionsApi(Protocol):
     async def list_subscriptions(self, *, request: Any) -> Any: ...
     async def create_subscription(self, *, request: Any) -> Any: ...
@@ -91,6 +102,10 @@ class SubscriptionsApi(Protocol):
 
 class ConferencesApi(Protocol):
     async def get_conference_record(self, *, request: Any) -> Any: ...
+    async def list_conference_records(self, *, request: Any) -> Any: ...
+    async def list_recordings(self, *, request: Any) -> Any: ...
+    async def list_transcripts(self, *, request: Any) -> Any: ...
+    async def list_smart_notes(self, *, request: Any) -> Any: ...
 
 
 def _datetime(value: Any) -> datetime | None:
@@ -151,6 +166,42 @@ class GoogleMeetEvents:
         except google_exceptions.GoogleAPICallError as exc:
             logger.warning("Meet 이벤트 구독 실패: %s", type(exc).__name__)
             raise MeetUnavailableError("Meet 이벤트 구독을 처리하지 못했습니다.") from exc
+
+    async def session_files(self, space_name: str) -> list[MeetFile]:
+        """공간의 모든 회의 기록에서 생성이 끝난 녹화·전사·스마트 메모 파일 (A53·A54)."""
+        try:
+            records = await self._conferences.list_conference_records(
+                request=meet.ListConferenceRecordsRequest(filter=f'space.name="{space_name}"')
+            )
+            found: list[MeetFile] = []
+            async for record in records:
+                found += await self._record_files(record.name)
+            return found
+        except google_exceptions.GoogleAPICallError as exc:
+            logger.warning("회의 파일 조회 실패(%s): %s", space_name, type(exc).__name__)
+            raise MeetUnavailableError() from exc
+
+    async def _record_files(self, record_name: str) -> list[MeetFile]:
+        files: list[MeetFile] = []
+        recordings = await self._conferences.list_recordings(
+            request=meet.ListRecordingsRequest(parent=record_name)
+        )
+        async for recording in recordings:
+            if recording.state == meet.Recording.State.FILE_GENERATED:
+                files.append(MeetFile("VIDEO", recording.drive_destination.file))
+        transcripts = await self._conferences.list_transcripts(
+            request=meet.ListTranscriptsRequest(parent=record_name)
+        )
+        async for transcript in transcripts:
+            if transcript.state == meet.Transcript.State.FILE_GENERATED:
+                files.append(MeetFile("TRANSCRIPT", transcript.docs_destination.document))
+        notes = await self._conferences.list_smart_notes(
+            request=meet.ListSmartNotesRequest(parent=record_name)
+        )
+        async for note in notes:
+            if note.state == meet.SmartNote.State.FILE_GENERATED:
+                files.append(MeetFile("SUMMARY", note.docs_destination.document))
+        return [f for f in files if f.file_id]
 
     async def get_conference(self, record_name: str) -> ConferenceInfo | None:
         try:

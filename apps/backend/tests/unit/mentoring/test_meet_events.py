@@ -1,5 +1,6 @@
 """Meet 이벤트 처리: 도메인 규칙·서비스 (인메모리 + 가짜 이벤트 원천, A49·M27)."""
 
+import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -74,6 +75,14 @@ class FakeSource:
         return self.records.get(record_name)
 
 
+class Collects:
+    def __init__(self) -> None:
+        self.sessions: list[uuid.UUID] = []
+
+    async def collect_needed(self, session_id: uuid.UUID) -> None:
+        self.sessions.append(session_id)
+
+
 class Seen:
     def __init__(self) -> None:
         self.ids: set[str] = set()
@@ -101,8 +110,9 @@ async def test_handle_applies_events_idempotently() -> None:
         "conferenceRecords/x": ConferenceInfo("conferenceRecords/x", "spaces/other", T, None),
     }
     source.fail_records = {"conferenceRecords/fail"}
+    collects = Collects()
     service = MeetEventService(
-        sessions=sessions, source=source, processed=seen, uow=FakeUnitOfWork()
+        sessions=sessions, source=source, processed=seen, artifacts=collects, uow=FakeUnitOfWork()
     )
     started = _event(1, CONFERENCE_STARTED, "conferenceRecords/1")
     assert await service.handle(started)
@@ -125,4 +135,5 @@ async def test_handle_applies_events_idempotently() -> None:
         T + timedelta(minutes=55),
     )
     assert stored.recording_status is RecordingStatus.FILE_GENERATED
+    assert collects.sessions == [session.id, session.id]  # 녹화·전사 생성 → 수집 요청
     assert await service.ensure_subscription() == "created"

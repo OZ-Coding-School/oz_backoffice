@@ -18,6 +18,7 @@ from app.shared.errors import ConflictError
 
 if TYPE_CHECKING:
     from app.contexts.audit.application.recorder import AuditRecorder
+    from app.contexts.mentoring.domain.artifact import MentoringArtifact
     from app.contexts.mentoring.domain.note import MentoringSessionNote
     from app.core.clock import Clock
     from app.integrations.google.meet import MeetSpace
@@ -414,6 +415,15 @@ class InMemorySessionRepository:
             if s.needs_space and s.starts_at > after
         ]
 
+    async def list_recent_with_space(
+        self, since: datetime, until: datetime
+    ) -> list[MentoringSession]:
+        return [
+            dataclasses.replace(s)
+            for s in self._active()
+            if s.google_space_name is not None and since <= s.ends_at <= until
+        ]
+
     async def list_needing_close(self) -> list[MentoringSession]:
         return [dataclasses.replace(s) for s in self.items.values() if s.needs_space_closed]
 
@@ -652,3 +662,30 @@ class InMemoryNoteRepository:
 
     async def save(self, note: "MentoringSessionNote") -> None:
         self.items[note.id] = dataclasses.replace(note)
+
+
+class InMemoryArtifactRepository:
+    def __init__(self) -> None:
+        self.items: dict[uuid.UUID, MentoringArtifact] = {}
+
+    async def add_if_absent(self, artifact: "MentoringArtifact") -> bool:
+        if any(
+            a.session_id == artifact.session_id and a.drive_file_id == artifact.drive_file_id
+            for a in self.items.values()
+        ):
+            return False
+        self.items[artifact.id] = dataclasses.replace(artifact)
+        return True
+
+    async def get(self, artifact_id: uuid.UUID) -> "MentoringArtifact | None":
+        found = self.items.get(artifact_id)
+        return dataclasses.replace(found) if found else None
+
+    async def save(self, artifact: "MentoringArtifact") -> None:
+        self.items[artifact.id] = dataclasses.replace(artifact)
+
+    async def list_by_session(self, session_id: uuid.UUID) -> list["MentoringArtifact"]:
+        return [dataclasses.replace(a) for a in self.items.values() if a.session_id == session_id]
+
+    async def list_pending(self) -> list["MentoringArtifact"]:
+        return [dataclasses.replace(a) for a in self.items.values() if a.needs_archive]

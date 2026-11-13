@@ -306,3 +306,41 @@ async def test_notes_unrecorded_and_overtime_constraint() -> None:
         await db.execute_query(
             "UPDATE mentoring_session_notes SET body = '' WHERE id = $1", [str(note.id)]
         )
+
+
+async def test_artifact_repository_and_constraints() -> None:
+    from app.contexts.mentoring.domain.artifact import MentoringArtifact
+    from app.contexts.mentoring.domain.enums import MentoringArtifactType
+    from app.contexts.mentoring.infrastructure.repositories import (
+        TortoiseMentoringArtifactRepository,
+    )
+
+    cohort = await create_cohort()
+    student = make_student(cohort_id=cohort.id)
+    await TortoiseStudentRepository().add(student)
+    mentor = await create_mentor()
+    session = _session(await _approved(mentor.id, student.id))
+    await sessions.add(session)
+    artifacts = TortoiseMentoringArtifactRepository()
+    video = MentoringArtifact(
+        session_id=session.id, drive_file_id="file-1", artifact_type=MentoringArtifactType.VIDEO
+    )
+    assert await artifacts.add_if_absent(video)
+    duplicate = MentoringArtifact(
+        session_id=session.id, drive_file_id="file-1", artifact_type=MentoringArtifactType.VIDEO
+    )
+    assert not await artifacts.add_if_absent(duplicate)  # 같은 세션·파일은 하나
+    assert [a.id for a in await artifacts.list_pending()] == [video.id]
+    video.archived(file_name="녹화.mp4", mime_type="video/mp4", file_size=1024)
+    await artifacts.save(video)
+    stored = await artifacts.get(video.id)
+    assert stored is not None
+    assert (stored.file_name, stored.file_size) == ("녹화.mp4", 1024)
+    assert await artifacts.list_pending() == []
+    assert [a.id for a in await artifacts.list_by_session(session.id)] == [video.id]
+    db = connections.get("default")
+    for sql in ("artifact_type = 'AUDIO'", "status = 'DONE'", "file_name = NULL"):
+        with pytest.raises(IntegrityError):
+            await db.execute_query(
+                f"UPDATE mentoring_artifacts SET {sql} WHERE id = $1", [str(video.id)]
+            )
