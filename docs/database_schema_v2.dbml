@@ -793,7 +793,7 @@ Table mentoring_sessions {
 }
 
 Table mentoring_artifacts {
-  note: "멘토링 자동 아티팩트 (Meet 녹화/전사/요약). 원본은 회사 계정 Google Drive에 두고, 멘토/운영진에게 Drive 권한을 주지 않고 백엔드가 서비스 계정으로 스트리밍 중계 (영상은 Range 요청 지원)"
+  note: "멘토링 자동 아티팩트 (Meet 녹화/전사/요약, 마이그레이션 20, A53·A54). 원본은 주최 계정 파일로 두되 공유 드라이브 '멘토링 녹화/과정명/N기/멘토 실명/YYYY-MM'로 옮기고(위임 drive), 멘토/수강생/운영진에게 Drive 권한을 주지 않고 백엔드가 서비스 계정으로 스트리밍 중계 (영상은 Range, 문서는 PDF 내보내기). check: artifact_type·status 값, COMPLETED면 file_name·mime_type 필수 (check_artifact_type, check_artifact_status, check_artifact_completed)"
 
   id uuid [pk, note: "default=uuid7 사용"]
   session_id uuid [not null, ref: > mentoring_sessions.id]
@@ -808,6 +808,7 @@ Table mentoring_artifacts {
 
   indexes {
     (session_id, drive_file_id) [unique, note: "이벤트 중복 수신/보완 폴링 재실행 시 중복 행 방지"]
+    (status) [note: "정리 대기(PENDING) 조회"]
   }
 }
 Table mentoring_session_notes {

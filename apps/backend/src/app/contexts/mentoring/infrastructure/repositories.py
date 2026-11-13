@@ -7,10 +7,15 @@ from typing import Any
 from tortoise.exceptions import IntegrityError
 from tortoise.expressions import Q
 
+from app.contexts.mentoring.domain.artifact import MentoringArtifact
 from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.availability import Interval
 from app.contexts.mentoring.domain.balance import BalanceAccount, BalanceTransaction
-from app.contexts.mentoring.domain.enums import MentoringRequestStatus, MentoringSessionStatus
+from app.contexts.mentoring.domain.enums import (
+    MentoringArtifactStatus,
+    MentoringRequestStatus,
+    MentoringSessionStatus,
+)
 from app.contexts.mentoring.domain.note import MentoringSessionNote
 from app.contexts.mentoring.domain.request import MentoringRequest
 from app.contexts.mentoring.domain.schedule import (
@@ -30,6 +35,7 @@ from app.contexts.mentoring.infrastructure.models import (
     CohortMentoringBlockTimeModel,
     CohortMentoringSettingsModel,
     CohortMentorModel,
+    MentoringArtifactModel,
     MentoringBalanceAccountModel,
     MentoringBalanceTransactionModel,
     MentoringHolidayModel,
@@ -901,3 +907,62 @@ class TortoiseMentoringSessionNoteRepository:
         row = await MentoringSessionNoteModel.get(id=note.id)
         row.body = note.body
         await row.save()
+
+
+_ARTIFACT_FIELDS = (
+    "drive_file_id",
+    "artifact_type",
+    "file_name",
+    "mime_type",
+    "file_size",
+    "status",
+)
+
+
+class TortoiseMentoringArtifactRepository:
+    @staticmethod
+    def _entity(row: MentoringArtifactModel) -> MentoringArtifact:
+        return MentoringArtifact(
+            id=row.id,
+            session_id=row.session_id,  # type: ignore[attr-defined]  # FK 컬럼 속성
+            created_at=row.created_at,
+            updated_at=row.updated_at,
+            **{name: getattr(row, name) for name in _ARTIFACT_FIELDS},
+        )
+
+    async def add_if_absent(self, artifact: MentoringArtifact) -> bool:
+        exists = await MentoringArtifactModel.filter(
+            session_id=artifact.session_id, drive_file_id=artifact.drive_file_id
+        ).exists()
+        if exists:
+            return False
+        try:
+            await MentoringArtifactModel.create(
+                id=artifact.id,
+                session_id=artifact.session_id,
+                **{name: getattr(artifact, name) for name in _ARTIFACT_FIELDS},
+            )
+        except IntegrityError:  # 동시에 같은 파일을 넣었다
+            return False
+        return True
+
+    async def get(self, artifact_id: uuid.UUID) -> MentoringArtifact | None:
+        row = await MentoringArtifactModel.get_or_none(id=artifact_id)
+        return self._entity(row) if row else None
+
+    async def save(self, artifact: MentoringArtifact) -> None:
+        await MentoringArtifactModel.filter(id=artifact.id).update(
+            **{name: getattr(artifact, name) for name in _ARTIFACT_FIELDS}
+        )
+
+    async def list_by_session(self, session_id: uuid.UUID) -> list[MentoringArtifact]:
+        rows = await MentoringArtifactModel.filter(session_id=session_id).order_by(
+            "created_at", "id"
+        )
+        return [self._entity(row) for row in rows]
+
+    async def list_pending(self) -> list[MentoringArtifact]:
+        rows = await MentoringArtifactModel.filter(status=MentoringArtifactStatus.PENDING).order_by(
+            "id"
+        )
+        return [self._entity(row) for row in rows]
