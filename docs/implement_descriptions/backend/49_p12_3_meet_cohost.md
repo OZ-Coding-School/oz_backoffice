@@ -1,7 +1,7 @@
 # 49. P12-3 Meet 멘토 공동 주최자 등록
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #54
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P12 (P12-3)
 - 이전 기록: [48. P12-2 Meet 이벤트 구독·실시간 수신·처리](48_p12_2_meet_events.md)
 
