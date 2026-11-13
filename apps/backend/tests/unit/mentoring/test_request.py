@@ -205,3 +205,24 @@ def test_refund_moves_used_back() -> None:
     )
     with pytest.raises(BusinessRuleViolation):
         account.refund(30, request_id=request_id, reason="취소")
+
+
+def test_overtime_and_partial_refund() -> None:
+    account = BalanceAccount(
+        student_id=new_id(), valid_from=date(2026, 11, 1), valid_until=date(2027, 4, 30)
+    )
+    account.grant(120, "지급", today=date(2026, 11, 11))
+    request_id = new_id()
+    account.hold(60, request_id=request_id, reason="신청")
+    account.use(60, request_id=request_id, reason="승인")
+    entry = account.overtime(30, request_id=request_id, reason="초과 진행")
+    assert (entry.type, account.used_minutes, account.remaining_minutes) == (
+        MentoringBalanceTransactionType.OVERTIME,
+        90,
+        30,
+    )
+    with pytest.raises(BusinessRuleViolation) as short:
+        account.overtime(60, request_id=request_id, reason="초과")
+    assert short.value.code == "insufficient_balance"
+    account.refund(30, request_id=request_id, reason="짧게 진행")
+    assert account.used_minutes == 60

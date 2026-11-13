@@ -262,3 +262,47 @@ async def test_meet_space_queries() -> None:
     stored = await sessions.get(canceled.id)
     assert stored is not None
     assert (stored.google_space_name, stored.google_meet_url) == ("spaces/abc", None)
+
+
+async def test_notes_unrecorded_and_overtime_constraint() -> None:
+    from app.contexts.mentoring.domain.note import MentoringSessionNote
+    from app.contexts.mentoring.infrastructure.repositories import (
+        TortoiseMentoringSessionNoteRepository,
+    )
+
+    cohort = await create_cohort()
+    student = make_student(cohort_id=cohort.id)
+    await TortoiseStudentRepository().add(student)
+    mentor = await create_mentor()
+    started = _session(await _approved(mentor.id, student.id), T - timedelta(hours=2))
+    recorded = _session(await _approved(mentor.id, student.id), T - timedelta(hours=5))
+    upcoming = _session(await _approved(mentor.id, student.id), T + timedelta(hours=2))
+    for session in (started, recorded, upcoming):
+        await sessions.add(session)
+    recorded.submit_completed(duration=60, topic="주제", summary="요약", now=T)
+    await sessions.save(recorded)
+    items, total = await sessions.list_unrecorded(cohort.id, before=T, limit=10, offset=0)
+    assert (total, [s.id for s in items]) == (1, [started.id])
+    stored = await sessions.get(recorded.id)
+    assert stored is not None
+    assert (stored.status, stored.record_duration_minutes, stored.body) == (
+        MentoringSessionStatus.COMPLETED,
+        60,
+        "요약",
+    )
+
+    notes = TortoiseMentoringSessionNoteRepository()
+    note = MentoringSessionNote(session_id=started.id, body="메모")
+    await notes.add(note)
+    note.rewrite("고친 메모")
+    await notes.save(note)
+    found = await notes.get_by_session(started.id)
+    assert found is not None
+    assert found.body == "고친 메모"
+    with pytest.raises(IntegrityError):  # 세션당 하나
+        await notes.add(MentoringSessionNote(session_id=started.id, body="두 번째"))
+    db = connections.get("default")
+    with pytest.raises(IntegrityError):
+        await db.execute_query(
+            "UPDATE mentoring_session_notes SET body = '' WHERE id = $1", [str(note.id)]
+        )

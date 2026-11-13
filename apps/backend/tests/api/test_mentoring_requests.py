@@ -460,3 +460,84 @@ async def test_meet_link_shown_then_hidden_after_cancel(
     assert hidden["google_meet_url"] is None  # 취소되면 바로 숨긴다
     assert await service.sync() == (0, 1)
     assert meet.restricted == ["spaces/s1"]
+
+
+async def test_record_note_and_unrecorded(
+    app: Any, client: AsyncClient, settings: Settings
+) -> None:
+    from app.core.clock import FixedClock
+
+    ctx = await _setup(client, settings)
+    student_h, mentor_h, admin = ctx["student_h"], ctx["mentor_h"], ctx["admin"]
+    request_id = (await client.post(URL, json=_body(ctx), headers=student_h)).json()["id"]
+    session = (
+        await client.post(
+            f"{URL}/{request_id}/approve",
+            json={"starts_at": ctx["at"].isoformat()},
+            headers=mentor_h,
+        )
+    ).json()["session"]
+    record = f"/api/v1/mentoring/sessions/{session['id']}/record"
+    admin_sessions = f"/api/v1/admin/cohorts/{ctx['cohort'].id}/mentoring/sessions"
+
+    early = await client.post(
+        record, json={"status": "COMPLETED", "duration": 60, "summary": "요약"}, headers=mentor_h
+    )
+    assert early.json()["error"]["code"] == "session_not_started"
+
+    app.state.clock = FixedClock(ctx["at"] + timedelta(hours=1))  # 진행 후
+    unrecorded = (await client.get(f"{admin_sessions}/unrecorded", headers=admin)).json()
+    assert [s["id"] for s in unrecorded["items"]] == [session["id"]]
+    missing = await client.post(
+        record, json={"status": "COMPLETED", "summary": "요약"}, headers=mentor_h
+    )
+    assert missing.status_code == 422  # 완료에는 진행 시간
+    assert (
+        await client.post(
+            record,
+            json={"status": "COMPLETED", "duration": 30, "summary": "요약"},
+            headers=student_h,
+        )
+    ).status_code == 403  # 담당 멘토만
+    done = await client.post(
+        record,
+        json={"status": "COMPLETED", "duration": 30, "topic": "실제 주제", "summary": "요약"},
+        headers=mentor_h,
+    )
+    assert done.status_code == 200, done.text
+    assert (
+        done.json()["status"],
+        done.json()["record_duration_minutes"],
+        done.json()["summary"],
+    ) == (
+        "COMPLETED",
+        30,
+        "요약",
+    )
+    (balance,) = (await client.get("/api/v1/me/balances", headers=student_h)).json()
+    assert (balance["remaining_minutes"], balance["used_minutes"]) == (150, 30)  # 짧게 → 차이 환불
+    again = await client.post(record, json={"status": "NO_SHOW"}, headers=mentor_h)
+    assert again.json()["error"]["code"] == "session_not_recordable"
+    edited = await client.patch(record, json={"summary": "고친 요약"}, headers=mentor_h)
+    assert edited.json()["summary"] == "고친 요약"
+    assert (await client.get(f"{admin_sessions}/unrecorded", headers=admin)).json()["total"] == 0
+
+    # 수강생은 요약을 보고, 운영진은 Meet 실제 시각 필드도 받는다
+    shown = (
+        await client.get(f"/api/v1/mentoring/sessions/{session['id']}", headers=student_h)
+    ).json()
+    assert shown["summary"] == "고친 요약"
+    assert "actual_started_at" not in shown
+    staff = (await client.get(f"{admin_sessions}/{session['id']}", headers=admin)).json()
+    assert "actual_started_at" in staff
+
+    note = f"/api/v1/mentoring/sessions/{session['id']}/note"
+    assert (await client.get(note, headers=mentor_h)).json()["body"] is None
+    saved = await client.put(note, json={"body": "다음엔 테스트 코드"}, headers=mentor_h)
+    assert saved.json()["body"] == "다음엔 테스트 코드"
+    assert (await client.get(note, headers=student_h)).status_code == 403  # 수강생은 못 본다
+    staff_note = await client.get(f"{admin_sessions}/{session['id']}/note", headers=admin)
+    assert staff_note.json()["body"] == "다음엔 테스트 코드"
+    assert (
+        await client.get(f"{admin_sessions}/{session['id']}/note", headers=student_h)
+    ).status_code == 403

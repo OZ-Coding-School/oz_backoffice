@@ -93,11 +93,16 @@ class SessionResponse(BaseModel):
     google_meet_url: str | None = Field(
         description="Meet 링크. 공간을 만들기 전이거나 취소된 세션은 null (A48)"
     )
+    summary: str | None = Field(description="기록 요약(완료) 또는 노쇼 사유. 수강생도 본다 (A53)")
+    record_duration_minutes: int | None = Field(description="실제 진행 시간(분), 완료만")
+    recorded_at: datetime | None = Field(description="기록 제출 시각")
     created_at: datetime | None
 
 
 class AdminSessionResponse(SessionResponse):
     mentor_name: str = Field(description="멘토 실명 (운영진 응답에만)")
+    actual_started_at: datetime | None = Field(description="Meet 실제 시작 (처음 회의)")
+    actual_ended_at: datetime | None = Field(description="Meet 실제 종료 (마지막 회의)")
 
 
 class SessionPresenter:
@@ -132,6 +137,11 @@ class SessionPresenter:
                     google_meet_url=(
                         None if s.status is MentoringSessionStatus.CANCELED else s.google_meet_url
                     ),
+                    summary=s.body,
+                    record_duration_minutes=s.record_duration_minutes,
+                    recorded_at=s.recorded_at,
+                    actual_started_at=s.actual_started_at,
+                    actual_ended_at=s.actual_ended_at,
                     created_at=s.created_at,
                 )
             )
@@ -140,7 +150,9 @@ class SessionPresenter:
     async def public(self, items: list[MentoringSession]) -> list[SessionResponse]:
         """수강생·멘토용 (멘토 실명 제외)."""
         return [
-            SessionResponse(**s.model_dump(exclude={"mentor_name"}))
+            SessionResponse(
+                **s.model_dump(exclude={"mentor_name", "actual_started_at", "actual_ended_at"})
+            )
             for s in await self.admin(items)
         ]
 

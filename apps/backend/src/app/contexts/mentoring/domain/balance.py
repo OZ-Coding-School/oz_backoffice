@@ -169,6 +169,17 @@ class BalanceAccount(AggregateRoot):
         self.used_minutes -= minutes
         return self._entry(MentoringBalanceTransactionType.REFUND, minutes, reason, request_id)
 
+    def overtime(self, minutes: int, *, request_id: uuid.UUID, reason: str) -> BalanceTransaction:
+        """신청보다 길게 진행: 초과분을 잔여에서 사용으로 (A53)."""
+        _rule(minutes > 0, "초과 시간이 올바르지 않습니다.", "invalid_balance_minutes")
+        _rule(
+            self.remaining_minutes >= minutes,
+            "잔여 시간이 부족해 신청보다 긴 진행 시간을 기록할 수 없습니다.",
+            "insufficient_balance",
+        )
+        self.used_minutes += minutes
+        return self._entry(MentoringBalanceTransactionType.OVERTIME, minutes, reason, request_id)
+
     def revoke_remaining(self, reason: str) -> BalanceTransaction | None:
         """수강 종료 회수: 잔여 전부를 줄인다(단위·사용 기간과 무관, A39). 잔여가 없으면 None."""
         if self.remaining_minutes <= 0:
