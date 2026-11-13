@@ -825,10 +825,11 @@ Table mentoring_session_notes {
 // 멘토링 정산
 // ----------------------------------------------
 Table mentoring_settlements {
-  note: "멘토별 월 정산 (DRAFT에서 집계, CLOSED로 마감 확정)"
+  note: "멘토 × 월 × 기수 정산 (마이그레이션 21, A55). DRAFT에서 집계, CLOSED로 마감 확정. check: status 값, 월은 1일, 합계 0 이상 (check_settlement_status, check_settlement_month, check_settlement_totals)"
 
   id uuid [pk, note: "default=uuid7 사용"]
   mentor_id uuid [not null, ref: > mentors.id]
+  cohort_id uuid [not null, ref: > cohorts.id, note: "정산 기수 (A55: 멘토 × 월 × 기수)"]
   settlement_month date [not null, note: "정산 대상 월 (해당 월 1일)"]
   status MentoringSettlementStatus [not null, default: 'DRAFT']
   session_count integer [not null, default: 0, note: "정산 대상 세션 수"]
@@ -839,7 +840,8 @@ Table mentoring_settlements {
   updated_at timestamptz [not null, default: `now()`]
 
   indexes {
-    (mentor_id, settlement_month) [unique]
+    (mentor_id, cohort_id, settlement_month) [unique]
+    (cohort_id, settlement_month)
   }
   checks {
     `(status = 'CLOSED') = (closed_at IS NOT NULL)` [name: "check_settlement_closed"]
@@ -847,7 +849,7 @@ Table mentoring_settlements {
 }
 
 Table mentoring_settlement_items {
-  note: "정산 명세 (세션 단위 스냅샷). 세션은 한 번만 정산"
+  note: "정산 명세 (세션 단위 스냅샷). 세션은 한 번만 정산. 정산이 지워지면 함께 지워진다(CASCADE, DRAFT 다시 집계). check: item_type·settlement_policy 값, pay_unit은 HOURLY·PER_SESSION만(M30), 값 0 이상"
 
   id uuid [pk, note: "default=uuid7 사용"]
   session_id uuid [not null, unique, ref: - mentoring_sessions.id, note: "중복 정산 방지"]

@@ -75,3 +75,13 @@ class MentoringArtifactStatus(StrEnum):
     PROCESSING = "PROCESSING"  # (예비)
     COMPLETED = "COMPLETED"  # 폴더 정리·메타데이터 완료, 열람 가능
     FAILED = "FAILED"  # 7일 동안 정리하지 못함
+
+
+class MentoringSettlementStatus(StrEnum):
+    DRAFT = "DRAFT"  # 집계 중 (다시 집계하면 새로 계산)
+    CLOSED = "CLOSED"  # 마감 확정 (바꿀 수 없음)
+
+
+class SettlementItemType(StrEnum):
+    SESSION = "SESSION"  # 진행된 세션
+    NO_SHOW = "NO_SHOW"  # 노쇼 (배정의 노쇼 고정 금액)

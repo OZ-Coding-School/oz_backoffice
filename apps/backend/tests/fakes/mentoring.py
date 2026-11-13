@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from app.contexts.audit.application.recorder import AuditRecorder
     from app.contexts.mentoring.domain.artifact import MentoringArtifact
     from app.contexts.mentoring.domain.note import MentoringSessionNote
+    from app.contexts.mentoring.domain.settlement import MentoringSettlement
     from app.core.clock import Clock
     from app.integrations.google.meet import MeetSpace
 
@@ -382,6 +383,9 @@ class InMemorySessionRepository:
         found = self.items.get(session_id)
         return dataclasses.replace(found) if found else None
 
+    async def get_many(self, session_ids: list[uuid.UUID]) -> dict[uuid.UUID, MentoringSession]:
+        return {i: dataclasses.replace(self.items[i]) for i in session_ids if i in self.items}
+
     async def save(self, session: MentoringSession) -> None:
         self.items[session.id] = dataclasses.replace(session)
 
@@ -512,8 +516,27 @@ class InMemorySessionRepository:
     ) -> tuple[list[MentoringSession], int]:
         return self._page([s for s in self.items.values() if s.mentor_id == mentor_id], query)
 
+    async def list_settleable(
+        self, cohort_id: uuid.UUID, *, before: datetime
+    ) -> list[MentoringSession]:
+        return [
+            dataclasses.replace(s)
+            for s in sorted(self.items.values(), key=lambda s: (s.starts_at, s.id))
+            if self.cohort_of_student.get(self._requests.items[s.request_id].requester_id)
+            == cohort_id
+            and s.status in (MentoringSessionStatus.COMPLETED, MentoringSessionStatus.NO_SHOW)
+            and s.recorded_at is not None
+            and s.starts_at < before
+        ]
+
     async def list_unrecorded(
-        self, cohort_id: uuid.UUID, *, before: datetime, limit: int, offset: int
+        self,
+        cohort_id: uuid.UUID,
+        *,
+        before: datetime,
+        limit: int,
+        offset: int,
+        mentor_id: uuid.UUID | None = None,
     ) -> tuple[list[MentoringSession], int]:
         found = sorted(
             (
@@ -524,6 +547,7 @@ class InMemorySessionRepository:
                 and s.status
                 in (MentoringSessionStatus.SCHEDULED, MentoringSessionStatus.IN_PROGRESS)
                 and s.starts_at < before
+                and (mentor_id is None or s.mentor_id == mentor_id)
             ),
             key=lambda s: (s.starts_at, s.id),
         )
@@ -689,3 +713,56 @@ class InMemoryArtifactRepository:
 
     async def list_pending(self) -> list["MentoringArtifact"]:
         return [dataclasses.replace(a) for a in self.items.values() if a.needs_archive]
+
+
+class InMemorySettlementRepository:
+    def __init__(self) -> None:
+        self.items: dict[uuid.UUID, MentoringSettlement] = {}
+
+    def _copy(self, s: "MentoringSettlement") -> "MentoringSettlement":
+        return dataclasses.replace(s, items=[dataclasses.replace(i) for i in s.items])
+
+    async def get(self, settlement_id: uuid.UUID) -> "MentoringSettlement | None":
+        found = self.items.get(settlement_id)
+        return self._copy(found) if found else None
+
+    async def get_by_key(
+        self, mentor_id: uuid.UUID, cohort_id: uuid.UUID, month: date
+    ) -> "MentoringSettlement | None":
+        found = next(
+            (
+                s
+                for s in self.items.values()
+                if (s.mentor_id, s.cohort_id, s.settlement_month) == (mentor_id, cohort_id, month)
+            ),
+            None,
+        )
+        return self._copy(found) if found else None
+
+    async def save(self, settlement: "MentoringSettlement") -> None:
+        taken = {
+            i.session_id for s in self.items.values() if s.id != settlement.id for i in s.items
+        }
+        if taken & {i.session_id for i in settlement.items}:
+            raise ConflictError("이미 정산된 세션", code="session_already_settled")
+        self.items[settlement.id] = self._copy(settlement)
+
+    async def list_by_cohort(
+        self, cohort_id: uuid.UUID, *, month: date | None
+    ) -> list["MentoringSettlement"]:
+        return [
+            self._copy(s)
+            for s in self.items.values()
+            if s.cohort_id == cohort_id and (month is None or s.settlement_month == month)
+        ]
+
+    async def settled_session_ids(
+        self, session_ids: list[uuid.UUID], *, exclude_settlement_id: uuid.UUID | None
+    ) -> set[uuid.UUID]:
+        return {
+            i.session_id
+            for s in self.items.values()
+            if s.id != exclude_settlement_id
+            for i in s.items
+            if i.session_id in session_ids
+        }

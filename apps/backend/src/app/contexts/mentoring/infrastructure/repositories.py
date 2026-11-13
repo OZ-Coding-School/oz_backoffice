@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import UTC, date, datetime
-from typing import Any
+from typing import Any, cast
 
 from tortoise.exceptions import IntegrityError
 from tortoise.expressions import Q
@@ -30,6 +30,7 @@ from app.contexts.mentoring.domain.settings import (
     MentoringHoliday,
     OperatingHours,
 )
+from app.contexts.mentoring.domain.settlement import MentoringSettlement, SettlementItem
 from app.contexts.mentoring.domain.team import MentoringTeam
 from app.contexts.mentoring.infrastructure.models import (
     CohortMentoringBlockTimeModel,
@@ -42,6 +43,8 @@ from app.contexts.mentoring.infrastructure.models import (
     MentoringRequestModel,
     MentoringSessionModel,
     MentoringSessionNoteModel,
+    MentoringSettlementItemModel,
+    MentoringSettlementModel,
     MentoringTeamMemberModel,
     MentoringTeamModel,
     MentorUnavailablePeriodModel,
@@ -739,6 +742,12 @@ class TortoiseMentoringSessionRepository:
         row = await MentoringSessionModel.get_or_none(id=session_id)
         return self._entity(row) if row else None
 
+    async def get_many(self, session_ids: list[uuid.UUID]) -> dict[uuid.UUID, MentoringSession]:
+        if not session_ids:
+            return {}
+        rows = await MentoringSessionModel.filter(id__in=session_ids)
+        return {row.id: self._entity(row) for row in rows}
+
     async def save(self, session: MentoringSession) -> None:
         values = {name: getattr(session, name) for name in _SESSION_FIELDS}
         await MentoringSessionModel.filter(id=session.id).update(**values)
@@ -880,14 +889,33 @@ class TortoiseMentoringSessionRepository:
             base = base.filter(mentor_id=mentor_id)
         return await self._page(base, query)
 
+    async def list_settleable(
+        self, cohort_id: uuid.UUID, *, before: datetime
+    ) -> list[MentoringSession]:
+        rows = await MentoringSessionModel.filter(
+            request__requester__cohort_id=cohort_id,
+            status__in=[MentoringSessionStatus.COMPLETED, MentoringSessionStatus.NO_SHOW],
+            recorded_at__isnull=False,
+            starts_at__lt=before,
+        ).order_by("starts_at", "id")
+        return [self._entity(row) for row in rows]
+
     async def list_unrecorded(
-        self, cohort_id: uuid.UUID, *, before: datetime, limit: int, offset: int
+        self,
+        cohort_id: uuid.UUID,
+        *,
+        before: datetime,
+        limit: int,
+        offset: int,
+        mentor_id: uuid.UUID | None = None,
     ) -> tuple[list[MentoringSession], int]:
         query = MentoringSessionModel.filter(
             request__requester__cohort_id=cohort_id,
             status__in=[MentoringSessionStatus.SCHEDULED, MentoringSessionStatus.IN_PROGRESS],
             starts_at__lt=before,
         )
+        if mentor_id is not None:
+            query = query.filter(mentor_id=mentor_id)
         total = await query.count()
         rows = await query.order_by("starts_at", "id").offset(offset).limit(limit)
         return [self._entity(row) for row in rows], total
@@ -976,3 +1004,112 @@ class TortoiseMentoringArtifactRepository:
             "id"
         )
         return [self._entity(row) for row in rows]
+
+
+_ITEM_FIELDS = (
+    "item_type",
+    "settlement_policy",
+    "billable_minutes",
+    "pay_unit",
+    "pay_rate",
+    "amount",
+)
+
+
+class TortoiseMentoringSettlementRepository:
+    @staticmethod
+    def _entity(
+        row: MentoringSettlementModel, items: list[MentoringSettlementItemModel] | None = None
+    ) -> MentoringSettlement:
+        return MentoringSettlement(
+            id=row.id,
+            mentor_id=row.mentor_id,  # type: ignore[attr-defined]  # FK 컬럼 속성
+            cohort_id=row.cohort_id,  # type: ignore[attr-defined]
+            settlement_month=row.settlement_month,
+            status=row.status,
+            closed_at=row.closed_at,
+            created_at=row.created_at,
+            updated_at=row.updated_at,
+            items=[
+                SettlementItem(
+                    id=i.id,
+                    session_id=i.session_id,  # type: ignore[attr-defined]
+                    cohort_id=i.cohort_id,  # type: ignore[attr-defined]
+                    created_at=i.created_at,
+                    **{name: getattr(i, name) for name in _ITEM_FIELDS},
+                )
+                for i in (items or [])
+            ],
+        )
+
+    async def _with_items(self, row: MentoringSettlementModel) -> MentoringSettlement:
+        items = await MentoringSettlementItemModel.filter(settlement_id=row.id).order_by(
+            "created_at", "id"
+        )
+        return self._entity(row, items)
+
+    async def get(self, settlement_id: uuid.UUID) -> MentoringSettlement | None:
+        row = await MentoringSettlementModel.get_or_none(id=settlement_id)
+        return await self._with_items(row) if row else None
+
+    async def get_by_key(
+        self, mentor_id: uuid.UUID, cohort_id: uuid.UUID, month: date
+    ) -> MentoringSettlement | None:
+        row = await MentoringSettlementModel.get_or_none(
+            mentor_id=mentor_id, cohort_id=cohort_id, settlement_month=month
+        )
+        return await self._with_items(row) if row else None
+
+    async def save(self, settlement: MentoringSettlement) -> None:
+        values: dict[str, Any] = {
+            "status": settlement.status,
+            "session_count": settlement.session_count,
+            "total_minutes": settlement.total_minutes,
+            "total_amount": settlement.total_amount,
+            "closed_at": settlement.closed_at,
+        }
+        exists = await MentoringSettlementModel.filter(id=settlement.id).exists()
+        if exists:
+            await MentoringSettlementModel.filter(id=settlement.id).update(**values)
+        else:
+            await MentoringSettlementModel.create(
+                id=settlement.id,
+                mentor_id=settlement.mentor_id,
+                cohort_id=settlement.cohort_id,
+                settlement_month=settlement.settlement_month,
+                **values,
+            )
+        await MentoringSettlementItemModel.filter(settlement_id=settlement.id).delete()
+        if settlement.items:
+            await MentoringSettlementItemModel.bulk_create(
+                [
+                    MentoringSettlementItemModel(
+                        id=item.id,
+                        settlement_id=settlement.id,
+                        session_id=item.session_id,
+                        cohort_id=item.cohort_id,
+                        **{name: getattr(item, name) for name in _ITEM_FIELDS},
+                    )
+                    for item in settlement.items
+                ]
+            )
+
+    async def list_by_cohort(
+        self, cohort_id: uuid.UUID, *, month: date | None
+    ) -> list[MentoringSettlement]:
+        query = MentoringSettlementModel.filter(cohort_id=cohort_id)
+        if month is not None:
+            query = query.filter(settlement_month=month)
+        rows = await query.order_by("-settlement_month", "id")
+        return [self._entity(row) for row in rows]
+
+    async def settled_session_ids(
+        self, session_ids: list[uuid.UUID], *, exclude_settlement_id: uuid.UUID | None
+    ) -> set[uuid.UUID]:
+        if not session_ids:
+            return set()
+        query = MentoringSettlementItemModel.filter(session_id__in=session_ids)
+        if exclude_settlement_id is not None:
+            query = query.exclude(settlement_id=exclude_settlement_id)
+        rows = await query.values_list("session_id", flat=True)
+        return {cast("uuid.UUID", value) for value in rows}

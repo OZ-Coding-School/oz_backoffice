@@ -16,6 +16,7 @@ from app.contexts.mentoring.domain.settings import (
     MentoringBlockTime,
     MentoringHoliday,
 )
+from app.contexts.mentoring.domain.settlement import MentoringSettlement
 from app.contexts.mentoring.domain.team import MentoringTeam
 
 
@@ -209,6 +210,7 @@ class MentoringSessionRepository(Protocol):
         ...
 
     async def get(self, session_id: uuid.UUID) -> MentoringSession | None: ...
+    async def get_many(self, session_ids: list[uuid.UUID]) -> dict[uuid.UUID, MentoringSession]: ...
     async def save(self, session: MentoringSession) -> None: ...
     async def lock(self, session_id: uuid.UUID) -> MentoringSession | None: ...
     async def get_by_space(self, space_name: str) -> MentoringSession | None: ...
@@ -275,8 +277,20 @@ class MentoringSessionRepository(Protocol):
     async def list_by_cohort(
         self, cohort_id: uuid.UUID, *, mentor_id: uuid.UUID | None, query: SessionQuery
     ) -> tuple[list[MentoringSession], int]: ...
+    async def list_settleable(
+        self, cohort_id: uuid.UUID, *, before: datetime
+    ) -> list[MentoringSession]:
+        """기록된(완료·노쇼) 세션 중 예정 시작이 before 이전인 것 (정산 집계 대상 후보)."""
+        ...
+
     async def list_unrecorded(
-        self, cohort_id: uuid.UUID, *, before: datetime, limit: int, offset: int
+        self,
+        cohort_id: uuid.UUID,
+        *,
+        before: datetime,
+        limit: int,
+        offset: int,
+        mentor_id: uuid.UUID | None = None,
     ) -> tuple[list[MentoringSession], int]:
         """예정 시작이 before 이전인데 기록이 없는 세션(예정·진행 중), 시작 오래된 순."""
         ...
@@ -297,3 +311,28 @@ class MentoringArtifactRepository(Protocol):
     async def save(self, artifact: MentoringArtifact) -> None: ...
     async def list_by_session(self, session_id: uuid.UUID) -> list[MentoringArtifact]: ...
     async def list_pending(self) -> list[MentoringArtifact]: ...
+
+
+class MentoringSettlementRepository(Protocol):
+    async def get(self, settlement_id: uuid.UUID) -> MentoringSettlement | None:
+        """명세 포함."""
+        ...
+
+    async def get_by_key(
+        self, mentor_id: uuid.UUID, cohort_id: uuid.UUID, month: date
+    ) -> MentoringSettlement | None: ...
+    async def save(self, settlement: MentoringSettlement) -> None:
+        """없으면 만들고, 있으면 합계를 고치고 명세를 통째로 바꾼다."""
+        ...
+
+    async def list_by_cohort(
+        self, cohort_id: uuid.UUID, *, month: date | None
+    ) -> list[MentoringSettlement]:
+        """명세 없이 (목록용)."""
+        ...
+
+    async def settled_session_ids(
+        self, session_ids: list[uuid.UUID], *, exclude_settlement_id: uuid.UUID | None
+    ) -> set[uuid.UUID]:
+        """이미 다른 정산 명세에 들어간 세션."""
+        ...

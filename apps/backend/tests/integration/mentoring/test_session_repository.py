@@ -344,3 +344,89 @@ async def test_artifact_repository_and_constraints() -> None:
             await db.execute_query(
                 f"UPDATE mentoring_artifacts SET {sql} WHERE id = $1", [str(video.id)]
             )
+
+
+async def test_settlement_repository_and_constraints() -> None:
+    from datetime import date
+
+    from app.contexts.mentoring.domain.enums import (
+        MentoringSettlementPolicy,
+        MentoringSettlementStatus,
+        PayUnit,
+        SettlementItemType,
+    )
+    from app.contexts.mentoring.domain.settlement import MentoringSettlement, SettlementItem
+    from app.contexts.mentoring.infrastructure.repositories import (
+        TortoiseMentoringSettlementRepository,
+    )
+
+    cohort = await create_cohort()
+    student = make_student(cohort_id=cohort.id)
+    await TortoiseStudentRepository().add(student)
+    mentor = await create_mentor()
+    done = _session(await _approved(mentor.id, student.id), T - timedelta(days=1))
+    pending = _session(await _approved(mentor.id, student.id), T - timedelta(hours=3))
+    for session in (done, pending):
+        await sessions.add(session)
+    done.submit_completed(duration=60, topic="주제", summary="요약", now=T)
+    await sessions.save(done)
+    settleable = await sessions.list_settleable(cohort.id, before=T)
+    assert [s.id for s in settleable] == [done.id]
+    _, unrecorded = await sessions.list_unrecorded(
+        cohort.id, before=T, limit=10, offset=0, mentor_id=mentor.id
+    )
+    assert unrecorded == 1
+
+    repo = TortoiseMentoringSettlementRepository()
+
+    def item(session_id: Any) -> SettlementItem:
+        return SettlementItem(
+            session_id=session_id,
+            cohort_id=cohort.id,
+            item_type=SettlementItemType.SESSION,
+            settlement_policy=MentoringSettlementPolicy.ACTUAL_DURATION,
+            billable_minutes=60,
+            pay_unit=PayUnit.HOURLY,
+            pay_rate=30000,
+            amount=30000,
+        )
+
+    settlement = MentoringSettlement(
+        mentor_id=mentor.id, cohort_id=cohort.id, settlement_month=date(2026, 11, 1)
+    )
+    settlement.replace_items([item(done.id)])
+    await repo.save(settlement)
+    stored = await repo.get_by_key(mentor.id, cohort.id, date(2026, 11, 1))
+    assert stored is not None
+    assert (stored.total_amount, [i.session_id for i in stored.items]) == (30000, [done.id])
+    assert await repo.settled_session_ids([done.id], exclude_settlement_id=None) == {done.id}
+    assert await repo.settled_session_ids([done.id], exclude_settlement_id=settlement.id) == set()
+    stored.replace_items([])  # 다시 집계하면 명세를 통째로 바꾼다
+    await repo.save(stored)
+    assert (await repo.get(settlement.id)).items == []  # type: ignore[union-attr]
+
+    other = MentoringSettlement(
+        mentor_id=mentor.id, cohort_id=cohort.id, settlement_month=date(2026, 12, 1)
+    )
+    other.replace_items([item(done.id)])
+    await repo.save(other)
+    stored.replace_items([item(done.id)])
+    with pytest.raises(IntegrityError):  # 세션은 한 번만 정산
+        await repo.save(stored)
+
+    other.close(T)
+    await repo.save(other)
+    assert [s.status for s in await repo.list_by_cohort(cohort.id, month=date(2026, 12, 1))] == [
+        MentoringSettlementStatus.CLOSED
+    ]
+    db = connections.get("default")
+    for sql in ("status = 'CLOSED', closed_at = NULL", "settlement_month = '2026-11-15'"):
+        with pytest.raises(IntegrityError):
+            await db.execute_query(
+                f"UPDATE mentoring_settlements SET {sql} WHERE id = $1", [str(settlement.id)]
+            )
+    with pytest.raises(IntegrityError):
+        await db.execute_query(
+            "UPDATE mentoring_settlement_items SET pay_unit = 'MONTHLY' WHERE settlement_id = $1",
+            [str(other.id)],
+        )
