@@ -1,7 +1,7 @@
 # 52. P14-1 정산 집계·조회·마감
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #57
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P14 (P14-1)
 - 이전 기록: [51. P13-2 녹화·전사·요약 수집·폴더 정리·중계](51_p13_2_meet_artifacts.md)
 
