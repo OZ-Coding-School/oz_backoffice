@@ -42,6 +42,7 @@
 | `GMAIL_SENDER`, `GOOGLE_SERVICE_ACCOUNT_JSON` | 운영 발신 계정, 서비스 계정 키 JSON(한 줄) | |
 | `MEET_DRIVER` | `google` | 위임에 Meet 범위가 등록된 뒤 켠다. `GMAIL_SENDER`가 Meet 공간 주최자가 된다(A46·A47) |
 | `MEET_PUBSUB_TOPIC`, `MEET_PUBSUB_SUBSCRIPTION` | `projects/<ID>/topics/<토픽>`, `projects/<ID>/subscriptions/<구독>` | 운영용 토픽·구독을 따로 만든다. worker가 구독을 실시간 수신한다(A50) |
+| `MEET_RECORDINGS_FOLDER_ID` | 공유 드라이브 `멘토링 녹화` 폴더 ID | 위임에 `drive` 범위, 주최 계정이 그 공유 드라이브 콘텐츠 관리자여야 한다(A54) |
 | `MEET_ORGANIZER_USER_ID` | 주최 계정(`GMAIL_SENDER`) 사용자 ID | 관리 콘솔 → 디렉터리 → 사용자 → 그 계정 주소의 숫자(A51). 없으면 이벤트 구독을 하지 않는다 |
 | `SMS_DRIVER` | 업체 어댑터 값 | 업체 확정 전에는 `console` → SMS 503 |
 
@@ -144,6 +145,7 @@ app.workers.tasks.mentoring       # 배정 만료(매일 00:00 KST), 대기 신�
 | `educator.contracts.expire` | 매일 00:05 | 종료일이 지난 계약 ENDED |
 | `academy.roster_sync.scheduled` | 매시간 | Airtable 설정이 없으면 건너뜀 |
 | `mentoring.requests.expire` | 10분마다 | 승인 가능한 희망 일시가 남지 않은 대기 신청 취소·보류 시간 반환 |
+| `mentoring.meet.artifacts.sync` | 매시 정각 | 종료 7일 이내 세션 녹화·전사·요약 보완 수집·남은 정리(M20). 설정이 없으면 건너뜀 |
 | `mentoring.meet.events.subscribe` | 6시간마다 | 주최 계정 Meet 이벤트 구독 생성·갱신. 설정이 없으면 건너뜀 |
 | `mentoring.meet.sync` | 10분마다 | 공간 없는 시작 전 예정 세션에 Meet 공간 생성, 취소된 세션 공간 막기. `MEET_DRIVER=disabled`면 건너뜀 |
 
@@ -151,4 +153,4 @@ app.workers.tasks.mentoring       # 배정 만료(매일 00:00 KST), 대기 신�
 
 ## 6. 변경 이력
 - 2026-11-11: 문서 작성 (P8까지 반영)
-- 2026-11-12: 대기 신청 만료 작업 추가 (P11-1), Meet 공간 생성·보완 작업과 `MEET_DRIVER` 추가 (P12-1), Meet 이벤트 구독·실시간 수신과 `MEET_PUBSUB_*` 추가 (P12-2)
+- 2026-11-12: 대기 신청 만료 작업 추가 (P11-1), Meet 공간 생성·보완 작업과 `MEET_DRIVER` 추가 (P12-1), Meet 이벤트 구독·실시간 수신과 `MEET_PUBSUB_*` 추가 (P12-2), 녹화 수집·정리 작업과 `MEET_RECORDINGS_FOLDER_ID` 추가 (P13-2)
