@@ -1,6 +1,6 @@
 # 50. P13-1 세션 기록·내부 메모·미제출 목록
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-13 병합)
 - 관련 PR: #55
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P13 (P13-1)
 - 이전 기록: [49. P12-3 Meet 멘토 공동 주최자 등록](49_p12_3_meet_cohost.md)
@@ -53,6 +53,8 @@ P13은 PR 두 개로 나눴다(A53). 이번 PR은 멘토의 기록 제출(완료
 - 통합(PostgreSQL): 메모 왕복·세션당 하나·빈 본문 CHECK, 미제출 목록, OVERTIME 원장 허용·신청당 하나
 - API: 시작 전 거부 → 미제출 목록 → 진행 시간 누락 422·수강생 403 → 제출(잔여 반영) → 재제출 거부 → 요약 수정 → 미제출 0 → 수강생 요약 보임·운영진 실제 시각 필드 → 메모(수강생 403, 운영진 조회)
 - 마이그레이션 19: `upgrade` → `migrate`("No changes detected") → `downgrade -v 19` → `upgrade`, DBML 파서 검증
+- GitHub Actions (PR #55): backend 잡 통과
+- 사용자가 작업 완료를 확인했다(2026-11-13). 메모 상한 5,000자는 별도 변경 요청 없이 유지
 - 전체 773 passed (compose `api` 컨테이너, ruff·ruff format·mypy·mypy tests·lint-imports 통과)
 - 커밋 4개를 worktree에서 하나씩 검사했다(765 → 767 → 772 → 773 passed)
 
