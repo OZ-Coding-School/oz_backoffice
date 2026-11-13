@@ -37,6 +37,9 @@ class FakeSpacesApi:
     async def end_active_conference(self, *, request: Any) -> Any:
         return await self._call("end", request)
 
+    async def create_member(self, *, request: Any) -> Any:
+        return await self._call("member", request)
+
 
 async def test_create_space_config() -> None:
     api = FakeSpacesApi()
@@ -45,6 +48,10 @@ async def test_create_space_config() -> None:
     config = api.requests[0][1].space.config
     on = meet.SpaceConfig.ArtifactConfig.AutoGenerationType.ON
     assert config.access_type == meet.SpaceConfig.AccessType.OPEN
+    assert config.moderation == meet.SpaceConfig.Moderation.ON  # 공동 주최자 역할이 적용되게
+    free = meet.SpaceConfig.ModerationRestrictions.RestrictionType.NO_RESTRICTION
+    assert config.moderation_restrictions.chat_restriction == free
+    assert config.moderation_restrictions.present_restriction == free
     assert config.artifact_config.recording_config.auto_recording_generation == on
     assert config.artifact_config.transcription_config.auto_transcription_generation == on
     assert config.artifact_config.smart_notes_config.auto_smart_notes_generation == on
@@ -77,3 +84,20 @@ def test_build_meet_client(settings: Settings) -> None:
     assert build_meet_client(settings) is None  # 기본 disabled
     missing = settings.model_copy(update={"meet_driver": "google"})
     assert build_meet_client(missing) is None  # 키·주최 계정 없음
+
+
+async def test_add_cohost() -> None:
+    api = FakeSpacesApi()
+    client = GoogleMeetClient(api)
+    await client.add_cohost("spaces/abc", "mentor@example.com")
+    request = api.requests[-1][1]
+    assert (request.parent, request.member.email, request.member.role) == (
+        "spaces/abc",
+        "mentor@example.com",
+        meet.Member.Role.COHOST,
+    )
+    api.errors["member"] = _error(google_exceptions.AlreadyExists, "이미 있음")
+    await client.add_cohost("spaces/abc", "mentor@example.com")  # 이미 등록돼 있으면 무시
+    api.errors["member"] = _error(google_exceptions.PermissionDenied, "권한")
+    with pytest.raises(MeetUnavailableError):
+        await client.add_cohost("spaces/abc", "mentor@example.com")
