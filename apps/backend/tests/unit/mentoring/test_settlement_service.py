@@ -6,6 +6,8 @@ from typing import Any
 import pytest
 
 from app.contexts.audit.application.recorder import AuditRecorder
+from app.contexts.educator.application.mentor_queries import MentorQueries
+from app.contexts.educator.domain.profiles import Mentor
 from app.contexts.mentoring.application.settlement_service import SettlementService
 from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.enums import (
@@ -21,6 +23,7 @@ from app.shared.errors import BusinessRuleViolation, NotFoundError
 from app.shared.ids import new_id
 from app.shared.time import KST
 from tests.fakes.audit import InMemoryAuditLogRepository
+from tests.fakes.educator import InMemoryMentorRepository
 from tests.fakes.mentoring import (
     InMemoryCohortMentorRepository,
     InMemoryRequestRepository,
@@ -39,7 +42,8 @@ class Harness:
         self, policy: MentoringSettlementPolicy = MentoringSettlementPolicy.ACTUAL_DURATION
     ) -> None:
         self.cohort_id = new_id()
-        self.mentor_id = new_id()
+        self.mentor = Mentor(user_id=new_id())
+        self.mentor_id = self.mentor.id
         self.student_id = new_id()
         self.requests = InMemoryRequestRepository()
         self.sessions = InMemorySessionRepository(self.requests)
@@ -61,6 +65,7 @@ class Harness:
             sessions=self.sessions,
             requests=self.requests,
             assignments=InMemoryCohortMentorRepository(self.assignment),
+            mentors=MentorQueries(InMemoryMentorRepository(self.mentor)),
             audit=AuditRecorder(self.audit_logs, self.clock),
             uow=FakeUnitOfWork(),
             clock=self.clock,
@@ -169,3 +174,18 @@ async def test_missing_assignment_is_skipped_and_scope() -> None:
     assert result.settlements == []
     with pytest.raises(NotFoundError):
         await h.service.get(new_id(), new_id())
+
+
+async def test_mentor_sees_only_closed_own() -> None:
+    h = Harness()
+    await h.session(3)
+    (settlement,) = (await h.service.aggregate(h.cohort_id, NOV, actor_id=new_id())).settlements
+    assert await h.service.list_for_mentor(h.mentor.user_id) == []  # 집계 중은 안 보인다
+    with pytest.raises(NotFoundError):
+        await h.service.get_for_mentor(h.mentor.user_id, settlement.id)
+    await h.service.close(h.cohort_id, settlement.id, confirm=True, actor_id=new_id())
+    assert [s.id for s in await h.service.list_for_mentor(h.mentor.user_id)] == [settlement.id]
+    detail = await h.service.get_for_mentor(h.mentor.user_id, settlement.id)
+    assert len(detail.items) == 1
+    with pytest.raises(NotFoundError):
+        await h.service.list_for_mentor(new_id())  # 멘토 프로필 없음

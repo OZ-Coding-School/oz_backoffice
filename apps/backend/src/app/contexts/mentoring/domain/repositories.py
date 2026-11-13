@@ -326,9 +326,13 @@ class MentoringSettlementRepository(Protocol):
         ...
 
     async def list_by_cohort(
-        self, cohort_id: uuid.UUID, *, month: date | None
+        self, cohort_id: uuid.UUID, *, month: date | None, with_items: bool = False
     ) -> list[MentoringSettlement]:
-        """명세 없이 (목록용)."""
+        """기본은 명세 없이 (목록용). with_items면 명세를 한 번에 묶어 읽는다(CSV)."""
+        ...
+
+    async def list_closed_by_mentor(self, mentor_id: uuid.UUID) -> list[MentoringSettlement]:
+        """그 멘토의 마감된 정산 (최근 월부터, 명세 없이)."""
         ...
 
     async def settled_session_ids(

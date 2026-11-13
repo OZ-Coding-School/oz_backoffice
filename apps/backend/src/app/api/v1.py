@@ -54,6 +54,9 @@ from app.contexts.mentoring.presentation.settings_router import router as mentor
 from app.contexts.mentoring.presentation.settlement_router import (
     admin_router as settlement_admin_router,
 )
+from app.contexts.mentoring.presentation.settlement_router import (
+    me_router as settlement_me_router,
+)
 from app.contexts.mentoring.presentation.team_router import admin_router as team_admin_router
 from app.contexts.mentoring.presentation.team_router import me_router as team_me_router
 from app.contexts.organization.presentation.admin_router import (
@@ -99,5 +102,6 @@ router.include_router(record_router)  # 세션 라우터의 /{session_id}보다 
 router.include_router(record_admin_router)
 router.include_router(session_router)
 router.include_router(settlement_admin_router)
+router.include_router(settlement_me_router)
 router.include_router(session_me_router)
 router.include_router(session_admin_router)

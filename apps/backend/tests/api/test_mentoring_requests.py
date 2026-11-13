@@ -719,3 +719,69 @@ async def test_settlement_aggregate_detail_close(
     assert (closed["applied"], closed["settlement"]["status"]) == (True, "CLOSED")
     again = await client.post(f"{base}/aggregate", json={"month": month}, headers=admin)
     assert again.json()["closed"] == [summary["id"]]
+
+
+async def test_settlement_csv_and_mentor_view(
+    app: Any, client: AsyncClient, settings: Settings
+) -> None:
+    import csv
+    import io
+
+    from app.core.clock import FixedClock
+
+    ctx = await _setup(client, settings)
+    student_h, mentor_h, admin = ctx["student_h"], ctx["mentor_h"], ctx["admin"]
+    at = ctx["at"]
+    rid = (await client.post(URL, json=_body(ctx), headers=student_h)).json()["id"]
+    sid = (
+        await client.post(
+            f"{URL}/{rid}/approve", json={"starts_at": at.isoformat()}, headers=mentor_h
+        )
+    ).json()["session"]["id"]
+    app.state.clock = FixedClock(at + timedelta(hours=2))
+    await client.post(
+        f"/api/v1/mentoring/sessions/{sid}/record",
+        json={"status": "COMPLETED", "duration": 60, "topic": "포트폴리오", "summary": "요약,쉼표"},
+        headers=mentor_h,
+    )
+    base = f"/api/v1/admin/cohorts/{ctx['cohort'].id}/mentoring/settlements"
+    month = at.strftime("%Y-%m")
+    (summary,) = (
+        await client.post(f"{base}/aggregate", json={"month": month}, headers=admin)
+    ).json()["settlements"]
+
+    exported = await client.get(
+        f"{base}/export.csv", params={"month": month, "columns": "topic,summary"}, headers=admin
+    )
+    assert exported.status_code == 200, exported.text
+    assert exported.headers["content-type"].startswith("text/csv")
+    assert exported.content.startswith("﻿".encode())  # BOM
+    rows = list(csv.reader(io.StringIO(exported.content.decode("utf-8-sig"))))
+    assert rows[0][-2:] == ["주제", "요약"]
+    assert len(rows) == 2
+    record = dict(zip(rows[0], rows[1], strict=True))
+    assert (record["멘토"], record["신청자"], record["금액(원)"], record["요약"]) == (
+        "김멘토",
+        "가수강",
+        "30000",
+        "요약,쉼표",
+    )
+    assert record["정산 상태"] == "집계 중"
+    bad = await client.get(
+        f"{base}/export.csv", params={"month": month, "columns": "x"}, headers=admin
+    )
+    assert bad.json()["error"]["code"] == "invalid_export_columns"
+    single = await client.get(f"{base}/{summary['id']}/export.csv", headers=admin)
+    assert len(next(iter(csv.reader(io.StringIO(single.content.decode("utf-8-sig")))))) == 14
+    assert (
+        await client.get(f"{base}/export.csv", params={"month": month}, headers=student_h)
+    ).status_code == 403
+
+    mine = "/api/v1/me/mentor-settlements"
+    assert (await client.get(mine, headers=mentor_h)).json() == []  # 마감 전
+    await client.post(f"{base}/{summary['id']}/close", json={"confirm": True}, headers=admin)
+    listed = (await client.get(mine, headers=mentor_h)).json()
+    assert [s["id"] for s in listed] == [summary["id"]]
+    detail = (await client.get(f"{mine}/{summary['id']}", headers=mentor_h)).json()
+    assert [i["amount"] for i in detail["items"]] == [30000]
+    assert (await client.get(mine, headers=student_h)).status_code == 404  # 멘토 아님
