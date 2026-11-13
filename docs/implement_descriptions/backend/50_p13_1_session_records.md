@@ -1,7 +1,7 @@
 # 50. P13-1 세션 기록·내부 메모·미제출 목록
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #55
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P13 (P13-1)
 - 이전 기록: [49. P12-3 Meet 멘토 공동 주최자 등록](49_p12_3_meet_cohost.md)
 
