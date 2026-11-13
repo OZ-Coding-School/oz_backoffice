@@ -1,7 +1,7 @@
 # 53. P14-2 정산 CSV 내보내기·멘토 정산 조회
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #58
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P14 (P14-2)
 - 이전 기록: [52. P14-1 정산 집계·조회·마감](52_p14_1_settlements.md)
 
