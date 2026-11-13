@@ -1,6 +1,6 @@
 # 49. P12-3 Meet 멘토 공동 주최자 등록
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-13 병합)
 - 관련 PR: #54
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P12 (P12-3)
 - 이전 기록: [48. P12-2 Meet 이벤트 구독·실시간 수신·처리](48_p12_2_meet_events.md)
@@ -39,6 +39,8 @@ P12-2를 실제 Google로 테스트하다가, 자동 녹화·전사·메모가 *
 - 단위: 어댑터(주최자 관리·참가자 제한 설정, COHOST 등록 요청, 이미 있음 무시, 오류 → `meet_unavailable`), 서비스(생성 시 멘토 이메일 공동 주최자 등록, 등록 실패 시 공간 막고 다음 주기 새 공간, 멘토 정보 없으면 공동 주최자 없이)
 - API: sync 후 공동 주최자 등록 1건
 - 실제 Google: 위 "실제 확인한 것"
+- GitHub Actions (PR #54): backend 잡 통과
+- 사용자가 작업 완료를 확인했다(2026-11-13)
 - 전체 760 passed (compose `api` 컨테이너, ruff·ruff format·mypy·mypy tests·lint-imports 통과)
 - 커밋 3개를 worktree에서 하나씩 검사했다(757 → 758 → 760 passed)
 - 스키마 변경 없음
