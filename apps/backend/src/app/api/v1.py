@@ -13,6 +13,10 @@ from app.contexts.identity.presentation.approval_router import me_router as memb
 from app.contexts.identity.presentation.password_router import router as password_router
 from app.contexts.identity.presentation.router import auth_router, me_router
 from app.contexts.identity.presentation.signup_router import router as signup_router
+from app.contexts.mentoring.presentation.artifact_router import (
+    admin_router as artifact_admin_router,
+)
+from app.contexts.mentoring.presentation.artifact_router import router as artifact_router
 from app.contexts.mentoring.presentation.assignment_router import (
     admin_router as mentor_assignment_admin_router,
 )
@@ -86,6 +90,8 @@ router.include_router(balance_me_router)
 router.include_router(request_router)
 router.include_router(request_me_router)
 router.include_router(request_admin_router)
+router.include_router(artifact_router)
+router.include_router(artifact_admin_router)
 router.include_router(record_router)  # 세션 라우터의 /{session_id}보다 먼저
 router.include_router(record_admin_router)
 router.include_router(session_router)

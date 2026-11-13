@@ -1,5 +1,6 @@
 """멘토링 신청 API (실제 DB, A42 P11-1: 신청·승인 전 취소·조회)."""
 
+import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -541,3 +542,115 @@ async def test_record_note_and_unrecorded(
     assert (
         await client.get(f"{admin_sessions}/{session['id']}/note", headers=student_h)
     ).status_code == 403
+
+
+async def test_artifact_list_and_stream(app: Any, client: AsyncClient, settings: Settings) -> None:
+    from collections.abc import AsyncIterator
+    from typing import cast
+
+    from fastapi import Request
+
+    from app.contexts.mentoring.application.artifact_service import ArtifactService
+    from app.contexts.mentoring.domain.artifact import MentoringArtifact
+    from app.contexts.mentoring.domain.enums import MentoringArtifactType
+    from app.contexts.mentoring.infrastructure.repositories import (
+        TortoiseMentoringArtifactRepository,
+        TortoiseMentoringRequestRepository,
+        TortoiseMentoringSessionRepository,
+    )
+    from app.contexts.mentoring.presentation.artifact_router import get_artifact_service
+    from app.contexts.mentoring.presentation.session_router import get_session_queries
+    from app.core.clock import SystemClock
+    from app.integrations.google.drive import DriveStream
+
+    streamed: list[tuple[str, bool, str | None]] = []
+
+    class FakeArchive:
+        async def stream(
+            self, file_id: str, *, export_pdf: bool, range_header: str | None
+        ) -> DriveStream:
+            streamed.append((file_id, export_pdf, range_header))
+
+            async def chunks() -> AsyncIterator[bytes]:
+                yield b"part"
+
+            if export_pdf:
+                return DriveStream(200, {"content-type": "application/pdf"}, chunks())
+            return DriveStream(
+                206, {"content-type": "video/mp4", "content-range": "bytes 0-3/10"}, chunks()
+            )
+
+    def service(request: Request) -> ArtifactService:
+        state = request.app.state
+        return ArtifactService(
+            sessions=TortoiseMentoringSessionRepository(),
+            requests=TortoiseMentoringRequestRepository(),
+            artifacts=TortoiseMentoringArtifactRepository(),
+            access=get_session_queries(request),
+            source=None,
+            archive=cast("Any", FakeArchive()),
+            students=state.student_queries,
+            cohorts=state.academy_catalog,
+            mentors=state.mentor_queries,
+            users=state.user_queries,
+            clock=SystemClock(),
+        )
+
+    app.dependency_overrides[get_artifact_service] = service
+    ctx = await _setup(client, settings)
+    student_h, mentor_h, admin = ctx["student_h"], ctx["mentor_h"], ctx["admin"]
+    request_id = (await client.post(URL, json=_body(ctx), headers=student_h)).json()["id"]
+    session_id = (
+        await client.post(
+            f"{URL}/{request_id}/approve",
+            json={"starts_at": ctx["at"].isoformat()},
+            headers=mentor_h,
+        )
+    ).json()["session"]["id"]
+    repo = TortoiseMentoringArtifactRepository()
+    video = MentoringArtifact(
+        session_id=uuid.UUID(session_id),
+        drive_file_id="v1",
+        artifact_type=MentoringArtifactType.VIDEO,
+    )
+    video.archived(file_name="녹화.mp4", mime_type="video/mp4", file_size=10)
+    doc = MentoringArtifact(
+        session_id=uuid.UUID(session_id),
+        drive_file_id="t1",
+        artifact_type=MentoringArtifactType.TRANSCRIPT,
+    )
+    doc.archived(
+        file_name="전사본", mime_type="application/vnd.google-apps.document", file_size=None
+    )
+    pending = MentoringArtifact(
+        session_id=uuid.UUID(session_id),
+        drive_file_id="p1",
+        artifact_type=MentoringArtifactType.SUMMARY,
+    )
+    for a in (video, doc, pending):
+        await repo.add_if_absent(a)
+
+    base = f"/api/v1/mentoring/sessions/{session_id}/artifacts"
+    listed = (await client.get(base, headers=student_h)).json()
+    assert {(a["artifact_type"], a["file_name"], a["mime_type"]) for a in listed} == {
+        ("VIDEO", "녹화.mp4", "video/mp4"),
+        ("TRANSCRIPT", "전사본.pdf", "application/pdf"),
+    }  # 정리 전 파일은 보이지 않는다
+    content = await client.get(
+        f"{base}/{video.id}/content", headers={**student_h, "Range": "bytes=0-3"}
+    )
+    assert (content.status_code, content.content) == (206, b"part")
+    assert content.headers["content-range"] == "bytes 0-3/10"
+    assert "inline; filename*=UTF-8''" in content.headers["content-disposition"]
+    pdf = await client.get(f"{base}/{doc.id}/content", headers=mentor_h)
+    assert (pdf.status_code, pdf.headers["content-type"]) == (200, "application/pdf")
+    assert streamed == [("v1", False, "bytes=0-3"), ("t1", True, None)]
+    assert (await client.get(f"{base}/{pending.id}/content", headers=student_h)).status_code == 404
+
+    stranger = bearer(settings, await _approved())
+    assert (await client.get(base, headers=stranger)).status_code == 404
+    admin_base = (
+        f"/api/v1/admin/cohorts/{ctx['cohort'].id}/mentoring/sessions/{session_id}/artifacts"
+    )
+    assert len((await client.get(admin_base, headers=admin)).json()) == 2
+    assert (await client.get(admin_base, headers=student_h)).status_code == 403
