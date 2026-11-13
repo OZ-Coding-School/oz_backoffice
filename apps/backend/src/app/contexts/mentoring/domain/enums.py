@@ -35,7 +35,8 @@ class MentoringBalanceTransactionType(StrEnum):
     HOLD = "HOLD"  # 신청: held += d
     RELEASE = "RELEASE"  # 승인 전 반려·취소: held -= d
     USING = "USING"  # 승인: held -= d, used += d
-    REFUND = "REFUND"  # 승인 후 취소·노쇼: used -= d
+    REFUND = "REFUND"  # 승인 후 취소·노쇼·짧게 진행: used -= d
+    OVERTIME = "OVERTIME"  # 신청보다 길게 진행(A53): used += d (잔여에서)
 
 
 class MentoringRequestStatus(StrEnum):

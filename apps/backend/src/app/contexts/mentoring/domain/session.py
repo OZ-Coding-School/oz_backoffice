@@ -5,18 +5,24 @@
   N은 같은 신청자·같은 멘토의 취소되지 않은 세션 순서. 주제는 신청 주제.
 - 멘토 일정 겹침은 DB EXCLUDE가, 신청자 일정 겹침은 서비스가 막는다.
 - Meet 공간은 승인 후 만들고(링크 = `google_meet_url`), 취소되면 막고 링크를 지운다(A48).
-- 진행·기록·녹화 필드는 P12-2·P13에서 채운다.
+- 기록(A53): 담당 멘토가 예정 시작 시각 이후 COMPLETED(실제 진행 시간 30분 단위·주제·요약 필수)
+  또는 NO_SHOW(사유 선택)를 제출한다. 진행 시간·완료/노쇼는 처음 제출로 고정, 주제·요약은 제출 후
+  7일까지 수정.
 """
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.contexts.mentoring.domain.enums import MentoringSessionStatus, RecordingStatus
 from app.shared.domain import AggregateRoot
 from app.shared.errors import BusinessRuleViolation
 
 TITLE_MAX_LENGTH = 100
+TOPIC_MAX_LENGTH = 100
+SUMMARY_MAX_LENGTH = 5000
+RECORD_UNIT_MINUTES = 30
+RECORD_EDIT_DAYS = 7
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,6 +34,17 @@ class SessionQuery:
     starts_before: datetime | None = None  # 미포함
     limit: int = 20
     offset: int = 0
+
+
+def _rule(condition: bool, message: str, code: str) -> None:
+    if not condition:
+        raise BusinessRuleViolation(message, code=code)
+
+
+def _text(value: str, limit: int, label: str, code: str) -> str:
+    text = value.strip()
+    _rule(0 < len(text) <= limit, f"{label}을(를) 1~{limit:,}자로 적어 주세요.", code)
+    return text
 
 
 def session_title(requester_label: str, mentor_label: str, number: int) -> str:
@@ -137,4 +154,72 @@ class MentoringSession(AggregateRoot):
             self.actual_started_at,
             self.actual_ended_at,
             self.google_conference_record_name,
+        )
+
+    # ------------------------------------------------------------------ 기록 (A53)
+    @property
+    def is_recorded(self) -> bool:
+        return self.recorded_at is not None
+
+    def submit_completed(self, *, duration: int, topic: str, summary: str, now: datetime) -> None:
+        _rule(
+            duration > 0 and duration % RECORD_UNIT_MINUTES == 0,
+            "진행 시간은 30분 단위로 적어 주세요.",
+            "invalid_record_duration",
+        )
+        topic_text = _text(topic, TOPIC_MAX_LENGTH, "주제", "invalid_record_topic")
+        summary_text = _text(summary, SUMMARY_MAX_LENGTH, "요약", "invalid_record_summary")
+        self._ensure_recordable(now)
+        self.status = MentoringSessionStatus.COMPLETED
+        self.record_duration_minutes = duration
+        self.topic = topic_text
+        self.body = summary_text
+        self.recorded_at = now
+
+    def submit_no_show(self, *, reason: str | None, now: datetime) -> None:
+        text = (reason or "").strip()
+        _rule(len(text) <= SUMMARY_MAX_LENGTH, "사유가 너무 깁니다.", "invalid_record_summary")
+        self._ensure_recordable(now)
+        self.status = MentoringSessionStatus.NO_SHOW
+        self.record_duration_minutes = None
+        self.body = text or None
+        self.recorded_at = now
+
+    def edit_record(self, *, topic: str | None, summary: str | None, now: datetime) -> None:
+        """주제·요약만, 제출 후 7일까지 (A53)."""
+        recorded_at = self.recorded_at
+        if recorded_at is None:
+            raise BusinessRuleViolation("아직 제출한 기록이 없습니다.", code="record_not_submitted")
+        _rule(
+            now <= recorded_at + timedelta(days=RECORD_EDIT_DAYS),
+            f"기록은 제출 후 {RECORD_EDIT_DAYS}일까지만 고칠 수 있습니다.",
+            "record_edit_expired",
+        )
+        if topic is not None:
+            _rule(
+                self.status is MentoringSessionStatus.COMPLETED,
+                "노쇼 기록에는 주제를 고칠 수 없습니다.",
+                "invalid_record_topic",
+            )
+            self.topic = _text(topic, TOPIC_MAX_LENGTH, "주제", "invalid_record_topic")
+        if summary is not None:
+            if self.status is MentoringSessionStatus.COMPLETED:
+                self.body = _text(summary, SUMMARY_MAX_LENGTH, "요약", "invalid_record_summary")
+            else:
+                text = summary.strip()
+                _rule(
+                    len(text) <= SUMMARY_MAX_LENGTH, "사유가 너무 깁니다.", "invalid_record_summary"
+                )
+                self.body = text or None
+
+    def _ensure_recordable(self, now: datetime) -> None:
+        _rule(
+            self.status in (MentoringSessionStatus.SCHEDULED, MentoringSessionStatus.IN_PROGRESS),
+            "기록을 제출할 수 없는 세션입니다.",
+            "session_not_recordable",
+        )
+        _rule(
+            now >= self.starts_at,
+            "예정 시작 시각 이후에 제출할 수 있습니다.",
+            "session_not_started",
         )
