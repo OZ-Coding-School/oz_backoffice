@@ -1,6 +1,6 @@
 # 52. P14-1 정산 집계·조회·마감
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-13 병합)
 - 관련 PR: #57
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P14 (P14-1)
 - 이전 기록: [51. P13-2 녹화·전사·요약 수집·폴더 정리·중계](51_p13_2_meet_artifacts.md)
@@ -47,6 +47,8 @@ P14는 PR 두 개로 나눴다(A55). 이번 PR은 운영진의 정산 집계·�
 - 통합(PostgreSQL): 정산 대상·미제출 조회, 정산 저장·명세 교체·다른 정산 제외, 세션당 명세 하나(유니크), 마감 CHECK·1일 CHECK·시급·회당만 CHECK
 - API: 잘못된 월 422, 수강생 403, 집계(금액·멘토 이름), 목록·상세, 마감 미리보기(미제출) → 확인 마감, 다시 집계 시 마감된 정산 표시
 - 마이그레이션 21: `upgrade` → `migrate`("No changes detected") → `downgrade -v 21` → `upgrade`, DBML 파서 검증
+- GitHub Actions (PR #57): backend 잡 통과
+- 사용자가 작업 완료를 확인했다(2026-11-13)
 - 전체 796 passed (compose `api` 컨테이너, ruff·ruff format·mypy·mypy tests·lint-imports 통과)
 - 코드 커밋 4개를 worktree에서 하나씩 검사했다(790 → 791 → 795 → 796 passed)
 
