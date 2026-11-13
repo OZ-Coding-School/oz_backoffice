@@ -1,7 +1,7 @@
 # 51. P13-2 녹화·전사·요약 수집·폴더 정리·중계
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #56
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P13 (P13-2)
 - 이전 기록: [50. P13-1 세션 기록·내부 메모·미제출 목록](50_p13_1_session_records.md)
 
