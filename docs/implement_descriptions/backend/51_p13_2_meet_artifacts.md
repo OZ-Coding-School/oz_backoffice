@@ -1,6 +1,6 @@
 # 51. P13-2 녹화·전사·요약 수집·폴더 정리·중계
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-13 병합)
 - 관련 PR: #56
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P13 (P13-2)
 - 이전 기록: [50. P13-1 세션 기록·내부 메모·미제출 목록](50_p13_1_session_records.md)
@@ -54,6 +54,8 @@ Meet이 만든 녹화·전사·스마트 메모를 세션별로 수집해 공유
 - 통합(PostgreSQL): 파일 저장·중복 무시·CHECK 위반
 - API: 목록(정리 전 숨김·문서 PDF 이름), 영상 206·Content-Range·inline, 문서 PDF, 정리 전 404, 비참여자 404, 운영진 목록·수강생 403 (Drive는 가짜로 바꿔 끼움)
 - 마이그레이션 20: `upgrade` → `migrate`("No changes detected") → `downgrade -v 20` → `upgrade`, DBML 파서 검증
+- GitHub Actions (PR #56): backend 잡 통과
+- 사용자가 작업 완료를 확인했다(2026-11-13)
 - 전체 786 passed (compose `api` 컨테이너, ruff·ruff format·mypy·mypy tests·lint-imports 통과)
 - 코드 커밋 5개를 worktree에서 하나씩 검사했다(775 → 780 → 784 → 785 → 786 passed)
 
