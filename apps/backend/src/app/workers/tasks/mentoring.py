@@ -12,6 +12,9 @@
   `mentoring.meet.events.handle`을 등록한다. 작업은 세션 진행·실제 시각·녹화 상태를 반영한다
   (A49, 중복은 Redis로 거름, 최대 3회 시도).
 - `mentoring.meet.events.subscribe`: 6시간마다, 주최 계정 이벤트 구독을 만들거나 갱신한다.
+- `mentoring.meet.artifacts.collect`: 녹화·전사·스마트 메모 생성 이벤트 뒤 그 세션 파일을
+  수집·정리한다(최대 3회). `mentoring.meet.artifacts.sync`: 1시간마다 종료 7일 이내 세션 보완
+  수집·남은 정리(M20).
 - `mentoring.enrollment_ended.process`: 명단 동기화가 성공하면 보낸다(roster 작업). 수강 중이 아닌
   수강생을 팀에서 빼고 대기 신청·시작 전 1:1 세션을 취소한 뒤 1:1 잔여를 회수한다(A39·A45, 멱등).
 
@@ -37,6 +40,7 @@ from app.contexts.educator.application.mentor_queries import MentorQueries
 from app.contexts.educator.infrastructure.repositories import TortoiseMentorRepository
 from app.contexts.identity.application.auth_service import UserQueries
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
+from app.contexts.mentoring.application.artifact_service import ArtifactService
 from app.contexts.mentoring.application.assignment_service import CohortMentorService
 from app.contexts.mentoring.application.availability_service import AvailableTimesService
 from app.contexts.mentoring.application.calendar import BusinessCalendar
@@ -45,12 +49,14 @@ from app.contexts.mentoring.application.meet_event_service import MeetEventServi
 from app.contexts.mentoring.application.meet_service import MeetSpaceService
 from app.contexts.mentoring.application.request_cleanup import RequestCleanup
 from app.contexts.mentoring.application.request_service import MentoringRequestService
+from app.contexts.mentoring.application.session_service import MentoringSessionQueries
 from app.contexts.mentoring.infrastructure.meet_events import RedisProcessedEvents
 from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseBalanceAccountRepository,
     TortoiseBalanceTransactionRepository,
     TortoiseCohortMentoringSettingsRepository,
     TortoiseCohortMentorRepository,
+    TortoiseMentoringArtifactRepository,
     TortoiseMentoringBlockTimeRepository,
     TortoiseMentoringHolidayRepository,
     TortoiseMentoringRequestRepository,
@@ -60,7 +66,12 @@ from app.contexts.mentoring.infrastructure.repositories import (
 )
 from app.core.clock import SystemClock
 from app.core.config import get_settings
-from app.core.meet import build_meet_client, build_meet_events_client, build_meet_listener
+from app.core.meet import (
+    build_drive_archive_client,
+    build_meet_client,
+    build_meet_events_client,
+    build_meet_listener,
+)
 from app.core.redis import create_redis
 from app.core.uow import UnitOfWork
 from app.integrations.google.meet import MeetUnavailableError
@@ -246,6 +257,7 @@ async def handle_event_with_retry(
             sessions=TortoiseMentoringSessionRepository(),
             source=source,
             processed=RedisProcessedEvents(redis),
+            artifacts=TaskiqArtifactScheduler(),
             uow=UnitOfWork(),
         )
     try:
@@ -302,3 +314,71 @@ async def _stop_meet_listener(_: TaskiqState) -> None:
     if _listener is not None:
         _listener.stop()
         _listener = None
+
+
+HOURLY_ON_THE_HOUR = {"cron": "0 * * * *"}
+
+
+async def build_artifact_service() -> ArtifactService:
+    settings = get_settings()
+    students = StudentQueries(TortoiseStudentRepository())
+    mentors = MentorQueries(TortoiseMentorRepository())
+    sessions = TortoiseMentoringSessionRepository()
+    requests = TortoiseMentoringRequestRepository()
+    return ArtifactService(
+        sessions=sessions,
+        requests=requests,
+        artifacts=TortoiseMentoringArtifactRepository(),
+        access=MentoringSessionQueries(
+            sessions=sessions,
+            requests=requests,
+            teams=TortoiseMentoringTeamRepository(),
+            students=students,
+            mentors=mentors,
+        ),
+        source=await build_meet_events_client(settings),
+        archive=build_drive_archive_client(settings),
+        students=students,
+        cohorts=AcademyCatalog(TortoiseBootcampRepository(), TortoiseCohortRepository()),
+        mentors=mentors,
+        users=UserQueries(TortoiseUserRepository()),
+        clock=SystemClock(),
+    )
+
+
+async def collect_with_retry(
+    session_id: uuid.UUID,
+    *,
+    service: ArtifactService | None = None,
+    delays: tuple[int, ...] = MEET_RETRY_DELAYS_SECONDS,
+) -> bool:
+    service = service or await build_artifact_service()
+    if not service.enabled:
+        return False
+    for attempt in range(1, MEET_ATTEMPTS + 1):
+        try:
+            await service.collect(session_id)
+            return True
+        except MeetUnavailableError:
+            logger.warning("녹화 수집 실패 %d/%d (세션 %s)", attempt, MEET_ATTEMPTS, session_id)
+            if attempt < MEET_ATTEMPTS:
+                await asyncio.sleep(delays[min(attempt - 1, len(delays) - 1)])
+    return False  # 1시간 보완 작업이 다시 수집한다
+
+
+@broker.task(task_name="mentoring.meet.artifacts.collect")
+async def collect_meet_artifacts(session_id: str) -> None:
+    await collect_with_retry(uuid.UUID(session_id))
+
+
+@broker.task(task_name="mentoring.meet.artifacts.sync", schedule=[HOURLY_ON_THE_HOUR])
+async def sync_meet_artifacts() -> None:
+    service = await build_artifact_service()
+    collected, archived = await service.sync()
+    if collected or archived:
+        logger.info("녹화 파일 %d개 수집, %d개 정리", collected, archived)
+
+
+class TaskiqArtifactScheduler:
+    async def collect_needed(self, session_id: uuid.UUID) -> None:
+        await collect_meet_artifacts.kiq(str(session_id))

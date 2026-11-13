@@ -13,7 +13,7 @@ Meet API가 알려 준 세션 파일만 다룬다(주최 계정의 다른 Drive 
 
 import logging
 import uuid
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from datetime import timedelta
 from typing import Protocol
 
@@ -55,8 +55,10 @@ class DriveArchive(Protocol):
 
 
 class CohortLabelLike(Protocol):
-    bootcamp_name: str
-    cohort_number: int
+    @property
+    def bootcamp_name(self) -> str: ...
+    @property
+    def cohort_number(self) -> int: ...
 
 
 class CohortLabels(Protocol):
@@ -64,7 +66,7 @@ class CohortLabels(Protocol):
 
     async def cohort_labels(
         self, cohort_ids: Iterable[uuid.UUID]
-    ) -> dict[uuid.UUID, CohortLabelLike]: ...
+    ) -> Mapping[uuid.UUID, CohortLabelLike]: ...
 
 
 class StudentLookup(Protocol):
