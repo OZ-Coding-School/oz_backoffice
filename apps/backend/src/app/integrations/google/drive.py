@@ -159,7 +159,11 @@ class GoogleDriveArchive:
         self, file_id: str, *, export_pdf: bool, range_header: str | None
     ) -> DriveStream:
         await asyncio.to_thread(self._credentials.refresh, AuthRequest())
-        headers = {"Authorization": f"Bearer {self._credentials.token}"}
+        # 받은 바이트를 그대로 넘기므로 압축하지 않은 응답을 받는다(압축되면 PDF·영상 구간이 깨진다)
+        headers = {
+            "Authorization": f"Bearer {self._credentials.token}",
+            "Accept-Encoding": "identity",
+        }
         if export_pdf:
             url = f"{FILES_URL}/{file_id}/export"
             params = {"mimeType": PDF_MIME}

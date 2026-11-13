@@ -135,6 +135,7 @@ async def test_stream_video_range_and_pdf_export() -> None:
             "Bearer token",
         )
         assert sent.url.params["alt"] == "media"
+        assert sent.headers["accept-encoding"] == "identity"  # 압축된 바이트를 그대로 넘기지 않게
 
         pdf = await archive.stream("d1", export_pdf=True, range_header="bytes=0-2")
         assert (pdf.status_code, pdf.headers["content-type"]) == (200, "application/pdf")
