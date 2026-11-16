@@ -313,9 +313,17 @@ class MentoringRequestService:
         mentor_id: uuid.UUID | None,
         limit: int,
         offset: int,
+        student_id: uuid.UUID | None = None,
+        team_id: uuid.UUID | None = None,
     ) -> tuple[list[MentoringRequest], int]:
         return await self._requests.list_by_cohort(
-            cohort_id, status=status, mentor_id=mentor_id, limit=limit, offset=offset
+            cohort_id,
+            status=status,
+            mentor_id=mentor_id,
+            limit=limit,
+            offset=offset,
+            student_id=student_id,
+            team_id=team_id,
         )
 
     # ------------------------------------------------------------------ 내부

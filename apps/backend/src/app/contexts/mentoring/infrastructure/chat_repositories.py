@@ -109,7 +109,14 @@ class TortoiseChatThreadRepository:
         return [_thread(row) for row in rows]
 
     async def list_by_cohort(
-        self, cohort_id: uuid.UUID, *, mentor_id: uuid.UUID | None, limit: int, offset: int
+        self,
+        cohort_id: uuid.UUID,
+        *,
+        mentor_id: uuid.UUID | None,
+        limit: int,
+        offset: int,
+        student_id: uuid.UUID | None = None,
+        team_id: uuid.UUID | None = None,
     ) -> tuple[list[ChatThread], int]:
         # 1:1은 수강 등록의 기수, 팀은 팀의 기수 (조인한 쿼리에 정렬식을 붙이면 Tortoise가
         # 컬럼 이름을 한정하지 않아 SQL로 id만 고른다)
@@ -119,28 +126,38 @@ class TortoiseChatThreadRepository:
             'LEFT JOIN "mentoring_teams" m ON m."id" = t."team_id" '
             'WHERE (s."cohort_id" = $1 OR m."cohort_id" = $1) '
             'AND ($2::uuid IS NULL OR t."mentor_id" = $2) '
+            # 방 주인 필터 (A59): 1:1 방은 student_id, 팀 방은 team_id만 있다
+            'AND ($5::uuid IS NULL OR t."student_id" = $5) '
+            'AND ($6::uuid IS NULL OR t."team_id" = $6) '
             'ORDER BY COALESCE(t."last_message_at", t."created_at") DESC, t."id" DESC '
             "LIMIT $3 OFFSET $4",
-            [cohort_id, mentor_id, limit, offset],
+            [cohort_id, mentor_id, limit, offset, student_id, team_id],
         )
         if not rows:
             total = 0
             if offset:
-                total = await self._count_by_cohort(cohort_id, mentor_id)
+                total = await self._count_by_cohort(cohort_id, mentor_id, student_id, team_id)
             return [], total
         ids = [row["id"] for row in rows]
         found = {row.id: _thread(row) for row in await MentoringChatThreadModel.filter(id__in=ids)}
         return [found[i] for i in ids], int(rows[0]["total"])
 
     @staticmethod
-    async def _count_by_cohort(cohort_id: uuid.UUID, mentor_id: uuid.UUID | None) -> int:
+    async def _count_by_cohort(
+        cohort_id: uuid.UUID,
+        mentor_id: uuid.UUID | None,
+        student_id: uuid.UUID | None,
+        team_id: uuid.UUID | None,
+    ) -> int:
         _, rows = await _db().execute_query(
             'SELECT count(*) AS "total" FROM "mentoring_chat_threads" t '
             'LEFT JOIN "students" s ON s."id" = t."student_id" '
             'LEFT JOIN "mentoring_teams" m ON m."id" = t."team_id" '
             'WHERE (s."cohort_id" = $1 OR m."cohort_id" = $1) '
-            'AND ($2::uuid IS NULL OR t."mentor_id" = $2)',
-            [cohort_id, mentor_id],
+            'AND ($2::uuid IS NULL OR t."mentor_id" = $2) '
+            'AND ($3::uuid IS NULL OR t."student_id" = $3) '
+            'AND ($4::uuid IS NULL OR t."team_id" = $4)',
+            [cohort_id, mentor_id, student_id, team_id],
         )
         return int(rows[0]["total"])
 

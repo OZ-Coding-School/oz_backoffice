@@ -351,8 +351,19 @@ class InMemoryRequestRepository:
         mentor_id: uuid.UUID | None,
         limit: int,
         offset: int,
+        student_id: uuid.UUID | None = None,
+        team_id: uuid.UUID | None = None,
     ) -> tuple[list[MentoringRequest], int]:
-        return self._page(list(self.items.values()), limit, offset)
+        # 기수는 보지 않는다 (인메모리 신청은 기수를 모른다)
+        found = [
+            r
+            for r in self.items.values()
+            if (status is None or r.status is status)
+            and (mentor_id is None or r.mentor_id == mentor_id)
+            and (student_id is None or (r.requester_id == student_id and r.team_id is None))
+            and (team_id is None or r.team_id == team_id)
+        ]
+        return self._page(found, limit, offset)
 
     async def list_stale(self, now: datetime) -> list[MentoringRequest]:
         return [self._copy(r) for r in self.items.values() if r.is_stale(now)]
@@ -554,15 +565,24 @@ class InMemorySessionRepository:
         return [dataclasses.replace(s) for s in found[offset : offset + limit]], len(found)
 
     async def list_by_cohort(
-        self, cohort_id: uuid.UUID, *, mentor_id: uuid.UUID | None, query: SessionQuery
+        self,
+        cohort_id: uuid.UUID,
+        *,
+        mentor_id: uuid.UUID | None,
+        query: SessionQuery,
+        student_id: uuid.UUID | None = None,
+        team_id: uuid.UUID | None = None,
     ) -> tuple[list[MentoringSession], int]:
-        found = [
-            s
-            for s in self.items.values()
-            if self.cohort_of_student.get(self._requests.items[s.request_id].requester_id)
-            == cohort_id
-            and (mentor_id is None or s.mentor_id == mentor_id)
-        ]
+        def matches(s: MentoringSession) -> bool:
+            r = self._requests.items[s.request_id]
+            return (
+                self.cohort_of_student.get(r.requester_id) == cohort_id
+                and (mentor_id is None or s.mentor_id == mentor_id)
+                and (student_id is None or (r.requester_id == student_id and r.team_id is None))
+                and (team_id is None or r.team_id == team_id)
+            )
+
+        found = [s for s in self.items.values() if matches(s)]
         return self._page(found, query)
 
 

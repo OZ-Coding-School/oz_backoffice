@@ -643,12 +643,18 @@ class TortoiseMentoringRequestRepository:
         mentor_id: uuid.UUID | None,
         limit: int,
         offset: int,
+        student_id: uuid.UUID | None = None,
+        team_id: uuid.UUID | None = None,
     ) -> tuple[list[MentoringRequest], int]:
         query = MentoringRequestModel.filter(requester__cohort_id=cohort_id)
         if status is not None:
             query = query.filter(status=status)
         if mentor_id is not None:
             query = query.filter(mentor_id=mentor_id)
+        if student_id is not None:
+            query = query.filter(requester_id=student_id, team_id__isnull=True)
+        if team_id is not None:
+            query = query.filter(team_id=team_id)
         return await self._page(query, limit, offset)
 
     async def list_pending(
@@ -883,11 +889,21 @@ class TortoiseMentoringSessionRepository:
         return await self._page(MentoringSessionModel.filter(mentor_id=mentor_id), query)
 
     async def list_by_cohort(
-        self, cohort_id: uuid.UUID, *, mentor_id: uuid.UUID | None, query: SessionQuery
+        self,
+        cohort_id: uuid.UUID,
+        *,
+        mentor_id: uuid.UUID | None,
+        query: SessionQuery,
+        student_id: uuid.UUID | None = None,
+        team_id: uuid.UUID | None = None,
     ) -> tuple[list[MentoringSession], int]:
         base = MentoringSessionModel.filter(request__requester__cohort_id=cohort_id)
         if mentor_id is not None:
             base = base.filter(mentor_id=mentor_id)
+        if student_id is not None:
+            base = base.filter(request__requester_id=student_id, request__team_id__isnull=True)
+        if team_id is not None:
+            base = base.filter(request__team_id=team_id)
         return await self._page(base, query)
 
     async def list_settleable(

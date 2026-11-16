@@ -84,6 +84,7 @@ async def _setup(client: AsyncClient, settings: Settings) -> dict[str, Any]:
         "admin": admin,
         "admin_path": f"{api}/mentoring/requests",
         "cohort": cohort,
+        "student": student,
         "mentor": mentor,
         "mentor_h": mentor_h,
         "student_h": bearer(settings, student_user),
@@ -127,6 +128,13 @@ async def test_create_cancel_and_lists(client: AsyncClient, settings: Settings) 
     assert received["total"] == 1
     staff = (await client.get(ctx["admin_path"], headers=ctx["admin"])).json()
     assert staff["items"][0]["mentor_name"] == "김멘토"
+    for params, total in (  # 신청자 1:1만 / 팀만 (A59)
+        ({"student_id": str(ctx["student"].id)}, 1),
+        ({"student_id": str(new_id())}, 0),
+        ({"team_id": str(new_id())}, 0),
+    ):
+        filtered = await client.get(ctx["admin_path"], params=params, headers=ctx["admin"])
+        assert filtered.json()["total"] == total
 
     no_reason = await client.post(
         f"{URL}/{body['id']}/cancel", json={"reason": ""}, headers=student_h
@@ -250,6 +258,12 @@ async def test_approve_reject_and_sessions(client: AsyncClient, settings: Settin
     admin_path = f"/api/v1/admin/cohorts/{ctx['cohort'].id}/mentoring/sessions"
     staff = (await client.get(admin_path, headers=admin)).json()
     assert staff["items"][0]["mentor_name"] == "김멘토"
+    for params, total in (  # 신청자 1:1만 / 팀만 (A59)
+        ({"student_id": str(ctx["student"].id)}, 1),
+        ({"team_id": str(new_id())}, 0),
+    ):
+        filtered = await client.get(admin_path, params=params, headers=admin)
+        assert filtered.json()["total"] == total
     one = await client.get(f"{admin_path}/{session['id']}", headers=admin)
     assert one.json()["id"] == session["id"]
     elsewhere = await create_cohort()

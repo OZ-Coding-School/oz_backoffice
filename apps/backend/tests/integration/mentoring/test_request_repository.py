@@ -76,6 +76,17 @@ async def test_request_round_trip_queries_and_constraints() -> None:
     )
     assert cohort_total == 2
     assert elsewhere.id not in {r.id for r in by_cohort}
+    # 신청자 필터는 1:1만, 팀 필터는 그 팀만 (팀 신청의 신청자도 같은 수강생이다, A59)
+    for filters, expected in (
+        ({"student_id": student.id}, [solo.id]),
+        ({"team_id": team.id}, [team_request.id]),
+        ({"student_id": student.id, "team_id": team.id}, []),
+        ({"student_id": other.id}, []),  # 다른 기수
+    ):
+        found, found_total = await repo.list_by_cohort(
+            cohort.id, status=None, mentor_id=None, limit=10, offset=0, **filters
+        )
+        assert ([r.id for r in found], found_total) == (expected, len(expected))
     _, mentor_total = await repo.list_for_mentor(mentor.id, status=None, limit=10, offset=0)
     assert mentor_total == 3
 

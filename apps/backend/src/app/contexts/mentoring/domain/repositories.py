@@ -187,7 +187,12 @@ class MentoringRequestRepository(Protocol):
         mentor_id: uuid.UUID | None,
         limit: int,
         offset: int,
-    ) -> tuple[list[MentoringRequest], int]: ...
+        student_id: uuid.UUID | None = None,
+        team_id: uuid.UUID | None = None,
+    ) -> tuple[list[MentoringRequest], int]:
+        """student_id는 그 수강 등록의 1:1 신청만, team_id는 그 팀의 신청만 (A59)."""
+        ...
+
     async def list_stale(self, now: datetime) -> list[MentoringRequest]:
         """대기 중이고 희망 일시가 모두 지난 신청."""
         ...
@@ -276,8 +281,17 @@ class MentoringSessionRepository(Protocol):
         self, mentor_id: uuid.UUID, query: SessionQuery
     ) -> tuple[list[MentoringSession], int]: ...
     async def list_by_cohort(
-        self, cohort_id: uuid.UUID, *, mentor_id: uuid.UUID | None, query: SessionQuery
-    ) -> tuple[list[MentoringSession], int]: ...
+        self,
+        cohort_id: uuid.UUID,
+        *,
+        mentor_id: uuid.UUID | None,
+        query: SessionQuery,
+        student_id: uuid.UUID | None = None,
+        team_id: uuid.UUID | None = None,
+    ) -> tuple[list[MentoringSession], int]:
+        """신청의 신청자로 거른다: student_id는 1:1만, team_id는 그 팀만 (A59)."""
+        ...
+
     async def list_settleable(
         self, cohort_id: uuid.UUID, *, before: datetime
     ) -> list[MentoringSession]:
@@ -367,8 +381,18 @@ class ChatThreadRepository(Protocol):
         ...
 
     async def list_by_cohort(
-        self, cohort_id: uuid.UUID, *, mentor_id: uuid.UUID | None, limit: int, offset: int
-    ) -> tuple[list[ChatThread], int]: ...
+        self,
+        cohort_id: uuid.UUID,
+        *,
+        mentor_id: uuid.UUID | None,
+        limit: int,
+        offset: int,
+        student_id: uuid.UUID | None = None,
+        team_id: uuid.UUID | None = None,
+    ) -> tuple[list[ChatThread], int]:
+        """student_id는 그 수강생의 1:1 방, team_id는 그 팀의 방 (A59)."""
+        ...
+
     async def unread_counts(
         self, user_id: uuid.UUID, thread_ids: list[uuid.UUID]
     ) -> dict[uuid.UUID, int]:

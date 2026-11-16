@@ -199,6 +199,16 @@ async def test_team_chat_and_staff_view(client: AsyncClient, settings: Settings)
     admin_path, admin = ctx["admin_path"], ctx["admin"]
     listed = (await client.get(admin_path, headers=admin)).json()
     assert listed["total"] == 2
+    by_team = (
+        await client.get(admin_path, params={"team_id": ctx["team_id"]}, headers=admin)
+    ).json()
+    by_student = (
+        await client.get(
+            admin_path, params={"student_id": str(ctx["students"][2].id)}, headers=admin
+        )
+    ).json()
+    assert [t["kind"] for t in by_team["items"]] == ["TEAM"]  # 방 주인 필터 (A59)
+    assert [t["kind"] for t in by_student["items"]] == ["DIRECT"]
     assert {(t["kind"], t["mentor_name"]) for t in listed["items"]} == {
         ("TEAM", "김멘토"),
         ("DIRECT", "김멘토"),

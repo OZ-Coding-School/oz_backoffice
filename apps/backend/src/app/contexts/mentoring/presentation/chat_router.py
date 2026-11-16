@@ -334,11 +334,20 @@ async def cohort_threads(
     service: ServiceDep,
     presenter: PresenterDep,
     mentor_id: uuid.UUID | None = None,
+    student_id: Annotated[
+        uuid.UUID | None, Query(description="이 수강 등록(students.id)의 1:1 방만 (A59)")
+    ] = None,
+    team_id: Annotated[uuid.UUID | None, Query(description="이 팀의 방만 (A59)")] = None,
     limit: Limit = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> Page[AdminThreadResponse]:
     views, total = await service.list_by_cohort(
-        cohort_id, mentor_id=mentor_id, limit=limit, offset=offset
+        cohort_id,
+        mentor_id=mentor_id,
+        limit=limit,
+        offset=offset,
+        student_id=student_id,
+        team_id=team_id,
     )
     return Page(items=await presenter.admin(views), total=total, limit=limit, offset=offset)
 

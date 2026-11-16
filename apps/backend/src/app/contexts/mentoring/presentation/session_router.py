@@ -196,8 +196,14 @@ async def cohort_sessions(
     presenter: PresenterDep,
     query: QueryDep,
     mentor_id: uuid.UUID | None = None,
+    student_id: Annotated[
+        uuid.UUID | None, Query(description="수강 등록(students.id)의 1:1 건만 (A59)")
+    ] = None,
+    team_id: Annotated[uuid.UUID | None, Query(description="이 팀의 건만 (A59)")] = None,
 ) -> Page[AdminSessionResponse]:
-    items, total = await queries.list_by_cohort(cohort_id, mentor_id=mentor_id, query=query)
+    items, total = await queries.list_by_cohort(
+        cohort_id, mentor_id=mentor_id, query=query, student_id=student_id, team_id=team_id
+    )
     return Page(
         items=await presenter.admin(items), total=total, limit=query.limit, offset=query.offset
     )
