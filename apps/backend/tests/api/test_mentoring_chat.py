@@ -1,0 +1,215 @@
+"""멘토링 채팅 API (실제 DB, A57)."""
+
+from datetime import UTC, datetime
+from typing import Any
+
+import pytest
+from httpx import AsyncClient
+
+from app.cli import create_super_admin
+from app.contexts.academy.infrastructure.repositories import TortoiseStudentRepository
+from app.contexts.access.application.roles import RoleAssignmentService
+from app.contexts.access.domain.catalog import COHORT_ASSISTANT
+from app.contexts.access.domain.enums import RoleScopeType
+from app.contexts.access.infrastructure.repositories import TortoiseUserRoleRepository
+from app.contexts.educator.domain.enums import DisplayNamePreference
+from app.contexts.identity.domain.entities import User
+from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
+from app.core.config import Settings
+from app.core.security import JWTService
+from tests.factories.academy import create_cohort, make_student
+from tests.factories.educator import create_mentor, create_user
+from tests.factories.staff_review import create_applicant, seed_roles
+
+pytestmark = pytest.mark.api
+
+CHAT = "/api/v1/mentoring/chat"
+MY_THREADS = "/api/v1/me/mentoring/chat/threads"
+
+
+def bearer(settings: Settings, user: User) -> dict[str, str]:
+    token, _ = JWTService(settings).encode(str(user.id), "access", now=datetime.now(UTC))
+    return {"Authorization": f"Bearer {token}"}
+
+
+async def _approved(**overrides: Any) -> User:
+    user = await create_user(**overrides)
+    user.approve(now=datetime.now(UTC))
+    await TortoiseUserRepository().save(user)
+    return user
+
+
+async def _setup(client: AsyncClient, settings: Settings) -> dict[str, Any]:
+    admin = bearer(
+        settings, (await create_super_admin("boss@nextrunners.co.kr", settings=settings)).user
+    )
+    cohort = await create_cohort()
+    api = f"/api/v1/admin/cohorts/{cohort.id}"
+    mentor_user = await _approved(name="김멘토")
+    mentor = await create_mentor(
+        mentor_user, nickname="멘토K", display_name_preference=DisplayNamePreference.NICKNAME
+    )
+    assigned = await client.post(
+        f"{api}/mentor-assignments",
+        json={
+            "mentor_id": str(mentor.id),
+            "start_date": "2026-11-01",
+            "cost_settlement_policy": "ACTUAL_DURATION",
+            "pay_unit": "HOURLY",
+            "pay_rate": 30000,
+        },
+        headers=admin,
+    )
+    assert assigned.status_code == 201, assigned.text
+    await client.put(
+        f"{api}/mentoring-settings", json={"allow_team_mentoring": True}, headers=admin
+    )
+    repo = TortoiseStudentRepository()
+    users = [await _approved(name=name) for name in ("가수강", "나수강", "다수강")]
+    students = [make_student(cohort_id=cohort.id, name=u.name, user_id=u.id) for u in users]
+    for s in students:
+        await repo.add(s)
+    team = await client.post(
+        f"{api}/mentoring-teams",
+        json={
+            "mentor_id": str(mentor.id),
+            "student_ids": [str(students[0].id), str(students[1].id)],
+        },
+        headers=admin,
+    )
+    assert team.status_code == 201, team.text
+    return {
+        "admin": admin,
+        "cohort": cohort,
+        "admin_path": f"{api}/mentoring/chat/threads",
+        "mentor": mentor,
+        "mentor_h": bearer(settings, mentor_user),
+        "students": students,
+        "student_h": [bearer(settings, u) for u in users],
+        "team_id": team.json()["id"],
+    }
+
+
+async def test_direct_chat_flow(client: AsyncClient, settings: Settings) -> None:
+    ctx = await _setup(client, settings)
+    me, mentor_h = ctx["student_h"][0], ctx["mentor_h"]
+    started = await client.post(
+        f"{CHAT}/messages",
+        json={
+            "cohort_id": str(ctx["cohort"].id),
+            "mentor_id": str(ctx["mentor"].id),
+            "body": " 질문 있습니다 ",
+        },
+        headers=me,
+    )
+    assert started.status_code == 201, started.text
+    first = started.json()
+    assert (first["body"], first["sender_kind"], first["sender_name"]) == (
+        "질문 있습니다",
+        "STUDENT",
+        "가수강",
+    )
+    thread_url = f"{CHAT}/threads/{first['thread_id']}"
+
+    reply = await client.post(f"{thread_url}/messages", json={"body": "답변"}, headers=mentor_h)
+    assert reply.status_code == 201, reply.text
+    assert (reply.json()["sender_kind"], reply.json()["sender_name"]) == ("MENTOR", "멘토K")
+
+    mine = (await client.get(MY_THREADS, headers=me)).json()
+    assert mine["total"] == 1
+    (thread,) = mine["items"]
+    assert (thread["kind"], thread["student_name"], thread["mentor_display_name"]) == (
+        "DIRECT",
+        "가수강",
+        "멘토K",
+    )
+    assert "mentor_name" not in thread
+    assert thread["unread_count"] == 1
+    assert thread["last_message"]["id"] == reply.json()["id"]
+
+    page = (await client.get(f"{thread_url}/messages?limit=1", headers=me)).json()
+    assert [m["body"] for m in page["items"]] == ["답변"]
+    rest = (
+        await client.get(f"{thread_url}/messages?before={page['next_before']}", headers=me)
+    ).json()
+    assert ([m["body"] for m in rest["items"]], rest["next_before"]) == (["질문 있습니다"], None)
+
+    read = await client.put(
+        f"{thread_url}/read", json={"message_id": reply.json()["id"]}, headers=me
+    )
+    assert read.json()["unread_count"] == 0
+
+    not_mine = await client.delete(f"{thread_url}/messages/{reply.json()['id']}", headers=me)
+    assert (not_mine.status_code, not_mine.json()["error"]["code"]) == (403, "not_message_sender")
+    deleted = await client.delete(f"{thread_url}/messages/{first['id']}", headers=me)
+    assert (deleted.json()["is_deleted"], deleted.json()["body"]) == (True, None)
+
+    empty = await client.post(f"{thread_url}/messages", json={"body": "  "}, headers=me)
+    assert (empty.status_code, empty.json()["error"]["code"]) == (422, "invalid_chat_message")
+    outsider = ctx["student_h"][2]  # 같은 기수의 다른 수강생
+    for response in (
+        await client.get(thread_url, headers=outsider),
+        await client.get(f"{thread_url}/messages", headers=outsider),
+        await client.post(f"{thread_url}/messages", json={"body": "끼어들기"}, headers=outsider),
+    ):
+        assert (response.status_code, response.json()["error"]["code"]) == (
+            404,
+            "chat_thread_not_found",
+        )
+    assert (await client.get(MY_THREADS)).status_code == 401
+
+
+async def test_team_chat_and_staff_view(client: AsyncClient, settings: Settings) -> None:
+    ctx = await _setup(client, settings)
+    started = await client.post(
+        f"{CHAT}/messages",
+        json={"team_id": ctx["team_id"], "body": "팀 질문"},
+        headers=ctx["student_h"][0],
+    )
+    assert started.status_code == 201, started.text
+    teammate = (await client.get(MY_THREADS, headers=ctx["student_h"][1])).json()
+    assert [(t["kind"], t["team_label"], t["unread_count"]) for t in teammate["items"]] == [
+        ("TEAM", "1팀", 1)
+    ]
+    assert (await client.get(MY_THREADS, headers=ctx["student_h"][2])).json()["total"] == 0
+    outsider = await client.post(
+        f"{CHAT}/messages",
+        json={"team_id": ctx["team_id"], "body": "끼어들기"},
+        headers=ctx["student_h"][2],
+    )
+    assert outsider.status_code == 404
+    by_mentor = await client.post(
+        f"{CHAT}/messages",
+        json={"student_id": str(ctx["students"][2].id), "body": "안녕하세요"},
+        headers=ctx["mentor_h"],
+    )
+    assert by_mentor.status_code == 201, by_mentor.text
+
+    admin_path, admin = ctx["admin_path"], ctx["admin"]
+    listed = (await client.get(admin_path, headers=admin)).json()
+    assert listed["total"] == 2
+    assert {(t["kind"], t["mentor_name"]) for t in listed["items"]} == {
+        ("TEAM", "김멘토"),
+        ("DIRECT", "김멘토"),
+    }
+    thread_id = started.json()["thread_id"]
+    one = await client.get(f"{admin_path}/{thread_id}", headers=admin)
+    assert one.json()["unread_count"] == 0
+    messages = (await client.get(f"{admin_path}/{thread_id}/messages", headers=admin)).json()
+    assert [m["body"] for m in messages["items"]] == ["팀 질문"]
+
+    await seed_roles()
+    assistant_user = await create_applicant()
+    assistant_user.approve(now=datetime.now(UTC))
+    await TortoiseUserRepository().save(assistant_user)
+    await RoleAssignmentService(TortoiseUserRoleRepository()).grant(
+        assistant_user.id, COHORT_ASSISTANT, RoleScopeType.COHORT, ctx["cohort"].id
+    )
+    assistant = bearer(settings, assistant_user)
+    assert (await client.get(admin_path, headers=assistant)).status_code == 200
+    other_cohort = await create_cohort()
+    other_path = f"/api/v1/admin/cohorts/{other_cohort.id}/mentoring/chat/threads"
+    assert (await client.get(other_path, headers=assistant)).status_code == 403
+    assert (await client.get(f"{other_path}/{thread_id}", headers=admin)).status_code == 404
+    assert (await client.get(admin_path, headers=ctx["student_h"][0])).status_code == 403
+    assert (await client.get(admin_path)).status_code == 401
