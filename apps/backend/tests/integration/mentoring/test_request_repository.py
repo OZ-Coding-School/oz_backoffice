@@ -87,6 +87,12 @@ async def test_request_round_trip_queries_and_constraints() -> None:
             cohort.id, status=None, mentor_id=None, limit=10, offset=0, **filters
         )
         assert ([r.id for r in found], found_total) == (expected, len(expected))
+    # 수강 등록별 1:1 대기 신청 수 (팀 신청은 빠진다, A59)
+    assert await repo.count_pending_by_requesters([student.id, other.id, new_id()]) == {
+        student.id: 1,
+        other.id: 1,
+    }
+    assert await repo.count_pending_by_requesters([]) == {}
     _, mentor_total = await repo.list_for_mentor(mentor.id, status=None, limit=10, offset=0)
     assert mentor_total == 3
 

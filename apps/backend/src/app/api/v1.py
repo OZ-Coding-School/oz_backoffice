@@ -33,6 +33,7 @@ from app.contexts.mentoring.presentation.balance_router import me_router as bala
 from app.contexts.mentoring.presentation.chat_router import admin_router as chat_admin_router
 from app.contexts.mentoring.presentation.chat_router import me_router as chat_me_router
 from app.contexts.mentoring.presentation.chat_router import router as chat_router
+from app.contexts.mentoring.presentation.mentee_router import admin_router as mentee_admin_router
 from app.contexts.mentoring.presentation.record_router import (
     admin_router as record_admin_router,
 )
@@ -108,6 +109,7 @@ router.include_router(settlement_admin_router)
 router.include_router(settlement_me_router)
 router.include_router(session_me_router)
 router.include_router(session_admin_router)
+router.include_router(mentee_admin_router)
 router.include_router(chat_router)
 router.include_router(chat_me_router)
 router.include_router(chat_admin_router)

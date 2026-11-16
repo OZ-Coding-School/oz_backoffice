@@ -5,8 +5,10 @@
 """
 
 import uuid
+from collections.abc import Collection
 
 from app.contexts.academy.domain.entities import Student
+from app.contexts.academy.domain.enums import EnrollmentStatus
 from app.contexts.academy.domain.repositories import StudentRepository
 
 
@@ -32,6 +34,22 @@ class StudentQueries:
             cohort_id, claimed=None, include_removed=False
         )
         return [s for s in students if is_active_enrollment(s)]
+
+    async def in_cohort(
+        self,
+        cohort_id: uuid.UUID,
+        *,
+        statuses: Collection[EnrollmentStatus] | None,
+        name: str | None,
+    ) -> list[Student]:
+        """그 기수 명단 (원천에서 삭제된 등록 제외, 이름순). statuses·name(부분 일치)으로 거른다."""
+        students = await self._students.list_by_cohort(
+            cohort_id, claimed=None, include_removed=False
+        )
+        keyword = name.strip() if name else ""
+        return [
+            s for s in students if (statuses is None or s.status in statuses) and keyword in s.name
+        ]
 
     async def of_user(self, user_id: uuid.UUID) -> list[Student]:
         """회원의 모든 수강 등록 (상태 무관)."""

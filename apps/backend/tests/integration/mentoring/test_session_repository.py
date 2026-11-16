@@ -134,6 +134,11 @@ async def test_session_round_trip_overlap_and_lists() -> None:
             cohort.id, mentor_id=None, query=SessionQuery(), **filters
         )
         assert ({s.id for s in found}, found_total) == (expected, len(expected))
+    # 수강 등록별 1:1 세션 수 (팀 세션은 빠진다, A59)
+    assert await sessions.count_by_requesters([student.id, teammate.id]) == {
+        student.id: {MentoringSessionStatus.SCHEDULED: 2}
+    }
+    assert await sessions.count_by_requesters([]) == {}
 
     db = connections.get("default")
     await db.execute_query(  # 취소된 세션은 겹침 검사에서 빠진다
