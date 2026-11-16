@@ -1,6 +1,6 @@
 # 55. P15-2 채팅 실시간 수신(SSE)·멘토링 이벤트 안내
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-16 병합)
 - 관련 PR: #60
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P15 (P15-2)
 - 이전 기록: [54. P15-1 채팅방·메시지·읽음·운영진 열람](54_p15_1_chat.md)
@@ -72,6 +72,8 @@ P15의 두 번째 PR이다(A57). P15-1의 REST 채팅에 실시간 수신(SSE)�
   - `text/event-stream`, `X-Accel-Buffering: no`
   - `ready` 뒤 15초 간격 `: ping`
   - 볼 수 없는 방의 알림은 건너뜀
+- GitHub Actions (PR #60): backend 잡 통과
+- 사용자가 작업 완료를 확인했다(2026-11-16)
 - 전체 827 passed (compose `api` 컨테이너, ruff·ruff format·mypy·mypy tests·lint-imports 통과)
 - 코드 커밋을 worktree에서 각각 검사했다
 - 스키마 변경 없음
@@ -80,4 +82,6 @@ P15의 두 번째 PR이다(A57). P15-1의 REST 채팅에 실시간 수신(SSE)�
 ## 남은 작업
 - 프론트엔드 채팅 화면(fetch 기반 SSE, 재연결 시 다시 조회)
 - 새 메시지 메일 알림은 알림 방식(M24) 결정 때
-- 실제 Meet 세션으로 이벤트 → 수집 → 폴더 → API 전체 흐름 확인(P13 남은 작업)
+
+## 이전 기록의 남은 작업 정리
+- [51. P13-2](51_p13_2_meet_artifacts.md)의 남은 작업 "실제 멘토링 세션으로 이벤트 → 수집 → 정리 → API 중계 전체 흐름 확인"은 사용자가 실제 Meet 세션으로 확인을 마쳤다(2026-11-16 사용자 확인). 기록 51은 작성된 내용을 바꾸지 않는 규칙에 따라 그대로 두고 여기에 완료를 남긴다.
