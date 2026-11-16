@@ -81,3 +81,24 @@ async def test_rollback_discards_writes() -> None:
         assert rows[0]["n"] == 0
     finally:
         await conn.execute_script("DROP TABLE IF EXISTS _uow_probe")
+
+
+async def test_savepoint_rolls_back_only_its_block() -> None:
+    conn = connections.get("default")
+    await conn.execute_script("CREATE TABLE IF NOT EXISTS _uow_probe (id int primary key)")
+    await conn.execute_script("TRUNCATE _uow_probe")
+    async with UnitOfWork() as uow:
+        await connections.get("default").execute_query("INSERT INTO _uow_probe VALUES (1)")
+
+        async def failing_block() -> None:
+            async with uow.savepoint():
+                await connections.get("default").execute_query("INSERT INTO _uow_probe VALUES (2)")
+                raise Rollback
+
+        with pytest.raises(Rollback):
+            await failing_block()
+        async with uow.savepoint():
+            await connections.get("default").execute_query("INSERT INTO _uow_probe VALUES (3)")
+    _, rows = await conn.execute_query("SELECT id FROM _uow_probe ORDER BY id")
+    assert [r["id"] for r in rows] == [1, 3]
+    await conn.execute_script("DROP TABLE _uow_probe")

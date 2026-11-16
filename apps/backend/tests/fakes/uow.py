@@ -1,5 +1,7 @@
 """단위 테스트용 UnitOfWork: 트랜잭션 없이 커밋 후 콜백만 실행한다."""
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from types import TracebackType
 from typing import Self
 
@@ -31,3 +33,7 @@ class FakeUnitOfWork(UnitOfWork):
         callbacks, self._after_commit = self._after_commit, []
         for callback in callbacks:
             await callback()
+
+    @asynccontextmanager
+    async def savepoint(self) -> AsyncIterator[None]:
+        yield

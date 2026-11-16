@@ -114,3 +114,18 @@ class ChatRead:
         self.last_read_message_id = message_id
         self.last_read_at = now
         return True
+
+
+class ChatEventKind(StrEnum):
+    MESSAGE = "message"  # 새 메시지 (안내 포함)
+    MESSAGE_DELETED = "message_deleted"
+    READ = "read"  # 내 읽음 위치가 바뀜 (다른 탭·기기 맞추기)
+
+
+@dataclass(frozen=True, slots=True)
+class ChatEvent:
+    """실시간 수신용 알림. 내용은 받는 쪽이 다시 읽는다(자격·이름을 받는 사람 기준으로)."""
+
+    kind: ChatEventKind
+    thread_id: uuid.UUID
+    message_id: uuid.UUID | None = None

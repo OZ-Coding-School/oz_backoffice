@@ -15,7 +15,8 @@ UoW를 직접 받지 않는 협력 객체(호출한 서비스의 트랜잭션 �
 열린 UoW가 없으면 바로 실행한다.
 """
 
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
 from contextvars import ContextVar, Token
 from types import TracebackType
 from typing import Self
@@ -46,6 +47,16 @@ class UnitOfWork:
 
     def on_commit(self, callback: AfterCommit) -> None:
         self._after_commit.append(callback)
+
+    @asynccontextmanager
+    async def savepoint(self) -> AsyncIterator[None]:
+        """열린 트랜잭션 안의 savepoint (블록이 실패하면 블록의 쓰기만 되돌린다).
+
+        열린 트랜잭션이 없으면 블록만의 트랜잭션이 된다. 부가 기록(채팅 안내 등)이 원래 처리를
+        되돌리지 않게 할 때 쓴다.
+        """
+        async with in_transaction(self._connection_name):
+            yield
 
     async def __aenter__(self) -> Self:
         if self._tx is not None:

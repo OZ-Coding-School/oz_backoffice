@@ -22,6 +22,7 @@ from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends, Query, Request, status
 from pydantic import BaseModel, Field
+from redis.asyncio import Redis
 
 from app.contexts.access.presentation.dependencies import ApprovedUser, require_permission
 from app.contexts.identity.application.auth_service import UserQueries
@@ -35,6 +36,7 @@ from app.contexts.mentoring.application.chat_service import (
     ThreadView,
 )
 from app.contexts.mentoring.domain.chat import ChatMessage, ChatThread, ChatThreadKind
+from app.contexts.mentoring.infrastructure.chat_events import RedisChatEvents
 from app.contexts.mentoring.infrastructure.chat_repositories import (
     TortoiseChatMessageRepository,
     TortoiseChatReadRepository,
@@ -47,6 +49,7 @@ from app.contexts.mentoring.infrastructure.repositories import (
 from app.core.clock import Clock
 from app.core.dependencies import get_clock
 from app.core.pagination import Page
+from app.core.redis import get_redis
 from app.core.uow import UnitOfWork
 
 router = APIRouter(prefix="/mentoring/chat", tags=["mentoring-chat"])
@@ -62,7 +65,11 @@ Before = Annotated[uuid.UUID | None, Query(description="이 메시지보다 앞�
 Limit = Annotated[int, Query(ge=1, le=100)]
 
 
-def get_chat_service(request: Request, clock: Annotated[Clock, Depends(get_clock)]) -> ChatService:
+def get_chat_service(
+    request: Request,
+    clock: Annotated[Clock, Depends(get_clock)],
+    redis: Annotated["Redis", Depends(get_redis)],
+) -> ChatService:
     state = request.app.state
     return ChatService(
         threads=TortoiseChatThreadRepository(),
@@ -72,6 +79,7 @@ def get_chat_service(request: Request, clock: Annotated[Clock, Depends(get_clock
         assignments=TortoiseCohortMentorRepository(),
         students=cast("StudentLookup", state.student_queries),
         mentors=cast("MentorDirectory", state.mentor_queries),
+        events=RedisChatEvents(redis),
         uow=UnitOfWork(),
         clock=clock,
     )
