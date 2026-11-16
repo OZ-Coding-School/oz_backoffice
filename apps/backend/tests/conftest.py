@@ -28,6 +28,7 @@ from tortoise.context import TortoiseContext
 from tortoise.warnings import TortoiseLoopSwitchWarning
 
 from app.api.health import get_database_probe
+from app.contexts.mentoring.infrastructure.chat_events import RedisChatEvents
 from app.core.config import Settings, get_settings
 from app.core.database import MODEL_APP, build_tortoise_config
 from app.core.redis import get_redis
@@ -118,6 +119,7 @@ def app(settings: Settings, fake_redis: FakeAsyncRedis) -> Iterator[FastAPI]:
         RecordingMeetScheduler()
     )  # Meet 공간 생성 작업도 보내지 않는다
     application.dependency_overrides[get_redis] = lambda: fake_redis
+    application.state.chat_events = RedisChatEvents(fake_redis)  # lifespan을 돌리지 않으므로
     application.dependency_overrides[get_database_probe] = lambda: _db_ok
     yield application
     application.dependency_overrides.clear()

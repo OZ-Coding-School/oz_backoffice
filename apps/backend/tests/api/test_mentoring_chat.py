@@ -244,7 +244,7 @@ async def test_stream_renders_events_for_each_receiver(
     message = sent.json()
     thread_id, message_id = uuid.UUID(message["thread_id"]), uuid.UUID(message["id"])
     request = cast("Any", SimpleNamespace(app=app))
-    service = get_chat_service(request, SystemClock(), fake_redis)
+    service = get_chat_service(request, SystemClock())
     presenter = ChatPresenter(request)
 
     def renderer(student_index: int) -> StreamRenderer:

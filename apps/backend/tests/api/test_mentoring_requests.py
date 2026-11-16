@@ -785,3 +785,67 @@ async def test_settlement_csv_and_mentor_view(
     detail = (await client.get(f"{mine}/{summary['id']}", headers=mentor_h)).json()
     assert [i["amount"] for i in detail["items"]] == [30000]
     assert (await client.get(mine, headers=student_h)).status_code == 404  # 멘토 아님
+
+
+async def test_chat_notices_follow_request_events(
+    app: Any, client: AsyncClient, settings: Settings
+) -> None:
+    """신청·승인·반려·취소·자동 취소·기록 때 1:1 방에 안내가 남는다 (A57·A58)."""
+    from app.core.clock import FixedClock
+
+    ctx = await _setup(client, settings)
+    student_h, mentor_h = ctx["student_h"], ctx["mentor_h"]
+    later = ctx["at"] + timedelta(hours=2)
+    first = (await client.post(URL, json=_body(ctx), headers=student_h)).json()["id"]
+    approved = await client.post(
+        f"{URL}/{first}/approve", json={"starts_at": ctx["at"].isoformat()}, headers=mentor_h
+    )
+    session_id = approved.json()["session"]["id"]
+    second = (
+        await client.post(
+            URL, json=_body(ctx, desired_times=[later.isoformat()]), headers=student_h
+        )
+    ).json()["id"]
+    await client.post(f"{URL}/{second}/reject", json={"reason": "일정 불가"}, headers=mentor_h)
+    third = (
+        await client.post(
+            URL, json=_body(ctx, desired_times=[later.isoformat()]), headers=student_h
+        )
+    ).json()["id"]
+    await client.post(f"{URL}/{third}/cancel", json={"reason": "개인 사정"}, headers=student_h)
+    await client.post(URL, json=_body(ctx, desired_times=[later.isoformat()]), headers=student_h)
+    await client.put(  # 신청 받기를 끄면 대기 신청이 자동 취소된다
+        "/api/v1/me/mentor-schedule/accepting", json={"accepting_requests": False}, headers=mentor_h
+    )
+    app.state.clock = FixedClock(ctx["at"] + timedelta(hours=1))
+    recorded = await client.post(
+        f"/api/v1/mentoring/sessions/{session_id}/record",
+        json={"status": "COMPLETED", "duration": 60, "summary": "요약"},
+        headers=mentor_h,
+    )
+    assert recorded.status_code == 200, recorded.text
+
+    threads = (await client.get("/api/v1/me/mentoring/chat/threads", headers=student_h)).json()
+    (thread,) = threads["items"]
+    assert thread["unread_count"] == 9
+    page = await client.get(
+        f"/api/v1/mentoring/chat/threads/{thread['id']}/messages", headers=mentor_h
+    )
+    items = list(reversed(page.json()["items"]))
+    assert {m["sender_kind"] for m in items} == {"SYSTEM"}
+    assert [m["body"].split("]")[0] + "]" for m in items] == [
+        "[멘토링 신청]",
+        "[멘토링 승인]",
+        "[멘토링 신청]",
+        "[멘토링 반려]",
+        "[멘토링 신청]",
+        "[멘토링 취소]",
+        "[멘토링 신청]",
+        "[멘토링 취소]",
+        "[멘토링 완료]",
+    ]
+    assert "주제: 포트폴리오 리뷰" in items[1]["body"]
+    assert items[3]["body"].endswith("사유: 일정 불가")
+    assert items[5]["body"].endswith("사유: 개인 사정")
+    assert "자동 취소" in items[7]["body"]
+    assert items[8]["body"].endswith("진행 60분")

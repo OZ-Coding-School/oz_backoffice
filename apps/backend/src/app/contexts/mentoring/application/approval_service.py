@@ -24,6 +24,7 @@ from app.contexts.academy.domain.entities import Student
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.educator.domain.profiles import Mentor
 from app.contexts.identity.domain.entities import User
+from app.contexts.mentoring.application.chat_notices import MentoringNotices
 from app.contexts.mentoring.application.meet_service import MeetSpaceScheduler
 from app.contexts.mentoring.domain.balance import BalanceAccount
 from app.contexts.mentoring.domain.repositories import (
@@ -87,7 +88,9 @@ class MentoringApprovalService:
         audit: AuditRecorder,
         uow: UnitOfWork,
         clock: Clock,
+        notices: MentoringNotices | None = None,
     ) -> None:
+        self._notices = notices
         self._requests = requests
         self._sessions = sessions
         self._accounts = accounts
@@ -140,6 +143,8 @@ class MentoringApprovalService:
             await self._accounts.save(account)
             await self._ledger.add_many([entry])
             await self._record(user_id, "approve", request, session)
+            if self._notices:
+                await self._notices.approved(request, session)
             session_id = session.id
             self._uow.on_commit(lambda: self._meet.space_needed(session_id))
         return request, session
@@ -162,6 +167,8 @@ class MentoringApprovalService:
             await self._accounts.save(account)
             await self._ledger.add_many([entry])
             await self._record(user_id, "reject", request)
+            if self._notices:
+                await self._notices.rejected(request)
         return request
 
     # ------------------------------------------------------------------ 내부

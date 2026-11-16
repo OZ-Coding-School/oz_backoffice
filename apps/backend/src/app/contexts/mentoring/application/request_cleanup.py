@@ -12,6 +12,7 @@ import uuid
 from typing import Any
 
 from app.contexts.audit.application.recorder import AuditRecorder
+from app.contexts.mentoring.application.chat_notices import MentoringNotices
 from app.contexts.mentoring.domain.balance import BalanceAccount, BalanceTransaction
 from app.contexts.mentoring.domain.enums import MentoringRequestStatus, MentoringSessionStatus
 from app.contexts.mentoring.domain.repositories import (
@@ -52,7 +53,9 @@ class RequestCleanup:
         ledger: BalanceTransactionRepository,
         audit: AuditRecorder,
         clock: Clock,
+        notices: MentoringNotices | None = None,
     ) -> None:
+        self._notices = notices
         self._requests = requests
         self._sessions = sessions
         self._accounts = accounts
@@ -109,6 +112,10 @@ class RequestCleanup:
             await self._record(
                 actor_id, "auto_reject" if reject else "auto_cancel", request, reason
             )
+            if self._notices:
+                await (
+                    self._notices.rejected(request) if reject else self._notices.canceled(request)
+                )
         await self._flush(changed, entries)
         return len(entries)
 
@@ -152,6 +159,8 @@ class RequestCleanup:
             await self._record(
                 actor_id, "auto_cancel", request, reason, session=session, refund=refund
             )
+            if self._notices:
+                await self._notices.canceled(request, session)
             done += 1
         await self._flush(changed, entries)
         return done

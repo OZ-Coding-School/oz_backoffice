@@ -28,6 +28,7 @@ from app.contexts.academy.domain.entities import Student
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.educator.domain.profiles import Mentor
 from app.contexts.mentoring.application.availability_service import AvailableTimes
+from app.contexts.mentoring.application.chat_notices import MentoringNotices
 from app.contexts.mentoring.domain.balance import BalanceAccount, BalanceTransaction
 from app.contexts.mentoring.domain.enums import MentoringRequestStatus
 from app.contexts.mentoring.domain.repositories import (
@@ -139,7 +140,9 @@ class MentoringRequestService:
         audit: AuditRecorder,
         uow: UnitOfWork,
         clock: Clock,
+        notices: MentoringNotices | None = None,
     ) -> None:
+        self._notices = notices
         self._requests = requests
         self._sessions = sessions
         self._accounts = accounts
@@ -161,6 +164,8 @@ class MentoringRequestService:
             account = await self._locked_account(prepared.request)
             await self._place(prepared, account)
             await self._record(user_id, "create", prepared.request)
+            if self._notices:
+                await self._notices.requested(prepared.request)
         return prepared.request
 
     # ------------------------------------------------------------------ 취소·변경
@@ -191,6 +196,8 @@ class MentoringRequestService:
             entries = self._cancel(request, account, session, reason, refund=True)
             await self._persist(request, account, entries, session)
             await self._record(user_id, "cancel", request)
+            if self._notices:
+                await self._notices.canceled(request, session)
         return request
 
     async def staff_cancel(
@@ -213,6 +220,8 @@ class MentoringRequestService:
             entries = self._cancel(request, account, session, reason, refund=refund)
             await self._persist(request, account, entries, session)
             await self._record(actor_id, "staff_cancel", request, refund=refund)
+            if self._notices:
+                await self._notices.canceled(request, session)
         return request
 
     async def change(
@@ -250,6 +259,8 @@ class MentoringRequestService:
             await self._persist(old, account, entries, session)
             await self._place(prepared, account)
             await self._record(user_id, "change", prepared.request)
+            if self._notices:
+                await self._notices.changed(prepared.request)
         return prepared.request
 
     async def expire_stale(self) -> int:
@@ -264,6 +275,8 @@ class MentoringRequestService:
                 entries = self._cancel(request, account, None, EXPIRED_REASON, refund=True)
                 await self._persist(request, account, entries, None)
                 await self._record(None, "expire", request)
+                if self._notices:
+                    await self._notices.canceled(request)
                 expired += 1
         return expired
 
