@@ -1,6 +1,6 @@
 # OZ 통합 백오피스
 
-오즈코딩스쿨 운영에 쓰던 개별 도구 5개(`prev_tools/`: Auto_monitor, exam, mentor, ucansign, vacation)를 PostgreSQL 기반의 단일 백오피스로 통합하는 모노레포. 백엔드(`apps/backend`, FastAPI)와 프론트엔드(`apps/frontend`, React)로 나뉜다. 1단계로 멘토링 기능을 먼저 이전한다.
+오즈코딩스쿨 운영에 쓰던 개별 도구 5개(`prev_tools/`: Auto_monitor, mentor, ucansign, vacation, oz_discord_admin)를 PostgreSQL 기반의 단일 백오피스로 통합하는 모노레포. 백엔드(`apps/backend`, FastAPI)와 프론트엔드(`apps/frontend`, React)로 나뉜다. 1단계로 멘토링 기능을 먼저 이전한다.
 
 | 문서 | 내용 |
 | --- | --- |
@@ -8,7 +8,7 @@
 | `docs/database_schema_v2.dbml` | 현재 DB 스키마 |
 | `docs/implement_plans/` | 구현 계획 (멘토링 1단계: `mentoring_phase1_backend.md`) |
 | `docs/implement_descriptions/` | 구현 기록 |
-| `docs/analysis/` | 기존 5개 서비스 분석 (로컬 전용, `.gitignore`) |
+| `docs/analysis/` | 기존 서비스 분석 (로컬 전용, `.gitignore`) |
 | `apps/*/CLAUDE.md` | 앱별 기술 스택·명령어·구조 규칙 |
 
 ## Git 브랜치 전략 (Git Flow + GitHub Flow)
