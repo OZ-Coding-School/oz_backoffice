@@ -1,7 +1,7 @@
 # 55. P15-2 채팅 실시간 수신(SSE)·멘토링 이벤트 안내
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #60
 - 관련 계획: `docs/implement_plans/mentoring_phase1_backend.md` P15 (P15-2)
 - 이전 기록: [54. P15-1 채팅방·메시지·읽음·운영진 열람](54_p15_1_chat.md)
 
