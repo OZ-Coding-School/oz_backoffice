@@ -51,7 +51,6 @@ Figma에서 운영진 화면을 설계하면서 멘티 상세와 팀 상세에 �
 - **API 테스트:** 신청·세션·채팅방 목록에서 `student_id`·`team_id` 필터가 동작한다.
 - **단위 테스트:** 채팅 서비스의 운영진 목록 필터.
 - **로컬 검사 (compose `api` 컨테이너):** ruff, ruff format, mypy, mypy tests, lint-imports 통과. 전체 827 passed. 이번 PR은 기존 테스트에 검증을 더했기 때문에 테스트 수는 그대로다.
-
 - GitHub Actions (PR #63) backend 잡 통과 후 병합
 - 사용자가 병합까지 진행하도록 승인했다(2026-11-16)
 
