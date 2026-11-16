@@ -124,6 +124,16 @@ async def test_session_round_trip_overlap_and_lists() -> None:
         cohort.id, mentor_id=other_mentor.id, query=SessionQuery()
     )
     assert cohort_total == 1
+    # 신청의 신청자로 거른다: 1:1만 / 그 팀만 (A59)
+    for filters, expected in (
+        ({"student_id": student.id}, {solo.id, other.id}),
+        ({"student_id": teammate.id}, set()),  # 팀 신청의 신청자지만 1:1은 없다
+        ({"team_id": team.id}, {team_session.id}),
+    ):
+        found, found_total = await sessions.list_by_cohort(
+            cohort.id, mentor_id=None, query=SessionQuery(), **filters
+        )
+        assert ({s.id for s in found}, found_total) == (expected, len(expected))
 
     db = connections.get("default")
     await db.execute_query(  # 취소된 세션은 겹침 검사에서 빠진다

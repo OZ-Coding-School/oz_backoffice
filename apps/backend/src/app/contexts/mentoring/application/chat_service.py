@@ -280,10 +280,22 @@ class ChatService:
 
     # ------------------------------------------------------------------ 운영진 열람
     async def list_by_cohort(
-        self, cohort_id: uuid.UUID, *, mentor_id: uuid.UUID | None, limit: int, offset: int
+        self,
+        cohort_id: uuid.UUID,
+        *,
+        mentor_id: uuid.UUID | None,
+        limit: int,
+        offset: int,
+        student_id: uuid.UUID | None = None,
+        team_id: uuid.UUID | None = None,
     ) -> tuple[list[ThreadView], int]:
         threads, total = await self._threads.list_by_cohort(
-            cohort_id, mentor_id=mentor_id, limit=limit, offset=offset
+            cohort_id,
+            mentor_id=mentor_id,
+            limit=limit,
+            offset=offset,
+            student_id=student_id,
+            team_id=team_id,
         )
         return await self._views(threads, await self._scope(threads), user_id=None), total
 

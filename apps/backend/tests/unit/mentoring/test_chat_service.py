@@ -282,6 +282,13 @@ async def test_staff_reads_threads_in_cohort(h: Harness) -> None:
         h.cohort_id, mentor_id=h.other_mentor.id, limit=20, offset=0
     )
     assert (filtered, total) == ([], 0)
+    by_student, _ = await h.service.list_by_cohort(
+        h.cohort_id, mentor_id=None, limit=20, offset=0, student_id=h.student.id
+    )
+    assert [v.thread.id for v in by_student] == [sent.thread_id]
+    assert await h.service.list_by_cohort(
+        h.cohort_id, mentor_id=None, limit=20, offset=0, team_id=new_id()
+    ) == ([], 0)
 
 
 async def test_events_go_to_participants_after_commit(h: Harness) -> None:

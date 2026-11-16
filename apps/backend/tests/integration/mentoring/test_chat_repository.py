@@ -87,6 +87,17 @@ async def test_thread_ensure_is_idempotent_and_constraints() -> None:
         (await create_cohort()).id, mentor_id=None, limit=10, offset=0
     )
     assert (other, other_total) == ([], 0)
+    # 방 주인 필터 (A59)
+    by_student, _ = await threads.list_by_cohort(
+        cohort.id, mentor_id=None, limit=10, offset=0, student_id=direct.student_id
+    )
+    by_team, _ = await threads.list_by_cohort(
+        cohort.id, mentor_id=None, limit=10, offset=0, team_id=team_thread.team_id
+    )
+    assert ([t.id for t in by_student], [t.id for t in by_team]) == ([direct.id], [team_thread.id])
+    assert await threads.list_by_cohort(
+        cohort.id, mentor_id=None, limit=10, offset=5, team_id=team_thread.team_id
+    ) == ([], 1)  # 빈 페이지의 전체 수도 필터를 따른다
 
 
 async def test_messages_cursor_delete_and_last_message() -> None:

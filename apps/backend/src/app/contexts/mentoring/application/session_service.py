@@ -71,9 +71,17 @@ class MentoringSessionQueries:
         return await self._sessions.list_for_mentor(mentor.id, query)
 
     async def list_by_cohort(
-        self, cohort_id: uuid.UUID, *, mentor_id: uuid.UUID | None, query: SessionQuery
+        self,
+        cohort_id: uuid.UUID,
+        *,
+        mentor_id: uuid.UUID | None,
+        query: SessionQuery,
+        student_id: uuid.UUID | None = None,
+        team_id: uuid.UUID | None = None,
     ) -> tuple[list[MentoringSession], int]:
-        return await self._sessions.list_by_cohort(cohort_id, mentor_id=mentor_id, query=query)
+        return await self._sessions.list_by_cohort(
+            cohort_id, mentor_id=mentor_id, query=query, student_id=student_id, team_id=team_id
+        )
 
     async def get_for_user(self, user_id: uuid.UUID, session_id: uuid.UUID) -> MentoringSession:
         session = await self._sessions.get(session_id)

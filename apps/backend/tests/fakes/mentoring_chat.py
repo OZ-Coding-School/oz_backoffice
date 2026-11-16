@@ -76,13 +76,22 @@ class InMemoryChatThreadRepository:
         return [dataclasses.replace(t) for t in sorted(found, key=_sort_key, reverse=True)]
 
     async def list_by_cohort(
-        self, cohort_id: uuid.UUID, *, mentor_id: uuid.UUID | None, limit: int, offset: int
+        self,
+        cohort_id: uuid.UUID,
+        *,
+        mentor_id: uuid.UUID | None,
+        limit: int,
+        offset: int,
+        student_id: uuid.UUID | None = None,
+        team_id: uuid.UUID | None = None,
     ) -> tuple[list[ChatThread], int]:
         found = [
             t
             for t in self._s.threads.values()
             if self._s.cohort_of.get(t.team_id or t.student_id) == cohort_id  # type: ignore[arg-type]
             and (mentor_id is None or t.mentor_id == mentor_id)
+            and (student_id is None or t.student_id == student_id)
+            and (team_id is None or t.team_id == team_id)
         ]
         ordered = sorted(found, key=_sort_key, reverse=True)
         return [dataclasses.replace(t) for t in ordered[offset : offset + limit]], len(found)
