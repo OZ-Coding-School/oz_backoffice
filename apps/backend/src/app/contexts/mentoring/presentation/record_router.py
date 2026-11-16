@@ -37,6 +37,7 @@ from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseMentoringSessionNoteRepository,
     TortoiseMentoringSessionRepository,
 )
+from app.contexts.mentoring.presentation.notices import build_notices
 from app.contexts.mentoring.presentation.session_router import (
     AdminSessionResponse,
     SessionPresenter,
@@ -72,6 +73,7 @@ def get_record_service(
         audit=cast("AuditRecorder", state.audit_recorder),
         uow=UnitOfWork(),
         clock=clock,
+        notices=build_notices(request, clock),
     )
 
 

@@ -17,6 +17,7 @@ from typing import Protocol
 from app.contexts.academy.domain.entities import Student
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.educator.domain.profiles import Mentor
+from app.contexts.mentoring.application.chat_notices import MentoringNotices
 from app.contexts.mentoring.domain.balance import BalanceTransaction
 from app.contexts.mentoring.domain.enums import MentoringSessionStatus
 from app.contexts.mentoring.domain.note import MentoringSessionNote
@@ -75,7 +76,9 @@ class SessionRecordService:
         audit: AuditRecorder,
         uow: UnitOfWork,
         clock: Clock,
+        notices: MentoringNotices | None = None,
     ) -> None:
+        self._notices = notices
         self._sessions = sessions
         self._requests = requests
         self._notes = notes
@@ -136,6 +139,8 @@ class SessionRecordService:
                 await self._accounts.save(account)
                 await self._ledger.add_many(entries)
             await self._record(user_id, "record", locked, extra={"requested": request.duration})
+            if self._notices:
+                await self._notices.recorded(request, locked)
         return locked
 
     async def edit(

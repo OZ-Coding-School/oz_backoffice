@@ -18,13 +18,19 @@
 - `mentoring.enrollment_ended.process`: 명단 동기화가 성공하면 보낸다(roster 작업). 수강 중이 아닌
   수강생을 팀에서 빼고 대기 신청·시작 전 1:1 세션을 취소한 뒤 1:1 잔여를 회수한다(A39·A45, 멱등).
 
+취소·반려·자동 취소 작업은 그 신청의 채팅방에 안내를 남긴다
+(A57·A58, 작업마다 Redis 연결을 열고 닫는다).
+
 이 모듈은 composition root라 여러 컨텍스트의 infrastructure를 직접 조립한다.
 """
 
 import asyncio
 import logging
 import uuid
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
+from redis.asyncio import Redis
 from taskiq import TaskiqEvents, TaskiqState
 
 from app.contexts.academy.application.catalog import AcademyCatalog
@@ -44,12 +50,20 @@ from app.contexts.mentoring.application.artifact_service import ArtifactService
 from app.contexts.mentoring.application.assignment_service import CohortMentorService
 from app.contexts.mentoring.application.availability_service import AvailableTimesService
 from app.contexts.mentoring.application.calendar import BusinessCalendar
+from app.contexts.mentoring.application.chat_notices import MentoringNotices
+from app.contexts.mentoring.application.chat_service import ChatService
 from app.contexts.mentoring.application.enrollment_ended import EnrollmentEndedService
 from app.contexts.mentoring.application.meet_event_service import MeetEventService
 from app.contexts.mentoring.application.meet_service import MeetSpaceService
 from app.contexts.mentoring.application.request_cleanup import RequestCleanup
 from app.contexts.mentoring.application.request_service import MentoringRequestService
 from app.contexts.mentoring.application.session_service import MentoringSessionQueries
+from app.contexts.mentoring.infrastructure.chat_events import RedisChatEvents
+from app.contexts.mentoring.infrastructure.chat_repositories import (
+    TortoiseChatMessageRepository,
+    TortoiseChatReadRepository,
+    TortoiseChatThreadRepository,
+)
 from app.contexts.mentoring.infrastructure.meet_events import RedisProcessedEvents
 from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseBalanceAccountRepository,
@@ -83,7 +97,34 @@ logger = logging.getLogger(__name__)
 DAILY_0000_KST = {"cron": "0 0 * * *", "cron_offset": "Asia/Seoul"}
 
 
-def build_cleanup(clock: SystemClock) -> RequestCleanup:
+def build_chat_notices(redis: "Redis", clock: SystemClock) -> MentoringNotices:
+    """작업 중 남기는 채팅 안내 (A57·A58). redis는 작업이 끝나면 닫는다."""
+    return MentoringNotices(
+        ChatService(
+            threads=TortoiseChatThreadRepository(),
+            messages=TortoiseChatMessageRepository(),
+            reads=TortoiseChatReadRepository(),
+            teams=TortoiseMentoringTeamRepository(),
+            assignments=TortoiseCohortMentorRepository(),
+            students=StudentQueries(TortoiseStudentRepository()),
+            mentors=MentorQueries(TortoiseMentorRepository()),
+            events=RedisChatEvents(redis),
+            uow=UnitOfWork(),
+            clock=clock,
+        )
+    )
+
+
+@asynccontextmanager
+async def chat_notices(clock: SystemClock) -> AsyncIterator[MentoringNotices]:
+    redis = create_redis(get_settings().redis_url)
+    try:
+        yield build_chat_notices(redis, clock)
+    finally:
+        await redis.aclose()
+
+
+def build_cleanup(clock: SystemClock, notices: MentoringNotices | None = None) -> RequestCleanup:
     return RequestCleanup(
         requests=TortoiseMentoringRequestRepository(),
         sessions=TortoiseMentoringSessionRepository(),
@@ -91,13 +132,14 @@ def build_cleanup(clock: SystemClock) -> RequestCleanup:
         ledger=TortoiseBalanceTransactionRepository(),
         audit=AuditRecorder(TortoiseAuditLogRepository(), clock),
         clock=clock,
+        notices=notices,
     )
 
 
-def build_assignment_service() -> CohortMentorService:
+def build_assignment_service(notices: MentoringNotices | None = None) -> CohortMentorService:
     clock = SystemClock()
     return CohortMentorService(
-        cleanup=build_cleanup(clock),
+        cleanup=build_cleanup(clock, notices),
         assignments=TortoiseCohortMentorRepository(),
         mentors=MentorQueries(TortoiseMentorRepository()),
         cohorts=AcademyCatalog(TortoiseBootcampRepository(), TortoiseCohortRepository()),
@@ -109,11 +151,14 @@ def build_assignment_service() -> CohortMentorService:
 
 @broker.task(task_name="mentoring.assignments.expire", schedule=[DAILY_0000_KST])
 async def expire_assignments() -> None:
-    count = await build_assignment_service().expire_ended()
+    async with chat_notices(SystemClock()) as notices:
+        count = await build_assignment_service(notices).expire_ended()
     logger.info("종료일이 지난 기수 멘토 배정 %d건을 비활성화했습니다.", count)
 
 
-def build_enrollment_ended_service() -> EnrollmentEndedService:
+def build_enrollment_ended_service(
+    notices: MentoringNotices | None = None,
+) -> EnrollmentEndedService:
     clock = SystemClock()
     return EnrollmentEndedService(
         teams=TortoiseMentoringTeamRepository(),
@@ -121,7 +166,7 @@ def build_enrollment_ended_service() -> EnrollmentEndedService:
         ledger=TortoiseBalanceTransactionRepository(),
         requests=TortoiseMentoringRequestRepository(),
         sessions=TortoiseMentoringSessionRepository(),
-        cleanup=build_cleanup(clock),
+        cleanup=build_cleanup(clock, notices),
         students=StudentQueries(TortoiseStudentRepository()),
         audit=AuditRecorder(TortoiseAuditLogRepository(), clock),
         uow=UnitOfWork(),
@@ -131,7 +176,8 @@ def build_enrollment_ended_service() -> EnrollmentEndedService:
 
 @broker.task(task_name="mentoring.enrollment_ended.process")
 async def process_enrollment_ended() -> None:
-    result = await build_enrollment_ended_service().process()
+    async with chat_notices(SystemClock()) as notices:
+        result = await build_enrollment_ended_service(notices).process()
     logger.info(
         "수강 종료 처리: 팀원 %d명 제외, 대기 신청 %d건·1:1 세션 %d건 취소, "
         "1:1 계좌 %d개에서 %d분 회수",
@@ -146,7 +192,7 @@ async def process_enrollment_ended() -> None:
 EVERY_10_MINUTES = {"cron": "*/10 * * * *"}
 
 
-def build_request_service() -> MentoringRequestService:
+def build_request_service(notices: MentoringNotices | None = None) -> MentoringRequestService:
     clock = SystemClock()
     mentors = MentorQueries(TortoiseMentorRepository())
     students = StudentQueries(TortoiseStudentRepository())
@@ -174,12 +220,14 @@ def build_request_service() -> MentoringRequestService:
         audit=AuditRecorder(TortoiseAuditLogRepository(), clock),
         uow=UnitOfWork(),
         clock=clock,
+        notices=notices,
     )
 
 
 @broker.task(task_name="mentoring.requests.expire", schedule=[EVERY_10_MINUTES])
 async def expire_requests() -> None:
-    count = await build_request_service().expire_stale()
+    async with chat_notices(SystemClock()) as notices:
+        count = await build_request_service(notices).expire_stale()
     if count:
         logger.info("승인 기한이 지난 대기 신청 %d건을 취소했습니다.", count)
 

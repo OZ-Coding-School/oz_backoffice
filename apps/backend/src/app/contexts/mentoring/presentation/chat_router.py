@@ -2,6 +2,7 @@
 
 참여자 (수강생·멘토, 자격이 없으면 404):
   GET    /me/mentoring/chat/threads                          참여 중인 방 (마지막 메시지 최신순)
+  GET    /me/mentoring/chat/stream                           실시간 수신 (SSE, A58)
   POST   /mentoring/chat/messages                            상대를 골라 보내기 (방이 없으면 만듦)
   GET    /mentoring/chat/threads/{id}                         방
   GET    /mentoring/chat/threads/{id}/messages?before=&limit= 메시지 (최신부터, 커서)
@@ -16,12 +17,15 @@
 """
 
 import uuid
+from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable
 from datetime import datetime
 from enum import StrEnum
 from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from redis.asyncio import Redis
 
 from app.contexts.access.presentation.dependencies import ApprovedUser, require_permission
 from app.contexts.identity.application.auth_service import UserQueries
@@ -34,20 +38,22 @@ from app.contexts.mentoring.application.chat_service import (
     StudentLookup,
     ThreadView,
 )
-from app.contexts.mentoring.domain.chat import ChatMessage, ChatThread, ChatThreadKind
-from app.contexts.mentoring.infrastructure.chat_repositories import (
-    TortoiseChatMessageRepository,
-    TortoiseChatReadRepository,
-    TortoiseChatThreadRepository,
+from app.contexts.mentoring.domain.chat import (
+    ChatEvent,
+    ChatEventKind,
+    ChatMessage,
+    ChatThread,
+    ChatThreadKind,
 )
-from app.contexts.mentoring.infrastructure.repositories import (
-    TortoiseCohortMentorRepository,
-    TortoiseMentoringTeamRepository,
-)
+from app.contexts.mentoring.infrastructure.chat_events import RedisChatEvents
+from app.contexts.mentoring.infrastructure.chat_repositories import TortoiseChatThreadRepository
+from app.contexts.mentoring.infrastructure.repositories import TortoiseMentoringTeamRepository
+from app.contexts.mentoring.presentation.notices import build_chat_service
 from app.core.clock import Clock
 from app.core.dependencies import get_clock
 from app.core.pagination import Page
-from app.core.uow import UnitOfWork
+from app.core.redis import get_redis
+from app.shared.errors import NotFoundError
 
 router = APIRouter(prefix="/mentoring/chat", tags=["mentoring-chat"])
 me_router = APIRouter(prefix="/me/mentoring/chat", tags=["mentoring-chat"])
@@ -63,18 +69,7 @@ Limit = Annotated[int, Query(ge=1, le=100)]
 
 
 def get_chat_service(request: Request, clock: Annotated[Clock, Depends(get_clock)]) -> ChatService:
-    state = request.app.state
-    return ChatService(
-        threads=TortoiseChatThreadRepository(),
-        messages=TortoiseChatMessageRepository(),
-        reads=TortoiseChatReadRepository(),
-        teams=TortoiseMentoringTeamRepository(),
-        assignments=TortoiseCohortMentorRepository(),
-        students=cast("StudentLookup", state.student_queries),
-        mentors=cast("MentorDirectory", state.mentor_queries),
-        uow=UnitOfWork(),
-        clock=clock,
-    )
+    return build_chat_service(request, clock)
 
 
 ServiceDep = Annotated[ChatService, Depends(get_chat_service)]
@@ -371,3 +366,85 @@ async def cohort_thread_messages(
 ) -> MessagePage:
     items = await service.messages_for_cohort(cohort_id, thread_id, before=before, limit=limit)
     return await _page(presenter, items, limit)
+
+
+# ---------------------------------------------------------------- 실시간 수신 (SSE)
+HEARTBEAT_SECONDS = 15.0  # 프록시가 유휴 연결을 끊지 않게 보내는 주석 줄 간격
+RETRY_MILLISECONDS = 3000  # 끊기면 브라우저가 다시 붙기까지 기다리는 시간
+STREAM_HEADERS = {
+    "Cache-Control": "no-cache, no-transform",
+    "X-Accel-Buffering": "no",  # nginx가 버퍼링하지 않게 (운영 참고사항)
+}
+
+
+def sse_frame(event: str, data: BaseModel) -> str:
+    return f"event: {event}\ndata: {data.model_dump_json()}\n\n"
+
+
+class StreamRenderer:
+    """알림을 받은 사람 기준으로 다시 읽어 SSE 프레임을 만든다. 볼 수 없게 됐으면 None."""
+
+    def __init__(self, service: ChatService, presenter: ChatPresenter, user_id: uuid.UUID) -> None:
+        self._service = service
+        self._presenter = presenter
+        self._user_id = user_id
+
+    async def __call__(self, event: ChatEvent) -> str | None:
+        try:
+            if event.kind is ChatEventKind.READ:
+                view = await self._service.get_thread(self._user_id, event.thread_id)
+                return sse_frame(event.kind.value, (await self._presenter.public([view]))[0])
+            if event.message_id is None:
+                return None
+            message = await self._service.get_message(
+                self._user_id, event.thread_id, event.message_id
+            )
+        except NotFoundError:
+            return None
+        return sse_frame(event.kind.value, (await self._presenter.messages([message]))[0])
+
+
+async def chat_stream(
+    events: AsyncGenerator[ChatEvent | None],
+    render: Callable[[ChatEvent], Awaitable[str | None]],
+    disconnected: Callable[[], Awaitable[bool]],
+) -> AsyncIterator[str]:
+    """`ready` 뒤 알림을 프레임으로, 조용하면 주석 줄(ping)을 보낸다. 연결이 끊기면 끝낸다."""
+    try:
+        yield f"retry: {RETRY_MILLISECONDS}\nevent: ready\ndata: {{}}\n\n"
+        async for event in events:
+            if await disconnected():
+                break
+            if event is None:
+                yield ": ping\n\n"
+                continue
+            frame = await render(event)
+            if frame is not None:
+                yield frame
+    finally:
+        await events.aclose()
+
+
+@me_router.get(
+    "/stream",
+    response_class=StreamingResponse,
+    responses={200: {"content": {"text/event-stream": {}}}},
+)
+async def stream(
+    request: Request,
+    user: ApprovedUser,
+    service: ServiceDep,
+    presenter: PresenterDep,
+    redis: Annotated["Redis", Depends(get_redis)],
+) -> StreamingResponse:
+    """내가 참여한 모든 방의 `message`·`message_deleted`(MessageResponse), `read`(ThreadResponse).
+
+    Authorization 헤더로 연결한다(fetch 기반 SSE). 끊긴 사이의 알림은 다시 보내지 않으므로
+    다시 연결하면 방 목록·열린 방 메시지를 다시 조회한다 (A58).
+    """
+    events = RedisChatEvents(redis).subscribe(user.id, idle_seconds=HEARTBEAT_SECONDS)
+    return StreamingResponse(
+        chat_stream(events, StreamRenderer(service, presenter, user.id), request.is_disconnected),
+        media_type="text/event-stream",
+        headers=STREAM_HEADERS,
+    )

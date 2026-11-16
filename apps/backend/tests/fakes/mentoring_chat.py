@@ -2,9 +2,10 @@
 
 import dataclasses
 import uuid
+from collections.abc import Iterable
 from datetime import UTC, datetime
 
-from app.contexts.mentoring.domain.chat import ChatMessage, ChatRead, ChatThread
+from app.contexts.mentoring.domain.chat import ChatEvent, ChatMessage, ChatRead, ChatThread
 
 
 class InMemoryChatStore:
@@ -155,3 +156,16 @@ class InMemoryChatReadRepository:
             )
         ):
             self._s.reads[(read.thread_id, read.user_id)] = dataclasses.replace(read)
+
+
+class RecordingChatEvents:
+    """보낸 실시간 알림을 남긴다. `fail`이면 Redis 오류처럼 실패한다."""
+
+    def __init__(self) -> None:
+        self.sent: list[tuple[set[uuid.UUID], ChatEvent]] = []
+        self.fail = False
+
+    async def publish(self, user_ids: Iterable[uuid.UUID], event: ChatEvent) -> None:
+        if self.fail:
+            raise ConnectionError("redis down")
+        self.sent.append((set(user_ids), event))

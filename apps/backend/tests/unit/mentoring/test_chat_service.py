@@ -11,6 +11,7 @@ from app.contexts.educator.application.mentor_queries import MentorQueries
 from app.contexts.educator.domain.profiles import Mentor
 from app.contexts.mentoring.application.chat_service import ChatService, ChatTarget
 from app.contexts.mentoring.domain.assignment import CohortMentor
+from app.contexts.mentoring.domain.chat import ChatEvent, ChatEventKind, ChatMessage
 from app.contexts.mentoring.domain.enums import (
     CohortMentorDeactivationReason,
     MentoringSettlementPolicy,
@@ -22,7 +23,7 @@ from app.shared.errors import BusinessRuleViolation, NotFoundError, PermissionDe
 from app.shared.ids import new_id
 from tests.fakes.educator import InMemoryMentorRepository
 from tests.fakes.mentoring import InMemoryCohortMentorRepository, InMemoryTeamRepository
-from tests.fakes.mentoring_chat import InMemoryChatStore
+from tests.fakes.mentoring_chat import InMemoryChatStore, RecordingChatEvents
 from tests.fakes.uow import FakeUnitOfWork
 
 pytestmark = pytest.mark.unit
@@ -79,6 +80,8 @@ class Harness:
         self.student = self.students.add(self.cohort_id)
         self.clock = FixedClock(NOW)
         self.store = InMemoryChatStore({self.student.id: self.cohort_id})
+        self.events = RecordingChatEvents()
+        self.uow = FakeUnitOfWork()
         self.service = ChatService(
             threads=self.store.thread_repo,
             messages=self.store.message_repo,
@@ -87,7 +90,8 @@ class Harness:
             assignments=self.assignments,
             students=self.students,
             mentors=MentorQueries(InMemoryMentorRepository(self.mentor, self.other_mentor)),
-            uow=FakeUnitOfWork(),
+            events=self.events,
+            uow=self.uow,
             clock=self.clock,
         )
 
@@ -278,3 +282,73 @@ async def test_staff_reads_threads_in_cohort(h: Harness) -> None:
         h.cohort_id, mentor_id=h.other_mentor.id, limit=20, offset=0
     )
     assert (filtered, total) == ([], 0)
+
+
+async def test_events_go_to_participants_after_commit(h: Harness) -> None:
+    other = h.students.add(h.cohort_id)
+    team = await h.team(h.student, other)
+    assert other.user_id is not None
+    sent = await h.service.start(h.student_user, ChatTarget(team_id=team.id), "팀 질문")
+    everyone = {h.student_user, other.user_id, h.mentor.user_id}
+    assert h.events.sent == [
+        (everyone, ChatEvent(ChatEventKind.MESSAGE, sent.thread_id, sent.id)),
+    ]
+    h.events.sent.clear()
+    await h.service.mark_read(other.user_id, sent.thread_id, sent.id)
+    assert h.events.sent == [({other.user_id}, ChatEvent(ChatEventKind.READ, sent.thread_id))]
+    h.events.sent.clear()
+    await h.service.mark_read(other.user_id, sent.thread_id, sent.id)  # 그대로면 알리지 않음
+    await h.service.delete_message(h.student_user, sent.thread_id, sent.id)
+    assert h.events.sent == [
+        (everyone, ChatEvent(ChatEventKind.MESSAGE_DELETED, sent.thread_id, sent.id)),
+    ]
+
+    # 알림이 실패해도 보내기는 성공 (이미 커밋됨)
+    h.events.fail = True
+    h.tick()
+    kept = await h.service.send(h.mentor.user_id, sent.thread_id, "답변")
+    assert kept.id in h.store.messages
+
+
+async def test_post_notice_creates_thread_and_notifies(h: Harness) -> None:
+    async with h.uow:
+        notice = await h.service.post_notice(
+            mentor_id=h.mentor.id, student_id=h.student.id, team_id=None, body="[멘토링 신청] 주제"
+        )
+        assert h.events.sent == []  # 커밋 뒤에 알린다
+    assert notice is not None
+    assert notice.is_system
+    assert h.events.sent == [
+        (
+            {h.student_user, h.mentor.user_id},
+            ChatEvent(ChatEventKind.MESSAGE, notice.thread_id, notice.id),
+        )
+    ]
+    view = await h.service.get_thread(h.student_user, notice.thread_id)
+    assert view.unread_count == 1  # 안내도 안 읽음에 들어간다
+    assert (await h.service.get_message(h.mentor.user_id, notice.thread_id, notice.id)).body == (
+        "[멘토링 신청] 주제"
+    )
+
+    # 자격이 없는 방에도 남기되(운영진 열람) 알리지 않는다
+    h.events.sent.clear()
+    h.student.end(EnrollmentStatus.COMPLETED, on=date(2026, 11, 15))
+    hidden = await h.service.post_notice(
+        mentor_id=h.mentor.id, student_id=h.student.id, team_id=None, body="[멘토링 취소]"
+    )
+    assert hidden is not None
+    assert h.events.sent == []
+
+
+async def test_post_notice_failure_is_swallowed(
+    h: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def broken(_: ChatMessage) -> None:
+        raise RuntimeError("db")
+
+    monkeypatch.setattr(h.store.message_repo, "add", broken)
+    notice = await h.service.post_notice(
+        mentor_id=h.mentor.id, student_id=h.student.id, team_id=None, body="안내"
+    )
+    assert notice is None
+    assert h.events.sent == []

@@ -54,6 +54,7 @@ from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseMentoringTeamRepository,
 )
 from app.contexts.mentoring.presentation.availability_router import get_available_times_service
+from app.contexts.mentoring.presentation.notices import build_notices
 from app.contexts.mentoring.presentation.presenters import NameBook
 from app.contexts.mentoring.presentation.session_router import SessionPresenter, SessionResponse
 from app.core.clock import Clock
@@ -94,6 +95,7 @@ def get_request_service(
         audit=cast("AuditRecorder", state.audit_recorder),
         uow=UnitOfWork(),
         clock=clock,
+        notices=build_notices(request, clock),
     )
 
 
@@ -117,6 +119,7 @@ def get_approval_service(
         audit=cast("AuditRecorder", state.audit_recorder),
         uow=UnitOfWork(),
         clock=clock,
+        notices=build_notices(request, clock),
     )
 
 

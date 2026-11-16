@@ -31,6 +31,7 @@ from app.contexts.identity.application.auth_service import UserQueries
 from app.contexts.identity.application.signup_matching import SignupMatcher
 from app.contexts.identity.application.user_admin import UserAdministration
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
+from app.contexts.mentoring.infrastructure.chat_events import RedisChatEvents
 from app.contexts.organization.application.employee_queries import EmployeeQueries
 from app.contexts.organization.infrastructure.repositories import TortoiseEmployeeRepository
 from app.core.clock import SystemClock
@@ -54,6 +55,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.redis = create_redis(settings.redis_url)
+        app.state.chat_events = RedisChatEvents(app.state.redis)  # 채팅 실시간 알림 (A58)
         app.state.http_client = httpx.AsyncClient(timeout=httpx.Timeout(10.0))
         await broker.startup()  # 작업을 보내는 쪽(API)도 브로커 연결이 필요하다
         try:

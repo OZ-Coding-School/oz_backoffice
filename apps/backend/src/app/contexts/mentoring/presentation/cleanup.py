@@ -12,6 +12,7 @@ from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseMentoringRequestRepository,
     TortoiseMentoringSessionRepository,
 )
+from app.contexts.mentoring.presentation.notices import build_notices
 from app.core.clock import Clock
 
 
@@ -23,4 +24,5 @@ def build_cleanup(request: Request, clock: Clock) -> RequestCleanup:
         ledger=TortoiseBalanceTransactionRepository(),
         audit=cast("AuditRecorder", request.app.state.audit_recorder),
         clock=clock,
+        notices=build_notices(request, clock),
     )
