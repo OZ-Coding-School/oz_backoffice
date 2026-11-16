@@ -6,6 +6,7 @@ from app.contexts.mentoring.domain.artifact import MentoringArtifact
 from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.availability import Interval
 from app.contexts.mentoring.domain.balance import BalanceAccount, BalanceTransaction
+from app.contexts.mentoring.domain.chat import ChatMessage, ChatRead, ChatThread
 from app.contexts.mentoring.domain.enums import MentoringRequestStatus
 from app.contexts.mentoring.domain.note import MentoringSessionNote
 from app.contexts.mentoring.domain.request import MentoringRequest
@@ -339,4 +340,60 @@ class MentoringSettlementRepository(Protocol):
         self, session_ids: list[uuid.UUID], *, exclude_settlement_id: uuid.UUID | None
     ) -> set[uuid.UUID]:
         """이미 다른 정산 명세에 들어간 세션."""
+        ...
+
+
+class ChatThreadRepository(Protocol):
+    async def get(self, thread_id: uuid.UUID) -> ChatThread | None: ...
+    async def find(
+        self, *, mentor_id: uuid.UUID, student_id: uuid.UUID | None, team_id: uuid.UUID | None
+    ) -> ChatThread | None: ...
+    async def ensure(self, thread: ChatThread) -> ChatThread:
+        """같은 (수강 등록|팀, 멘토) 방이 있으면 그 방, 없으면 만든다 (동시 생성 안전)."""
+        ...
+
+    async def touch(self, thread_id: uuid.UUID, at: datetime) -> None:
+        """마지막 메시지 시각을 앞으로만 옮긴다."""
+        ...
+
+    async def list_for(
+        self,
+        *,
+        student_ids: list[uuid.UUID],
+        team_ids: list[uuid.UUID],
+        mentor_id: uuid.UUID | None,
+    ) -> list[ChatThread]:
+        """후보 방 (자격 검사는 서비스). 마지막 메시지 최신순."""
+        ...
+
+    async def list_by_cohort(
+        self, cohort_id: uuid.UUID, *, mentor_id: uuid.UUID | None, limit: int, offset: int
+    ) -> tuple[list[ChatThread], int]: ...
+    async def unread_counts(
+        self, user_id: uuid.UUID, thread_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, int]:
+        """읽음 위치 뒤 남이 보낸·지우지 않은 메시지 수 (0이면 빠짐)."""
+        ...
+
+    async def last_messages(self, thread_ids: list[uuid.UUID]) -> dict[uuid.UUID, ChatMessage]: ...
+
+
+class ChatMessageRepository(Protocol):
+    async def add(self, message: ChatMessage) -> None: ...
+    async def save(self, message: ChatMessage) -> None:
+        """삭제(본문·삭제 시각)만 바뀐다."""
+        ...
+
+    async def get(self, message_id: uuid.UUID) -> ChatMessage | None: ...
+    async def list_before(
+        self, thread_id: uuid.UUID, *, before: uuid.UUID | None, limit: int
+    ) -> list[ChatMessage]:
+        """before보다 앞선 메시지를 최신부터 limit개."""
+        ...
+
+
+class ChatReadRepository(Protocol):
+    async def get(self, thread_id: uuid.UUID, user_id: uuid.UUID) -> ChatRead | None: ...
+    async def save(self, read: ChatRead) -> None:
+        """없으면 만들고, 있으면 앞으로만 옮긴다."""
         ...

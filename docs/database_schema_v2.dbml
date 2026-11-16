@@ -894,21 +894,27 @@ Table mentoring_chat_threads {
 }
 
 Table mentoring_chat_messages {
-  note: "채팅 메시지 (실시간 전달은 WebSocket/SSE + Redis Pub/Sub)"
+  note: "채팅 메시지 (실시간 전달은 SSE + Redis Pub/Sub, A57). 텍스트 2,000자, 수정 없음, 보낸 사람만 삭제"
 
-  id uuid [pk, note: "default=uuid7 사용 (시간순 정렬)"]
+  id uuid [pk, note: "default=uuid7 사용 (시간순 정렬, 목록 커서)"]
   thread_id uuid [not null, ref: > mentoring_chat_threads.id]
-  sender_id uuid [null, ref: > users.id, note: "null이면 시스템 안내 메시지"]
-  body text [not null]
+  sender_id uuid [null, ref: > users.id, note: "null이면 시스템 안내 메시지 (삭제 불가)"]
+  body text [null, note: "삭제하면 null"]
   created_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz [null, note: "보낸 사람이 지운 시각 (A57)"]
 
   indexes {
-    (thread_id, created_at)
+    (thread_id, id)
+  }
+  checks {
+    `body IS NULL OR char_length(body) BETWEEN 1 AND 2000` [name: "check_chat_message_body"]
+    `(deleted_at IS NULL) = (body IS NOT NULL)` [name: "check_chat_message_deleted"]
+    `sender_id IS NOT NULL OR deleted_at IS NULL` [name: "check_chat_message_system_kept"]
   }
 }
 
 Table mentoring_chat_reads {
-  note: "채팅방 참여자별 읽음 위치 (안 읽은 메시지 수 = last_read_at 이후 메시지 수)"
+  note: "채팅방 참여자별 읽음 위치 (안 읽은 메시지 수 = last_read_message_id 이후 남이 보낸·삭제되지 않은 메시지 수, A57). 복합 PK라 Tortoise 모델 없이 raw SQL"
 
   thread_id uuid [not null, ref: > mentoring_chat_threads.id]
   user_id uuid [not null, ref: > users.id]
