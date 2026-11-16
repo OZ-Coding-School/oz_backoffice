@@ -1,9 +1,13 @@
 """멘토링 채팅 API (실제 DB, A57)."""
 
+import uuid
 from datetime import UTC, datetime
-from typing import Any
+from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
+from fakeredis import FakeAsyncRedis
+from fastapi import FastAPI
 from httpx import AsyncClient
 
 from app.cli import create_super_admin
@@ -15,6 +19,13 @@ from app.contexts.access.infrastructure.repositories import TortoiseUserRoleRepo
 from app.contexts.educator.domain.enums import DisplayNamePreference
 from app.contexts.identity.domain.entities import User
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
+from app.contexts.mentoring.domain.chat import ChatEvent, ChatEventKind
+from app.contexts.mentoring.presentation.chat_router import (
+    ChatPresenter,
+    StreamRenderer,
+    get_chat_service,
+)
+from app.core.clock import SystemClock
 from app.core.config import Settings
 from app.core.security import JWTService
 from tests.factories.academy import create_cohort, make_student
@@ -213,3 +224,41 @@ async def test_team_chat_and_staff_view(client: AsyncClient, settings: Settings)
     assert (await client.get(f"{other_path}/{thread_id}", headers=admin)).status_code == 404
     assert (await client.get(admin_path, headers=ctx["student_h"][0])).status_code == 403
     assert (await client.get(admin_path)).status_code == 401
+
+
+async def test_stream_requires_login(client: AsyncClient) -> None:
+    assert (await client.get("/api/v1/me/mentoring/chat/stream")).status_code == 401
+
+
+async def test_stream_renders_events_for_each_receiver(
+    client: AsyncClient, settings: Settings, app: FastAPI, fake_redis: FakeAsyncRedis
+) -> None:
+    """SSE가 받은 알림을 받는 사람 기준으로 다시 읽어 프레임을 만든다 (ASGI 테스트 클라이언트는
+    끝나지 않는 응답을 읽지 못해 렌더러를 직접 부른다)."""
+    ctx = await _setup(client, settings)
+    sent = await client.post(
+        f"{CHAT}/messages",
+        json={"team_id": ctx["team_id"], "body": "팀 질문"},
+        headers=ctx["student_h"][0],
+    )
+    message = sent.json()
+    thread_id, message_id = uuid.UUID(message["thread_id"]), uuid.UUID(message["id"])
+    request = cast("Any", SimpleNamespace(app=app))
+    service = get_chat_service(request, SystemClock(), fake_redis)
+    presenter = ChatPresenter(request)
+
+    def renderer(student_index: int) -> StreamRenderer:
+        return StreamRenderer(service, presenter, ctx["students"][student_index].user_id)
+
+    new = ChatEvent(ChatEventKind.MESSAGE, thread_id, message_id)
+    frame = await renderer(1)(new)
+    assert frame is not None
+    assert frame.startswith("event: message\ndata: ")
+    assert '"body":"팀 질문"' in frame
+    assert '"sender_name":"가수강"' in frame
+    assert await renderer(2)(new) is None  # 팀원이 아니면 건너뛴다
+
+    read = await renderer(1)(ChatEvent(ChatEventKind.READ, thread_id))
+    assert read is not None
+    assert read.startswith("event: read\ndata: ")
+    assert '"unread_count":1' in read
