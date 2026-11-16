@@ -14,6 +14,7 @@ class FakeUnitOfWork(UnitOfWork):
 
     async def __aenter__(self) -> Self:
         self._after_commit = []
+        self._enter_scope()
         return self
 
     async def __aexit__(
@@ -22,6 +23,7 @@ class FakeUnitOfWork(UnitOfWork):
         exc: BaseException | None,
         tb: TracebackType | None,
     ) -> None:
+        self._exit_scope()
         if exc_type is not None:
             self.rollbacks += 1
             return
