@@ -10,6 +10,10 @@ from app.contexts.mentoring.infrastructure.models.balance import (
     MentoringBalanceAccountModel,
     MentoringBalanceTransactionModel,
 )
+from app.contexts.mentoring.infrastructure.models.chat import (
+    MentoringChatMessageModel,
+    MentoringChatThreadModel,
+)
 from app.contexts.mentoring.infrastructure.models.note import MentoringSessionNoteModel
 from app.contexts.mentoring.infrastructure.models.request import MentoringRequestModel
 from app.contexts.mentoring.infrastructure.models.schedule import MentorUnavailablePeriodModel
@@ -36,6 +40,8 @@ __all__ = [
     "MentoringArtifactModel",
     "MentoringBalanceAccountModel",
     "MentoringBalanceTransactionModel",
+    "MentoringChatMessageModel",
+    "MentoringChatThreadModel",
     "MentoringHolidayModel",
     "MentoringRequestModel",
     "MentoringSessionModel",
