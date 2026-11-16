@@ -9,9 +9,9 @@
 
 | # | 결정 |
 | --- | --- |
-| D1 | `prev_tools/`의 5개 서비스(Auto_monitor, exam, mentor, ucansign, vacation)를 PostgreSQL 기반의 단일 백오피스로 통합한다. 백엔드(`apps/backend`)와 프론트엔드(`apps/frontend`)를 분리한다 |
-| D2 | **멘토링 기능을 먼저 이전한다.** `docs/database_schema_v2.dbml`은 멘토링 이전 범위로 축소된 스키마다. 나머지 서비스(출결 감시, 시험, 전자서명, 수강생 신청서)는 이후 단계에서 테이블을 다시 추가한다 |
-| D3 | 수강생도 전원 `users` 계정을 가진다 (이메일 필수). 기존 exam의 링크 인증, vacation의 익명 폼은 이전 시 로그인 기반으로 바꾼다 |
+| D1 | ~~`prev_tools/`의 5개 서비스(Auto_monitor, exam, mentor, ucansign, vacation)를 PostgreSQL 기반의 단일 백오피스로 통합한다.~~ (변경: 2026-11-16 → D11: exam 제외, oz_discord_admin 포함) 백엔드(`apps/backend`)와 프론트엔드(`apps/frontend`)를 분리한다 |
+| D2 | **멘토링 기능을 먼저 이전한다.** `docs/database_schema_v2.dbml`은 멘토링 이전 범위로 축소된 스키마다. 나머지 서비스(출결 감시, ~~시험,~~ 전자서명, 수강생 신청서, 디스코드 관리 — D11)는 이후 단계에서 테이블을 다시 추가한다 |
+| D3 | 수강생도 전원 `users` 계정을 가진다 (이메일 필수). 기존 exam의 링크 인증, vacation의 익명 폼은 이전 시 로그인 기반으로 바꾼다 (exam은 D11로 범위에서 제외) |
 | D4 | 권한은 `user_roles`(범위 기반 RBAC: GLOBAL / BOOTCAMP / COHORT)로 판정하고, `bootcamp_staffs` / `cohort_staffs` / `cohort_mentors`는 담당자 표시용으로 함께 쓴다. 담당자 배정 시 같은 트랜잭션에서 `user_roles`를 동기화한다 |
 | D5 | `departments`는 조직도 용도만이다. 데이터 소유 범위는 bootcamp / cohort 기준이다 |
 | D6 | HRD-Net 과정 1 : 운영과정(`bootcamps`) N. 같은 HRD 과정에서 파생상품으로 운영과정이 다르게 구성된다 **(보완 2026-11-09)** HRD 연결은 기수 단위다. 기수(`cohorts.hrd_net_cohort_id`)는 운영과정의 대표 HRD 과정과 다른 HRD 과정의 회차에도 연결될 수 있다(예: CEO 1기 → 프론트엔드 HRD 9회차, 1인창업 3기 → 프론트엔드 HRD 16회차). `bootcamps.hrd_net_bootcamp_id`는 대표값이다 |
@@ -19,6 +19,7 @@
 | D8 | 조교·운영매니저는 내부 직원(`employees`), 멘토·강사는 외부 채용 인원(`users` + `mentors`/`instructors`)이다 |
 | D9 | 수강생 신청서(휴가·결석·지각·조퇴·중도포기·출석인정)는 공통 테이블 + 승인 워크플로로 만들고 DB를 원천으로 한다 (후속 단계) |
 | D10 | 범위 밖으로 제외: 챕터/과목/기수별 과목, 일반 과제, 프로젝트, 공통 `files` 테이블, 외부 계정(Slack/Discord/ZEP) 테이블. 출결 이전 때 외부 계정을 다시 설계한다 |
+| D11 | **통합 범위 변경** (2026-11-16, 사용자 결정): **시험(`exam`)은 통합 범위에서 제외**한다. **디스코드 관리(`prev_tools/oz_discord_admin`)를 통합 범위에 넣는다** — 과정·기수 서버 목록·설정, 서버 템플릿(카테고리·채널·역할 초기 구성), 역할 부여 자동화·하차자 역할 제거, 예약 공지, AI 질의응답 설정. 통합 대상은 Auto_monitor(출결 감시), mentor(멘토링), ucansign(행정 서류), vacation(수강생 신청서, D9), oz_discord_admin(디스코드)이다. 외부 계정(Discord) 테이블은 D10대로 디스코드·출결 이전 때 설계한다 |
 
 ## 2. 멘토링 도메인 (2026-11-04 ~ 11-05)
 
@@ -191,6 +192,7 @@
 | --- | --- |
 | F1 | React + Vite + TS + Tailwind + shadcn/ui + TanStack Query + Zustand + lucide-react + oxlint / 테스트: Vitest + Testing Library + MSW + Playwright E2E (처음부터 적용) |
 | F2 | 서버 데이터는 TanStack Query, 클라이언트 전용 상태만 Zustand |
+| F3 | **운영진 화면 구조** (2026-11-16, 사용자 결정, Figma `Admin (Draft)` 페이지): 두 단 내비게이션 — 왼쪽 **모듈 레일**(홈 / 학사 / 출결 감시 / 멘토링 / 강사·멘토 / 행정 업무 / 디스코드 / 회원·권한 / 설정, 9개)과 고른 모듈의 **모듈 메뉴**. 권한이 없는 모듈은 숨긴다. 상단 막대의 **현재 기수**를 기수 단위 모듈(출결·멘토링·행정 업무)에 적용한다. **멘토링** 메뉴는 신청 관리·세션 관리·팀 관리·정산 관리·멘토링 설정 5개이고, **1:1 채팅 열람·시간 계좌는 수강생 상세**, 팀 채팅·팀 시간 계좌는 **팀 상세**의 탭에서 본다. **행정 업무**는 수강생 신청서(휴가·결석·지각·조퇴·중도포기·출석인정)와 행정 서류(개인 서류 발송·훈련장려금·발송·서명 현황·과정 서류 정보·유캔사인 계정)를 함께 관리한다. 수강생·멘토 로그인(`/login`)과 운영진 로그인(`/staff/login`, Google)은 진입점을 나눈다(경로는 잠정) |
 
 ## 6. 미결정·보류
 
