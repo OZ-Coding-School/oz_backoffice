@@ -7,7 +7,7 @@ from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.availability import Interval
 from app.contexts.mentoring.domain.balance import BalanceAccount, BalanceTransaction
 from app.contexts.mentoring.domain.chat import ChatMessage, ChatRead, ChatThread
-from app.contexts.mentoring.domain.enums import MentoringRequestStatus
+from app.contexts.mentoring.domain.enums import MentoringRequestStatus, MentoringSessionStatus
 from app.contexts.mentoring.domain.note import MentoringSessionNote
 from app.contexts.mentoring.domain.request import MentoringRequest
 from app.contexts.mentoring.domain.schedule import MentorUnavailablePeriod
@@ -159,6 +159,12 @@ class MentoringRequestRepository(Protocol):
         """1:1은 그 수강생의 대기 신청 수, 팀은 그 팀의 대기 신청 수."""
         ...
 
+    async def count_pending_by_requesters(
+        self, requester_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, int]:
+        """수강 등록별 1:1 대기 신청 수 (0이면 빠짐, A59)."""
+        ...
+
     async def list_for_participants(
         self,
         *,
@@ -277,6 +283,12 @@ class MentoringSessionRepository(Protocol):
     async def list_for_participants(
         self, *, student_ids: list[uuid.UUID], team_ids: list[uuid.UUID], query: SessionQuery
     ) -> tuple[list[MentoringSession], int]: ...
+    async def count_by_requesters(
+        self, requester_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, dict[MentoringSessionStatus, int]]:
+        """수강 등록별 1:1 세션 수를 상태별로 (없는 상태는 빠짐, A59)."""
+        ...
+
     async def list_for_mentor(
         self, mentor_id: uuid.UUID, query: SessionQuery
     ) -> tuple[list[MentoringSession], int]: ...

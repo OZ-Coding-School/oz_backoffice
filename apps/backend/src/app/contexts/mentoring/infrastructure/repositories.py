@@ -6,6 +6,7 @@ from typing import Any, cast
 
 from tortoise.exceptions import IntegrityError
 from tortoise.expressions import Q
+from tortoise.functions import Count
 
 from app.contexts.mentoring.domain.artifact import MentoringArtifact
 from app.contexts.mentoring.domain.assignment import CohortMentor
@@ -597,6 +598,23 @@ class TortoiseMentoringRequestRepository:
             return await query.filter(team_id=team_id).count()
         return await query.filter(requester_id=requester_id, team_id__isnull=True).count()
 
+    async def count_pending_by_requesters(
+        self, requester_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, int]:
+        if not requester_ids:
+            return {}
+        rows = (
+            await MentoringRequestModel.filter(
+                requester_id__in=requester_ids,
+                team_id__isnull=True,
+                status=MentoringRequestStatus.PENDING,
+            )
+            .annotate(n=Count("id"))
+            .group_by("requester_id")
+            .values("requester_id", "n")
+        )
+        return {row["requester_id"]: row["n"] for row in rows}
+
     async def _page(
         self, query: Any, limit: int, offset: int
     ) -> tuple[list[MentoringRequest], int]:
@@ -887,6 +905,25 @@ class TortoiseMentoringSessionRepository:
         self, mentor_id: uuid.UUID, query: SessionQuery
     ) -> tuple[list[MentoringSession], int]:
         return await self._page(MentoringSessionModel.filter(mentor_id=mentor_id), query)
+
+    async def count_by_requesters(
+        self, requester_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, dict[MentoringSessionStatus, int]]:
+        if not requester_ids:
+            return {}
+        rows = (
+            await MentoringSessionModel.filter(
+                request__requester_id__in=requester_ids, request__team_id__isnull=True
+            )
+            .annotate(n=Count("id"))
+            .group_by("request__requester_id", "status")
+            .values("request__requester_id", "status", "n")
+        )
+        result: dict[uuid.UUID, dict[MentoringSessionStatus, int]] = {}
+        for row in rows:
+            by_status = result.setdefault(row["request__requester_id"], {})
+            by_status[MentoringSessionStatus(row["status"])] = row["n"]
+        return result
 
     async def list_by_cohort(
         self,
