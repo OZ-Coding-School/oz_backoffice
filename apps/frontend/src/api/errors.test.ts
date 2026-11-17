@@ -31,3 +31,11 @@ describe("API 오류 변환", () => {
     expect(isRetryableError(new ApiError(401, "token_expired", ""))).toBe(false);
   });
 });
+
+describe("Retry-After", () => {
+  it("429의 남은 초를 읽는다", () => {
+    const error = toApiError(429, { error: { code: "login_locked", message: "잠김" } }, "120");
+    expect(error.retryAfterSeconds).toBe(120);
+    expect(toApiError(429, { error: { code: "x", message: "" } }, "abc").retryAfterSeconds).toBeNull();
+  });
+});

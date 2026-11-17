@@ -72,7 +72,7 @@ api.use(authMiddleware);
  */
 export async function unwrap<T>(result: Promise<{ data?: T; error?: unknown; response: Response }>): Promise<T> {
   const { data, error, response } = await result;
-  if (!response.ok) throw toApiError(response.status, error);
+  if (!response.ok) throw toApiError(response.status, error, response.headers.get("Retry-After"));
   return data as T;
 }
 

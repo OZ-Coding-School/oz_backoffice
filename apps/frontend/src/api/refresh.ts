@@ -1,7 +1,7 @@
 import { env } from "@/env";
 
 import { readApiError } from "./errors";
-import { endSession, setAccessToken } from "./session";
+import { endSession, hasSession, setAccessToken } from "./session";
 
 /** 탭 간 갱신 잠금 이름. 같은 사이트의 모든 탭이 공유한다 (decisions F19). */
 export const REFRESH_LOCK = "oz-auth-refresh";
@@ -38,7 +38,8 @@ async function requestRefresh(): Promise<boolean> {
   }
   const error = await readApiError(response);
   if (response.status === 401) {
-    endSession(error.code);
+    // 끝낼 세션이 있을 때만 끝낸다. 처음 방문(쿠키 없음)이 앞서 남은 종료 사유를 덮지 않게 한다
+    if (hasSession()) endSession(error.code);
     return false;
   }
   throw error;
