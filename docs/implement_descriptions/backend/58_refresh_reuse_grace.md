@@ -1,6 +1,6 @@
 # 58. refresh 재사용 유예 시간
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-17 병합)
 - 관련 PR: #73
 - 관련 결정: `docs/decisions.md` A60 (A7 보완), F19
 - 이전 기록: [57. 운영진 멘티 목록·신청·세션 수 집계](57_mentee_list.md)
@@ -61,6 +61,9 @@
   - 유예 안 재사용은 200으로 access만 주고 Set-Cookie가 없으며, 먼저 받은 새 refresh는 그대로 쓸 수 있다.
   - 11초 뒤 재사용은 401 `refresh_token_reused`이고, 새 refresh도 폐기된다.
 - **로컬 검사 (compose `api` 컨테이너):** ruff, ruff format, mypy, mypy tests, lint-imports 통과. 전체 837 passed.
+
+- GitHub Actions (PR #73): 백엔드 검사 잡 통과
+- 사용자가 병합을 확인했다(2026-11-17)
 
 ## 남은 작업
 - FE-0b: 프론트 API 클라이언트에서 Web Locks로 갱신을 직렬화한다(F19).
