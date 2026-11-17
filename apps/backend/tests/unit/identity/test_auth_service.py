@@ -10,7 +10,7 @@ from app.contexts.identity.application.auth_service import (
     StaffGoogleLoginService,
     UserQueries,
 )
-from app.contexts.identity.application.tokens import TokenService
+from app.contexts.identity.application.tokens import IssuedAccess, IssuedTokens, TokenService
 from app.contexts.identity.domain.enums import SocialLoginProvider, UserApprovalStatus
 from app.contexts.identity.infrastructure.token_store import (
     RedisOAuthStateStore,
@@ -39,7 +39,7 @@ class Harness:
         self.google = FakeGoogleAuthenticator()
         self.google.identities["good-code"] = STAFF
         store = RedisRefreshTokenStore(redis, ttl_seconds=settings.refresh_token_ttl_seconds)
-        self.tokens = TokenService(JWTService(settings), store, self.clock)
+        self.tokens = TokenService(JWTService(settings), store, self.clock, reuse_grace_seconds=10)
         self.uow = FakeUnitOfWork()
         self.login = StaffGoogleLoginService(
             google=self.google,
@@ -142,6 +142,7 @@ async def test_suspended_user_cannot_login(h: Harness) -> None:
 async def test_refresh_rotates_and_blocks_suspended_user(h: Harness) -> None:
     login = await h.complete()
     renewed = await h.sessions.refresh(login.tokens.refresh_token)
+    assert isinstance(renewed, IssuedTokens)
     assert h.tokens.read_access(renewed.access_token) == login.user.id
 
     user = await h.users.get(login.user.id)
@@ -152,6 +153,14 @@ async def test_refresh_rotates_and_blocks_suspended_user(h: Harness) -> None:
     with pytest.raises(AuthenticationError) as exc:
         await h.sessions.refresh(renewed.refresh_token)
     assert exc.value.code == "account_disabled"
+
+
+async def test_refresh_reuse_within_grace_gives_access_only(h: Harness) -> None:
+    login = await h.complete()
+    await h.sessions.refresh(login.tokens.refresh_token)
+    again = await h.sessions.refresh(login.tokens.refresh_token)
+    assert isinstance(again, IssuedAccess)
+    assert h.tokens.read_access(again.access_token) == login.user.id
 
 
 async def test_logout_revokes_refresh(h: Harness) -> None:

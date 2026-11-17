@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 from urllib.parse import parse_qs, urlparse
 
@@ -245,7 +245,31 @@ async def test_me_requires_valid_access_token(
     assert response.json()["error"]["code"] == code
 
 
-async def test_refresh_rotates_cookie_and_detects_reuse(auth_client: AsyncClient) -> None:
+async def test_refresh_reuse_within_grace_keeps_cookie(auth_client: AsyncClient) -> None:
+    """회전 직후 같은 refresh가 다시 오면 access만 주고 쿠키는 바꾸지 않는다 (A60)."""
+    first = refresh_cookie(await login(auth_client))
+    renewed = await auth_client.post(
+        "/api/v1/auth/refresh", headers={"Cookie": f"oz_refresh={first}"}
+    )
+    second = refresh_cookie(renewed)
+
+    again = await auth_client.post(
+        "/api/v1/auth/refresh", headers={"Cookie": f"oz_refresh={first}"}
+    )
+    assert again.status_code == 200
+    assert again.json()["access_token"]
+    assert again.headers["cache-control"] == "no-store"
+    assert not any(h.startswith("oz_refresh=") for h in again.headers.get_list("set-cookie"))
+    # 먼저 받은 새 refresh는 그대로 쓸 수 있다
+    still = await auth_client.post(
+        "/api/v1/auth/refresh", headers={"Cookie": f"oz_refresh={second}"}
+    )
+    assert still.status_code == 200
+
+
+async def test_refresh_rotates_cookie_and_detects_reuse(
+    auth_app: FastAPI, auth_client: AsyncClient
+) -> None:
     first = refresh_cookie(await login(auth_client))
 
     renewed = await auth_client.post(
@@ -255,6 +279,8 @@ async def test_refresh_rotates_cookie_and_detects_reuse(auth_client: AsyncClient
     second = refresh_cookie(renewed)
     assert second != first
 
+    clock = auth_app.state.clock
+    clock.set(clock.now() + timedelta(seconds=11))  # 유예 시간(10초)이 지난 재사용
     reused = await auth_client.post(
         "/api/v1/auth/refresh", headers={"Cookie": f"oz_refresh={first}"}
     )

@@ -49,7 +49,7 @@ def get_token_service(
     jwt: Annotated[JWTService, Depends(get_jwt_service)],
 ) -> TokenService:
     store = RedisRefreshTokenStore(redis, ttl_seconds=settings.refresh_token_ttl_seconds)
-    return TokenService(jwt, store, clock)
+    return TokenService(jwt, store, clock, reuse_grace_seconds=settings.refresh_reuse_grace_seconds)
 
 
 TokensDep = Annotated[TokenService, Depends(get_token_service)]

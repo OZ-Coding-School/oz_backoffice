@@ -29,6 +29,7 @@
 | `REDIS_URL`, `TASKIQ_REDIS_URL` | 운영 Redis (DB 번호를 나눈다) | 리프레시 토큰·레이트 리밋·락 / 작업 큐 |
 | `JWT_SECRET_KEY` | `openssl rand -hex 32`로 새로 만든 값 | 코드 기본값 금지. 바꾸면 모든 세션이 끊긴다 |
 | `REFRESH_COOKIE_SECURE` | `true` | |
+| `REFRESH_REUSE_GRACE_SECONDS` | `10` (기본값) | 회전 직후 같은 refresh 재사용을 탈취로 보지 않는 시간(A60). 0이면 유예 없음 |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | OAuth 클라이언트 | |
 | `GOOGLE_REDIRECT_URI` | `https://<API 도메인>/api/v1/auth/google/callback` | 콘솔 등록값과 같아야 한다 |
 | `GOOGLE_ALLOWED_DOMAIN` | `nextrunners.co.kr` | |

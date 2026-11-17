@@ -5,7 +5,7 @@ import uuid
 from dataclasses import dataclass
 
 from app.contexts.identity.application.ports import GoogleAuthenticator
-from app.contexts.identity.application.tokens import IssuedTokens, TokenService
+from app.contexts.identity.application.tokens import IssuedAccess, IssuedTokens, TokenService
 from app.contexts.identity.domain.entities import OAuthAccount, User
 from app.contexts.identity.domain.enums import SocialLoginProvider
 from app.contexts.identity.domain.repositories import UserRepository
@@ -121,13 +121,16 @@ class SessionService:
         self._users = users
         self._tokens = tokens
 
-    async def refresh(self, refresh_token: str) -> IssuedTokens:
-        user_id = await self._tokens.consume_refresh(refresh_token)
-        user = await self._users.get(user_id)
+    async def refresh(self, refresh_token: str) -> IssuedTokens | IssuedAccess:
+        """회전하면 새 access·refresh, 재사용 유예(A60)면 access만 돌려준다."""
+        consumed = await self._tokens.consume_refresh(refresh_token)
+        user = await self._users.get(consumed.user_id)
         if user is None or not user.can_login:
-            await self._tokens.revoke_all(user_id)
+            await self._tokens.revoke_all(consumed.user_id)
             raise _account_disabled()
-        return await self._tokens.issue(user_id)
+        if not consumed.rotated:
+            return self._tokens.issue_access(consumed.user_id)
+        return await self._tokens.issue(consumed.user_id)
 
     async def logout(self, refresh_token: str) -> None:
         await self._tokens.revoke(refresh_token)
