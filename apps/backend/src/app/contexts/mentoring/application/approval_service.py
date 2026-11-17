@@ -220,7 +220,9 @@ class MentoringApprovalService:
                 return account
             if request.team_id is None and account.student_id == request.requester_id:
                 return account
-        raise NotFoundError("신청의 시간 계좌를 찾을 수 없습니다.", code="balance_account_missing")
+        raise NotFoundError(
+            "신청에 연결된 크레딧을 찾을 수 없습니다.", code="balance_account_missing"
+        )
 
     async def _record(
         self,

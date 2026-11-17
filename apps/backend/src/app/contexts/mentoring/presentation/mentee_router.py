@@ -79,7 +79,7 @@ class MenteeResponse(BaseModel):
     is_signed_up: bool = Field(description="회원 가입(계정 연결) 여부")
     status: EnrollmentStatus
     team: MenteeTeam | None
-    account: MenteeAccount | None = Field(description="1:1 시간 계좌 (지급 전이면 없음)")
+    account: MenteeAccount | None = Field(description="1:1 크레딧 (지급 전이면 없음)")
     pending_request_count: int = Field(description="1:1 대기 신청 수")
     upcoming_session_count: int = Field(description="1:1 예정·진행 중 세션 수")
     completed_session_count: int = Field(description="1:1 완료 세션 수")

@@ -19,7 +19,7 @@ PERMISSIONS: dict[str, str] = {
     "mentoring.settings.manage": "기수 멘토링 설정, 금지 시간대",
     "mentoring.assignment.manage": "멘토 배정·단가",
     "mentoring.team.manage": "멘토링 팀 구성",
-    "mentoring.balance.grant": "멘토링 시간 지급·조정",
+    "mentoring.balance.grant": "멘토링 크레딧 지급·조정",
     "mentoring.request.read": "멘토링 신청·세션 조회",
     "mentoring.request.cancel": "운영진 취소, 환불 선택",
     "mentoring.settlement.close": "정산 집계·마감·조회",

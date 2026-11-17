@@ -139,13 +139,13 @@ class GrantRequest(BaseModel):
         default_factory=list, max_length=500, description="STUDENTS·TEAMS일 때 대상 ID"
     )
     minutes: int | None = Field(
-        default=None, description="60분 단위. 비우면 기수 설정의 기본 지급 시간"
+        default=None, description="60분 단위. 비우면 기수 설정의 기본 지급 크레딧"
     )
     valid_from: date | None = Field(
-        default=None, description="새 계좌 사용 시작일 (기본: 기수 시작일)"
+        default=None, description="새 크레딧 사용 시작일 (기본: 기수 시작일)"
     )
     valid_until: date | None = Field(
-        default=None, description="새 계좌 사용 종료일 (기본: 기수 종료일)"
+        default=None, description="새 크레딧 사용 종료일 (기본: 기수 종료일)"
     )
     reason: str = Field(min_length=1, max_length=REASON_MAX_LENGTH)
 
@@ -154,7 +154,7 @@ class GrantedResponse(BaseModel):
     owner_id: uuid.UUID
     account_id: uuid.UUID
     minutes: int
-    created: bool = Field(description="이번 지급으로 계좌를 만들었는지")
+    created: bool = Field(description="이번 지급으로 크레딧을 처음 만들었는지")
 
 
 class SkippedResponse(BaseModel):
@@ -169,7 +169,7 @@ class GrantResponse(BaseModel):
 
 
 class AdjustRequest(BaseModel):
-    minutes: int = Field(description="60분 단위, ± (만료 계좌는 음수만)")
+    minutes: int = Field(description="60분 단위, ± (사용 기간이 끝난 크레딧은 음수만)")
     reason: str = Field(min_length=1, max_length=REASON_MAX_LENGTH)
 
 
@@ -333,7 +333,7 @@ async def list_transactions(
 async def my_accounts(
     user: ApprovedUser, service: ServiceDep, clock: ClockDep
 ) -> list[AccountResponse]:
-    """본인 1:1 계좌와 소속 팀 계좌 (A39)."""
+    """본인 1:1 크레딧과 소속 팀 크레딧 (A39)."""
     accounts = await service.mine(user.id)
     owners = await service.owners_of(accounts)
     return _accounts(accounts, owners, business_date(clock.now()))

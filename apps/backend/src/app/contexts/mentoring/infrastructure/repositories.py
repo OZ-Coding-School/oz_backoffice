@@ -298,7 +298,7 @@ class TortoiseMentoringTeamRepository:
             await MentoringTeamModel.filter(id=team_id).delete()
         except IntegrityError as exc:
             raise ConflictError(
-                "시간 계좌나 신청이 있는 팀은 삭제할 수 없습니다.", code="team_in_use"
+                "크레딧이나 신청이 있는 팀은 삭제할 수 없습니다.", code="team_in_use"
             ) from exc
 
     async def list_by_cohort(self, cohort_id: uuid.UUID) -> list[MentoringTeam]:
@@ -427,7 +427,7 @@ class TortoiseBalanceAccountRepository(
             await super().add(entity)
         except IntegrityError as exc:
             raise ConflictError(
-                "이미 계좌가 있습니다. 다시 시도하세요.", code="balance_account_exists"
+                "이미 크레딧이 있습니다. 다시 시도하세요.", code="balance_account_exists"
             ) from exc
 
     async def lock_many(self, account_ids: list[uuid.UUID]) -> list[BalanceAccount]:

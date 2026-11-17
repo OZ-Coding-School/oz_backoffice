@@ -86,7 +86,7 @@ class BalanceAccount(AggregateRoot):
     def __post_init__(self) -> None:
         _rule(
             (self.student_id is None) != (self.team_id is None),
-            "계좌 소유자는 수강생 또는 팀 하나입니다.",
+            "크레딧 소유자는 수강생 또는 팀 하나입니다.",
             "invalid_balance_owner",
         )
         _rule(
@@ -106,7 +106,7 @@ class BalanceAccount(AggregateRoot):
         ensure_grant_minutes(minutes)
         _rule(
             not self.is_expired(today),
-            "사용 기간이 끝난 계좌입니다. 기간을 먼저 연장하세요.",
+            "사용 기간이 끝난 크레딧입니다. 기간을 먼저 연장하세요.",
             "balance_account_expired",
         )
         self.total_minutes += minutes
@@ -120,12 +120,12 @@ class BalanceAccount(AggregateRoot):
         )
         _rule(
             delta < 0 or not self.is_expired(today),
-            "사용 기간이 끝난 계좌는 줄이는 조정만 할 수 있습니다.",
+            "사용 기간이 끝난 크레딧은 줄이는 조정만 할 수 있습니다.",
             "balance_account_expired",
         )
         _rule(
             self.remaining_minutes + delta >= 0,
-            "잔여 시간보다 많이 줄일 수 없습니다.",
+            "남은 크레딧보다 많이 줄일 수 없습니다.",
             "insufficient_balance",
         )
         self.total_minutes += delta
@@ -133,8 +133,10 @@ class BalanceAccount(AggregateRoot):
 
     def hold(self, minutes: int, *, request_id: uuid.UUID, reason: str) -> BalanceTransaction:
         """신청: 잔여에서 보류로 옮긴다 (M9)."""
-        _rule(minutes > 0, "보류 시간이 올바르지 않습니다.", "invalid_balance_minutes")
-        _rule(self.remaining_minutes >= minutes, "잔여 시간이 부족합니다.", "insufficient_balance")
+        _rule(minutes > 0, "차감 예정 크레딧이 올바르지 않습니다.", "invalid_balance_minutes")
+        _rule(
+            self.remaining_minutes >= minutes, "남은 크레딧이 부족합니다.", "insufficient_balance"
+        )
         self.held_minutes += minutes
         return self._entry(MentoringBalanceTransactionType.HOLD, minutes, reason, request_id)
 
@@ -142,7 +144,7 @@ class BalanceAccount(AggregateRoot):
         """승인 전 반려·취소·만료: 보류를 잔여로 돌린다 (M9)."""
         _rule(
             0 < minutes <= self.held_minutes,
-            "해제할 보류 시간이 없습니다.",
+            "돌려줄 차감 예정 크레딧이 없습니다.",
             "invalid_balance_minutes",
         )
         self.held_minutes -= minutes
@@ -152,7 +154,7 @@ class BalanceAccount(AggregateRoot):
         """승인: 보류를 사용으로 옮긴다 (M9)."""
         _rule(
             0 < minutes <= self.held_minutes,
-            "사용할 보류 시간이 없습니다.",
+            "확정할 차감 예정 크레딧이 없습니다.",
             "invalid_balance_minutes",
         )
         self.held_minutes -= minutes
@@ -174,7 +176,7 @@ class BalanceAccount(AggregateRoot):
         _rule(minutes > 0, "초과 시간이 올바르지 않습니다.", "invalid_balance_minutes")
         _rule(
             self.remaining_minutes >= minutes,
-            "잔여 시간이 부족해 신청보다 긴 진행 시간을 기록할 수 없습니다.",
+            "남은 크레딧이 부족해 신청보다 긴 진행 시간을 기록할 수 없습니다.",
             "insufficient_balance",
         )
         self.used_minutes += minutes

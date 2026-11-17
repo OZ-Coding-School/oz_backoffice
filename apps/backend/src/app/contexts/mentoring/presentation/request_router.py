@@ -263,7 +263,10 @@ async def cancel_request(
     service: ServiceDep,
     presenter: PresenterDep,
 ) -> RequestResponse:
-    """대기는 신청자만(보류 해제), 승인 후는 신청자·담당 멘토가 마감 전까지(전액 환불)."""
+    """대기는 신청자만(차감 예정 크레딧 반환).
+
+    승인 후는 신청자·담당 멘토가 마감 전까지(전액 환불).
+    """
     canceled = await service.cancel(user.id, request_id, body.reason)
     return (await presenter.public([canceled]))[0]
 
@@ -330,7 +333,7 @@ async def approve_request(
     presenter: PresenterDep,
     sessions: Annotated[SessionPresenter, Depends(SessionPresenter)],
 ) -> ApprovalResponse:
-    """그 신청의 멘토만. 보류 시간을 사용으로 옮기고 세션을 만든다."""
+    """그 신청의 멘토만. 차감 예정 크레딧을 차감 확정하고 세션을 만든다."""
     approved, session = await service.approve(user.id, request_id, body.starts_at)
     return ApprovalResponse(
         request=(await presenter.public([approved]))[0],
@@ -346,7 +349,7 @@ async def reject_request(
     service: ApprovalDep,
     presenter: PresenterDep,
 ) -> RequestResponse:
-    """그 신청의 멘토만, 사유 필수. 보류 시간을 돌려준다."""
+    """그 신청의 멘토만, 사유 필수. 차감 예정 크레딧을 돌려준다."""
     rejected = await service.reject(user.id, request_id, body.reason)
     return (await presenter.public([rejected]))[0]
 

@@ -265,7 +265,7 @@ class BalanceService:
     ) -> list[BalanceTransaction]:
         account = await self._accounts.get(account_id)
         if account is None or await self._cohort_of(account) != cohort_id:
-            raise NotFoundError("계좌를 찾을 수 없습니다.", code="balance_account_not_found")
+            raise NotFoundError("크레딧 정보를 찾을 수 없습니다.", code="balance_account_not_found")
         return await self._ledger.list_by_account(account_id, before=before, limit=limit)
 
     async def mine(self, user_id: uuid.UUID) -> list[BalanceAccount]:
@@ -281,7 +281,7 @@ class BalanceService:
         self, user_id: uuid.UUID, account_id: uuid.UUID, *, before: uuid.UUID | None, limit: int
     ) -> list[BalanceTransaction]:
         if account_id not in {a.id for a in await self.mine(user_id)}:
-            raise NotFoundError("계좌를 찾을 수 없습니다.", code="balance_account_not_found")
+            raise NotFoundError("크레딧 정보를 찾을 수 없습니다.", code="balance_account_not_found")
         return await self._ledger.list_by_account(account_id, before=before, limit=limit)
 
     async def owners_of(self, accounts: list[BalanceAccount]) -> Owners:
@@ -301,7 +301,7 @@ class BalanceService:
         settings = await self._settings.get_by_cohort(cohort_id)
         if settings is None:
             raise NotFoundError(
-                "기본 지급 시간을 쓰려면 기수 멘토링 설정이 필요합니다.",
+                "기본 지급 크레딧을 쓰려면 기수 멘토링 설정이 필요합니다.",
                 code="mentoring_settings_not_configured",
             )
         return settings.default_team_minutes if is_team else settings.default_1on1_minutes
@@ -362,12 +362,12 @@ class BalanceService:
     ) -> BalanceAccount:
         locked = await self._accounts.lock_many([account_id])
         if not locked or await self._cohort_of(locked[0]) != cohort_id:
-            raise NotFoundError("계좌를 찾을 수 없습니다.", code="balance_account_not_found")
+            raise NotFoundError("크레딧 정보를 찾을 수 없습니다.", code="balance_account_not_found")
         return locked[0]
 
 
 def owner_of(account: BalanceAccount) -> uuid.UUID:
     owner = account.team_id if account.team_id is not None else account.student_id
     if owner is None:  # 도메인 불변식상 없지만 타입을 좁힌다
-        raise NotFoundError("계좌 소유자가 없습니다.", code="balance_owner_missing")
+        raise NotFoundError("크레딧 소유자가 없습니다.", code="balance_owner_missing")
     return owner

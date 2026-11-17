@@ -269,7 +269,7 @@ async def update_team(
 async def delete_team(
     cohort_id: uuid.UUID, team_id: uuid.UUID, user: TeamManager, service: ServiceDep
 ) -> Response:
-    """시간 계좌·신청이 있는 팀은 409 `team_in_use`."""
+    """크레딧·신청이 있는 팀은 409 `team_in_use`."""
     await service.delete(cohort_id, team_id, actor_id=user.id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

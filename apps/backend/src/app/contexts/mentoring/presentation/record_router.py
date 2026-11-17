@@ -134,7 +134,7 @@ async def submit_record(
     service: ServiceDep,
     presenter: PresenterDep,
 ) -> SessionResponse:
-    """진행 시간·완료/노쇼는 처음 제출로 고정. 계좌는 실제 진행 시간 기준으로 맞춘다."""
+    """진행 시간·완료/노쇼는 처음 제출로 고정. 크레딧은 실제 진행 시간 기준으로 맞춘다."""
     session = await service.submit(
         user.id,
         session_id,
