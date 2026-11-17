@@ -1,6 +1,6 @@
 # 59. 계정 종류(account_type)와 운영진 로그인 실패 경로
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-17 병합)
 - 관련 PR: #75
 - 관련 결정: `docs/decisions.md` A61, F20 (프론트엔드 계획 BE-0)
 - 이전 기록: [58. refresh 재사용 유예 시간](58_refresh_reuse_grace.md)
@@ -39,6 +39,9 @@ FE-1(인증 화면)을 설계하다가 백엔드에 두 가지가 모자란 것�
   - 단위: 이메일 가입 MEMBER
 - **로컬 검사 (compose `api`):** ruff, ruff format, mypy, mypy tests, lint-imports 통과. 전체 840 passed.
 - **프론트엔드:** 다시 만든 타입으로 `typecheck`·`test` 통과
+
+- GitHub Actions (PR #75): 백엔드 검사(스키마 일치 포함)·프론트엔드 검사(타입 일치 포함)·E2E 3개 통과
+- 사용자가 병합을 확인했다(2026-11-17)
 
 ## 남은 작업
 - FE-1a~1c: `account_type`과 `approval_status`로 로그인 후 경로를 정하고, 운영진 로그인 화면에서 `?error=` 문구를 보여 준다.
