@@ -114,6 +114,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        # 로그인 잠금·발송 제한(429)의 남은 시간을 프론트가 읽는다 (decisions F21)
+        expose_headers=["Retry-After"],
     )
     register_exception_handlers(app)
 
