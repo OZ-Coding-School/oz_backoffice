@@ -23,6 +23,7 @@ _USER_FIELDS = (
     "email",
     "hashed_password",
     "name",
+    "account_type",
     "phone_number",
     "birth_date",
     "approval_status",

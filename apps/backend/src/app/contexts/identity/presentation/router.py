@@ -104,7 +104,7 @@ async def google_callback(
 
     - 성공: refresh 쿠키를 설정하고 `{FRONTEND_BASE_URL}/`로 보낸다.
       프론트는 `/auth/refresh`로 access 토큰을 받는다.
-    - 실패: `{FRONTEND_BASE_URL}/login?error=<code>`로 보낸다.
+    - 실패: 운영진 로그인 화면 `{FRONTEND_BASE_URL}/staff/login?error=<code>`로 보낸다 (A61).
     """
     try:
         if error or not code or not state:
@@ -114,7 +114,7 @@ async def google_callback(
         result = await service.complete(code=code, state=state, browser_state=browser_state)
     except AppError as exc:
         response = RedirectResponse(
-            f"{settings.frontend_base_url}/login?{urlencode({'error': exc.code})}",
+            f"{settings.frontend_base_url}/staff/login?{urlencode({'error': exc.code})}",
             status_code=status.HTTP_302_FOUND,
         )
     else:
@@ -180,6 +180,7 @@ async def me(
         id=user.id,
         email=user.email,
         name=user.name,
+        account_type=user.account_type,
         phone_number=user.phone_number,
         approval_status=user.approval_status,
         approved_at=user.approved_at,

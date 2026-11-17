@@ -73,7 +73,7 @@ export interface paths {
          *
          *     - 성공: refresh 쿠키를 설정하고 `{FRONTEND_BASE_URL}/`로 보낸다.
          *       프론트는 `/auth/refresh`로 access 토큰을 받는다.
-         *     - 실패: `{FRONTEND_BASE_URL}/login?error=<code>`로 보낸다.
+         *     - 실패: 운영진 로그인 화면 `{FRONTEND_BASE_URL}/staff/login?error=<code>`로 보낸다 (A61).
          */
         get: operations["google_callback_api_v1_auth_google_callback_get"];
         put?: never;
@@ -2804,6 +2804,12 @@ export interface components {
             /** Remaining Minutes */
             remaining_minutes: number;
         };
+        /**
+         * AccountType
+         * @description 계정 종류. 가입 경로로 정해지고 바뀌지 않는다 (decisions A61).
+         * @enum {string}
+         */
+        AccountType: "MEMBER" | "STAFF";
         /** AdjustRequest */
         AdjustRequest: {
             /**
@@ -4271,6 +4277,8 @@ export interface components {
             email: string;
             /** Name */
             name: string;
+            /** @description MEMBER: 수강생·멘토(가입 상태 화면), STAFF: 운영진(정보 입력 화면) (A61) */
+            account_type: components["schemas"]["AccountType"];
             /** Phone Number */
             phone_number: string | null;
             approval_status: components["schemas"]["UserApprovalStatus"];

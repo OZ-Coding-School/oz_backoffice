@@ -1,6 +1,13 @@
 from enum import StrEnum
 
 
+class AccountType(StrEnum):
+    """계정 종류. 가입 경로로 정해지고 바뀌지 않는다 (decisions A61)."""
+
+    MEMBER = "MEMBER"  # 수강생·멘토 (이메일·비밀번호 가입)
+    STAFF = "STAFF"  # 운영진 (회사 Google 로그인, CLI 최고 관리자)
+
+
 class UserApprovalStatus(StrEnum):
     PENDING = "PENDING"
     APPROVED = "APPROVED"

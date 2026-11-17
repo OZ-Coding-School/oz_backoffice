@@ -59,7 +59,7 @@
 
 | 영역 | 경로 |
 | --- | --- |
-| 인증 | `/login`, `/signup`, `/password-reset`, `/staff/login`, `/staff/registration` |
+| 인증 | `/login`, `/signup`, `/password-reset`, `/staff/login`, `/staff/registration`(A61) |
 | 수강생 | `/`(홈), `/mentoring/apply`, `/mentoring/requests`, `/mentoring/requests/$id`, `/mentoring/requests/$id/edit`, `/mentoring/sessions`, `/mentoring/sessions/$id`, `/mentoring/team`, `/mentoring/chat`, `/mentoring/balance`, `/me` |
 | 멘토 | `/`(홈), `/mentor/requests`, `/mentor/requests/$id`, `/mentor/sessions`, `/mentor/sessions/$id`, `/mentor/schedule`, `/mentor/chat`, `/mentor/settlements`, `/mentor/settlements/$id`, `/mentor/profile` |
 | 운영진 | `/admin`(홈), `/admin/<모듈>/<메뉴>` (예: `/admin/mentoring/requests`, `/admin/academy/cohorts`) |
@@ -125,6 +125,7 @@ src/
 
 | PR | 내용 | 필요한 화면 | 근거 |
 | --- | --- | --- | --- |
+| BE-0 | 인증 화면 보완: `users.account_type`(MEMBER/STAFF)과 `/me` 응답, Google 로그인 실패 경로 `/staff/login?error=` (A61) | FE-1 | F20 |
 | BE-1 | 수강생 멘토링 신청 준비: **내 수강 등록 목록**(기수·기간·상태), **기수 멘토링 설정 요약**(허용 종류 1:1·팀, 진행 단위, 신청 마감 등), **신청 받는 멘토 목록·공개 프로필**(`GET /me/mentoring/mentors?cohort_id`, 표시 이름·사진·headline·expertise·introduction, 실명·연락처 제외) | FE-2(기수 선택), FE-3(신청), 내 정보 | F12, F13 |
 | BE-2 | 수강생 세션 보완: 세션 응답에 **실제 진행 시각**(Meet)·**참여자 목록**, 세션 상세의 **전사본 텍스트**(옆 패널용) 제공 방식, 녹화 영상 재생 인증 방식(아래 리스크) | FE-5(진행 기록·세션 상세), FE-10 | F14 |
 | BE-3 | 운영진 **유효 권한 코드·범위** 응답 | FE-14(운영진 틀) | F17 |
@@ -149,6 +150,8 @@ FE-0a 디자인 토큰 ─ FE-0b API 클라이언트 ─ FE-1 인증·로그인�
 - **FE-0b API 클라이언트:** `api:gen` 스크립트와 생성 타입, openapi-fetch 클라이언트, 인증 미들웨어(2.2), `ApiError`, Query 키 규칙, 세션 스토어, 생성 타입을 쓰는 MSW 핸들러 도우미.
 
 ### FE-1. 인증·로그인·가입 (Figma `Login`)
+
+> F20으로 PR을 다시 나눴다: BE-0 → FE-1a(앱 시작·가드 + 로그인·재설정·가입 상태 모달) → FE-1b(가입 마법사) → FE-1c(운영진 로그인·정보 입력). 아래 항목 구분은 화면 묶음 설명으로 둔다. 로그인 후에는 역할별 임시 홈으로 보낸다(FE-2·FE-14에서 교체).
 - **FE-1a 앱 시작·가드:** 시작 시 refresh → `/me`, 역할별 진입, 승인 게이트, 로그아웃.
 - **FE-1b 수강생·멘토 로그인·비밀번호 재설정:** `POST /auth/login`(401·429 잠금 안내), `/auth/password-reset/code`·`/auth/password-reset`, 가입 상태 모달(`GET/POST /me/member-signup`, 대기·반려·재신청).
 - **FE-1c 회원가입 마법사 (F10):** 유형 → 이메일 인증 → 휴대폰 인증 → 가입 정보(수강생은 `GET /auth/signup/cohorts`) → 완료(대기·승인). 오류 화면(409·429·코드 불일치·가입 토큰 만료).
@@ -235,7 +238,8 @@ FE-0a 디자인 토큰 ─ FE-0b API 클라이언트 ─ FE-1 인증·로그인�
 - [x] 초기 세팅 ① 도구·테스트 구성 (#66, 구현 기록 frontend/01)
 - [x] FE-0a 디자인 토큰 (#72, 구현 기록 frontend/02, F18)
 - [x] FE-0b API 클라이언트 (#74, 구현 기록 frontend/03, F19)
-- [ ] FE-1 인증·로그인·가입 (1a 앱 시작·가드, 1b 로그인·재설정, 1c 가입 마법사, 1d 운영진)
+- [ ] BE-0 계정 종류·운영진 로그인 실패 경로 (A61)
+- [ ] FE-1 인증·로그인·가입 (F20: 1a 앱 시작·가드·로그인·재설정·가입 상태, 1b 가입 마법사, 1c 운영진)
 - [ ] BE-1 수강생 신청 준비 API
 - [ ] FE-2 회원 공통 틀
 - [ ] FE-3 수강생 멘토링 신청

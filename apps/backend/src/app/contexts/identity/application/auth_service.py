@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from app.contexts.identity.application.ports import GoogleAuthenticator
 from app.contexts.identity.application.tokens import IssuedAccess, IssuedTokens, TokenService
 from app.contexts.identity.domain.entities import OAuthAccount, User
-from app.contexts.identity.domain.enums import SocialLoginProvider
+from app.contexts.identity.domain.enums import AccountType, SocialLoginProvider
 from app.contexts.identity.domain.repositories import UserRepository
 from app.contexts.identity.domain.sessions import OAuthStateStore
 from app.core.clock import Clock
@@ -96,7 +96,10 @@ class StaffGoogleLoginService:
                 user = await self._users.get_by_email(identity.email)
                 if user is None:
                     user = User(
-                        email=identity.email, name=_display_name(identity), email_verified_at=now
+                        email=identity.email,
+                        name=_display_name(identity),
+                        account_type=AccountType.STAFF,
+                        email_verified_at=now,
                     )
                     await self._users.add(user)
                 await self._users.add_oauth_account(
