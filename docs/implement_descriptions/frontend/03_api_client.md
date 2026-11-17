@@ -1,7 +1,7 @@
 # 03. API 클라이언트 (OpenAPI 타입 생성, 인증·토큰 갱신)
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #74
 - 관련 결정: `docs/decisions.md` F6·F8·F19, A7·A60
 - 이전 기록: [02. 디자인 토큰](02_design_tokens.md)
 
