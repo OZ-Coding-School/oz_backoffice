@@ -1,0 +1,229 @@
+/*
+ * 디자인 토큰 (decisions F18). Figma 파일 `Design System` 페이지의 변수·텍스트 스타일·그림자에서 옮겼다.
+ * Figma 이름과 코드 이름의 대응은 tokens.md에 있다. 값을 바꿀 때는 Figma와 이 파일을 함께 고친다.
+ */
+@import "tailwindcss";
+
+/*
+ * 글꼴은 앱에 포함한다 (외부 CDN 없음). 한글은 가변 글꼴 하나로 400·500·700을 모두 쓰고,
+ * 유니코드 범위별로 나뉘어 화면에 나온 글자의 파일만 받는다.
+ */
+@import "@fontsource-variable/noto-sans-kr/wght.css";
+@import "@fontsource/fira-code/400.css";
+
+/* 다크 모드는 루트의 .dark 클래스로 켠다 (src/lib/theme.ts, index.html) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ── 색: 라이트 ─────────────────────────────────────────── */
+:root {
+  --background: #ffffff;
+  --foreground: #09090b;
+  --card: #ffffff;
+  --card-foreground: #09090b;
+  --popover: #ffffff;
+  --popover-foreground: #09090b;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+
+  --primary: #7c3aed;
+  --primary-hover: #6d28d9;
+  --primary-foreground: #ffffff;
+  --primary-text: #6d28d9;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #18181b;
+  --accent: #f5f3ff;
+  --accent-foreground: #6d28d9;
+  --brand-panel: #7c3aed;
+
+  --border: #e4e4e7;
+  --input: #d4d4d8;
+  --ring: #8b5cf6;
+
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --destructive-subtle: #fef2f2;
+  --destructive-text: #dc2626;
+  --success: #16a34a;
+  --success-subtle: #f0fdf4;
+  --success-text: #16a34a;
+  --warning: #f59e0b;
+  --warning-subtle: #fffbeb;
+  --warning-text: #d97706;
+  --info: #2563eb;
+  --info-subtle: #eff6ff;
+  --info-text: #2563eb;
+
+  --sidebar: #fafafa;
+  --sidebar-foreground: #3f3f46;
+  --sidebar-accent: #ede9fe;
+  --sidebar-accent-foreground: #6d28d9;
+  --sidebar-border: #e4e4e7;
+}
+
+/* ── 색: 다크 ───────────────────────────────────────────── */
+.dark {
+  --background: #1f1f23;
+  --foreground: #fafafa;
+  --card: #27272a;
+  --card-foreground: #fafafa;
+  --popover: #27272a;
+  --popover-foreground: #fafafa;
+  --muted: #323238;
+  --muted-foreground: #a1a1aa;
+
+  --primary: #7c3aed;
+  --primary-hover: #6d28d9;
+  --primary-foreground: #ffffff;
+  --primary-text: #c4b5fd;
+  --secondary: #323238;
+  --secondary-foreground: #fafafa;
+  --accent: #2e1065;
+  --accent-foreground: #ddd6fe;
+  --brand-panel: #4c1d95;
+
+  --border: #3f3f46;
+  --input: #3f3f46;
+  --ring: #a78bfa;
+
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --destructive-subtle: #450a0a;
+  --destructive-text: #f87171;
+  --success: #22c55e;
+  --success-subtle: #052e16;
+  --success-text: #4ade80;
+  --warning: #fbbf24;
+  --warning-subtle: #451a03;
+  --warning-text: #fbbf24;
+  --info: #3b82f6;
+  --info-subtle: #172554;
+  --info-text: #60a5fa;
+
+  --sidebar: #27272a;
+  --sidebar-foreground: #d4d4d8;
+  --sidebar-accent: #2e1065;
+  --sidebar-accent-foreground: #ddd6fe;
+  --sidebar-border: #3f3f46;
+}
+
+/*
+ * Tailwind 테마. 기본 색 팔레트와 글자 크기는 지우고 Figma 토큰만 남긴다
+ * (하네스: 색·글자는 토큰만 쓴다). 간격(4px 단위)과 모서리(4·6·8·12px)는 Tailwind 기본값이 Figma와 같다.
+ */
+@theme inline {
+  --color-*: initial;
+  --color-white: #ffffff;
+  --color-black: #000000;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-text: var(--primary-text);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-brand-panel: var(--brand-panel);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-subtle: var(--destructive-subtle);
+  --color-destructive-text: var(--destructive-text);
+  --color-success: var(--success);
+  --color-success-subtle: var(--success-subtle);
+  --color-success-text: var(--success-text);
+  --color-warning: var(--warning);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-warning-text: var(--warning-text);
+  --color-info: var(--info);
+  --color-info-subtle: var(--info-subtle);
+  --color-info-text: var(--info-text);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+
+  --font-sans: "Noto Sans KR Variable", system-ui, -apple-system, "Apple SD Gothic Neo", sans-serif;
+  --font-mono: "Fira Code", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* 텍스트 스타일: 크기·줄 높이·자간·굵기를 한 클래스로 (예: text-h1, text-body-strong) */
+  --text-*: initial;
+  --text-display: 30px;
+  --text-display--line-height: 38px;
+  --text-display--letter-spacing: -0.5px;
+  --text-display--font-weight: 700;
+  --text-h1: 24px;
+  --text-h1--line-height: 32px;
+  --text-h1--letter-spacing: -0.3px;
+  --text-h1--font-weight: 700;
+  --text-h2: 20px;
+  --text-h2--line-height: 28px;
+  --text-h2--letter-spacing: -0.2px;
+  --text-h2--font-weight: 700;
+  --text-h3: 16px;
+  --text-h3--line-height: 24px;
+  --text-h3--font-weight: 700;
+  --text-body-lg: 16px;
+  --text-body-lg--line-height: 24px;
+  --text-body: 14px;
+  --text-body--line-height: 20px;
+  --text-body-strong: 14px;
+  --text-body-strong--line-height: 20px;
+  --text-body-strong--font-weight: 500;
+  --text-body-sm: 13px;
+  --text-body-sm--line-height: 18px;
+  --text-label: 13px;
+  --text-label--line-height: 18px;
+  --text-label--font-weight: 500;
+  --text-caption: 12px;
+  --text-caption--line-height: 16px;
+  --text-caption-strong: 12px;
+  --text-caption-strong--line-height: 16px;
+  --text-caption-strong--font-weight: 500;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+
+  --shadow-*: initial;
+  --shadow-sm: 0 1px 2px 0 rgb(9 9 11 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(9 9 11 / 0.1), 0 2px 4px -2px rgb(9 9 11 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(9 9 11 / 0.1), 0 4px 6px -4px rgb(9 9 11 / 0.1);
+}
+
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-border);
+  }
+
+  html {
+    font-family: var(--font-sans);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+}

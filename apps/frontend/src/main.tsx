@@ -3,8 +3,11 @@ import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
+import "./styles/index.css";
+
 import { env } from "./env";
 import { createQueryClient } from "./lib/query-client";
+import { applyTheme, watchSystemTheme } from "./lib/theme";
 import { createAppRouter } from "./router";
 
 async function enableMocking(): Promise<void> {
@@ -12,6 +15,9 @@ async function enableMocking(): Promise<void> {
   const { worker } = await import("./mocks/browser");
   await worker.start({ onUnhandledRequest: "bypass" });
 }
+
+applyTheme();
+watchSystemTheme();
 
 const queryClient = createQueryClient();
 const router = createAppRouter(queryClient);
