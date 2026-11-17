@@ -87,7 +87,7 @@ PR을 올리기 전에 변경한 앱의 검사를 로컬에서 모두 통과시�
 | | 계층 의존 규칙 | `docker compose exec api lint-imports` |
 | | 테스트 (통합 포함) | `docker compose exec api pytest` |
 | | (호스트 실행 시) | `apps/backend`에서 `uv run ruff check .` 등 같은 명령에 `uv run`을 붙이고, 테스트는 `TEST_DATABASE_URL=postgres://oz:oz@localhost:5432/oz_backoffice_test uv run pytest` |
-| `apps/frontend` | 린트·타입·단위 테스트·빌드·E2E | `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, `npm run e2e` (프론트엔드 세팅 후, 앱 디렉터리에서) |
+| `apps/frontend` | 린트·포맷·타입·단위 테스트·빌드·E2E | `npm run lint`, `npm run format:check`, `npm run typecheck`, `npm test`, `npm run build`, `npm run e2e` (프론트엔드 세팅 후, 앱 디렉터리에서) |
 
 - 백엔드 CI는 PostgreSQL 서비스 컨테이너로 통합 테스트까지 실행한다. compose의 `api` 컨테이너에서도 통합 테스트까지 실행된다.
 - 문서(`docs/`)만 바꾼 PR은 CI 검사가 실행되지 않는다.
