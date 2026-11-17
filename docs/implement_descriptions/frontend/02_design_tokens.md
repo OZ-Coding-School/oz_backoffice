@@ -1,6 +1,6 @@
 # 02. 디자인 토큰 (Tailwind·shadcn 테마, 글꼴, 다크 모드)
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-17 병합)
 - 관련 PR: #72
 - 관련 결정: `docs/decisions.md` F8·F18, 계획 `docs/implement_plans/mentoring_phase1_frontend.md` FE-0a
 - 이전 기록: [01. 프론트엔드 프로젝트 도구·테스트 구성](01_frontend_project_setup.md)
@@ -55,6 +55,9 @@
   - `npm run e2e`: 5 passed (기존 홈 1 + 시스템 다크 첫 화면 적용, 고른 테마 기억, 글꼴 적용·한글 글꼴 로드, 운영 빌드에 확인 화면 없음)
 - `npm run dev`로 `/dev/design-system`을 라이트·다크로 띄워 Figma 토큰(색·글자·그림자·모서리)과 Button·Badge·Input을 눈으로 비교했다.
 - `npx shadcn@4.23.0 add separator --dry-run`으로 CLI가 `components.json`을 읽는지 확인했다(실제로 추가하지는 않음).
+
+- GitHub Actions (PR #72): 프론트엔드 검사 잡과 E2E 3개 통과
+- 사용자가 병합을 확인했다(2026-11-17)
 
 ## 남은 작업
 - FE-0b API 클라이언트(OpenAPI 타입 생성, openapi-fetch, 인증 미들웨어)
