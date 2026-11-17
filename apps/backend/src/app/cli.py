@@ -4,12 +4,14 @@
     docker compose exec api python -m app.cli create-super-admin kim@nextrunners.co.kr --name 김오즈
     docker compose exec api python -m app.cli seed-roles
     docker compose exec api python -m app.cli send-test-mail someone@gmail.com
+    docker compose exec -T api python -m app.cli export-openapi > apps/frontend/openapi.json
 
 composition root라 각 컨텍스트의 infrastructure를 직접 조립한다.
 """
 
 import argparse
 import asyncio
+import json
 import sys
 import warnings
 from collections.abc import Sequence
@@ -65,7 +67,24 @@ def _parser() -> argparse.ArgumentParser:
     commands.add_parser("seed-roles", help="역할·권한 정의를 DB에 맞춘다 (멱등)")
     mail = commands.add_parser("send-test-mail", help="현재 MAIL_DRIVER로 테스트 메일을 보낸다")
     mail.add_argument("to", help="받는 주소")
+    commands.add_parser(
+        "export-openapi",
+        help="OpenAPI 스키마를 표준 출력으로 내보낸다 (프론트 타입 생성용, decisions F19)",
+    )
     return parser
+
+
+def export_openapi(settings: Settings) -> str:
+    """서버·DB·Redis 없이 앱 정의에서 스키마를 만든다.
+
+    프론트는 이 결과를 `apps/frontend/openapi.json`으로 커밋하고
+    `npm run api:gen`으로 타입을 만든다.
+    CI는 다시 내보낸 결과와 커밋된 파일을 비교한다.
+    """
+    from app.main import create_app  # 앱 조립은 이 명령에서만 필요하다
+
+    schema = create_app(settings).openapi()
+    return json.dumps(schema, ensure_ascii=False, indent=2) + "\n"
 
 
 async def send_test_mail(to: str, *, settings: Settings) -> str:
@@ -111,6 +130,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     warnings.filterwarnings("ignore", message=r"Module .* has no models")
     args = _parser().parse_args(argv)
     settings = get_settings()
+    if args.command == "export-openapi":  # 로그 없이 스키마만 출력한다
+        sys.stdout.write(export_openapi(settings))
+        return 0
     configure_logging(settings.log_level)  # console 메일 드라이버 출력 등을 보이게 한다
     try:
         print(asyncio.run(_run(args, settings)))
