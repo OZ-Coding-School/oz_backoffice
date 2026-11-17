@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 
 import "./styles/index.css";
 
+import { onSessionEnded } from "./api/session";
 import { env } from "./env";
 import { createQueryClient } from "./lib/query-client";
 import { applyTheme, watchSystemTheme } from "./lib/theme";
@@ -21,6 +22,8 @@ watchSystemTheme();
 
 const queryClient = createQueryClient();
 const router = createAppRouter(queryClient);
+// 세션이 끝나면 다른 사용자의 데이터가 남지 않도록 캐시를 비운다 (decisions F19)
+onSessionEnded(() => queryClient.clear());
 
 await enableMocking();
 

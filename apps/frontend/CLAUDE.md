@@ -14,7 +14,7 @@ OZ 통합 백오피스 프론트엔드. `apps/backend`의 REST API를 사용하�
 | UI 컴포넌트 | shadcn/ui | Radix 기반 컴포넌트 (소스 복사 방식, `components/ui`, `components.json`). 추가한 뒤 Figma `Components`에 맞춰 고친다 |
 | 서버 상태 | TanStack Query | API 조회/캐싱/뮤테이션, 서버 데이터의 단일 출처 |
 | 클라이언트 상태 | Zustand | 인증 세션, UI 상태 등 서버와 무관한 전역 상태 |
-| API 타입 | openapi-typescript + openapi-fetch | 백엔드 OpenAPI에서 타입 생성 (decisions F6, API 클라이언트 PR에서 설정) |
+| API 타입 | openapi-typescript + openapi-fetch | 백엔드가 내보낸 `openapi.json` → `src/api/schema.gen.ts` (decisions F6·F19). 생성 도구는 TypeScript 5가 필요해 `tools/openapi/`에 따로 둔다 |
 | 아이콘 | lucide-react | 아이콘 세트 |
 | 글꼴 | @fontsource | Noto Sans KR 가변 글꼴 + Fira Code, 앱에 포함 (외부 CDN 없음) |
 | 린트 | oxlint | 정적 분석 (`--deny-warnings`, 경고도 실패) |
@@ -45,7 +45,11 @@ npm run typecheck         # tsc -b
 npm test                  # vitest run (npm run test:watch: 감시 모드)
 npm run build             # tsc -b && vite build → dist/
 npm run e2e               # playwright (로컬은 빌드 후 preview를 띄운다. 최초 1회 npx playwright install chromium)
+npm run api:schema        # 백엔드 스키마를 openapi.json으로 내보낸다 (compose의 api 컨테이너가 떠 있어야 함)
+npm run api:gen           # openapi.json → src/api/schema.gen.ts (tools/openapi의 openapi-typescript)
 ```
+
+- **백엔드 API를 바꾸면** 같은 PR에서 `npm run api:schema && npm run api:gen`을 실행하고 `openapi.json`·`schema.gen.ts`를 함께 커밋한다. CI가 두 파일이 백엔드와 맞는지 확인한다(백엔드 잡: 스키마, 프론트 잡: 생성 타입).
 
 - PR 전에 `lint`, `format:check`, `typecheck`, `test`, `build`, `e2e`를 모두 통과시킨다. CI(`.github/workflows/ci.yml`)도 같은 명령을 실행하고, E2E는 3개로 나눠 실행한다.
 - npm 10(Node 23 이하)은 이 의존성 조합에서 설치 오류(`Cannot read properties of null (reading 'edgesOut')`)가 난다. Node 24를 쓰거나 `npx -y npm@11 install`로 설치한다.
@@ -60,12 +64,15 @@ src/
 ├── routeTree.gen.ts    # 라우터 플러그인이 src/routes에서 생성 (커밋, 직접 고치지 않음)
 ├── env.ts              # VITE_* 환경 값 (apiBaseUrl = VITE_BACKEND_URL + /api/v1)
 ├── routes/             # 파일 기반 라우트 (__root.tsx, index.tsx …). *.test.tsx는 라우트에서 제외. dev/는 개발 서버 전용(운영 빌드에서 notFound)
+├── api/                # client.ts(api·unwrap), session.ts(Zustand 세션), refresh.ts(갱신·탭 간 잠금), errors.ts(ApiError), schema.gen.ts(생성)
 ├── styles/             # index.css(Tailwind·토큰·글꼴·다크 모드), tokens.md(Figma 대응표)
 ├── components/ui/      # shadcn 기반 컴포넌트 (Figma Components에 맞춤: button, badge, input …)
 ├── lib/                # 앱 공통 유틸 (query-client.ts, utils.ts의 cn, theme.ts 테마 전환)
-├── mocks/              # MSW 핸들러(handlers.ts)·브라우저 워커(browser.ts)·테스트 서버(node.ts)
+├── mocks/              # MSW 핸들러(handlers.ts)·브라우저 워커(browser.ts)·테스트 서버(node.ts)·apiUrl 도우미(api.ts)
 └── test/               # Vitest 설정(setup.ts)·렌더 도우미(render.tsx: renderRoute)
 e2e/                    # Playwright 시나리오
+tools/openapi/          # 타입 생성 도구 (openapi-typescript + TypeScript 5, 앱과 별도 package.json·잠금 파일)
+openapi.json            # 백엔드가 내보낸 스키마 (생성 파일, 직접 고치지 않음)
 ```
 
 - import 경로는 `@/` 별칭(= `src/`)을 쓴다.
@@ -73,6 +80,17 @@ e2e/                    # Playwright 시나리오
 - shadcn 컴포넌트는 `npx shadcn@<버전> add <이름>`으로 추가한 뒤 Figma `Components`의 변형·치수·토큰에 맞춰 고친다. Figma에 없는 hover·focus 상태는 decisions F18 규칙을 따른다.
 - 테스트는 `renderRoute(path)`로 앱과 같은 라우터·Query 구성에서 렌더링한다. 모킹하지 않은 API 요청은 실패한다(`onUnhandledRequest: 'error'`).
 - 새 라우트 파일을 추가하면 `npm run dev`나 `npm run build`가 `routeTree.gen.ts`를 다시 만든다. 바뀐 생성 파일도 함께 커밋한다(타입 검사가 이 파일을 쓴다).
+
+## API 호출
+
+- 호출은 `api`(openapi-fetch)로 하고 Query에서는 `unwrap()`으로 데이터를 꺼낸다. 오류는 `ApiError(status, code, message, fieldErrors)`로 던져진다.
+  ```ts
+  useQuery({ queryKey: meKeys.detail(), queryFn: () => unwrap(api.GET("/api/v1/me")) });
+  ```
+- 인증은 클라이언트가 맡는다: access 토큰을 붙이고, 만료 30초 전이면 미리 갱신하고, 401이면 한 번 갱신 후 다시 보낸다. 갱신은 탭 간 잠금(Web Locks)으로 한 번에 한 탭만 한다(decisions F19·A60). 화면 코드에서 토큰을 직접 다루지 않는다.
+- 세션이 끝나면(refresh 401) access 토큰과 Query 캐시를 비우고 `useSession().endedReason`에 사유 코드를 남기며, 다른 탭도 함께 로그아웃한다.
+- Query 조회 재시도는 네트워크 오류·5xx만 1회다. 4xx는 바로 화면에서 처리한다.
+- MSW 핸들러 URL은 `apiUrl("/api/v1/...")`로 만든다(없는 경로는 타입 오류).
 
 ## 상태 관리 원칙
 
