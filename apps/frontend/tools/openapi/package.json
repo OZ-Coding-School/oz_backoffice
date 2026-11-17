@@ -1,0 +1,10 @@
+{
+  "name": "oz-backoffice-openapi-tools",
+  "private": true,
+  "description": "API 타입 생성 도구 (decisions F19). openapi-typescript가 TypeScript 5를 요구해 앱(TypeScript 7)과 의존성을 나눴다.",
+  "type": "module",
+  "devDependencies": {
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.3"
+  }
+}

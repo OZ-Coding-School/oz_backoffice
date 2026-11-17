@@ -39,6 +39,8 @@ jobs:
           filters: |
             backend:
               - 'apps/backend/**'
+              # 커밋된 스키마만 바뀌어도 백엔드 결과와 같은지 확인한다 (decisions F19)
+              - 'apps/frontend/openapi.json'
               - 'infra/postgres/**'
               - '.github/workflows/ci.yml'
             frontend:
@@ -97,6 +99,15 @@ jobs:
         run: uv run mypy tests
       - name: Import rules (import-linter)
         run: uv run lint-imports
+      # 프론트 타입 생성의 원본인 스키마 파일이 지금 백엔드와 같은지 (decisions F19)
+      - name: OpenAPI schema is up to date
+        run: |
+          uv run python -m app.cli export-openapi > "$RUNNER_TEMP/openapi.json"
+          if ! cmp -s "$RUNNER_TEMP/openapi.json" ../frontend/openapi.json; then
+            echo "::error::apps/frontend/openapi.json이 백엔드 API와 다릅니다. apps/frontend에서 npm run api:schema && npm run api:gen 후 커밋하세요."
+            diff -u ../frontend/openapi.json "$RUNNER_TEMP/openapi.json" | head -80
+            exit 1
+          fi
       # floci 이미지에는 헬스체크 도구가 없어 서비스 옵션 대신 여기서 응답을 기다린다
       - name: Wait for S3 emulator
         run: |
@@ -135,6 +146,14 @@ jobs:
         run: npm run lint
       - name: Format (prettier)
         run: npm run format:check
+      # 커밋된 API 타입이 커밋된 스키마로 다시 만든 결과와 같은지 (decisions F19)
+      - name: API types are up to date
+        run: |
+          npm run api:gen
+          git diff --exit-code -- src/api/schema.gen.ts || {
+            echo "::error::src/api/schema.gen.ts가 openapi.json과 다릅니다. npm run api:gen 후 커밋하세요."
+            exit 1
+          }
       - name: TypeCheck
         run: npm run typecheck
       - name: Unit test (vitest)

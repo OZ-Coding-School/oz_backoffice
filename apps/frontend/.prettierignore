@@ -4,5 +4,7 @@ playwright-report
 test-results
 package-lock.json
 src/routeTree.gen.ts
+src/api/schema.gen.ts
+openapi.json
 public/mockServiceWorker.js
 *.md

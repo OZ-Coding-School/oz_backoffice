@@ -15,5 +15,5 @@
       "rules": { "react/only-export-components": "off" }
     }
   ],
-  "ignorePatterns": ["dist", "src/routeTree.gen.ts", "public/mockServiceWorker.js"]
+  "ignorePatterns": ["dist", "src/routeTree.gen.ts", "src/api/schema.gen.ts", "tools", "public/mockServiceWorker.js"]
 }
