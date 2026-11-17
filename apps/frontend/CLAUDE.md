@@ -10,12 +10,13 @@ OZ 통합 백오피스 프론트엔드. `apps/backend`의 REST API를 사용하�
 | 빌드/개발 서버 | Vite 8 | 번들링, HMR, 환경변수(`VITE_*`) |
 | 언어 | TypeScript 7 | 정적 타입 (strict, `noUncheckedIndexedAccess`) |
 | 라우터 | TanStack Router | 파일 기반 라우트(`src/routes`), 경로·검색 파라미터 타입 (decisions F5) |
-| 스타일 | Tailwind CSS | 유틸리티 클래스 기반 스타일링 (디자인 토큰 PR에서 설정) |
-| UI 컴포넌트 | shadcn/ui | Radix 기반 컴포넌트 (소스 복사 방식, `components/ui`, 디자인 토큰 PR에서 설정) |
+| 스타일 | Tailwind CSS v4 | `@tailwindcss/vite`, CSS `@theme`에 Figma 토큰 (`src/styles/index.css`, 대응표 `src/styles/tokens.md`, decisions F18) |
+| UI 컴포넌트 | shadcn/ui | Radix 기반 컴포넌트 (소스 복사 방식, `components/ui`, `components.json`). 추가한 뒤 Figma `Components`에 맞춰 고친다 |
 | 서버 상태 | TanStack Query | API 조회/캐싱/뮤테이션, 서버 데이터의 단일 출처 |
 | 클라이언트 상태 | Zustand | 인증 세션, UI 상태 등 서버와 무관한 전역 상태 |
 | API 타입 | openapi-typescript + openapi-fetch | 백엔드 OpenAPI에서 타입 생성 (decisions F6, API 클라이언트 PR에서 설정) |
 | 아이콘 | lucide-react | 아이콘 세트 |
+| 글꼴 | @fontsource | Noto Sans KR 가변 글꼴 + Fira Code, 앱에 포함 (외부 CDN 없음) |
 | 린트 | oxlint | 정적 분석 (`--deny-warnings`, 경고도 실패) |
 | 포매터 | Prettier | 기본값 + 한 줄 120자 (`.prettierrc.json`, decisions F9). `*.md`·생성 파일 제외 |
 
@@ -58,14 +59,18 @@ src/
 ├── router.tsx          # createAppRouter(queryClient, history?) — 앱과 테스트가 같은 구성
 ├── routeTree.gen.ts    # 라우터 플러그인이 src/routes에서 생성 (커밋, 직접 고치지 않음)
 ├── env.ts              # VITE_* 환경 값 (apiBaseUrl = VITE_BACKEND_URL + /api/v1)
-├── routes/             # 파일 기반 라우트 (__root.tsx, index.tsx …). *.test.tsx는 라우트에서 제외
-├── lib/                # 앱 공통 유틸 (query-client.ts)
+├── routes/             # 파일 기반 라우트 (__root.tsx, index.tsx …). *.test.tsx는 라우트에서 제외. dev/는 개발 서버 전용(운영 빌드에서 notFound)
+├── styles/             # index.css(Tailwind·토큰·글꼴·다크 모드), tokens.md(Figma 대응표)
+├── components/ui/      # shadcn 기반 컴포넌트 (Figma Components에 맞춤: button, badge, input …)
+├── lib/                # 앱 공통 유틸 (query-client.ts, utils.ts의 cn, theme.ts 테마 전환)
 ├── mocks/              # MSW 핸들러(handlers.ts)·브라우저 워커(browser.ts)·테스트 서버(node.ts)
 └── test/               # Vitest 설정(setup.ts)·렌더 도우미(render.tsx: renderRoute)
 e2e/                    # Playwright 시나리오
 ```
 
 - import 경로는 `@/` 별칭(= `src/`)을 쓴다.
+- 색·글자는 토큰 클래스만 쓴다(`bg-primary`, `text-h2`, `text-muted-foreground` …). Tailwind 기본 팔레트와 글자 크기는 지웠으므로 `bg-violet-600`·`text-sm`은 동작하지 않는다. 토큰 목록은 `src/styles/tokens.md`, 확인 화면은 개발 서버의 `/dev/design-system`.
+- shadcn 컴포넌트는 `npx shadcn@<버전> add <이름>`으로 추가한 뒤 Figma `Components`의 변형·치수·토큰에 맞춰 고친다. Figma에 없는 hover·focus 상태는 decisions F18 규칙을 따른다.
 - 테스트는 `renderRoute(path)`로 앱과 같은 라우터·Query 구성에서 렌더링한다. 모킹하지 않은 API 요청은 실패한다(`onUnhandledRequest: 'error'`).
 - 새 라우트 파일을 추가하면 `npm run dev`나 `npm run build`가 `routeTree.gen.ts`를 다시 만든다. 바뀐 생성 파일도 함께 커밋한다(타입 검사가 이 파일을 쓴다).
 
