@@ -1,7 +1,7 @@
 # 02. 디자인 토큰 (Tailwind·shadcn 테마, 글꼴, 다크 모드)
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #72
 - 관련 결정: `docs/decisions.md` F8·F18, 계획 `docs/implement_plans/mentoring_phase1_frontend.md` FE-0a
 - 이전 기록: [01. 프론트엔드 프로젝트 도구·테스트 구성](01_frontend_project_setup.md)
 
