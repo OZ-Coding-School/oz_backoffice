@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_ttl_seconds: int = 15 * 60
     refresh_token_ttl_seconds: int = 14 * 24 * 60 * 60
+    # 회전 직후 이 시간 안에 같은 refresh가 다시 오면 탈취로 보지 않고 access만 준다
+    # (여러 탭의 동시 갱신·네트워크 재전송 대비, decisions A60)
+    refresh_reuse_grace_seconds: int = 10
     # refresh 쿠키 Secure 속성.
     # 브라우저는 http://localhost도 보안 출처로 보므로 로컬에서도 true로 둔다
     refresh_cookie_secure: bool = True

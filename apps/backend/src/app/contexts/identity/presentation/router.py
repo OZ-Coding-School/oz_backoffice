@@ -15,7 +15,7 @@ from fastapi.responses import RedirectResponse
 from app.contexts.access.application.roles import RoleQueries
 from app.contexts.access.presentation.dependencies import CurrentUser, get_role_queries
 from app.contexts.identity.application.auth_service import SessionService, StaffGoogleLoginService
-from app.contexts.identity.application.tokens import IssuedTokens
+from app.contexts.identity.application.tokens import IssuedAccess, IssuedTokens
 from app.contexts.identity.presentation.dependencies import (
     SettingsDep,
     get_session_service,
@@ -142,6 +142,12 @@ async def refresh(
     if not refresh_token:
         raise AuthenticationError("로그인이 필요합니다.", code="refresh_token_missing")
     tokens = await service.refresh(refresh_token)
+    if isinstance(tokens, IssuedAccess):
+        # 재사용 유예(A60): refresh 쿠키는 그대로 두고 access만 준다
+        response.headers["Cache-Control"] = "no-store"
+        return AccessTokenResponse(
+            access_token=tokens.access_token, expires_at=tokens.access_expires_at
+        )
     return respond_with_tokens(response, tokens, settings)
 
 
