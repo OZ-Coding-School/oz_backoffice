@@ -1,6 +1,6 @@
 # 01. 프론트엔드 프로젝트 도구·테스트 구성
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-17 병합)
 - 관련 PR: #66
 - 관련 결정: `docs/decisions.md` F1·F2·F5~F8
 
@@ -57,6 +57,8 @@
   - `format:check`, `lint`, `typecheck`, `test`(2 passed), `build`, `e2e`(1 passed): 모두 통과
   - `npm run dev`로 띄워 `http://localhost:5173`이 제목과 함께 응답하는 것을 확인했다.
 - GitHub Actions (PR #66): 프론트엔드 검사 잡과 E2E 3개 통과 (포매터 추가 전)
+- GitHub Actions (PR #66, 포매터 추가 후): `Format (prettier)` 단계를 포함한 프론트엔드 검사 잡과 E2E 3개 통과
+- 사용자가 병합을 확인했다(2026-11-17)
 
 ## 남은 작업
 - 두 번째 PR: 디자인 토큰(Figma 라이트·다크 → Tailwind·shadcn 테마), 폰트, 다크 모드 전환
