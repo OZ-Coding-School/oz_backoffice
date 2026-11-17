@@ -17,6 +17,7 @@ OZ 통합 백오피스 프론트엔드. `apps/backend`의 REST API를 사용하�
 | API 타입 | openapi-typescript + openapi-fetch | 백엔드 OpenAPI에서 타입 생성 (decisions F6, API 클라이언트 PR에서 설정) |
 | 아이콘 | lucide-react | 아이콘 세트 |
 | 린트 | oxlint | 정적 분석 (`--deny-warnings`, 경고도 실패) |
+| 포매터 | Prettier | 기본값 + 한 줄 120자 (`.prettierrc.json`, decisions F9). `*.md`·생성 파일 제외 |
 
 ## 테스트
 
@@ -31,20 +32,21 @@ OZ 통합 백오피스 프론트엔드. `apps/backend`의 REST API를 사용하�
 
 ## 명령어
 
-Node 24 LTS(`.nvmrc`)와 그에 포함된 npm 11을 쓴다(decisions F7). **`apps/frontend`에서 실행한다.**
+Node 24 LTS(`.nvmrc`, CI·배포 기준)와 npm 11을 쓴다. 로컬은 Node 24 이상이면 된다(`engines`, decisions F7). **`apps/frontend`에서 실행한다.**
 
 ```bash
 npm ci                    # 의존성 설치 (package-lock.json 그대로)
 cp .env.example .env.local  # 최초 1회 (없으면 기본값: 백엔드 http://localhost:8000)
 npm run dev               # 개발 서버 http://localhost:5173 (백엔드 CORS 기본값과 같은 포트)
 npm run lint              # oxlint (경고도 실패)
+npm run format            # prettier --write . (npm run format:check: 검사만)
 npm run typecheck         # tsc -b
 npm test                  # vitest run (npm run test:watch: 감시 모드)
 npm run build             # tsc -b && vite build → dist/
 npm run e2e               # playwright (로컬은 빌드 후 preview를 띄운다. 최초 1회 npx playwright install chromium)
 ```
 
-- PR 전에 `lint`, `typecheck`, `test`, `build`, `e2e`를 모두 통과시킨다. CI(`.github/workflows/ci.yml`)도 같은 명령을 실행하고, E2E는 3개로 나눠 실행한다.
+- PR 전에 `lint`, `format:check`, `typecheck`, `test`, `build`, `e2e`를 모두 통과시킨다. CI(`.github/workflows/ci.yml`)도 같은 명령을 실행하고, E2E는 3개로 나눠 실행한다.
 - npm 10(Node 23 이하)은 이 의존성 조합에서 설치 오류(`Cannot read properties of null (reading 'edgesOut')`)가 난다. Node 24를 쓰거나 `npx -y npm@11 install`로 설치한다.
 - msw의 postinstall 스크립트는 허용하지 않았다. 브라우저 워커(`public/mockServiceWorker.js`)는 `npx msw init public`으로 만들어 커밋했다(msw 버전을 올리면 다시 만든다).
 

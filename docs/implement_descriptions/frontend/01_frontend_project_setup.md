@@ -12,9 +12,10 @@
 | 경로 | 역할 |
 | --- | --- |
 | `apps/frontend/package.json`, `package-lock.json` | 스크립트 `dev`·`build`·`preview`·`lint`·`typecheck`·`test`·`e2e`. 의존성 버전은 정확한 값으로 고정했다. |
-| `.nvmrc` | Node 24 |
+| `.nvmrc` | Node 24. `package.json` `engines`는 `>=24`다. |
 | `vite.config.ts` | TanStack Router 플러그인(파일 기반, 코드 분할 자동, `*.test.tsx` 제외), React 플러그인, `@` 별칭, dev 5173·preview 4173 포트, Vitest(jsdom) 설정 |
 | `tsconfig*.json` | strict, `noUncheckedIndexedAccess`. 앱과 설정 파일(vite·playwright·e2e)을 나눴다. |
+| `.prettierrc.json`, `.prettierignore` | Prettier 기본값에 한 줄 120자만 바꿨다. 문서(`*.md`)와 생성 파일은 제외한다. CI 프론트엔드 잡에 `format:check` 단계를 추가했다. |
 | `.oxlintrc.json` | correctness는 오류, suspicious는 경고로 둔다. 스크립트에 `--deny-warnings`를 붙여 경고도 실패로 처리한다. 라우트 파일에서는 `only-export-components`를 끈다. |
 | `playwright.config.ts` | chromium. CI에서는 앞 단계 빌드를 쓰고 preview만 띄우며, 로컬에서는 빌드부터 한다. |
 | `src/main.tsx`, `router.tsx`, `routeTree.gen.ts` | QueryClientProvider와 RouterProvider. 라우터 컨텍스트로 queryClient를 넘긴다. |
@@ -26,7 +27,7 @@
 | `src/routes/index.test.tsx`, `e2e/home.spec.ts` | 홈 화면과 없는 경로 단위 테스트, 홈 E2E |
 | `apps/frontend/CLAUDE.md` | 스택·명령어·구조·규칙 |
 
-**주요 버전:** React 19.3, Vite 8.3, TypeScript 7.0, TanStack Router 1.170·Query 5.107, Vitest 5.1, MSW 2.15, Playwright 1.65, oxlint 1.93
+**주요 버전:** React 19.3, Vite 8.3, TypeScript 7.0, TanStack Router 1.170·Query 5.107, Vitest 5.1, MSW 2.15, Playwright 1.65, oxlint 1.93, Prettier 3.10
 
 ## 주요 결정
 - **사용자 결정**
@@ -34,6 +35,8 @@
   - API 타입은 OpenAPI에서 자동 생성(F6, 세 번째 PR).
   - Node 24 LTS와 npm(F7).
   - 초기 세팅은 PR 3개로 나눈다(F8).
+  - 코드 포매터는 Prettier로 하고, 기본값에 한 줄 120자만 바꾼다(F9).
+  - 로컬 Node는 24 이상을 허용한다. CI·배포 기준은 24다(F7 보완).
 - **Tailwind·shadcn·lucide·Zustand·openapi는 쓰는 PR에서 설치한다.** 이 PR에는 쓰지 않는 의존성을 넣지 않았다.
 - **`routeTree.gen.ts`는 커밋한다.** CI의 typecheck가 build보다 먼저 실행되기 때문이다.
 - **MSW 브라우저 워커는 개발 모드에서 `VITE_API_MOCKING=true`일 때만 켠다.** 운영 빌드에는 워커를 올리지 않는다.
@@ -50,6 +53,10 @@
   - `npm test`: 2 passed
   - `npm run build`: 통과
   - `npm run e2e`: 1 passed (chromium)
+- 로컬(Node 26.13, npm 11.20, 사용자가 Node를 올린 뒤 `npm ci`로 다시 설치)
+  - `format:check`, `lint`, `typecheck`, `test`(2 passed), `build`, `e2e`(1 passed): 모두 통과
+  - `npm run dev`로 띄워 `http://localhost:5173`이 제목과 함께 응답하는 것을 확인했다.
+- GitHub Actions (PR #66): 프론트엔드 검사 잡과 E2E 3개 통과 (포매터 추가 전)
 
 ## 남은 작업
 - 두 번째 PR: 디자인 토큰(Figma 라이트·다크 → Tailwind·shadcn 테마), 폰트, 다크 모드 전환

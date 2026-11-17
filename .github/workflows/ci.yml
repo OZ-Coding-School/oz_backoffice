@@ -133,6 +133,8 @@ jobs:
       - run: npm ci
       - name: Lint (oxlint)
         run: npm run lint
+      - name: Format (prettier)
+        run: npm run format:check
       - name: TypeCheck
         run: npm run typecheck
       - name: Unit test (vitest)
