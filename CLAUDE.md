@@ -20,6 +20,7 @@ Git 브랜치·커밋·PR·구현 기록 규칙은 README를 따른다.
 | `docs/decisions.md` | **확정된 결정 전체** (통합 범위, 멘토링 규칙, 데이터 규칙, 기술 선택, 미결정 항목) | 결정의 단일 출처. 다른 문서와 다르면 이 문서가 우선 |
 | `docs/database_schema_v2.dbml` | 현재 DB 스키마 (멘토링 범위) | 작업 기준 스키마 |
 | `docs/implement_plans/mentoring_phase1_backend.md` | **멘토링 1단계 백엔드 상세 구현계획** (PR P1~P15별 테이블·API·규칙·테스트, 권한표, 선행 준비물, 진행 체크리스트) | 다음 구현 작업의 기준 |
+| `docs/implement_plans/mentoring_phase1_frontend.md` | **멘토링 1단계 프론트엔드 상세 구현계획** (공통 규약, 범위 밖 제외표, 백엔드 보완 API, PR FE-0~FE-23, 진행 체크리스트) | 프론트엔드 작업의 기준 (decisions F15~F17) |
 | `docs/implement_plans/backend_architecture.md` | 백엔드 구조 설계 (컨텍스트, 계층 규칙, 테스트 전략) | |
 | `apps/backend/CLAUDE.md` | 백엔드 명령어·구조 규칙 | |
 | `apps/frontend/CLAUDE.md` | 프론트엔드 기술 스택 | |
