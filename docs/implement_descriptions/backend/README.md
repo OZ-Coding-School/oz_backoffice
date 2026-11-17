@@ -59,4 +59,4 @@
 | 55 | [P15-2 채팅 실시간 수신(SSE)·멘토링 이벤트 안내](55_p15_2_chat_stream_notices.md) | 완료 (#60) |
 | 56 | [운영진 신청·세션·채팅방 목록 필터](56_admin_list_filters.md) | 완료 (#63) |
 | 57 | [운영진 멘티 목록·신청·세션 수 집계](57_mentee_list.md) | 완료 (#64) |
-| 58 | [refresh 재사용 유예 시간](58_refresh_reuse_grace.md) | PR 진행 중 |
+| 58 | [refresh 재사용 유예 시간](58_refresh_reuse_grace.md) | PR 진행 중 (#73) |
