@@ -1,7 +1,7 @@
 # 59. 계정 종류(account_type)와 운영진 로그인 실패 경로
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #75
 - 관련 결정: `docs/decisions.md` A61, F20 (프론트엔드 계획 BE-0)
 - 이전 기록: [58. refresh 재사용 유예 시간](58_refresh_reuse_grace.md)
 
