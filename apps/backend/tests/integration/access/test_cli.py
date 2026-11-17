@@ -5,6 +5,7 @@ from app.contexts.access.domain.catalog import ROLES, SUPER_ADMIN
 from app.contexts.access.infrastructure.models import RoleModel
 from app.contexts.access.infrastructure.repositories import TortoiseUserRoleRepository
 from app.contexts.audit.infrastructure.models import AuditLogModel
+from app.contexts.identity.domain.enums import AccountType
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
 from app.core.config import Settings
 
@@ -19,6 +20,7 @@ async def test_create_super_admin_on_real_db(settings: Settings) -> None:
     user = await TortoiseUserRepository().get_by_email("boss@nextrunners.co.kr")
     assert user is not None
     assert (user.name, user.is_approved, user.is_active) == ("대표", True, True)
+    assert user.account_type is AccountType.STAFF
     assert await TortoiseUserRoleRepository().exists(user.id, SUPER_ADMIN, "GLOBAL", None)
     assert await AuditLogModel.filter(target_id=user.id, action="access.role.grant").count() == 1
 

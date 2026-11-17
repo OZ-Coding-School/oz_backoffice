@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 import pytest
 
 from app.contexts.identity.domain.entities import OAuthAccount, User
-from app.contexts.identity.domain.enums import SocialLoginProvider, UserApprovalStatus
+from app.contexts.identity.domain.enums import AccountType, SocialLoginProvider, UserApprovalStatus
 from app.shared.errors import BusinessRuleViolation
 from app.shared.ids import new_id
 from tests.factories.identity import make_user
@@ -14,7 +14,12 @@ NOW = datetime(2026, 11, 5, 9, 0, tzinfo=UTC)
 
 
 def test_new_user_is_pending_and_normalized() -> None:
-    user = User(email="  Kim@Gmail.COM ", name="  김오즈 ", phone_number="010-1234-5678")
+    user = User(
+        email="  Kim@Gmail.COM ",
+        name="  김오즈 ",
+        account_type=AccountType.MEMBER,
+        phone_number="010-1234-5678",
+    )
     assert user.email == "kim@gmail.com"
     assert user.name == "김오즈"
     assert user.phone_number == "01012345678"

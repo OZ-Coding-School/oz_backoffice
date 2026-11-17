@@ -194,14 +194,14 @@ async def test_callback_failure_redirects_to_login_page(
     )
 
     assert done.status_code == 302
-    assert done.headers["location"] == f"http://localhost:5173/login?error={code}"
+    assert done.headers["location"] == f"http://localhost:5173/staff/login?error={code}"
     assert not any(h.startswith("oz_refresh=") for h in done.headers.get_list("set-cookie"))
 
 
 async def test_callback_with_forged_state_cookie(auth_client: AsyncClient) -> None:
     await google_redirect(auth_client)
     done = await callback(auth_client, state="forged", state_cookie="forged")
-    assert done.headers["location"] == "http://localhost:5173/login?error=oauth_state_invalid"
+    assert done.headers["location"] == "http://localhost:5173/staff/login?error=oauth_state_invalid"
 
 
 async def test_me_shows_pending_status_and_gate_blocks(auth_client: AsyncClient) -> None:
@@ -211,6 +211,7 @@ async def test_me_shows_pending_status_and_gate_blocks(auth_client: AsyncClient)
     assert me.status_code == 200
     assert me.json()["email"] == "kim@nextrunners.co.kr"
     assert me.json()["approval_status"] == "PENDING"
+    assert me.json()["account_type"] == "STAFF"  # Google 로그인으로 만든 계정 (A61)
     assert me.json()["roles"] == []
 
     gated = await auth_client.get("/_test/approved-only", headers=bearer(logged_in))

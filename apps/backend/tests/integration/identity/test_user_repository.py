@@ -5,7 +5,7 @@ from tortoise import connections
 from tortoise.exceptions import IntegrityError
 
 from app.contexts.identity.domain.entities import OAuthAccount
-from app.contexts.identity.domain.enums import SocialLoginProvider, UserApprovalStatus
+from app.contexts.identity.domain.enums import AccountType, SocialLoginProvider, UserApprovalStatus
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
 from tests.factories.identity import make_user
 
@@ -23,6 +23,7 @@ async def test_add_get_and_save_round_trip() -> None:
     assert loaded is not None
     assert loaded.email == "round@gmail.com"
     assert loaded.approval_status is UserApprovalStatus.PENDING
+    assert loaded.account_type is AccountType.MEMBER
 
     loaded.approve(now=NOW)
     await repo.save(loaded)
@@ -71,6 +72,7 @@ async def test_oauth_account_lookup_and_uniqueness() -> None:
         ("approval_status = 'APPROVED'", "check_users_approved_at"),
         ("approval_status = 'UNKNOWN'", "check_users_approval_status"),
         ("phone_number = '0212345678'", "check_users_phone_number"),
+        ("account_type = 'ADMIN'", "check_users_account_type"),
     ],
 )
 async def test_db_check_constraints_reject_invalid_rows(column_sql: str, constraint: str) -> None:
@@ -87,7 +89,8 @@ async def test_db_check_constraints_reject_invalid_rows(column_sql: str, constra
 async def test_db_defaults_apply_to_raw_insert() -> None:
     conn = connections.get("default")
     await conn.execute_query(
-        "INSERT INTO users (id, email, name) VALUES (gen_random_uuid(), 'raw@gmail.com', '로우')"
+        "INSERT INTO users (id, email, name, account_type) "
+        "VALUES (gen_random_uuid(), 'raw@gmail.com', '로우', 'MEMBER')"
     )
     _, rows = await conn.execute_query(
         "SELECT approval_status, is_active, created_at IS NOT NULL AS has_created "

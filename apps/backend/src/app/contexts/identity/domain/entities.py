@@ -4,7 +4,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime
 
-from app.contexts.identity.domain.enums import SocialLoginProvider, UserApprovalStatus
+from app.contexts.identity.domain.enums import AccountType, SocialLoginProvider, UserApprovalStatus
 from app.shared.domain import AggregateRoot, Entity
 from app.shared.errors import BusinessRuleViolation
 from app.shared.normalization import normalize_name, normalize_phone
@@ -21,6 +21,7 @@ class User(AggregateRoot):
 
     email: str
     name: str
+    account_type: AccountType
     hashed_password: str | None = None
     phone_number: str | None = None
     birth_date: date | None = None

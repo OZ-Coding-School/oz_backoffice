@@ -10,6 +10,7 @@ from tortoise import fields, models
 
 from app.contexts.educator.domain.enums import DisplayNamePreference
 from app.contexts.identity.domain.enums import (
+    AccountType,
     MemberSignupStatus,
     MemberSignupType,
     SignupMatchResult,
@@ -24,6 +25,7 @@ class UserModel(models.Model):
     email = fields.CharField(max_length=255, unique=True)
     hashed_password = fields.CharField(max_length=255, null=True)
     name = fields.CharField(max_length=50)
+    account_type = fields.CharEnumField(AccountType, max_length=10)
     phone_number = fields.CharField(max_length=11, null=True, unique=True)
     birth_date = fields.DateField(null=True)
     approval_status = fields.CharEnumField(

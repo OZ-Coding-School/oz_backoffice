@@ -73,7 +73,7 @@
           "auth"
         ],
         "summary": "Google Callback",
-        "description": "Google이 돌려보내는 콜백. 결과와 상관없이 프론트엔드로 302 리디렉션한다.\n\n- 성공: refresh 쿠키를 설정하고 `{FRONTEND_BASE_URL}/`로 보낸다.\n  프론트는 `/auth/refresh`로 access 토큰을 받는다.\n- 실패: `{FRONTEND_BASE_URL}/login?error=<code>`로 보낸다.",
+        "description": "Google이 돌려보내는 콜백. 결과와 상관없이 프론트엔드로 302 리디렉션한다.\n\n- 성공: refresh 쿠키를 설정하고 `{FRONTEND_BASE_URL}/`로 보낸다.\n  프론트는 `/auth/refresh`로 access 토큰을 받는다.\n- 실패: 운영진 로그인 화면 `{FRONTEND_BASE_URL}/staff/login?error=<code>`로 보낸다 (A61).",
         "operationId": "google_callback_api_v1_auth_google_callback_get",
         "parameters": [
           {
@@ -10526,6 +10526,15 @@
         ],
         "title": "AccountResponse"
       },
+      "AccountType": {
+        "type": "string",
+        "enum": [
+          "MEMBER",
+          "STAFF"
+        ],
+        "title": "AccountType",
+        "description": "계정 종류. 가입 경로로 정해지고 바뀌지 않는다 (decisions A61)."
+      },
       "AdjustRequest": {
         "properties": {
           "minutes": {
@@ -14462,6 +14471,10 @@
             "type": "string",
             "title": "Name"
           },
+          "account_type": {
+            "$ref": "#/components/schemas/AccountType",
+            "description": "MEMBER: 수강생·멘토(가입 상태 화면), STAFF: 운영진(정보 입력 화면) (A61)"
+          },
           "phone_number": {
             "anyOf": [
               {
@@ -14501,6 +14514,7 @@
           "id",
           "email",
           "name",
+          "account_type",
           "phone_number",
           "approval_status",
           "approved_at",

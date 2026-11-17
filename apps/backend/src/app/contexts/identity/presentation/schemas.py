@@ -4,10 +4,10 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.contexts.access.domain.enums import RoleScopeType
-from app.contexts.identity.domain.enums import UserApprovalStatus
+from app.contexts.identity.domain.enums import AccountType, UserApprovalStatus
 
 
 class AccessTokenResponse(BaseModel):
@@ -27,6 +27,9 @@ class MeResponse(BaseModel):
     id: uuid.UUID
     email: str
     name: str
+    account_type: AccountType = Field(
+        description="MEMBER: 수강생·멘토(가입 상태 화면), STAFF: 운영진(정보 입력 화면) (A61)"
+    )
     phone_number: str | None
     approval_status: UserApprovalStatus
     approved_at: datetime | None

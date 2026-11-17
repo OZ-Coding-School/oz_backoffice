@@ -4,6 +4,7 @@ from itertools import count
 from typing import Any
 
 from app.contexts.identity.domain.entities import User
+from app.contexts.identity.domain.enums import AccountType
 
 _seq = count(1)
 
@@ -16,4 +17,8 @@ def make_user(**overrides: Any) -> User:
         "phone_number": f"010{n:08d}",
     }
     values.update(overrides)
+    # 회사 도메인이면 운영진, 아니면 회원 (가입 경로와 같은 기준, A61)
+    if "account_type" not in values:
+        staff = str(values["email"]).endswith("@nextrunners.co.kr")
+        values["account_type"] = AccountType.STAFF if staff else AccountType.MEMBER
     return User(**values)

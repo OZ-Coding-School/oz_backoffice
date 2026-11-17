@@ -14,6 +14,7 @@ from app.contexts.identity.application.signup import SignupForm, SignupService
 from app.contexts.identity.application.signup_matching import SignupMatcher
 from app.contexts.identity.application.verification_codes import VerificationCodes
 from app.contexts.identity.domain.enums import (
+    AccountType,
     MemberSignupStatus,
     MemberSignupType,
     SignupMatchResult,
@@ -186,6 +187,7 @@ async def test_full_signup_creates_pending_user_and_signup(h: Harness) -> None:
         "hashed:abcd123!",
     )
     assert user.approval_status is UserApprovalStatus.PENDING
+    assert user.account_type is AccountType.MEMBER  # 이메일 가입은 회원 (A61)
     assert user.email_verified_at == NOW
     assert user.phone_verified_at is not None
     signup = result.signup

@@ -3,7 +3,7 @@
 import uuid
 
 from app.contexts.identity.domain.entities import User
-from app.contexts.identity.domain.enums import UserApprovalStatus
+from app.contexts.identity.domain.enums import AccountType, UserApprovalStatus
 from app.contexts.identity.domain.repositories import UserRepository
 from app.core.clock import Clock
 from app.shared.errors import BusinessRuleViolation, NotFoundError
@@ -30,7 +30,9 @@ class UserAdministration:
         user = await self._users.get_by_email(email)
         created = user is None
         if user is None:
-            user = User(email=email, name=name or email.split("@", 1)[0])
+            user = User(
+                email=email, name=name or email.split("@", 1)[0], account_type=AccountType.STAFF
+            )
             await self._users.add(user)
         if user.deleted_at is not None or (user.is_approved and not user.is_active):
             raise BusinessRuleViolation("탈퇴했거나 정지된 계정입니다.", code="account_disabled")
