@@ -6,7 +6,7 @@
 | --- | --- |
 | `docs/decisions.md` | 확정된 결정 전체 (다른 문서와 다르면 이 문서가 우선) |
 | `docs/database_schema_v2.dbml` | 현재 DB 스키마 |
-| `docs/implement_plans/` | 구현 계획 (멘토링 1단계: `mentoring_phase1_backend.md`) |
+| `docs/implement_plans/` | 구현 계획 (멘토링 1단계: `mentoring_phase1_backend.md`, `mentoring_phase1_frontend.md`) |
 | `docs/implement_descriptions/` | 구현 기록 |
 | `docs/analysis/` | 기존 서비스 분석 (로컬 전용, `.gitignore`) |
 | `apps/*/CLAUDE.md` | 앱별 기술 스택·명령어·구조 규칙 |
