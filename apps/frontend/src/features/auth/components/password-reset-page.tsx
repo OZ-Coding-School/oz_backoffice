@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, CircleCheck, CircleX, Mail, ShieldCheck } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -13,6 +13,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatKst, secondsFromNow } from "@/lib/datetime";
+import { formatSeconds, useCountdown } from "@/lib/use-countdown";
 import { cn } from "@/lib/utils";
 
 import { VERIFICATION_ERRORS, type AlertMessage } from "../messages";
@@ -113,16 +114,6 @@ const codeForm = z
   .refine((v) => v.password === v.confirm, { path: ["confirm"], message: "비밀번호가 서로 달라요." });
 type CodeValues = z.infer<typeof codeForm>;
 
-function useCountdown(until: number | null): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (until === null) return;
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, [until]);
-  return until === null ? 0 : Math.max(0, Math.ceil((until - now) / 1000));
-}
-
 function CodeStep({ email }: { email: string }) {
   const navigate = useNavigate();
   const [alert, setAlert] = useState<AlertMessage | null>(null);
@@ -179,9 +170,6 @@ function CodeStep({ email }: { email: string }) {
     }
   });
 
-  const minutes = Math.floor(remaining / 60);
-  const seconds = String(remaining % 60).padStart(2, "0");
-
   return (
     <div className="flex flex-col gap-6">
       <BackToLogin />
@@ -205,7 +193,7 @@ function CodeStep({ email }: { email: string }) {
             error={errors.code?.message}
             helper={
               remaining > 0 ? (
-                `코드 다시 받기는 ${minutes}:${seconds} 뒤에 할 수 있어요.`
+                `코드 다시 받기는 ${formatSeconds(remaining)} 뒤에 할 수 있어요.`
               ) : (
                 <button
                   type="button"
