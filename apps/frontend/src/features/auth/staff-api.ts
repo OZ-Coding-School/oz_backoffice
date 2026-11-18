@@ -29,42 +29,43 @@ export function submitStaffRegistration(body: StaffRegistrationRequest) {
   return unwrap(api.PUT("/api/v1/me/staff-registration", { body }));
 }
 
-/** 부서 표시 이름: 상위 부서가 있으면 '상위 › 하위' (decisions F25) */
-export function departmentLabels(departments: StaffOptions["departments"]): { id: string; label: string }[] {
-  const byId = new Map(departments.map((d) => [d.id, d]));
-  const path = (id: string, seen = new Set<string>()): string => {
-    const d = byId.get(id);
-    if (!d) return "";
-    if (!d.parent_id || seen.has(d.parent_id) || !byId.has(d.parent_id)) return d.name;
-    seen.add(id);
-    return `${path(d.parent_id, seen)} › ${d.name}`;
-  };
-  return departments.map((d) => ({ id: d.id, label: path(d.id) })).sort((a, b) => a.label.localeCompare(b.label, "ko"));
+export type AssignmentScope = NonNullable<StaffOptions["positions"][number]["assignment_scope"]>;
+
+/** 팀 칸 값: 팀 id, 또는 팀 없이 부서 직속 (A62) */
+export const NO_TEAM = "none";
+
+/** 고른 부서의 팀 (이름순) */
+export function teamsOf(options: StaffOptions, departmentId: string) {
+  return options.teams
+    .filter((t) => t.department_id === departmentId)
+    .sort((a, b) => a.name.localeCompare(b.name, "ko"));
 }
 
-/** 담당 대상 값: 과정 전체 `bootcamp:<id>` 또는 기수 `cohort:<id>` */
-export type TargetValue = `bootcamp:${string}` | `cohort:${string}`;
-
-export function targetOptions(options: StaffOptions, role: StaffRole): { value: TargetValue; label: string }[] {
-  const bootcampName = new Map(options.bootcamps.map((b) => [b.id, b.name]));
-  const cohorts = options.cohorts.map((c) => ({
-    value: `cohort:${c.id}` as TargetValue,
-    label: `${bootcampName.get(c.bootcamp_id) ?? ""} ${c.cohort_number}기`.trim(),
-  }));
-  if (role === "ASSISTANT") return cohorts; // 조교는 기수만 (A11)
-  return [
-    ...options.bootcamps.map((b) => ({ value: `bootcamp:${b.id}` as TargetValue, label: `${b.name} (과정 전체)` })),
-    ...cohorts,
-  ];
+/** 팀이 담당하는 과정 (이름순). 팀이 없으면(부서 직속) 없다 (A62) */
+export function teamBootcamps(options: StaffOptions, teamId: string | null) {
+  if (!teamId || teamId === NO_TEAM) return [];
+  return options.bootcamps.filter((b) => b.team_id === teamId).sort((a, b) => a.name.localeCompare(b.name, "ko"));
 }
 
-export function toTargetValue(a: { bootcamp_id?: string | null; cohort_id?: string | null }): TargetValue | "" {
-  if (a.cohort_id) return `cohort:${a.cohort_id}`;
-  if (a.bootcamp_id) return `bootcamp:${a.bootcamp_id}`;
-  return "";
+/** 과정의 기수 (회차순). 승인된 조교가 있는 기수는 서버가 이미 뺐다 (A63) */
+export function bootcampCohorts(options: StaffOptions, bootcampId: string) {
+  return options.cohorts.filter((c) => c.bootcamp_id === bootcampId).sort((a, b) => a.cohort_number - b.cohort_number);
 }
 
-export function fromTargetValue(value: string): { bootcamp_id: string | null; cohort_id: string | null } {
-  const [kind, id = ""] = value.split(":");
-  return kind === "cohort" ? { bootcamp_id: null, cohort_id: id } : { bootcamp_id: id, cohort_id: null };
+export function scopeOf(options: StaffOptions, positionId: string): AssignmentScope | null {
+  return options.positions.find((p) => p.id === positionId)?.assignment_scope ?? null;
+}
+
+/** 담당 표시 이름: 과정은 과정 이름, 기수는 '과정 N기' */
+export function assignmentLabel(
+  options: StaffOptions,
+  a: { bootcamp_id?: string | null; cohort_id?: string | null },
+): string | null {
+  const bootcampName = (id: string) => options.bootcamps.find((b) => b.id === id)?.name;
+  if (a.cohort_id) {
+    const cohort = options.cohorts.find((c) => c.id === a.cohort_id);
+    if (!cohort) return null;
+    return `${bootcampName(cohort.bootcamp_id) ?? ""} ${cohort.cohort_number}기`.trim();
+  }
+  return a.bootcamp_id ? (bootcampName(a.bootcamp_id) ?? null) : null;
 }
