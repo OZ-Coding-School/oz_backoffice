@@ -52,6 +52,7 @@ def get_staff_registration_service(
         teams=TortoiseTeamRepository(),
         bootcamp_teams=TortoiseBootcampTeamRepository(),
         positions=TortoiseEmployeePositionRepository(),
+        cohort_staffs=TortoiseCohortStaffRepository(),
         catalog=catalog,
         uow=UnitOfWork(),
         staff_email_domain=settings.google_allowed_domain,
