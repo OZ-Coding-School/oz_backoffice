@@ -1,6 +1,6 @@
 # 63. 계정 종류를 수강생·멘토·운영진으로 나눔
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-18 병합)
 - 관련 PR: #82
 - 관련 결정: `docs/decisions.md` A65 (A61 변경)
 - 이전 기록: [62. 수강생 멘토링 신청 준비 API (BE-1)](62_student_mentoring_prep.md)
@@ -40,6 +40,8 @@ FE-2(회원 공통 틀)는 수강생 틀과 멘토 틀을 나눠 보여 준다. 
   - 통합: 저장·조회, raw insert
 - 로컬 검사 (compose `api`): ruff, ruff format, mypy, mypy tests, lint-imports 통과. 전체 869 passed.
 - 프론트엔드: `lint`, `format:check`, `typecheck`, `test`(82), `build`, `e2e`(9) 통과
+- GitHub Actions (PR #82): 백엔드 검사·프론트엔드 검사(타입 일치 포함)·E2E 통과
+- 사용자가 병합을 확인했다(2026-11-18)
 
 ## 남은 작업
 - FE-2: `account_type`으로 수강생 틀과 멘토 틀을 고른다
