@@ -63,3 +63,4 @@
 | 59 | [계정 종류(account_type)와 운영진 로그인 실패 경로](59_account_type.md) | 완료 (#75) |
 | 60 | [조직 구조: 부서·팀과 직위 담당 방식](60_org_teams.md) | 완료 (#79) |
 | 61 | [조교 담당 기수는 비어 있는 기수만](61_cohort_assistant_filter.md) | 완료 (#80) |
+| 62 | [수강생 멘토링 신청 준비 API (BE-1)](62_student_mentoring_prep.md) | 완료 (#81) |

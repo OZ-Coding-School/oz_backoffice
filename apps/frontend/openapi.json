@@ -3760,6 +3760,37 @@
         ]
       }
     },
+    "/api/v1/me/enrollments": {
+      "get": {
+        "tags": [
+          "my-enrollments"
+        ],
+        "summary": "My Enrollments",
+        "description": "내 수강 등록 (기수 시작일이 늦은 것부터).",
+        "operationId": "my_enrollments_api_v1_me_enrollments_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EnrollmentResponse"
+                  },
+                  "type": "array",
+                  "title": "Response My Enrollments Api V1 Me Enrollments Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/contract-files/uploads": {
       "post": {
         "tags": [
@@ -4421,7 +4452,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MentorProfileResponse"
+                  "$ref": "#/components/schemas/app__contexts__educator__presentation__mentor_router__MentorProfileResponse"
                 }
               }
             }
@@ -4455,7 +4486,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MentorProfileResponse"
+                  "$ref": "#/components/schemas/app__contexts__educator__presentation__mentor_router__MentorProfileResponse"
                 }
               }
             }
@@ -4554,7 +4585,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MentorProfileResponse"
+                  "$ref": "#/components/schemas/app__contexts__educator__presentation__mentor_router__MentorProfileResponse"
                 }
               }
             }
@@ -4585,7 +4616,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MentorProfileResponse"
+                  "$ref": "#/components/schemas/app__contexts__educator__presentation__mentor_router__MentorProfileResponse"
                 }
               }
             }
@@ -4724,7 +4755,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MentorProfileResponse"
+                  "$ref": "#/components/schemas/app__contexts__educator__presentation__mentor_router__MentorProfileResponse"
                 }
               }
             }
@@ -4780,7 +4811,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MentorProfileResponse"
+                  "$ref": "#/components/schemas/app__contexts__educator__presentation__mentor_router__MentorProfileResponse"
                 }
               }
             }
@@ -4896,7 +4927,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MentorProfileResponse"
+                  "$ref": "#/components/schemas/app__contexts__educator__presentation__mentor_router__MentorProfileResponse"
                 }
               }
             }
@@ -4944,7 +4975,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MentorProfileResponse"
+                  "$ref": "#/components/schemas/app__contexts__educator__presentation__mentor_router__MentorProfileResponse"
                 }
               }
             }
@@ -7060,6 +7091,167 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/api/v1/me/mentoring/settings": {
+      "get": {
+        "tags": [
+          "student-mentoring"
+        ],
+        "summary": "Mentoring Settings",
+        "description": "설정이 없으면 404 `mentoring_settings_not_configured`.",
+        "operationId": "mentoring_settings_api_v1_me_mentoring_settings_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cohort_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Cohort Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MentoringSettingsSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/mentoring/mentors": {
+      "get": {
+        "tags": [
+          "student-mentoring"
+        ],
+        "summary": "Accepting Mentors",
+        "description": "신청 받는 멘토 (표시 이름순). 기수 멘토 수는 적어 페이지를 나누지 않는다.",
+        "operationId": "accepting_mentors_api_v1_me_mentoring_mentors_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cohort_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Cohort Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MentorCard"
+                  },
+                  "title": "Response Accepting Mentors Api V1 Me Mentoring Mentors Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/mentoring/mentors/{mentor_id}": {
+      "get": {
+        "tags": [
+          "student-mentoring"
+        ],
+        "summary": "Mentor Profile",
+        "description": "그 기수에 배정되지 않았으면 404 `mentor_not_assigned`.",
+        "operationId": "mentor_profile_api_v1_me_mentoring_mentors__mentor_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "mentor_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Mentor Id"
+            }
+          },
+          {
+            "name": "cohort_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Cohort Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app__contexts__mentoring__presentation__student_router__MentorProfileResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/admin/cohorts/{cohort_id}/mentoring-balances": {
@@ -13830,6 +14022,86 @@
         ],
         "title": "EmploymentType"
       },
+      "EnrollmentResponse": {
+        "properties": {
+          "student_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Student Id",
+            "description": "수강 등록 id"
+          },
+          "cohort_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Cohort Id"
+          },
+          "bootcamp_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Bootcamp Id"
+          },
+          "bootcamp_name": {
+            "type": "string",
+            "title": "Bootcamp Name"
+          },
+          "cohort_number": {
+            "type": "integer",
+            "title": "Cohort Number"
+          },
+          "cohort_status": {
+            "$ref": "#/components/schemas/CohortStatus"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Start Date",
+            "description": "기수 시작일"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "title": "End Date",
+            "description": "기수 종료일"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EnrollmentStatus",
+            "description": "수강 상태"
+          },
+          "enrolled_at": {
+            "type": "string",
+            "format": "date",
+            "title": "Enrolled At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At",
+            "description": "수강 종료일 (수강 중이면 null)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "student_id",
+          "cohort_id",
+          "bootcamp_id",
+          "bootcamp_name",
+          "cohort_number",
+          "cohort_status",
+          "start_date",
+          "end_date",
+          "status",
+          "enrolled_at",
+          "ended_at"
+        ],
+        "title": "EnrollmentResponse"
+      },
       "EnrollmentStatus": {
         "type": "string",
         "enum": [
@@ -15155,6 +15427,63 @@
         ],
         "title": "MentorActivationResponse"
       },
+      "MentorCard": {
+        "properties": {
+          "mentor_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Mentor Id"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name",
+            "description": "수강생에게 보이는 이름 (실명 또는 닉네임, 멘토가 고름)"
+          },
+          "headline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headline"
+          },
+          "expertise": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expertise"
+          },
+          "profile_image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Image Url",
+            "description": "presigned GET (만료 10분)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mentor_id",
+          "display_name",
+          "headline",
+          "expertise",
+          "profile_image_url"
+        ],
+        "title": "MentorCard"
+      },
       "MentorDeactivateRequest": {
         "properties": {
           "confirm": {
@@ -15283,108 +15612,6 @@
         ],
         "title": "MentorListItem"
       },
-      "MentorProfileResponse": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Id"
-          },
-          "user_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "User Id"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name",
-            "description": "실명 (회원 이름)"
-          },
-          "display_name": {
-            "type": "string",
-            "title": "Display Name",
-            "description": "수강생에게 보이는 이름 (표시 이름 선택 반영)"
-          },
-          "nickname": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Nickname"
-          },
-          "display_name_preference": {
-            "$ref": "#/components/schemas/DisplayNamePreference"
-          },
-          "headline": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Headline"
-          },
-          "introduction": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Introduction"
-          },
-          "expertise": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Expertise"
-          },
-          "profile_image_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Profile Image Url",
-            "description": "presigned GET (만료 10분)"
-          },
-          "is_active": {
-            "type": "boolean",
-            "title": "Is Active"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "user_id",
-          "name",
-          "display_name",
-          "nickname",
-          "display_name_preference",
-          "headline",
-          "introduction",
-          "expertise",
-          "profile_image_url",
-          "is_active"
-        ],
-        "title": "MentorProfileResponse"
-      },
       "MentorSummary": {
         "properties": {
           "mentor_id": {
@@ -15454,6 +15681,50 @@
           "CANCELED"
         ],
         "title": "MentoringSessionStatus"
+      },
+      "MentoringSettingsSummary": {
+        "properties": {
+          "cohort_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Cohort Id"
+          },
+          "allow_1_on_1": {
+            "type": "boolean",
+            "title": "Allow 1 On 1",
+            "description": "1:1 멘토링 허용"
+          },
+          "allow_team_mentoring": {
+            "type": "boolean",
+            "title": "Allow Team Mentoring",
+            "description": "팀 멘토링 허용 ('내 팀' 메뉴도 이때만)"
+          },
+          "allowed_duration": {
+            "type": "integer",
+            "title": "Allowed Duration",
+            "description": "진행 단위(분, 30 또는 60). 진행 시간은 이 값의 배수"
+          },
+          "min_lead_hours": {
+            "type": "integer",
+            "title": "Min Lead Hours",
+            "description": "시작 N시간 전까지 신청"
+          },
+          "max_pending_requests": {
+            "type": "integer",
+            "title": "Max Pending Requests",
+            "description": "승인 대기 신청 최대 건수"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cohort_id",
+          "allow_1_on_1",
+          "allow_team_mentoring",
+          "allowed_duration",
+          "min_lead_hours",
+          "max_pending_requests"
+        ],
+        "title": "MentoringSettingsSummary"
       },
       "MentoringSettlementPolicy": {
         "type": "string",
@@ -19430,6 +19701,108 @@
         ],
         "title": "WeekendSeType"
       },
+      "app__contexts__educator__presentation__mentor_router__MentorProfileResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "실명 (회원 이름)"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name",
+            "description": "수강생에게 보이는 이름 (표시 이름 선택 반영)"
+          },
+          "nickname": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nickname"
+          },
+          "display_name_preference": {
+            "$ref": "#/components/schemas/DisplayNamePreference"
+          },
+          "headline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headline"
+          },
+          "introduction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Introduction"
+          },
+          "expertise": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expertise"
+          },
+          "profile_image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Image Url",
+            "description": "presigned GET (만료 10분)"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "user_id",
+          "name",
+          "display_name",
+          "nickname",
+          "display_name_preference",
+          "headline",
+          "introduction",
+          "expertise",
+          "profile_image_url",
+          "is_active"
+        ],
+        "title": "MentorProfileResponse"
+      },
       "app__contexts__mentoring__presentation__balance_router__SkippedResponse": {
         "properties": {
           "owner_id": {
@@ -19473,6 +19846,81 @@
           "code"
         ],
         "title": "SkippedResponse"
+      },
+      "app__contexts__mentoring__presentation__student_router__MentorProfileResponse": {
+        "properties": {
+          "mentor_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Mentor Id"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name",
+            "description": "수강생에게 보이는 이름 (실명 또는 닉네임, 멘토가 고름)"
+          },
+          "headline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headline"
+          },
+          "expertise": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expertise"
+          },
+          "profile_image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Image Url",
+            "description": "presigned GET (만료 10분)"
+          },
+          "introduction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Introduction"
+          },
+          "accepting_requests": {
+            "type": "boolean",
+            "title": "Accepting Requests",
+            "description": "false면 지금은 1:1 신청을 받지 않는다"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mentor_id",
+          "display_name",
+          "headline",
+          "expertise",
+          "profile_image_url",
+          "introduction",
+          "accepting_requests"
+        ],
+        "title": "MentorProfileResponse"
       },
       "app__contexts__mentoring__presentation__team_router__TeamResponse": {
         "properties": {

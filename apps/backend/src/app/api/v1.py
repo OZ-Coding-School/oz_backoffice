@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from app.contexts.academy.presentation.admin_router import router as academy_router
+from app.contexts.academy.presentation.me_router import router as my_enrollments_router
 from app.contexts.academy.presentation.roster_router import router as roster_router
 from app.contexts.access.presentation.admin_router import router as user_roles_router
 from app.contexts.educator.presentation.admin_router import router as contract_router
@@ -61,6 +62,7 @@ from app.contexts.mentoring.presentation.settlement_router import (
 from app.contexts.mentoring.presentation.settlement_router import (
     me_router as settlement_me_router,
 )
+from app.contexts.mentoring.presentation.student_router import router as student_mentoring_router
 from app.contexts.mentoring.presentation.team_router import admin_router as team_admin_router
 from app.contexts.mentoring.presentation.team_router import me_router as team_me_router
 from app.contexts.organization.presentation.admin_router import (
@@ -84,6 +86,7 @@ router.include_router(user_roles_router)
 router.include_router(organization_router)
 router.include_router(academy_router)
 router.include_router(roster_router)
+router.include_router(my_enrollments_router)
 router.include_router(contract_router)
 router.include_router(mentor_me_router)
 router.include_router(mentor_admin_router)
@@ -95,6 +98,7 @@ router.include_router(mentor_schedule_admin_router)
 router.include_router(mentor_available_times_router)
 router.include_router(team_admin_router)
 router.include_router(team_me_router)
+router.include_router(student_mentoring_router)
 router.include_router(balance_admin_router)
 router.include_router(balance_me_router)
 router.include_router(request_router)
