@@ -62,3 +62,4 @@
 | 58 | [refresh 재사용 유예 시간](58_refresh_reuse_grace.md) | 완료 (#73) |
 | 59 | [계정 종류(account_type)와 운영진 로그인 실패 경로](59_account_type.md) | 완료 (#75) |
 | 60 | [조직 구조: 부서·팀과 직위 담당 방식](60_org_teams.md) | 완료 (#79) |
+| 61 | [조교 담당 기수는 비어 있는 기수만](61_cohort_assistant_filter.md) | PR 진행 중 |
