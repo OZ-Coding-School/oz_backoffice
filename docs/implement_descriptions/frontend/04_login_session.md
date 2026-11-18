@@ -22,7 +22,8 @@ FE-1(인증 화면)을 BE-0(#75, 계정 종류) 다음 화면 PR 3개로 나눴�
 | `src/features/auth/api.ts` | `meQuery`·`memberSignupQuery`·`signupCohortsQuery`, `ensureSession`(앱을 연 뒤 한 번 refresh → `/me`), `login`, `logout` |
 | `src/features/auth/guards.ts`, `navigation.ts` | `requireAccount`(아래 "라우트 가드" 참고), `afterLoginPath`(로그인 후 갈 곳) |
 | `src/routes/_auth/login.tsx`, `password-reset.tsx`, `_member/index.tsx`(`/`), `_staff/admin.tsx`(`/admin`) | 파일 라우트. 로그인은 `?redirect`·`?email` 검색 파라미터 |
-| `src/features/auth/components/auth-layout.tsx`, `brand.ts` | 소개 영역(데스크톱 560·태블릿 320·모바일 숨김 + 폼 위 로고), 소개 문구(F22) |
+| `src/features/auth/components/auth-layout.tsx`, `brand.ts` | 소개 영역(데스크톱 560·태블릿 320·모바일 숨김 + 폼 위 로고), 소개 문구(F22), 오즈 워드마크 로고(F23) |
+| `src/assets/brand/oz-wordmark-*.png`, `public/favicon.png`, `index.html` | 사용자가 준 오즈 로고: 워드마크(밝은 배경 다크 / 보라·다크 모드 라이트), 파비콘·홈 화면 아이콘은 원형 마크(F23) |
 | `login-page.tsx` | 로그인 폼, 오류·잠금(Retry-After → "HH:mm부터")·세션 종료 Alert, 승인 전 회원이면 가입 상태 모달 |
 | `password-reset-page.tsx` | 1단계(이메일) → 2단계(아래 참고) |
 | `signup-status-dialog.tsx` | 승인 대기(신청 요약)·반려(사유, 수강생은 기수 / 멘토는 닉네임·보일 이름으로 재신청). 닫기는 로그아웃 |
@@ -58,6 +59,7 @@ FE-1(인증 화면)을 BE-0(#75, 계정 종류) 다음 화면 PR 3개로 나눴�
   - Toast는 sonner로 만든다.
   - 로그인 후에는 원래 가려던 화면으로 간다(같은 계정 영역일 때만).
   - 모든 화면은 반응형 3단계(390·768·1440)로 Figma에 먼저 그린 뒤 구현한다. 태블릿은 소개 영역 320을 둔다(사용자 제안).
+- **F23 오즈 로고(사용자 제공 파일):** 워드마크 + 줄바꿈 + "운영 행정 지원 플랫폼"으로 하고, 파비콘은 원형 마크다. 기존 'OZ' 상자 마크는 쓰지 않는다.
 - **F22**
   - 앱 시작 때는 빈 배경을 두고, 0.3초가 넘으면 스피너를 보여 준다.
   - 가입·운영진 로그인 링크는 디자인대로 둔다(화면은 FE-1b·1c).

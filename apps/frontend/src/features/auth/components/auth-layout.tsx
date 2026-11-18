@@ -1,31 +1,29 @@
 import { CircleCheck } from "lucide-react";
 import type { ReactNode } from "react";
 
+import wordmarkDark from "@/assets/brand/oz-wordmark-dark.png";
+import wordmarkLight from "@/assets/brand/oz-wordmark-light.png";
 import { cn } from "@/lib/utils";
 
 import { MEMBER_BRAND, type BrandCopy } from "../brand";
 
-const PLATFORM = "오즈코딩스쿨 운영 행정 지원 플랫폼";
-
-/** 로고 (OZ 마크 + 플랫폼 이름). 소개 영역에서는 흰 마크, 그 밖에는 보라 마크. */
+/**
+ * 오즈 워드마크 + 줄바꿈 + "운영 행정 지원 플랫폼" (decisions F23).
+ * 보라 소개 영역에서는 흰 워드마크, 그 밖에서는 라이트 모드 어두운 워드마크 / 다크 모드 흰 워드마크.
+ */
 export function Logo({ onBrand = false, className }: { onBrand?: boolean; className?: string }) {
   return (
-    <div className={cn("flex items-center gap-2.5", className)}>
-      <span
-        aria-hidden
-        className={cn(
-          "inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-caption-strong",
-          onBrand ? "bg-white text-primary" : "bg-primary text-primary-foreground",
-        )}
-      >
-        OZ
-      </span>
-      <span
-        className={cn(
-          onBrand ? "text-caption-strong text-white lg:text-body-strong" : "text-body-strong text-foreground",
-        )}
-      >
-        {PLATFORM}
+    <div className={cn("flex flex-col items-start gap-1.5", className)}>
+      {onBrand ? (
+        <img src={wordmarkLight} alt="오즈코딩스쿨" className="h-5 w-auto lg:h-6" />
+      ) : (
+        <>
+          <img src={wordmarkDark} alt="오즈코딩스쿨" className="h-5 w-auto dark:hidden" />
+          <img src={wordmarkLight} alt="오즈코딩스쿨" className="hidden h-5 w-auto dark:block" />
+        </>
+      )}
+      <span className={cn("text-caption-strong", onBrand ? "text-white/80" : "text-muted-foreground")}>
+        운영 행정 지원 플랫폼
       </span>
     </div>
   );

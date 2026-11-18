@@ -62,7 +62,7 @@ test("모바일에서는 소개 영역을 숨기고 로고를 위에 둔다", as
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/login");
   await expect(page.getByRole("complementary")).toBeHidden();
-  await expect(page.getByRole("main").getByText("오즈코딩스쿨 운영 행정 지원 플랫폼")).toBeVisible();
+  await expect(page.getByRole("main").getByText("운영 행정 지원 플랫폼")).toBeVisible();
 
   await page.setViewportSize({ width: 768, height: 1024 });
   await expect(page.getByRole("complementary")).toBeVisible();
