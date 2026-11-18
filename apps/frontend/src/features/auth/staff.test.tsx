@@ -136,7 +136,7 @@ describe("운영진 최초 정보 입력", () => {
     ]);
   });
 
-  it("과정 담당 직위는 팀 과정을 여러 개 체크하고, 직위를 바꾸면 담당이 비워지고 섹션이 사라진다", async () => {
+  it("과정 담당 직위는 팀 과정을 드롭다운에서 추가·삭제하고, 직위를 바꾸면 담당이 비워지고 섹션이 사라진다", async () => {
     const puts = mockStaff(null);
     const user = userEvent.setup();
     await renderRoute("/staff/registration");
@@ -145,26 +145,43 @@ describe("운영진 최초 정보 입력", () => {
     await pick(user, screen.getByRole("combobox", { name: "직위" }), "운영 매니저");
     await pick(user, screen.getByRole("combobox", { name: "고용 형태" }), "정규직");
 
-    expect(screen.getByText("담당 과정")).toBeInTheDocument();
-    expect(screen.queryByRole("checkbox", { name: "다른 팀 과정" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("checkbox", { name: "백엔드 부트캠프" }));
+    const add = () => screen.getByRole("combobox", { name: "담당 과정 추가" });
+    await user.click(add());
+    let listbox = await screen.findByRole("listbox");
+    expect(
+      within(listbox)
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["백엔드 부트캠프", "프론트엔드 부트캠프"]); // 다른 팀 과정은 없다
+    await user.click(within(listbox).getByRole("option", { name: "백엔드 부트캠프" }));
     expect(screen.getByText("1 / 2")).toBeInTheDocument();
+    await user.click(add());
+    listbox = await screen.findByRole("listbox");
+    expect(
+      within(listbox)
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["프론트엔드 부트캠프"]);
+    await user.keyboard("{Escape}");
 
     await pick(user, screen.getByRole("combobox", { name: "직위" }), "인턴");
     expect(screen.queryByText("담당 과정")).not.toBeInTheDocument();
     await pick(user, screen.getByRole("combobox", { name: "직위" }), "운영 매니저");
-    expect(screen.getByRole("checkbox", { name: "백엔드 부트캠프" })).not.toBeChecked();
+    expect(screen.queryByRole("list", { name: "추가한 담당 과정" })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("checkbox", { name: "프론트엔드 부트캠프" }));
-    await user.click(screen.getByRole("checkbox", { name: "백엔드 부트캠프" }));
+    await pick(user, add(), "프론트엔드 부트캠프");
+    await pick(user, add(), "백엔드 부트캠프");
+    expect(add()).toHaveTextContent("모든 과정을 추가했어요");
+    await user.click(screen.getByRole("button", { name: "프론트엔드 부트캠프 빼기" }));
+    await pick(user, add(), "프론트엔드 부트캠프");
     await user.click(screen.getByRole("button", { name: "승인 신청" }));
 
     await screen.findByRole("heading", { name: "승인을 기다리고 있어요" });
     expect(puts[0]).toMatchObject({
       team_id: "t1",
       assignments: [
-        { role: "MANAGER", bootcamp_id: "b2", cohort_id: null },
         { role: "MANAGER", bootcamp_id: "b1", cohort_id: null },
+        { role: "MANAGER", bootcamp_id: "b2", cohort_id: null },
       ],
     });
   });
@@ -256,6 +273,8 @@ describe("운영진 최초 정보 입력", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("담당 과정을 다시 확인해 주세요.");
     await user.click(screen.getByRole("button", { name: "고쳐서 다시 신청" }));
     expect(await screen.findByRole("combobox", { name: "팀" })).toHaveTextContent("교육 1팀");
-    expect(screen.getByRole("checkbox", { name: "백엔드 부트캠프" })).toBeChecked();
+    expect(
+      within(screen.getByRole("list", { name: "추가한 담당 과정" })).getByText("백엔드 부트캠프"),
+    ).toBeInTheDocument();
   });
 });

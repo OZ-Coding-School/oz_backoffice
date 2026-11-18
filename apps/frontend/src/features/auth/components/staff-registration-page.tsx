@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { LogOut, Pencil, RotateCw } from "lucide-react";
+import { LogOut, Pencil, RotateCw, X } from "lucide-react";
 import { useState } from "react";
 import { Controller, useForm, useWatch, type Control } from "react-hook-form";
 import { z } from "zod";
@@ -11,7 +11,6 @@ import { FormField } from "@/components/form-field";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { formatKst } from "@/lib/datetime";
@@ -331,7 +330,10 @@ function SelectField({
   );
 }
 
-/** COURSE 직위: 소속 팀 과정을 여러 개 체크한다. 운영 매니저로 등록된다 (A62) */
+/**
+ * COURSE 직위: 소속 팀 과정을 드롭다운에서 골라 아래 목록에 추가한다(운영 매니저, A62·F26).
+ * 이미 추가한 과정은 드롭다운에서 빠지고, 목록의 X로 뺀다.
+ */
 function CoursePicker({
   control,
   bootcamps,
@@ -345,44 +347,71 @@ function CoursePicker({
     <Controller
       control={control}
       name="bootcamp_ids"
-      render={({ field }) => (
-        <section aria-labelledby="course-label" className="flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <span id="course-label" className="text-label text-foreground">
-              담당 과정
-            </span>
-            {bootcamps.length ? (
-              <span className="text-caption text-muted-foreground">
-                {field.value.length} / {bootcamps.length}
+      render={({ field }) => {
+        const chosen = field.value
+          .map((id) => bootcamps.find((b) => b.id === id))
+          .filter((b): b is StaffOptions["bootcamps"][number] => b !== undefined);
+        const remaining = bootcamps.filter((b) => !field.value.includes(b.id));
+        return (
+          <section aria-labelledby="course-label" className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span id="course-label" className="text-label text-foreground">
+                담당 과정
               </span>
+              {bootcamps.length ? (
+                <span className="text-caption text-muted-foreground">
+                  {chosen.length} / {bootcamps.length}
+                </span>
+              ) : null}
+            </div>
+            <p className="text-caption text-muted-foreground">
+              {bootcamps.length
+                ? "소속 팀이 담당하는 과정을 골라 추가하세요. 추가한 과정의 운영 매니저로 등록돼요."
+                : "소속 팀이 담당하는 과정이 아직 없어요. 담당 없이 신청할 수 있어요."}
+            </p>
+            {bootcamps.length ? (
+              <Select
+                value=""
+                onValueChange={(id) => field.onChange([...field.value, id])}
+                disabled={!remaining.length}
+              >
+                <SelectTrigger aria-label="담당 과정 추가">
+                  <SelectValue placeholder={remaining.length ? "과정을 선택해 추가하세요" : "모든 과정을 추가했어요"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {remaining.map((b) => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             ) : null}
-          </div>
-          <p className="text-caption text-muted-foreground">
-            {bootcamps.length
-              ? "소속 팀이 담당하는 과정이에요. 고른 과정의 운영 매니저로 등록돼요."
-              : "소속 팀이 담당하는 과정이 아직 없어요. 담당 없이 신청할 수 있어요."}
-          </p>
-          {bootcamps.length ? (
-            <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">
-              {bootcamps.map((b) => (
-                <li key={b.id} className="flex px-3 py-2.5">
-                  <Checkbox
-                    checked={field.value.includes(b.id)}
-                    onCheckedChange={(checked) =>
-                      field.onChange(
-                        checked === true ? [...field.value, b.id] : field.value.filter((id) => id !== b.id),
-                      )
-                    }
-                  >
-                    {b.name}
-                  </Checkbox>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          {error ? <p className="text-caption text-destructive-text">{error}</p> : null}
-        </section>
-      )}
+            {chosen.length ? (
+              <ul
+                aria-label="추가한 담당 과정"
+                className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card"
+              >
+                {chosen.map((b) => (
+                  <li key={b.id} className="flex items-center gap-2 py-1 pr-1 pl-3">
+                    <span className="min-w-0 flex-1 truncate text-body text-foreground">{b.name}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`${b.name} 빼기`}
+                      className="px-2"
+                      onClick={() => field.onChange(field.value.filter((id) => id !== b.id))}
+                    >
+                      <X />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {error ? <p className="text-caption text-destructive-text">{error}</p> : null}
+          </section>
+        );
+      }}
     />
   );
 }
