@@ -1,7 +1,7 @@
 # 06. FE-1c 운영진 로그인·최초 정보 입력
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #78
 - 관련 결정: `docs/decisions.md` F11·F21·F22·F25, A11·A15·A61
 - 이전 기록: [05. FE-1b 회원가입 마법사](05_signup_wizard.md)
 
