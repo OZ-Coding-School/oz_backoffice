@@ -23,7 +23,7 @@ async def test_add_get_and_save_round_trip() -> None:
     assert loaded is not None
     assert loaded.email == "round@gmail.com"
     assert loaded.approval_status is UserApprovalStatus.PENDING
-    assert loaded.account_type is AccountType.MEMBER
+    assert loaded.account_type is AccountType.STUDENT
 
     loaded.approve(now=NOW)
     await repo.save(loaded)
@@ -90,7 +90,7 @@ async def test_db_defaults_apply_to_raw_insert() -> None:
     conn = connections.get("default")
     await conn.execute_query(
         "INSERT INTO users (id, email, name, account_type) "
-        "VALUES (gen_random_uuid(), 'raw@gmail.com', '로우', 'MEMBER')"
+        "VALUES (gen_random_uuid(), 'raw@gmail.com', '로우', 'STUDENT')"
     )
     _, rows = await conn.execute_query(
         "SELECT approval_status, is_active, created_at IS NOT NULL AS has_created "

@@ -1,5 +1,10 @@
 import type { Me } from "./api";
 
+/** 수강생·멘토(이메일 가입) 계정인지 (A65: 계정 종류는 STUDENT·MENTOR·STAFF 중 하나) */
+export function isMember(me: Pick<Me, "account_type">): boolean {
+  return me.account_type !== "STAFF";
+}
+
 /** 로그인한 사용자의 홈 (F20: 회원 `/`, 운영진 `/admin`). 승인 전 운영진은 정보 입력 화면. */
 export function homePath(me: Me): string {
   if (me.account_type === "STAFF") return me.approval_status === "APPROVED" ? "/admin" : "/staff/registration";
@@ -25,5 +30,5 @@ export function afterLoginPath(me: Me, redirect: string | undefined): string {
 
 /** 승인 전 회원은 로그인 화면 위 가입 상태 모달에서 처리한다. */
 export function needsSignupStatus(me: Me | null): me is Me {
-  return me !== null && me.account_type === "MEMBER" && me.approval_status !== "APPROVED";
+  return me !== null && isMember(me) && me.approval_status !== "APPROVED";
 }

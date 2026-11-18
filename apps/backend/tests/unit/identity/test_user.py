@@ -17,7 +17,7 @@ def test_new_user_is_pending_and_normalized() -> None:
     user = User(
         email="  Kim@Gmail.COM ",
         name="  김오즈 ",
-        account_type=AccountType.MEMBER,
+        account_type=AccountType.STUDENT,
         phone_number="010-1234-5678",
     )
     assert user.email == "kim@gmail.com"
@@ -112,3 +112,20 @@ def test_only_rejected_user_can_resubmit() -> None:
     user.reject()
     user.resubmit()
     assert user.approval_status is UserApprovalStatus.PENDING
+
+
+def test_member_type_changes_only_before_approval() -> None:
+    """승인 전 재신청이면 수강생 ↔ 멘토로 바뀌고, 승인·운영진 계정은 바뀌지 않는다 (A65)."""
+    user = make_user(account_type=AccountType.STUDENT)
+    user.change_member_type(AccountType.MENTOR)
+    assert user.account_type is AccountType.MENTOR
+    with pytest.raises(BusinessRuleViolation) as to_staff:
+        user.change_member_type(AccountType.STAFF)
+    assert to_staff.value.code == "account_type_locked"
+
+    user.approve(now=NOW)
+    with pytest.raises(BusinessRuleViolation):
+        user.change_member_type(AccountType.STUDENT)
+    staff = make_user(email="kim@nextrunners.co.kr")
+    with pytest.raises(BusinessRuleViolation):
+        staff.change_member_type(AccountType.STUDENT)

@@ -4,7 +4,7 @@ const ME = {
   id: "u1",
   email: "student@gmail.com",
   name: "가수강",
-  account_type: "MEMBER",
+  account_type: "STUDENT",
   phone_number: "01012345678",
   approval_status: "APPROVED",
   approved_at: "2026-11-16T01:00:00Z",

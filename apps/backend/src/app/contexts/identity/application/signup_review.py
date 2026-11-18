@@ -31,7 +31,11 @@ from app.contexts.identity.application.signup import (
 from app.contexts.identity.application.signup_mails import approval_mail, rejection_mail
 from app.contexts.identity.application.signup_matching import RoleGranter, SignupMatcher
 from app.contexts.identity.domain.entities import User
-from app.contexts.identity.domain.enums import MemberSignupStatus, MemberSignupType
+from app.contexts.identity.domain.enums import (
+    MemberSignupStatus,
+    MemberSignupType,
+    member_account_type,
+)
 from app.contexts.identity.domain.repositories import (
     MemberSignupRepository,
     PendingSignupFilter,
@@ -219,7 +223,9 @@ class SignupReviewService:
         user = await self._users.get(user_id)
         if signup is None or user is None:
             raise NotFoundError("승인 대기 중인 가입 신청이 없습니다.", code="signup_not_found")
-        if signup_type is not None and signup.signup_type is not signup_type:
+        if (signup_type is not None and signup.signup_type is not signup_type) or (
+            user.account_type is not member_account_type(signup.signup_type)
+        ):
             raise BusinessRuleViolation(
                 "신청 유형에 맞는 승인 방법이 아닙니다.", code="signup_type_mismatch"
             )
@@ -312,6 +318,7 @@ class MemberSignupSelfService:
                     "반려된 신청만 다시 신청할 수 있습니다.", code="signup_not_rejected"
                 )
             user.resubmit()
+            user.change_member_type(member_account_type(form.signup_type))
             await self._users.save(user)
             is_student = form.signup_type is MemberSignupType.STUDENT
             signup = MemberSignup(

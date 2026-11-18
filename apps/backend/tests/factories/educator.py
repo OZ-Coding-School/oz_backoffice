@@ -41,9 +41,11 @@ async def create_applicant_signup(
     **user_overrides: Any,
 ) -> tuple[User, "MemberSignup"]:
     """승인 대기 수강생·멘토(회원 PENDING + 가입 신청)."""
+    from app.contexts.identity.domain.enums import member_account_type
     from app.contexts.identity.domain.signup import MemberSignup
     from app.contexts.identity.infrastructure.repositories import TortoiseMemberSignupRepository
 
+    user_overrides.setdefault("account_type", member_account_type(signup_type))
     user = await create_user(**user_overrides)
     signup = MemberSignup(user_id=user.id, signup_type=signup_type, requested_cohort_id=cohort_id)
     await TortoiseMemberSignupRepository().add(signup)
