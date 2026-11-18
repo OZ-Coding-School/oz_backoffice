@@ -9,13 +9,46 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthRouteImport } from './routes/_auth'
+import { Route as MemberRouteImport } from './routes/_member'
+import { Route as StaffRouteImport } from './routes/_staff'
+import { Route as AuthLoginRouteImport } from './routes/_auth/login'
+import { Route as AuthPasswordResetRouteImport } from './routes/_auth/password-reset'
+import { Route as MemberIndexRouteImport } from './routes/_member/index'
+import { Route as StaffAdminRouteImport } from './routes/_staff/admin'
 import { Route as DevDesignSystemRouteImport } from './routes/dev/design-system'
 
-const IndexRoute = IndexRouteImport.update({
+const AuthRoute = AuthRouteImport.update({
+  id: '/_auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MemberRoute = MemberRouteImport.update({
+  id: '/_member',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StaffRoute = StaffRouteImport.update({
+  id: '/_staff',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthLoginRoute = AuthLoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => AuthRoute,
+} as any)
+const AuthPasswordResetRoute = AuthPasswordResetRouteImport.update({
+  id: '/password-reset',
+  path: '/password-reset',
+  getParentRoute: () => AuthRoute,
+} as any)
+const MemberIndexRoute = MemberIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => MemberRoute,
+} as any)
+const StaffAdminRoute = StaffAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => StaffRoute,
 } as any)
 const DevDesignSystemRoute = DevDesignSystemRouteImport.update({
   id: '/dev/design-system',
@@ -24,39 +57,105 @@ const DevDesignSystemRoute = DevDesignSystemRouteImport.update({
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/': typeof MemberIndexRoute
+  '/login': typeof AuthLoginRoute
+  '/password-reset': typeof AuthPasswordResetRoute
+  '/admin': typeof StaffAdminRoute
   '/dev/design-system': typeof DevDesignSystemRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
+  '/': typeof MemberIndexRoute
+  '/login': typeof AuthLoginRoute
+  '/password-reset': typeof AuthPasswordResetRoute
+  '/admin': typeof StaffAdminRoute
   '/dev/design-system': typeof DevDesignSystemRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
+  '/_auth': typeof AuthRouteWithChildren
+  '/_member': typeof MemberRouteWithChildren
+  '/_staff': typeof StaffRouteWithChildren
+  '/_auth/login': typeof AuthLoginRoute
+  '/_auth/password-reset': typeof AuthPasswordResetRoute
+  '/_staff/admin': typeof StaffAdminRoute
   '/dev/design-system': typeof DevDesignSystemRoute
+  '/_member/': typeof MemberIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dev/design-system'
+  fullPaths:
+    '/' | '/login' | '/password-reset' | '/admin' | '/dev/design-system'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dev/design-system'
-  id: '__root__' | '/' | '/dev/design-system'
+  to: '/' | '/login' | '/password-reset' | '/admin' | '/dev/design-system'
+  id:
+    | '__root__'
+    | '/_auth'
+    | '/_member'
+    | '/_staff'
+    | '/_auth/login'
+    | '/_auth/password-reset'
+    | '/_staff/admin'
+    | '/dev/design-system'
+    | '/_member/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
+  AuthRoute: typeof AuthRouteWithChildren
+  MemberRoute: typeof MemberRouteWithChildren
+  StaffRoute: typeof StaffRouteWithChildren
   DevDesignSystemRoute: typeof DevDesignSystemRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
+    '/_auth': {
+      id: '/_auth'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_member': {
+      id: '/_member'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof MemberRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_staff': {
+      id: '/_staff'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof StaffRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_auth/login': {
+      id: '/_auth/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof AuthLoginRouteImport
+      parentRoute: typeof AuthRoute
+    }
+    '/_auth/password-reset': {
+      id: '/_auth/password-reset'
+      path: '/password-reset'
+      fullPath: '/password-reset'
+      preLoaderRoute: typeof AuthPasswordResetRouteImport
+      parentRoute: typeof AuthRoute
+    }
+    '/_member/': {
+      id: '/_member/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof MemberIndexRouteImport
+      parentRoute: typeof MemberRoute
+    }
+    '/_staff/admin': {
+      id: '/_staff/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof StaffAdminRouteImport
+      parentRoute: typeof StaffRoute
     }
     '/dev/design-system': {
       id: '/dev/design-system'
@@ -68,8 +167,43 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthRouteChildren {
+  AuthLoginRoute: typeof AuthLoginRoute
+  AuthPasswordResetRoute: typeof AuthPasswordResetRoute
+}
+
+const AuthRouteChildren: AuthRouteChildren = {
+  AuthLoginRoute: AuthLoginRoute,
+  AuthPasswordResetRoute: AuthPasswordResetRoute,
+}
+
+const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
+
+interface MemberRouteChildren {
+  MemberIndexRoute: typeof MemberIndexRoute
+}
+
+const MemberRouteChildren: MemberRouteChildren = {
+  MemberIndexRoute: MemberIndexRoute,
+}
+
+const MemberRouteWithChildren =
+  MemberRoute._addFileChildren(MemberRouteChildren)
+
+interface StaffRouteChildren {
+  StaffAdminRoute: typeof StaffAdminRoute
+}
+
+const StaffRouteChildren: StaffRouteChildren = {
+  StaffAdminRoute: StaffAdminRoute,
+}
+
+const StaffRouteWithChildren = StaffRoute._addFileChildren(StaffRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+  AuthRoute: AuthRouteWithChildren,
+  MemberRoute: MemberRouteWithChildren,
+  StaffRoute: StaffRouteWithChildren,
   DevDesignSystemRoute: DevDesignSystemRoute,
 }
 export const routeTree = rootRouteImport

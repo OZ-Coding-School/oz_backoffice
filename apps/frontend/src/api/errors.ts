@@ -7,13 +7,22 @@ export class ApiError extends Error {
   readonly code: string;
   /** 422 요청 검증 오류의 필드별 메시지 (키: `email`, `items.0.name` …) */
   readonly fieldErrors: Readonly<Record<string, string>>;
+  /** 429의 `Retry-After`(초). 다시 시도할 수 있는 시각을 보여 줄 때 쓴다 */
+  readonly retryAfterSeconds: number | null;
 
-  constructor(status: number, code: string, message: string, fieldErrors: Record<string, string> = {}) {
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    fieldErrors: Record<string, string> = {},
+    retryAfterSeconds: number | null = null,
+  ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
     this.fieldErrors = fieldErrors;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 
@@ -26,10 +35,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-export function toApiError(status: number, body: unknown): ApiError {
+function parseRetryAfter(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const seconds = Number(value);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : null;
+}
+
+export function toApiError(status: number, body: unknown, retryAfter?: string | null): ApiError {
   if (isRecord(body) && isRecord(body.error) && typeof body.error.code === "string") {
     const message = typeof body.error.message === "string" ? body.error.message : FALLBACK_MESSAGE;
-    return new ApiError(status, body.error.code, message);
+    return new ApiError(status, body.error.code, message, {}, parseRetryAfter(retryAfter));
   }
   if (status === 422 && isRecord(body) && Array.isArray(body.detail)) {
     const fieldErrors: Record<string, string> = {};
@@ -48,7 +63,7 @@ export function toApiError(status: number, body: unknown): ApiError {
 /** 응답 본문을 읽어 ApiError로 바꾼다 (JSON이 아니면 상태 코드만으로). */
 export async function readApiError(response: Response): Promise<ApiError> {
   const body: unknown = await response.json().catch(() => null);
-  return toApiError(response.status, body);
+  return toApiError(response.status, body, response.headers.get("Retry-After"));
 }
 
 /** 다시 시도해 볼 만한 오류인가: 네트워크 오류·5xx만 (4xx는 같은 결과, decisions F19). */

@@ -4,8 +4,16 @@ import { cleanup } from "@testing-library/react";
 
 import { server } from "@/mocks/node";
 
-// jsdom에 없는 브라우저 API (라우터 스크롤 복원이 부른다)
+// jsdom에 없는 브라우저 API (라우터 스크롤 복원, Radix 팝오버·셀렉트가 부른다)
 window.scrollTo = () => {};
+globalThis.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};
+Element.prototype.scrollIntoView ??= () => {};
+Element.prototype.hasPointerCapture ??= () => false;
+Element.prototype.releasePointerCapture ??= () => {};
 
 // 모킹하지 않은 API 요청은 실패로 본다 (실제 네트워크 호출 금지)
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
