@@ -80,6 +80,7 @@ docker compose exec api aerich upgrade                 # 적용
 
 docker compose exec api python -m app.cli create-super-admin <email> [--name 이름]  # 최고 관리자 등록 (멱등)
 docker compose exec api python -m app.cli seed-roles   # 역할·권한 정의(access/domain/catalog.py)를 DB에 반영 (멱등)
+docker compose exec api python -m app.cli seed-dev-org # 개발용 부서·팀·직위·과정 담당 팀 (멱등, local·test 전용, A62)
 docker compose exec api python -m app.cli send-test-mail <받는주소>  # 현재 MAIL_DRIVER로 확인 메일 발송 (Gmail 설정 확인)
 ```
 
@@ -130,9 +131,10 @@ src/app/
 - enum은 `CharEnumField`(varchar)로 저장하고, 허용 값은 마이그레이션에 CHECK로 건다. DB 기본값(`now()`, `false` 등)과 DBML check 제약도 마이그레이션 raw SQL로 추가한다. aerich 생성 파일(`migrations/`)은 ruff 대상에서 제외한다.
 - aerich 생성물에서 직접 고쳐야 하는 것 (aerich 0.10 한계):
   - **downgrade의 테이블 삭제 순서가 FK 의존을 고려하지 않는다.** 참조하는 쪽부터 지우도록 고친다.
-  - **자기 참조 FK는 "cyclic fk references"로 생성을 거부한다.** 모델에는 `UUIDField`로 두고 FK 제약은 raw SQL로 건다(예: `departments.parent_id`).
+  - **자기 참조 FK는 "cyclic fk references"로 생성을 거부한다.** 모델에는 `UUIDField`로 두고 FK 제약은 raw SQL로 건다(예: 예전 `departments.parent_id`, 24에서 제거).
   - 마이그레이션을 만든 뒤 개발 DB에서 `aerich upgrade` → `aerich migrate`("No changes detected" 확인) → `aerich downgrade -v <n>` → `aerich upgrade`로 검증한다.
-  - `aerich downgrade -v <n>`은 **버전 n까지 포함해** 되돌린다(n 이후 전부 삭제). 새 마이그레이션 n만 되돌리려면 `-v n`을 쓴다. `-v n-1`은 그 전 마이그레이션 테이블까지 지운다.
+  - `aerich downgrade -v <n>`은 **버전 n까지 포함해** 되돌린다(n 이후 전부 삭제). 새 마이그레이션 n만 되돌리려면 `-v n`을 쓴다. `-v n-1`은 그 전 마이그레이션 테이블까지 지운다. `-d`를 붙이면 마이그레이션 파일까지 지우므로 검증할 때는 붙이지 않는다.
+- 마이그레이션은 스키마만 바꾸고 데이터를 넣거나 옮기지 않는다. 개발 데이터는 CLI 시드 명령으로 넣는다 (A62).
 - 테스트 DB는 `tests/conftest.py`의 autouse 픽스처가 관리한다. 테스트에서 따로 요청하지 않는다.
   - `tortoise_db`(세션): 테스트 전용 DB(이름이 `_test`로 끝나야 함)를 지우고 새로 만든다. 격리된 `TortoiseContext`(전역 연결 없음)를 열고 **aerich 마이그레이션 SQL을 처음부터 적용**한 뒤, 세션이 끝나면 DB를 지운다. `tortoise_test_context`는 `generate_schemas()`를 강제해 raw SQL 제약이 빠지므로 쓰지 않는다.
   - `clean_tables`(테스트마다): 테스트가 끝나면 모든 모델 테이블을 TRUNCATE한다.

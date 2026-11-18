@@ -6,7 +6,10 @@ from fastapi import Depends, Request
 
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.identity.application.auth_service import UserQueries
-from app.contexts.organization.application.org_service import OrganizationAdminService
+from app.contexts.organization.application.org_service import (
+    BootcampLookup,
+    OrganizationAdminService,
+)
 from app.contexts.organization.application.registration_service import (
     RegistrationChoiceValidator,
     StaffRegistrationService,
@@ -20,11 +23,13 @@ from app.contexts.organization.application.staff_roles import StaffRoleGranter, 
 from app.contexts.organization.application.staff_service import StaffAssignmentService
 from app.contexts.organization.infrastructure.repositories import (
     TortoiseBootcampStaffRepository,
+    TortoiseBootcampTeamRepository,
     TortoiseCohortStaffRepository,
     TortoiseDepartmentRepository,
     TortoiseEmployeePositionRepository,
     TortoiseEmployeeRegistrationRepository,
     TortoiseEmployeeRepository,
+    TortoiseTeamRepository,
 )
 from app.core.clock import Clock
 from app.core.config import Settings
@@ -44,6 +49,8 @@ def get_staff_registration_service(
     return StaffRegistrationService(
         registrations=TortoiseEmployeeRegistrationRepository(),
         departments=TortoiseDepartmentRepository(),
+        teams=TortoiseTeamRepository(),
+        bootcamp_teams=TortoiseBootcampTeamRepository(),
         positions=TortoiseEmployeePositionRepository(),
         catalog=catalog,
         uow=UnitOfWork(),
@@ -71,6 +78,8 @@ def get_staff_registration_review_service(
         cohort_staffs=TortoiseCohortStaffRepository(),
         validator=RegistrationChoiceValidator(
             departments=TortoiseDepartmentRepository(),
+            teams=TortoiseTeamRepository(),
+            bootcamp_teams=TortoiseBootcampTeamRepository(),
             positions=TortoiseEmployeePositionRepository(),
             catalog=catalog,
         ),
@@ -101,6 +110,9 @@ def get_staff_assignment_service(
 def get_organization_admin_service(request: Request) -> OrganizationAdminService:
     return OrganizationAdminService(
         departments=TortoiseDepartmentRepository(),
+        teams=TortoiseTeamRepository(),
+        bootcamp_teams=TortoiseBootcampTeamRepository(),
+        bootcamps=cast("BootcampLookup", request.app.state.academy_catalog),
         positions=TortoiseEmployeePositionRepository(),
         employees=TortoiseEmployeeRepository(),
         audit=cast("AuditRecorder", request.app.state.audit_recorder),

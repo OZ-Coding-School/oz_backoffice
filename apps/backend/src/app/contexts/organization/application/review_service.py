@@ -2,7 +2,7 @@
 
 승인은 한 트랜잭션에서 아래를 모두 처리한다.
 1. 신청을 어드민이 조정한 항목으로 승인
-2. 직원(`employees`) 생성 또는 부서·직위·고용 형태 갱신
+2. 직원(`employees`) 생성 또는 부서·팀·직위·고용 형태 갱신
 3. 담당자(`bootcamp_staffs`·`cohort_staffs`) 추가 (이미 있으면 건너뜀)
 4. 담당에 맞는 역할(`user_roles`) 부여: 매니저 → COHORT_MANAGER, 조교 → COHORT_ASSISTANT
 5. 회원 승인, 감사 로그
@@ -47,9 +47,15 @@ class StaffUserApprover(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class RegistrationAdjustment:
-    """승인할 때 어드민이 바꾸는 항목. None이면 신청한 값을 그대로 쓴다."""
+    """승인할 때 어드민이 바꾸는 항목. 보내지 않은 항목은 신청한 값을 그대로 쓴다.
+
+    팀은 None(부서 직속)으로 바꿀 수 있어 보내지 않음을 `team_changed`로 구분한다.
+    조정은 자유이고 존재만 검사한다 (A62).
+    """
 
     department_id: uuid.UUID | None = None
+    team_changed: bool = False
+    team_id: uuid.UUID | None = None
     position_id: uuid.UUID | None = None
     employment_type: EmploymentType | None = None
     assignments: list[RequestedAssignment] | None = None
@@ -100,6 +106,7 @@ class StaffRegistrationReviewService:
         async with self._uow:
             registration = await self._get(registration_id)
             department_id = adjustment.department_id or registration.department_id
+            team_id = adjustment.team_id if adjustment.team_changed else registration.team_id
             position_id = adjustment.position_id or registration.position_id
             employment_type = adjustment.employment_type or registration.employment_type
             assignments = (
@@ -108,12 +115,17 @@ class StaffRegistrationReviewService:
                 else adjustment.assignments
             )
             await self._validator.validate(
-                department_id=department_id, position_id=position_id, assignments=assignments
+                department_id=department_id,
+                team_id=team_id,
+                position_id=position_id,
+                assignments=assignments,
+                strict=False,
             )
             requested = _snapshot(registration)
             registration.approve(
                 now=self._clock.now(),
                 department_id=department_id,
+                team_id=team_id,
                 position_id=position_id,
                 employment_type=employment_type,
                 assignments=assignments,
@@ -171,13 +183,16 @@ class StaffRegistrationReviewService:
             employee = Employee(
                 user_id=registration.user_id,
                 department_id=registration.department_id,
+                team_id=registration.team_id,
                 position_id=registration.position_id,
                 employment_type=registration.employment_type,
             )
             await self._employees.add(employee)
             return employee
         employee.transfer(
-            department_id=registration.department_id, position_id=registration.position_id
+            department_id=registration.department_id,
+            team_id=registration.team_id,
+            position_id=registration.position_id,
         )
         employee.change_employment_type(registration.employment_type)
         await self._employees.save(employee)
@@ -207,6 +222,7 @@ class StaffRegistrationReviewService:
 def _snapshot(registration: EmployeeRegistration) -> dict[str, object]:
     return {
         "department_id": str(registration.department_id),
+        "team_id": str(registration.team_id) if registration.team_id else None,
         "position_id": str(registration.position_id),
         "employment_type": registration.employment_type.value,
         "assignments": [

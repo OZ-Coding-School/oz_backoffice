@@ -96,10 +96,12 @@ async def approve_staff_registration(
     users: UsersDep,
     body: ApproveStaffRegistrationRequest | None = None,
 ) -> AdminStaffRegistrationResponse:
-    """승인. 본문으로 부서·직위·고용 형태·담당을 조정할 수 있다 (보내지 않은 항목은 신청값)."""
+    """승인. 본문으로 부서·팀·직위·고용 형태·담당을 조정할 수 있다 (보내지 않은 항목은 신청값)."""
     body = body or ApproveStaffRegistrationRequest()
     adjustment = RegistrationAdjustment(
         department_id=body.department_id,
+        team_changed="team_id" in body.model_fields_set,
+        team_id=body.team_id,
         position_id=body.position_id,
         employment_type=body.employment_type,
         assignments=None

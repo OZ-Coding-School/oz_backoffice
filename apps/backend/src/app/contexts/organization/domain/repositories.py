@@ -5,10 +5,12 @@ from typing import Protocol
 
 from app.contexts.organization.domain.entities import (
     BootcampStaff,
+    BootcampTeam,
     CohortStaff,
     Department,
     Employee,
     EmployeePosition,
+    Team,
 )
 from app.contexts.organization.domain.enums import EmployeeRegistrationStatus
 from app.contexts.organization.domain.registration import EmployeeRegistration
@@ -19,12 +21,44 @@ class DepartmentRepository(Protocol):
     async def save(self, department: Department) -> None: ...
     async def get(self, entity_id: uuid.UUID) -> Department | None: ...
     async def delete(self, entity_id: uuid.UUID) -> None: ...
-    async def find_by_parent_and_name(
-        self, parent_id: uuid.UUID | None, name: str
-    ) -> Department | None: ...
+    async def get_by_name(self, name: str) -> Department | None: ...
     async def list_all(self) -> list[Department]:
         """조직도 전체 (부서 수가 적어 한 번에 읽는다)."""
         ...
+
+
+class TeamRepository(Protocol):
+    async def add(self, team: Team) -> None: ...
+    async def save(self, team: Team) -> None: ...
+    async def get(self, entity_id: uuid.UUID) -> Team | None: ...
+    async def delete(self, entity_id: uuid.UUID) -> None:
+        """직원·신청·담당 과정이 참조 중이면 409 in_use."""
+        ...
+
+    async def is_referenced(self, team_id: uuid.UUID) -> bool:
+        """직원·가입 신청(이력 포함)·담당 과정 중 하나라도 이 팀을 참조하는지."""
+        ...
+
+    async def move_references(self, from_team_id: uuid.UUID, to_team_id: uuid.UUID) -> None:
+        """직원·가입 신청(이력 포함)·담당 과정의 팀을 다른 팀으로 바꾼다 (A62 팀 삭제)."""
+        ...
+
+    async def find_by_department_and_name(
+        self, department_id: uuid.UUID, name: str
+    ) -> Team | None: ...
+    async def list_all(self) -> list[Team]: ...
+
+
+class BootcampTeamRepository(Protocol):
+    """과정의 담당 팀 (과정당 한 팀, A62)."""
+
+    async def assign(self, bootcamp_id: uuid.UUID, team_id: uuid.UUID | None) -> None:
+        """담당 팀을 정한다. None이면 담당 팀을 없앤다."""
+        ...
+
+    async def get(self, bootcamp_id: uuid.UUID) -> BootcampTeam | None: ...
+    async def list_all(self) -> list[BootcampTeam]: ...
+    async def list_bootcamp_ids(self, team_id: uuid.UUID) -> set[uuid.UUID]: ...
 
 
 class EmployeePositionRepository(Protocol):

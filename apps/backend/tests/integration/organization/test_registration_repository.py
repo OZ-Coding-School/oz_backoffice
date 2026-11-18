@@ -19,7 +19,7 @@ from app.contexts.organization.infrastructure.repositories import (
 )
 from tests.factories.academy import create_cohort
 from tests.factories.identity import make_user
-from tests.factories.organization import create_department, create_position
+from tests.factories.organization import create_department, create_position, create_team
 
 pytestmark = pytest.mark.integration
 
@@ -53,8 +53,10 @@ async def test_registration_round_trip_with_assignments() -> None:
     assert loaded.status is EmployeeRegistrationStatus.PENDING
     assert loaded.created_at is not None
 
+    team = await create_team(loaded.department_id)
     loaded.update(
         department_id=loaded.department_id,
+        team_id=team.id,
         position_id=loaded.position_id,
         employment_type=EmploymentType.CONTRACT,
         assignments=assignments[1:],
@@ -63,6 +65,7 @@ async def test_registration_round_trip_with_assignments() -> None:
     latest = await repo.get_latest_by_user(registration.user_id)
     assert latest is not None
     assert latest.employment_type is EmploymentType.CONTRACT
+    assert latest.team_id == team.id
     assert latest.assignments == assignments[1:]
     assert await repo.get_latest_by_user(make_user().id) is None
 

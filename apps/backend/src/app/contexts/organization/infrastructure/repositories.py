@@ -4,10 +4,12 @@ import uuid
 
 from app.contexts.organization.domain.entities import (
     BootcampStaff,
+    BootcampTeam,
     CohortStaff,
     Department,
     Employee,
     EmployeePosition,
+    Team,
 )
 from app.contexts.organization.domain.enums import EmployeeRegistrationStatus
 from app.contexts.organization.domain.registration import (
@@ -22,6 +24,8 @@ from app.contexts.organization.infrastructure.models import (
     EmployeePositionModel,
     EmployeeRegistrationAssignmentModel,
     EmployeeRegistrationModel,
+    TeamBootcampModel,
+    TeamModel,
 )
 from app.core.persistence import TortoiseRepository
 
@@ -29,18 +33,10 @@ from app.core.persistence import TortoiseRepository
 class TortoiseDepartmentRepository(TortoiseRepository[Department, DepartmentModel]):
     model = DepartmentModel
     entity = Department
-    fields = ("parent_id", "name", "description", "rules")
+    fields = ("name", "description", "rules")
 
-    async def find_by_parent_and_name(
-        self, parent_id: uuid.UUID | None, name: str
-    ) -> Department | None:
-        query = DepartmentModel.filter(name=name.strip())
-        query = (
-            query.filter(parent_id__isnull=True)
-            if parent_id is None
-            else query.filter(parent_id=parent_id)
-        )
-        row = await query.first()
+    async def get_by_name(self, name: str) -> Department | None:
+        row = await DepartmentModel.get_or_none(name=name.strip())
         return self.to_entity(row) if row else None
 
     async def list_all(self) -> list[Department]:
@@ -48,12 +44,66 @@ class TortoiseDepartmentRepository(TortoiseRepository[Department, DepartmentMode
         return [self.to_entity(row) for row in rows]
 
 
+class TortoiseTeamRepository(TortoiseRepository[Team, TeamModel]):
+    model = TeamModel
+    entity = Team
+    fields = ("department_id", "name", "description")
+
+    async def is_referenced(self, team_id: uuid.UUID) -> bool:
+        return (
+            await EmployeeModel.filter(team_id=team_id).exists()
+            or await EmployeeRegistrationModel.filter(team_id=team_id).exists()
+            or await TeamBootcampModel.filter(team_id=team_id).exists()
+        )
+
+    async def move_references(self, from_team_id: uuid.UUID, to_team_id: uuid.UUID) -> None:
+        await EmployeeModel.filter(team_id=from_team_id).update(team_id=to_team_id)
+        await EmployeeRegistrationModel.filter(team_id=from_team_id).update(team_id=to_team_id)
+        await TeamBootcampModel.filter(team_id=from_team_id).update(team_id=to_team_id)
+
+    async def find_by_department_and_name(self, department_id: uuid.UUID, name: str) -> Team | None:
+        row = await TeamModel.get_or_none(department_id=department_id, name=name.strip())
+        return self.to_entity(row) if row else None
+
+    async def list_all(self) -> list[Team]:
+        rows = await TeamModel.all().order_by("name", "id")
+        return [self.to_entity(row) for row in rows]
+
+
+class TortoiseBootcampTeamRepository:
+    async def assign(self, bootcamp_id: uuid.UUID, team_id: uuid.UUID | None) -> None:
+        if team_id is None:
+            await TeamBootcampModel.filter(bootcamp_id=bootcamp_id).delete()
+            return
+        updated = await TeamBootcampModel.filter(bootcamp_id=bootcamp_id).update(team_id=team_id)
+        if not updated:
+            await TeamBootcampModel.create(bootcamp_id=bootcamp_id, team_id=team_id)
+
+    async def get(self, bootcamp_id: uuid.UUID) -> BootcampTeam | None:
+        row = await TeamBootcampModel.get_or_none(bootcamp_id=bootcamp_id)
+        return _bootcamp_team(row) if row else None
+
+    async def list_all(self) -> list[BootcampTeam]:
+        return [_bootcamp_team(row) for row in await TeamBootcampModel.all().order_by("id")]
+
+    async def list_bootcamp_ids(self, team_id: uuid.UUID) -> set[uuid.UUID]:
+        ids = await TeamBootcampModel.filter(team_id=team_id).values_list("bootcamp_id", flat=True)
+        return {uuid.UUID(str(i)) for i in ids}
+
+
+def _bootcamp_team(row: TeamBootcampModel) -> BootcampTeam:
+    return BootcampTeam(
+        bootcamp_id=row.bootcamp_id,  # type: ignore[attr-defined]  # Tortoise FK 컬럼 속성
+        team_id=row.team_id,  # type: ignore[attr-defined]
+    )
+
+
 class TortoiseEmployeePositionRepository(
     TortoiseRepository[EmployeePosition, EmployeePositionModel]
 ):
     model = EmployeePositionModel
     entity = EmployeePosition
-    fields = ("name", "priority")
+    fields = ("name", "priority", "assignment_scope")
 
     async def get_by_name(self, name: str) -> EmployeePosition | None:
         row = await EmployeePositionModel.get_or_none(name=name.strip())
@@ -67,7 +117,7 @@ class TortoiseEmployeePositionRepository(
 class TortoiseEmployeeRepository(TortoiseRepository[Employee, EmployeeModel]):
     model = EmployeeModel
     entity = Employee
-    fields = ("user_id", "department_id", "position_id", "employment_type")
+    fields = ("user_id", "department_id", "team_id", "position_id", "employment_type")
 
     async def get_by_user(self, user_id: uuid.UUID) -> Employee | None:
         row = await EmployeeModel.get_or_none(user_id=user_id)
@@ -144,6 +194,7 @@ class TortoiseEmployeeRegistrationRepository(
     fields = (
         "user_id",
         "department_id",
+        "team_id",
         "position_id",
         "employment_type",
         "status",

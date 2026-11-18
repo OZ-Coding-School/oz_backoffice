@@ -1,10 +1,11 @@
-"""조직 마스터 관리 API (부서·직위·직원). 권한: org.manage (전체 범위).
+"""조직 마스터 관리 API (부서·팀·과정 담당 팀·직위·직원). 권한: org.manage (전체 범위).
 
-PATCH는 보낸 필드만 바꾼다. 부서의 parent_id에 null을 보내면 최상위 부서가 된다.
+PATCH는 보낸 필드만 바꾼다. null을 보낼 수 있는 항목(팀 설명, 직위 담당 방식, 직원 팀)은
+null을 보내면 값을 비운다 (A62).
 """
 
 import uuid
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, Response, status
 from pydantic import BaseModel, Field
@@ -14,10 +15,18 @@ from app.contexts.identity.application.auth_service import UserQueries
 from app.contexts.identity.domain.entities import User
 from app.contexts.organization.application.org_service import (
     DepartmentChanges,
+    EmployeeChanges,
     OrganizationAdminService,
+    PositionChanges,
+    TeamChanges,
 )
-from app.contexts.organization.domain.entities import Department, Employee, EmployeePosition
-from app.contexts.organization.domain.enums import EmploymentType
+from app.contexts.organization.domain.entities import (
+    Department,
+    Employee,
+    EmployeePosition,
+    Team,
+)
+from app.contexts.organization.domain.enums import AssignmentScope, EmploymentType
 from app.contexts.organization.presentation.dependencies import (
     get_organization_admin_service,
     get_user_queries,
@@ -35,64 +44,115 @@ UsersDep = Annotated[UserQueries, Depends(get_user_queries)]
 # ---------------------------------------------------------------- 스키마
 class DepartmentResponse(BaseModel):
     id: uuid.UUID
-    parent_id: uuid.UUID | None
     name: str
     description: str
     rules: str | None
 
     @classmethod
     def of(cls, d: Department) -> "DepartmentResponse":
-        return cls(
-            id=d.id, parent_id=d.parent_id, name=d.name, description=d.description, rules=d.rules
-        )
+        return cls(id=d.id, name=d.name, description=d.description, rules=d.rules)
 
 
 class DepartmentCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=20)
     description: str = Field(min_length=1, max_length=500)
-    parent_id: uuid.UUID | None = None
     rules: str | None = None
 
 
 class DepartmentUpdateRequest(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=20)
     description: str | None = Field(default=None, min_length=1, max_length=500)
-    parent_id: uuid.UUID | None = None
     rules: str | None = None
+
+
+class TeamResponse(BaseModel):
+    id: uuid.UUID
+    department_id: uuid.UUID
+    name: str
+    description: str | None
+    bootcamp_ids: list[uuid.UUID] = Field(description="담당 과정 (과정당 한 팀)")
+
+    @classmethod
+    def of(cls, t: Team, bootcamp_ids: list[uuid.UUID]) -> "TeamResponse":
+        return cls(
+            id=t.id,
+            department_id=t.department_id,
+            name=t.name,
+            description=t.description,
+            bootcamp_ids=bootcamp_ids,
+        )
+
+
+class TeamCreateRequest(BaseModel):
+    department_id: uuid.UUID
+    name: str = Field(min_length=1, max_length=20)
+    description: str | None = Field(default=None, max_length=500)
+
+
+class TeamUpdateRequest(BaseModel):
+    department_id: uuid.UUID | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=20)
+    description: str | None = Field(default=None, max_length=500)
+
+
+class BootcampTeamRequest(BaseModel):
+    team_id: uuid.UUID | None = Field(description="담당 팀. null이면 담당 팀을 없앤다")
+
+
+class BootcampTeamResponse(BaseModel):
+    bootcamp_id: uuid.UUID
+    team_id: uuid.UUID | None
 
 
 class PositionResponse(BaseModel):
     id: uuid.UUID
     name: str
     priority: int
+    assignment_scope: AssignmentScope | None
 
     @classmethod
     def of(cls, p: EmployeePosition) -> "PositionResponse":
-        return cls(id=p.id, name=p.name, priority=p.priority)
+        return cls(id=p.id, name=p.name, priority=p.priority, assignment_scope=p.assignment_scope)
 
 
 class PositionCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=20)
     priority: int = Field(ge=0, le=32767)
+    assignment_scope: AssignmentScope | None = Field(
+        default=None,
+        description="COURSE: 팀의 과정 여러 개, COHORT: 팀 과정의 기수 하나, null: 담당 없음",
+    )
 
 
 class PositionUpdateRequest(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=20)
     priority: int | None = Field(default=None, ge=0, le=32767)
+    assignment_scope: AssignmentScope | None = None
 
 
 class EmployeeResponse(BaseModel):
     id: uuid.UUID
     user: StaffUserSummary | None
     department_id: uuid.UUID
+    team_id: uuid.UUID | None
     position_id: uuid.UUID
     employment_type: EmploymentType
 
 
 class EmployeeUpdateRequest(BaseModel):
     department_id: uuid.UUID | None = None
+    team_id: uuid.UUID | None = None
     position_id: uuid.UUID | None = None
     employment_type: EmploymentType | None = None
+
+
+def _sent(body: BaseModel, nullable: tuple[str, ...] = ()) -> dict[str, Any]:
+    """보낸 항목만. null을 허용하지 않는 항목의 null은 보내지 않은 것으로 본다."""
+    return {
+        k: v
+        for k, v in body.model_dump(exclude_unset=True).items()
+        if v is not None or k in nullable
+    }
 
 
 async def _employees(employees: list[Employee], users: UserQueries) -> list[EmployeeResponse]:
@@ -107,6 +167,7 @@ async def _employees(employees: list[Employee], users: UserQueries) -> list[Empl
                 if user
                 else None,
                 department_id=e.department_id,
+                team_id=e.team_id,
                 position_id=e.position_id,
                 employment_type=e.employment_type,
             )
@@ -117,7 +178,7 @@ async def _employees(employees: list[Employee], users: UserQueries) -> list[Empl
 # ---------------------------------------------------------------- 부서
 @router.get("/departments", response_model=list[DepartmentResponse])
 async def list_departments(_: Admin, service: ServiceDep) -> list[DepartmentResponse]:
-    """전체 부서 (평면 목록, parent_id로 트리를 만든다)."""
+    """전체 부서 (이름순)."""
     return [DepartmentResponse.of(d) for d in await service.list_departments()]
 
 
@@ -128,7 +189,6 @@ async def create_department(
     department = await service.create_department(
         name=body.name,
         description=body.description,
-        parent_id=body.parent_id,
         rules=body.rules,
         actor_id=admin.id,
     )
@@ -139,9 +199,8 @@ async def create_department(
 async def update_department(
     department_id: uuid.UUID, body: DepartmentUpdateRequest, admin: Admin, service: ServiceDep
 ) -> DepartmentResponse:
-    sent = body.model_dump(exclude_unset=True)
     department = await service.update_department(
-        department_id, DepartmentChanges(**sent), actor_id=admin.id
+        department_id, DepartmentChanges(**_sent(body, ("rules",))), actor_id=admin.id
     )
     return DepartmentResponse.of(department)
 
@@ -150,9 +209,66 @@ async def update_department(
 async def delete_department(
     department_id: uuid.UUID, admin: Admin, service: ServiceDep
 ) -> Response:
-    """하위 부서·직원·가입 신청이 참조 중이면 409 in_use."""
+    """팀·직원·가입 신청이 참조 중이면 409 in_use."""
     await service.delete_department(department_id, actor_id=admin.id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ---------------------------------------------------------------- 팀
+@router.get("/teams", response_model=list[TeamResponse])
+async def list_teams(_: Admin, service: ServiceDep) -> list[TeamResponse]:
+    """전체 팀과 담당 과정 (이름순)."""
+    return [TeamResponse.of(t, ids) for t, ids in await service.list_teams()]
+
+
+@router.post("/teams", response_model=TeamResponse, status_code=status.HTTP_201_CREATED)
+async def create_team(body: TeamCreateRequest, admin: Admin, service: ServiceDep) -> TeamResponse:
+    team = await service.create_team(
+        department_id=body.department_id,
+        name=body.name,
+        description=body.description,
+        actor_id=admin.id,
+    )
+    return TeamResponse.of(team, [])
+
+
+@router.patch("/teams/{team_id}", response_model=TeamResponse)
+async def update_team(
+    team_id: uuid.UUID, body: TeamUpdateRequest, admin: Admin, service: ServiceDep
+) -> TeamResponse:
+    """부서를 바꾸면 팀이 다른 부서로 옮겨 간다 (담당 과정은 그대로)."""
+    team = await service.update_team(
+        team_id, TeamChanges(**_sent(body, ("description",))), actor_id=admin.id
+    )
+    ids = next((ids for t, ids in await service.list_teams() if t.id == team.id), [])
+    return TeamResponse.of(team, ids)
+
+
+@router.delete("/teams/{team_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_team(
+    team_id: uuid.UUID,
+    admin: Admin,
+    service: ServiceDep,
+    move_to_team_id: Annotated[
+        uuid.UUID | None,
+        Query(description="직원·가입 신청(이력 포함)·담당 과정을 옮길 팀"),
+    ] = None,
+) -> Response:
+    """팀을 지운다. 참조가 있으면 `move_to_team_id`로 옮긴 뒤 지운다.
+
+    옮길 팀 없이 참조가 남아 있으면 409 `team_in_use`, 같은 팀이면 422 `invalid_move_to_team`.
+    """
+    await service.delete_team(team_id, move_to_team_id=move_to_team_id, actor_id=admin.id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.put("/bootcamps/{bootcamp_id}/team", response_model=BootcampTeamResponse)
+async def set_bootcamp_team(
+    bootcamp_id: uuid.UUID, body: BootcampTeamRequest, admin: Admin, service: ServiceDep
+) -> BootcampTeamResponse:
+    """과정의 담당 팀을 정한다 (과정당 한 팀, A62)."""
+    team_id = await service.set_bootcamp_team(bootcamp_id, body.team_id, actor_id=admin.id)
+    return BootcampTeamResponse(bootcamp_id=bootcamp_id, team_id=team_id)
 
 
 # ---------------------------------------------------------------- 직위
@@ -167,7 +283,10 @@ async def create_position(
     body: PositionCreateRequest, admin: Admin, service: ServiceDep
 ) -> PositionResponse:
     position = await service.create_position(
-        name=body.name, priority=body.priority, actor_id=admin.id
+        name=body.name,
+        priority=body.priority,
+        assignment_scope=body.assignment_scope,
+        actor_id=admin.id,
     )
     return PositionResponse.of(position)
 
@@ -177,7 +296,7 @@ async def update_position(
     position_id: uuid.UUID, body: PositionUpdateRequest, admin: Admin, service: ServiceDep
 ) -> PositionResponse:
     position = await service.update_position(
-        position_id, name=body.name, priority=body.priority, actor_id=admin.id
+        position_id, PositionChanges(**_sent(body, ("assignment_scope",))), actor_id=admin.id
     )
     return PositionResponse.of(position)
 
@@ -221,12 +340,8 @@ async def update_employee(
     service: ServiceDep,
     users: UsersDep,
 ) -> EmployeeResponse:
-    """부서·직위·고용 형태 이동. 직원 생성은 가입 승인으로만 한다."""
+    """부서·팀·직위·고용 형태 이동 (존재만 검사). 직원 생성은 가입 승인으로만 한다."""
     employee = await service.update_employee(
-        employee_id,
-        department_id=body.department_id,
-        position_id=body.position_id,
-        employment_type=body.employment_type,
-        actor_id=admin.id,
+        employee_id, EmployeeChanges(**_sent(body, ("team_id",))), actor_id=admin.id
     )
     return (await _employees([employee], users))[0]

@@ -1,6 +1,7 @@
-"""organization 도메인 엔티티: 부서, 직위, 직원, 과정·기수 담당자.
+"""organization 도메인 엔티티: 부서, 팀, 직위, 직원, 과정·기수 담당자.
 
 부서는 조직도 용도이며 데이터 소유 범위가 아니다 (decisions D5).
+부서 아래에 팀이 있고, 과정은 담당 팀 하나에 소속된다 (A62).
 조교·운영매니저는 내부 직원이다 (D8). 담당자 배정은 표시용이고 권한은 user_roles와 동기화한다 (D4).
 """
 
@@ -8,7 +9,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 
-from app.contexts.organization.domain.enums import EmploymentType, StaffRole
+from app.contexts.organization.domain.enums import AssignmentScope, EmploymentType, StaffRole
 from app.shared.domain import AggregateRoot
 from app.shared.errors import BusinessRuleViolation
 
@@ -20,11 +21,10 @@ def _require(condition: bool, message: str, code: str) -> None:
 
 @dataclass(kw_only=True, eq=False)
 class Department(AggregateRoot):
-    """부서. 같은 상위 부서 안에서 이름은 유일하다 (최상위끼리도 유일)."""
+    """부서. 이름은 유일하다. 하위 조직은 팀(`Team`)으로 둔다 (A62)."""
 
     name: str
     description: str
-    parent_id: uuid.UUID | None = None
     rules: str | None = None
 
     def __post_init__(self) -> None:
@@ -36,42 +36,71 @@ class Department(AggregateRoot):
             "부서 설명은 1~500자여야 합니다.",
             "invalid_department",
         )
-        _require(
-            self.parent_id != self.id,
-            "자기 자신을 상위 부서로 지정할 수 없습니다.",
-            "invalid_department",
-        )
 
     def update(self, *, name: str, description: str, rules: str | None) -> None:
         """이름·설명·규칙을 바꾼다. 검증은 생성할 때와 같다."""
         changed = Department(id=self.id, name=name, description=description, rules=rules)
         self.name, self.description, self.rules = changed.name, changed.description, changed.rules
 
-    def move_under(self, parent_id: uuid.UUID | None) -> None:
-        """상위 부서를 바꾼다. 여러 단계에 걸친 순환은 부서 트리를 조회하는 서비스에서 검사한다."""
+
+@dataclass(kw_only=True, eq=False)
+class Team(AggregateRoot):
+    """팀. 한 부서에 소속되고 같은 부서 안에서 이름은 유일하다 (A62)."""
+
+    department_id: uuid.UUID
+    name: str
+    description: str | None = None
+
+    def __post_init__(self) -> None:
+        self.name = self.name.strip()
+        if self.description is not None:
+            self.description = self.description.strip() or None
+        _require(0 < len(self.name) <= 20, "팀 이름은 1~20자여야 합니다.", "invalid_team")
         _require(
-            parent_id != self.id,
-            "자기 자신을 상위 부서로 지정할 수 없습니다.",
-            "invalid_department",
+            self.description is None or len(self.description) <= 500,
+            "팀 설명은 500자 이내여야 합니다.",
+            "invalid_team",
         )
-        self.parent_id = parent_id
+
+    def update(self, *, department_id: uuid.UUID, name: str, description: str | None) -> None:
+        changed = Team(id=self.id, department_id=department_id, name=name, description=description)
+        self.department_id, self.name, self.description = (
+            changed.department_id,
+            changed.name,
+            changed.description,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class BootcampTeam:
+    """과정의 담당 팀 (과정당 한 팀, A62)."""
+
+    bootcamp_id: uuid.UUID
+    team_id: uuid.UUID
 
 
 @dataclass(kw_only=True, eq=False)
 class EmployeePosition(AggregateRoot):
-    """직위. priority가 작을수록 높은 직급이다."""
+    """직위. priority가 작을수록 높은 직급이다.
+
+    assignment_scope는 운영진 정보 입력에서 담당을 고르는 방식이다 (A62).
+    """
 
     name: str
     priority: int
+    assignment_scope: AssignmentScope | None = None
 
     def __post_init__(self) -> None:
         self.name = self.name.strip()
         _require(0 < len(self.name) <= 20, "직위명은 1~20자여야 합니다.", "invalid_position")
         _require(self.priority >= 0, "직급 우선순위는 0 이상이어야 합니다.", "invalid_position")
 
-    def update(self, *, name: str, priority: int) -> None:
-        changed = EmployeePosition(id=self.id, name=name, priority=priority)
+    def update(self, *, name: str, priority: int, assignment_scope: AssignmentScope | None) -> None:
+        changed = EmployeePosition(
+            id=self.id, name=name, priority=priority, assignment_scope=assignment_scope
+        )
         self.name, self.priority = changed.name, changed.priority
+        self.assignment_scope = changed.assignment_scope
 
 
 @dataclass(kw_only=True, eq=False)
@@ -82,9 +111,13 @@ class Employee(AggregateRoot):
     department_id: uuid.UUID
     position_id: uuid.UUID
     employment_type: EmploymentType
+    team_id: uuid.UUID | None = None  # 팀 없이 부서 직속일 수 있다 (A62)
 
-    def transfer(self, *, department_id: uuid.UUID, position_id: uuid.UUID) -> None:
+    def transfer(
+        self, *, department_id: uuid.UUID, team_id: uuid.UUID | None, position_id: uuid.UUID
+    ) -> None:
         self.department_id = department_id
+        self.team_id = team_id
         self.position_id = position_id
 
     def change_employment_type(self, employment_type: EmploymentType) -> None:

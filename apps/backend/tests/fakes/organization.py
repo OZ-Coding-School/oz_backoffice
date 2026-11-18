@@ -5,7 +5,12 @@ from collections.abc import Iterable
 from dataclasses import replace
 
 from app.contexts.academy.domain.entities import Bootcamp, Cohort
-from app.contexts.organization.domain.entities import Department, EmployeePosition
+from app.contexts.organization.domain.entities import (
+    BootcampTeam,
+    Department,
+    EmployeePosition,
+    Team,
+)
 from app.contexts.organization.domain.enums import EmployeeRegistrationStatus
 from app.contexts.organization.domain.registration import EmployeeRegistration
 from app.shared.errors import BusinessRuleViolation
@@ -27,16 +32,70 @@ class InMemoryDepartmentRepository:
     async def delete(self, entity_id: uuid.UUID) -> None:
         self.items.pop(entity_id, None)
 
-    async def find_by_parent_and_name(
-        self, parent_id: uuid.UUID | None, name: str
-    ) -> Department | None:
-        return next(
-            (d for d in self.items.values() if d.parent_id == parent_id and d.name == name.strip()),
-            None,
-        )
+    async def get_by_name(self, name: str) -> Department | None:
+        return next((d for d in self.items.values() if d.name == name.strip()), None)
 
     async def list_all(self) -> list[Department]:
         return sorted(self.items.values(), key=lambda d: d.name)
+
+
+class InMemoryTeamRepository:
+    def __init__(self, *teams: Team) -> None:
+        self.items = {t.id: t for t in teams}
+        self.referenced: set[uuid.UUID] = set()  # 직원·신청·과정이 참조 중인 팀
+
+    async def is_referenced(self, team_id: uuid.UUID) -> bool:
+        return team_id in self.referenced
+
+    async def move_references(self, from_team_id: uuid.UUID, to_team_id: uuid.UUID) -> None:
+        if from_team_id in self.referenced:
+            self.referenced.discard(from_team_id)
+            self.referenced.add(to_team_id)
+
+    async def add(self, team: Team) -> None:
+        self.items[team.id] = team
+
+    async def save(self, team: Team) -> None:
+        self.items[team.id] = team
+
+    async def get(self, entity_id: uuid.UUID) -> Team | None:
+        return self.items.get(entity_id)
+
+    async def delete(self, entity_id: uuid.UUID) -> None:
+        self.items.pop(entity_id, None)
+
+    async def find_by_department_and_name(self, department_id: uuid.UUID, name: str) -> Team | None:
+        return next(
+            (
+                t
+                for t in self.items.values()
+                if t.department_id == department_id and t.name == name.strip()
+            ),
+            None,
+        )
+
+    async def list_all(self) -> list[Team]:
+        return sorted(self.items.values(), key=lambda t: t.name)
+
+
+class InMemoryBootcampTeamRepository:
+    def __init__(self, *links: BootcampTeam) -> None:
+        self.items = {link.bootcamp_id: link for link in links}
+
+    async def assign(self, bootcamp_id: uuid.UUID, team_id: uuid.UUID | None) -> None:
+        if team_id is None:
+            self.items.pop(bootcamp_id, None)
+        else:
+            self.items[bootcamp_id] = BootcampTeam(bootcamp_id=bootcamp_id, team_id=team_id)
+
+    async def get(self, bootcamp_id: uuid.UUID) -> BootcampTeam | None:
+        return self.items.get(bootcamp_id)
+
+    async def list_all(self) -> list[BootcampTeam]:
+        return list(self.items.values())
+
+    async def list_bootcamp_ids(self, team_id: uuid.UUID) -> set[uuid.UUID]:
+        return {link.bootcamp_id for link in self.items.values() if link.team_id == team_id}
 
 
 class InMemoryEmployeePositionRepository:
