@@ -12,12 +12,15 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as MemberRouteImport } from './routes/_member'
 import { Route as StaffRouteImport } from './routes/_staff'
+import { Route as StaffAuthRouteImport } from './routes/_staffAuth'
 import { Route as AuthLoginRouteImport } from './routes/_auth/login'
 import { Route as AuthPasswordResetRouteImport } from './routes/_auth/password-reset'
 import { Route as AuthSignupRouteImport } from './routes/_auth/signup'
 import { Route as MemberIndexRouteImport } from './routes/_member/index'
 import { Route as StaffAdminRouteImport } from './routes/_staff/admin'
 import { Route as DevDesignSystemRouteImport } from './routes/dev/design-system'
+import { Route as StaffAuthStaffLoginRouteImport } from './routes/_staffAuth/staff/login'
+import { Route as StaffAuthStaffRegistrationRouteImport } from './routes/_staffAuth/staff/registration'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/_auth',
@@ -29,6 +32,10 @@ const MemberRoute = MemberRouteImport.update({
 } as any)
 const StaffRoute = StaffRouteImport.update({
   id: '/_staff',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StaffAuthRoute = StaffAuthRouteImport.update({
+  id: '/_staffAuth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthLoginRoute = AuthLoginRouteImport.update({
@@ -61,6 +68,17 @@ const DevDesignSystemRoute = DevDesignSystemRouteImport.update({
   path: '/dev/design-system',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StaffAuthStaffLoginRoute = StaffAuthStaffLoginRouteImport.update({
+  id: '/staff/login',
+  path: '/staff/login',
+  getParentRoute: () => StaffAuthRoute,
+} as any)
+const StaffAuthStaffRegistrationRoute =
+  StaffAuthStaffRegistrationRouteImport.update({
+    id: '/staff/registration',
+    path: '/staff/registration',
+    getParentRoute: () => StaffAuthRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof MemberIndexRoute
@@ -69,6 +87,8 @@ export interface FileRoutesByFullPath {
   '/signup': typeof AuthSignupRoute
   '/admin': typeof StaffAdminRoute
   '/dev/design-system': typeof DevDesignSystemRoute
+  '/staff/login': typeof StaffAuthStaffLoginRoute
+  '/staff/registration': typeof StaffAuthStaffRegistrationRoute
 }
 export interface FileRoutesByTo {
   '/': typeof MemberIndexRoute
@@ -77,18 +97,23 @@ export interface FileRoutesByTo {
   '/signup': typeof AuthSignupRoute
   '/admin': typeof StaffAdminRoute
   '/dev/design-system': typeof DevDesignSystemRoute
+  '/staff/login': typeof StaffAuthStaffLoginRoute
+  '/staff/registration': typeof StaffAuthStaffRegistrationRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_auth': typeof AuthRouteWithChildren
   '/_member': typeof MemberRouteWithChildren
   '/_staff': typeof StaffRouteWithChildren
+  '/_staffAuth': typeof StaffAuthRouteWithChildren
   '/_auth/login': typeof AuthLoginRoute
   '/_auth/password-reset': typeof AuthPasswordResetRoute
   '/_auth/signup': typeof AuthSignupRoute
   '/_staff/admin': typeof StaffAdminRoute
   '/dev/design-system': typeof DevDesignSystemRoute
   '/_member/': typeof MemberIndexRoute
+  '/_staffAuth/staff/login': typeof StaffAuthStaffLoginRoute
+  '/_staffAuth/staff/registration': typeof StaffAuthStaffRegistrationRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -99,6 +124,8 @@ export interface FileRouteTypes {
     | '/signup'
     | '/admin'
     | '/dev/design-system'
+    | '/staff/login'
+    | '/staff/registration'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -107,23 +134,29 @@ export interface FileRouteTypes {
     | '/signup'
     | '/admin'
     | '/dev/design-system'
+    | '/staff/login'
+    | '/staff/registration'
   id:
     | '__root__'
     | '/_auth'
     | '/_member'
     | '/_staff'
+    | '/_staffAuth'
     | '/_auth/login'
     | '/_auth/password-reset'
     | '/_auth/signup'
     | '/_staff/admin'
     | '/dev/design-system'
     | '/_member/'
+    | '/_staffAuth/staff/login'
+    | '/_staffAuth/staff/registration'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   AuthRoute: typeof AuthRouteWithChildren
   MemberRoute: typeof MemberRouteWithChildren
   StaffRoute: typeof StaffRouteWithChildren
+  StaffAuthRoute: typeof StaffAuthRouteWithChildren
   DevDesignSystemRoute: typeof DevDesignSystemRoute
 }
 
@@ -148,6 +181,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof StaffRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_staffAuth': {
+      id: '/_staffAuth'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof StaffAuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_auth/login': {
@@ -192,6 +232,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DevDesignSystemRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_staffAuth/staff/login': {
+      id: '/_staffAuth/staff/login'
+      path: '/staff/login'
+      fullPath: '/staff/login'
+      preLoaderRoute: typeof StaffAuthStaffLoginRouteImport
+      parentRoute: typeof StaffAuthRoute
+    }
+    '/_staffAuth/staff/registration': {
+      id: '/_staffAuth/staff/registration'
+      path: '/staff/registration'
+      fullPath: '/staff/registration'
+      preLoaderRoute: typeof StaffAuthStaffRegistrationRouteImport
+      parentRoute: typeof StaffAuthRoute
+    }
   }
 }
 
@@ -230,10 +284,25 @@ const StaffRouteChildren: StaffRouteChildren = {
 
 const StaffRouteWithChildren = StaffRoute._addFileChildren(StaffRouteChildren)
 
+interface StaffAuthRouteChildren {
+  StaffAuthStaffLoginRoute: typeof StaffAuthStaffLoginRoute
+  StaffAuthStaffRegistrationRoute: typeof StaffAuthStaffRegistrationRoute
+}
+
+const StaffAuthRouteChildren: StaffAuthRouteChildren = {
+  StaffAuthStaffLoginRoute: StaffAuthStaffLoginRoute,
+  StaffAuthStaffRegistrationRoute: StaffAuthStaffRegistrationRoute,
+}
+
+const StaffAuthRouteWithChildren = StaffAuthRoute._addFileChildren(
+  StaffAuthRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRouteWithChildren,
   MemberRoute: MemberRouteWithChildren,
   StaffRoute: StaffRouteWithChildren,
+  StaffAuthRoute: StaffAuthRouteWithChildren,
   DevDesignSystemRoute: DevDesignSystemRoute,
 }
 export const routeTree = rootRouteImport

@@ -32,7 +32,15 @@ export function Logo({ onBrand = false, className }: { onBrand?: boolean; classN
  * 로그인·재설정·가입 화면 틀 (Figma `Login`, decisions F21).
  * 소개 영역: 데스크톱(lg) 560, 태블릿(md) 320, 모바일은 숨기고 폼 위에 로고.
  */
-export function AuthLayout({ brand = MEMBER_BRAND, children }: { brand?: BrandCopy; children: ReactNode }) {
+export function AuthLayout({
+  brand = MEMBER_BRAND,
+  wide = false,
+  children,
+}: {
+  brand?: BrandCopy;
+  wide?: boolean;
+  children: ReactNode;
+}) {
   return (
     <div className="flex min-h-dvh bg-background">
       <aside className="relative hidden shrink-0 flex-col overflow-hidden bg-brand-panel px-8 py-10 text-white md:flex md:w-80 lg:w-140 lg:px-14 lg:py-12">
@@ -56,7 +64,7 @@ export function AuthLayout({ brand = MEMBER_BRAND, children }: { brand?: BrandCo
       </aside>
       <main className="flex min-w-0 flex-1 flex-col px-4 pt-5 pb-6 md:items-center md:justify-center md:px-6 md:py-12">
         <Logo className="mb-10 md:hidden" />
-        <div className="w-full md:max-w-100">{children}</div>
+        <div className={cn("w-full", wide ? "md:max-w-130" : "md:max-w-100")}>{children}</div>
       </main>
     </div>
   );
