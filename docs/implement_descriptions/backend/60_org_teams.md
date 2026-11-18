@@ -1,7 +1,7 @@
 # 60. 조직 구조: 부서·팀과 직위 담당 방식
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #79
 - 관련 결정: `docs/decisions.md` A62 (A11 변경)
 - 이전 기록: [59. 계정 종류(account_type)와 운영진 로그인 실패 경로](59_account_type.md)
 
