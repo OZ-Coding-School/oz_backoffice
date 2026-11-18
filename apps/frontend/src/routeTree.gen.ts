@@ -14,6 +14,7 @@ import { Route as MemberRouteImport } from './routes/_member'
 import { Route as StaffRouteImport } from './routes/_staff'
 import { Route as AuthLoginRouteImport } from './routes/_auth/login'
 import { Route as AuthPasswordResetRouteImport } from './routes/_auth/password-reset'
+import { Route as AuthSignupRouteImport } from './routes/_auth/signup'
 import { Route as MemberIndexRouteImport } from './routes/_member/index'
 import { Route as StaffAdminRouteImport } from './routes/_staff/admin'
 import { Route as DevDesignSystemRouteImport } from './routes/dev/design-system'
@@ -40,6 +41,11 @@ const AuthPasswordResetRoute = AuthPasswordResetRouteImport.update({
   path: '/password-reset',
   getParentRoute: () => AuthRoute,
 } as any)
+const AuthSignupRoute = AuthSignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
+  getParentRoute: () => AuthRoute,
+} as any)
 const MemberIndexRoute = MemberIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -60,6 +66,7 @@ export interface FileRoutesByFullPath {
   '/': typeof MemberIndexRoute
   '/login': typeof AuthLoginRoute
   '/password-reset': typeof AuthPasswordResetRoute
+  '/signup': typeof AuthSignupRoute
   '/admin': typeof StaffAdminRoute
   '/dev/design-system': typeof DevDesignSystemRoute
 }
@@ -67,6 +74,7 @@ export interface FileRoutesByTo {
   '/': typeof MemberIndexRoute
   '/login': typeof AuthLoginRoute
   '/password-reset': typeof AuthPasswordResetRoute
+  '/signup': typeof AuthSignupRoute
   '/admin': typeof StaffAdminRoute
   '/dev/design-system': typeof DevDesignSystemRoute
 }
@@ -77,6 +85,7 @@ export interface FileRoutesById {
   '/_staff': typeof StaffRouteWithChildren
   '/_auth/login': typeof AuthLoginRoute
   '/_auth/password-reset': typeof AuthPasswordResetRoute
+  '/_auth/signup': typeof AuthSignupRoute
   '/_staff/admin': typeof StaffAdminRoute
   '/dev/design-system': typeof DevDesignSystemRoute
   '/_member/': typeof MemberIndexRoute
@@ -84,9 +93,20 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/login' | '/password-reset' | '/admin' | '/dev/design-system'
+    | '/'
+    | '/login'
+    | '/password-reset'
+    | '/signup'
+    | '/admin'
+    | '/dev/design-system'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/password-reset' | '/admin' | '/dev/design-system'
+  to:
+    | '/'
+    | '/login'
+    | '/password-reset'
+    | '/signup'
+    | '/admin'
+    | '/dev/design-system'
   id:
     | '__root__'
     | '/_auth'
@@ -94,6 +114,7 @@ export interface FileRouteTypes {
     | '/_staff'
     | '/_auth/login'
     | '/_auth/password-reset'
+    | '/_auth/signup'
     | '/_staff/admin'
     | '/dev/design-system'
     | '/_member/'
@@ -143,6 +164,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthPasswordResetRouteImport
       parentRoute: typeof AuthRoute
     }
+    '/_auth/signup': {
+      id: '/_auth/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof AuthSignupRouteImport
+      parentRoute: typeof AuthRoute
+    }
     '/_member/': {
       id: '/_member/'
       path: '/'
@@ -170,11 +198,13 @@ declare module '@tanstack/react-router' {
 interface AuthRouteChildren {
   AuthLoginRoute: typeof AuthLoginRoute
   AuthPasswordResetRoute: typeof AuthPasswordResetRoute
+  AuthSignupRoute: typeof AuthSignupRoute
 }
 
 const AuthRouteChildren: AuthRouteChildren = {
   AuthLoginRoute: AuthLoginRoute,
   AuthPasswordResetRoute: AuthPasswordResetRoute,
+  AuthSignupRoute: AuthSignupRoute,
 }
 
 const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)

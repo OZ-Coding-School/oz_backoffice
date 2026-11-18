@@ -130,9 +130,9 @@ export function LoginPage({ me, redirect, email }: { me: Me | null; redirect?: s
         </form>
         <p className="text-center text-body text-muted-foreground">
           아직 계정이 없나요?{" "}
-          <a href="/signup" className="text-body-strong text-primary-text hover:underline">
+          <Link to="/signup" className="text-body-strong text-primary-text hover:underline">
             수강생·멘토 가입
-          </a>
+          </Link>
         </p>
         <p className="text-center text-caption text-muted-foreground">
           운영진이신가요?{" "}
