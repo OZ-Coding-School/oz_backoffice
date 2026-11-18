@@ -1,7 +1,7 @@
 # 62. 수강생 멘토링 신청 준비 API (BE-1)
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #81
 - 관련 결정: `docs/decisions.md` A64, F12·F13 (프론트엔드 계획 BE-1)
 - 이전 기록: [61. 조교 담당 기수는 비어 있는 기수만](61_cohort_assistant_filter.md)
 
