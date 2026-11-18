@@ -63,6 +63,7 @@ def check_assignment_scope(
     *,
     team_bootcamp_ids: set[uuid.UUID],
     cohort_bootcamps: dict[uuid.UUID, uuid.UUID],
+    assisted_cohort_ids: set[uuid.UUID] | None = None,
 ) -> None:
     """직위 담당 방식에 맞는 담당인지 검사한다 (A62, 신청할 때만).
 
@@ -70,6 +71,7 @@ def check_assignment_scope(
     - COURSE: 운영 매니저 + 소속 팀의 과정 (여러 개)
     - COHORT: 조교 + 소속 팀 과정의 기수 (하나)
     `cohort_bootcamps`는 기수 → 과정. 팀이 없으면 `team_bootcamp_ids`가 비어 담당을 고를 수 없다.
+    `assisted_cohort_ids`는 이미 조교가 배정된 기수다. 조교로 고를 수 없다 (A63).
     """
     if not assignments:
         return
@@ -99,6 +101,12 @@ def check_assignment_scope(
             )
             message = "소속 팀 과정의 기수를 조교로 골라야 합니다."
         _require(ok, message, "invalid_staff_assignment")
+        if scope is AssignmentScope.COHORT:
+            _require(
+                a.cohort_id not in (assisted_cohort_ids or set()),
+                "이미 조교가 배정된 기수입니다.",
+                "invalid_staff_assignment",
+            )
 
 
 @dataclass(kw_only=True, eq=False)

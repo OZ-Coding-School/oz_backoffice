@@ -18,7 +18,7 @@ from app.contexts.organization.domain.entities import (
     EmployeePosition,
     Team,
 )
-from app.contexts.organization.domain.enums import EmploymentType
+from app.contexts.organization.domain.enums import EmploymentType, StaffRole
 from app.contexts.organization.domain.registration import (
     EmployeeRegistration,
     RequestedAssignment,
@@ -26,6 +26,7 @@ from app.contexts.organization.domain.registration import (
 )
 from app.contexts.organization.domain.repositories import (
     BootcampTeamRepository,
+    CohortStaffRepository,
     DepartmentRepository,
     EmployeePositionRepository,
     EmployeeRegistrationRepository,
@@ -75,6 +76,7 @@ class RegistrationChoiceValidator:
         position_id: uuid.UUID,
         assignments: list[RequestedAssignment],
         strict: bool,
+        assisted_cohort_ids: set[uuid.UUID] | None = None,
     ) -> None:
         if await self._departments.get(department_id) is None:
             raise BusinessRuleViolation("존재하지 않는 부서입니다.", code="department_not_found")
@@ -107,6 +109,7 @@ class RegistrationChoiceValidator:
             assignments,
             team_bootcamp_ids=team_bootcamp_ids,
             cohort_bootcamps=cohort_bootcamps,
+            assisted_cohort_ids=assisted_cohort_ids,
         )
 
 
@@ -129,10 +132,12 @@ class StaffRegistrationService:
         teams: TeamRepository,
         bootcamp_teams: BootcampTeamRepository,
         positions: EmployeePositionRepository,
+        cohort_staffs: CohortStaffRepository,
         catalog: StaffTargetCatalog,
         uow: UnitOfWork,
         staff_email_domain: str,
     ) -> None:
+        self._cohort_staffs = cohort_staffs
         self._registrations = registrations
         self._departments = departments
         self._teams = teams
@@ -150,7 +155,7 @@ class StaffRegistrationService:
             bootcamp_teams=await self._bootcamp_teams.list_all(),
             positions=await self._positions.list_all(),
             bootcamps=await self._catalog.staffable_bootcamps(),
-            cohorts=await self._catalog.staffable_cohorts(),
+            cohorts=await self._open_cohorts(),
         )
 
     async def get_mine(self, applicant: User) -> EmployeeRegistration | None:
@@ -182,6 +187,9 @@ class StaffRegistrationService:
             position_id=position_id,
             assignments=assignments,
             strict=True,
+            assisted_cohort_ids=await self._cohort_staffs.cohort_ids_with_role(StaffRole.ASSISTANT)
+            if any(a.cohort_id for a in assignments)
+            else set(),
         )
 
         async with self._uow:
@@ -206,6 +214,11 @@ class StaffRegistrationService:
             )
             await self._registrations.add(registration)
             return registration
+
+    async def _open_cohorts(self) -> list[Cohort]:
+        """조교로 고를 수 있는 기수: 담당 가능한 기수 중 승인된 조교가 없는 기수 (A63)."""
+        assisted = await self._cohort_staffs.cohort_ids_with_role(StaffRole.ASSISTANT)
+        return [c for c in await self._catalog.staffable_cohorts() if c.id not in assisted]
 
     def _ensure_staff_account(self, user: User) -> None:
         if not user.email.endswith(self._staff_suffix):

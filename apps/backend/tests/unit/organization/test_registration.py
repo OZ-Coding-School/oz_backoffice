@@ -209,6 +209,17 @@ class TestAssignmentScope:
                 self.check(AssignmentScope.COHORT, *wrong)
             assert exc.value.code == "invalid_staff_assignment"
 
+    def test_cohort_with_assistant_cannot_be_taken(self) -> None:
+        with pytest.raises(BusinessRuleViolation) as exc:
+            check_assignment_scope(
+                AssignmentScope.COHORT,
+                [self.assistant(self.team_cohort)],
+                team_bootcamp_ids={self.team_bootcamp},
+                cohort_bootcamps={self.team_cohort: self.team_bootcamp},
+                assisted_cohort_ids={self.team_cohort},
+            )
+        assert exc.value.code == "invalid_staff_assignment"
+
     def test_position_without_scope_cannot_take_assignments(self) -> None:
         with pytest.raises(BusinessRuleViolation) as exc:
             self.check(None, self.manager(self.team_bootcamp))

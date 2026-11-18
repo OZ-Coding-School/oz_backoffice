@@ -5730,7 +5730,10 @@ export interface components {
             staff_roles: components["schemas"]["StaffRole"][];
             /** Bootcamps */
             bootcamps: components["schemas"]["BootcampOption"][];
-            /** Cohorts */
+            /**
+             * Cohorts
+             * @description 조교로 고를 수 있는 기수: 진행 예정·진행 중 기수 중 승인된 조교가 없는 기수 (A63)
+             */
             cohorts: components["schemas"]["CohortOption"][];
         };
         /** StaffRegistrationRequest */

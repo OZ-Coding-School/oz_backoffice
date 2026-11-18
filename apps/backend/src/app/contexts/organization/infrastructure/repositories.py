@@ -11,7 +11,7 @@ from app.contexts.organization.domain.entities import (
     EmployeePosition,
     Team,
 )
-from app.contexts.organization.domain.enums import EmployeeRegistrationStatus
+from app.contexts.organization.domain.enums import EmployeeRegistrationStatus, StaffRole
 from app.contexts.organization.domain.registration import (
     EmployeeRegistration,
     RequestedAssignment,
@@ -182,6 +182,12 @@ class TortoiseCohortStaffRepository(TortoiseRepository[CohortStaff, CohortStaffM
     async def list_by_employee(self, employee_id: uuid.UUID) -> list[CohortStaff]:
         rows = await CohortStaffModel.filter(employee_id=employee_id).order_by("id")
         return [self.to_entity(row) for row in rows]
+
+    async def cohort_ids_with_role(self, role: StaffRole) -> set[uuid.UUID]:
+        ids = (
+            await CohortStaffModel.filter(role=role).distinct().values_list("cohort_id", flat=True)
+        )
+        return {uuid.UUID(str(i)) for i in ids}
 
 
 class TortoiseEmployeeRegistrationRepository(

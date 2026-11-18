@@ -24,6 +24,7 @@ from tests.fakes.identity import InMemoryUserRepository
 from tests.fakes.organization import (
     FakeStaffTargetCatalog,
     InMemoryBootcampTeamRepository,
+    InMemoryCohortStaffRepository,
     InMemoryDepartmentRepository,
     InMemoryEmployeePositionRepository,
     InMemoryEmployeeRegistrationRepository,
@@ -64,6 +65,7 @@ def registration_app(app: FastAPI, users: InMemoryUserRepository) -> FastAPI:
             BootcampTeam(bootcamp_id=BOOTCAMP.id, team_id=TEAM.id)
         ),
         positions=InMemoryEmployeePositionRepository(POSITION),
+        cohort_staffs=InMemoryCohortStaffRepository(),
         catalog=FakeStaffTargetCatalog([BOOTCAMP], [COHORT]),
         uow=FakeUnitOfWork(),
         staff_email_domain="nextrunners.co.kr",

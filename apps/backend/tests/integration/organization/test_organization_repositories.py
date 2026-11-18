@@ -168,6 +168,8 @@ async def test_staff_assignments() -> None:
     assert [s.role for s in await cohort_staffs.list_by_employee(employee.id)] == [
         StaffRole.ASSISTANT
     ]
+    assert await cohort_staffs.cohort_ids_with_role(StaffRole.ASSISTANT) == {cohort.id}
+    assert await cohort_staffs.cohort_ids_with_role(StaffRole.MANAGER) == set()
 
     bootcamp_staffs = TortoiseBootcampStaffRepository()
     await bootcamp_staffs.add(

@@ -59,7 +59,10 @@ class StaffRegistrationOptionsResponse(BaseModel):
     employment_types: list[EmploymentType]
     staff_roles: list[StaffRole]
     bootcamps: list[BootcampOption]
-    cohorts: list[CohortOption]
+    cohorts: list[CohortOption] = Field(
+        description="조교로 고를 수 있는 기수: 진행 예정·진행 중 기수 중 "
+        "승인된 조교가 없는 기수 (A63)"
+    )
 
 
 class AssignmentPayload(BaseModel):

@@ -7,11 +7,12 @@ from dataclasses import replace
 from app.contexts.academy.domain.entities import Bootcamp, Cohort
 from app.contexts.organization.domain.entities import (
     BootcampTeam,
+    CohortStaff,
     Department,
     EmployeePosition,
     Team,
 )
-from app.contexts.organization.domain.enums import EmployeeRegistrationStatus
+from app.contexts.organization.domain.enums import EmployeeRegistrationStatus, StaffRole
 from app.contexts.organization.domain.registration import EmployeeRegistration
 from app.shared.errors import BusinessRuleViolation
 
@@ -144,6 +145,26 @@ class InMemoryEmployeeRegistrationRepository:
     ) -> tuple[list[EmployeeRegistration], int]:
         matched = sorted((r for r in self.items.values() if r.status is status), key=lambda r: r.id)
         return [replace(r) for r in matched[offset : offset + limit]], len(matched)
+
+
+class InMemoryCohortStaffRepository:
+    def __init__(self, *staffs: CohortStaff) -> None:
+        self.items = {s.id: s for s in staffs}
+
+    async def add(self, staff: CohortStaff) -> None:
+        self.items[staff.id] = staff
+
+    async def remove(self, staff_id: uuid.UUID) -> None:
+        self.items.pop(staff_id, None)
+
+    async def list_by_cohort(self, cohort_id: uuid.UUID) -> list[CohortStaff]:
+        return [s for s in self.items.values() if s.cohort_id == cohort_id]
+
+    async def list_by_employee(self, employee_id: uuid.UUID) -> list[CohortStaff]:
+        return [s for s in self.items.values() if s.employee_id == employee_id]
+
+    async def cohort_ids_with_role(self, role: StaffRole) -> set[uuid.UUID]:
+        return {s.cohort_id for s in self.items.values() if s.role is role}
 
 
 class FakeStaffTargetCatalog:
