@@ -6,4 +6,4 @@
 | 02 | [디자인 토큰 (Tailwind·shadcn 테마, 글꼴, 다크 모드)](02_design_tokens.md) | 완료 (#72) |
 | 03 | [API 클라이언트 (OpenAPI 타입 생성, 인증·토큰 갱신)](03_api_client.md) | 완료 (#74) |
 | 04 | [FE-1a 로그인·세션 가드·비밀번호 재설정·가입 상태](04_login_session.md) | 완료 (#76) |
-| 05 | [FE-1b 회원가입 마법사](05_signup_wizard.md) | PR 진행 중 (#77) |
+| 05 | [FE-1b 회원가입 마법사](05_signup_wizard.md) | 완료 (#77) |
