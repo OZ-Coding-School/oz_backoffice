@@ -13,7 +13,7 @@ import { MEMBER_BRAND, type BrandCopy } from "../brand";
  */
 export function Logo({ onBrand = false, className }: { onBrand?: boolean; className?: string }) {
   return (
-    <div className={cn("flex flex-col items-start gap-1.5", className)}>
+    <div className={cn("flex flex-col items-start gap-1", className)}>
       {onBrand ? (
         <img src={wordmarkLight} alt="오즈코딩스쿨" className="h-5 w-auto lg:h-6" />
       ) : (
@@ -22,9 +22,8 @@ export function Logo({ onBrand = false, className }: { onBrand?: boolean; classN
           <img src={wordmarkLight} alt="오즈코딩스쿨" className="hidden h-5 w-auto dark:block" />
         </>
       )}
-      <span className={cn("text-caption-strong", onBrand ? "text-white/80" : "text-muted-foreground")}>
-        운영 행정 지원 플랫폼
-      </span>
+      {/* 로그인 화면에서는 워드마크와 비슷한 크기 (F23, Figma Logo md·lg) */}
+      <span className={cn("text-h3", onBrand ? "text-white/80" : "text-muted-foreground")}>운영 행정 지원 플랫폼</span>
     </div>
   );
 }
