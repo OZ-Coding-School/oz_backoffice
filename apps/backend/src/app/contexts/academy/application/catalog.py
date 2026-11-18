@@ -36,6 +36,9 @@ class AcademyCatalog:
         cohort = await self._cohorts.get(cohort_id)
         return cohort.bootcamp_id if cohort else None
 
+    async def get_bootcamp(self, bootcamp_id: uuid.UUID) -> Bootcamp | None:
+        return await self._bootcamps.get(bootcamp_id)
+
     async def get_cohort(self, cohort_id: uuid.UUID) -> Cohort | None:
         return await self._cohorts.get(cohort_id)
 

@@ -8,7 +8,13 @@ from app.contexts.academy.domain.entities import Bootcamp, Cohort
 from app.contexts.identity.application.auth_service import UserQueries
 from app.contexts.identity.domain.entities import User
 from app.contexts.organization.application.registration_service import StaffRegistrationService
-from app.contexts.organization.domain.entities import Department, EmployeePosition
+from app.contexts.organization.domain.entities import (
+    BootcampTeam,
+    Department,
+    EmployeePosition,
+    Team,
+)
+from app.contexts.organization.domain.enums import AssignmentScope
 from app.contexts.organization.presentation.dependencies import get_staff_registration_service
 from app.core.config import Settings
 from app.core.security import JWTService
@@ -17,17 +23,21 @@ from tests.factories.identity import make_user
 from tests.fakes.identity import InMemoryUserRepository
 from tests.fakes.organization import (
     FakeStaffTargetCatalog,
+    InMemoryBootcampTeamRepository,
     InMemoryDepartmentRepository,
     InMemoryEmployeePositionRepository,
     InMemoryEmployeeRegistrationRepository,
+    InMemoryTeamRepository,
 )
 from tests.fakes.uow import FakeUnitOfWork
 
 pytestmark = pytest.mark.api
 
 URL = "/api/v1/me/staff-registration"
-DEPARTMENT = Department(name="교육 1팀", description="부트캠프 운영")
-POSITION = EmployeePosition(name="매니저", priority=3)
+DEPARTMENT = Department(name="교육운영본부", description="교육 운영")
+TEAM = Team(department_id=DEPARTMENT.id, name="교육 1팀")
+OTHER_TEAM = Team(department_id=new_id(), name="다른 팀")
+POSITION = EmployeePosition(name="운영 매니저", priority=3, assignment_scope=AssignmentScope.COURSE)
 BOOTCAMP = Bootcamp(hrd_net_bootcamp_id=new_id(), name="백엔드", code="AH")
 COHORT = Cohort(
     hrd_net_cohort_id=new_id(),
@@ -49,6 +59,10 @@ def registration_app(app: FastAPI, users: InMemoryUserRepository) -> FastAPI:
     service = StaffRegistrationService(
         registrations=InMemoryEmployeeRegistrationRepository(),
         departments=InMemoryDepartmentRepository(DEPARTMENT),
+        teams=InMemoryTeamRepository(TEAM, OTHER_TEAM),
+        bootcamp_teams=InMemoryBootcampTeamRepository(
+            BootcampTeam(bootcamp_id=BOOTCAMP.id, team_id=TEAM.id)
+        ),
         positions=InMemoryEmployeePositionRepository(POSITION),
         catalog=FakeStaffTargetCatalog([BOOTCAMP], [COHORT]),
         uow=FakeUnitOfWork(),
@@ -72,12 +86,10 @@ async def login_as(users: InMemoryUserRepository, settings: Settings, user: User
 def body(**overrides: object) -> dict[str, object]:
     values: dict[str, object] = {
         "department_id": str(DEPARTMENT.id),
+        "team_id": str(TEAM.id),
         "position_id": str(POSITION.id),
         "employment_type": "REGULAR",
-        "assignments": [
-            {"role": "MANAGER", "bootcamp_id": str(BOOTCAMP.id)},
-            {"role": "ASSISTANT", "cohort_id": str(COHORT.id)},
-        ],
+        "assignments": [{"role": "MANAGER", "bootcamp_id": str(BOOTCAMP.id)}],
     }
     values.update(overrides)
     return values
@@ -92,11 +104,19 @@ async def test_pending_staff_gets_options(api: AsyncClient, pending_staff: dict[
     response = await api.get(f"{URL}/options", headers=pending_staff)
     assert response.status_code == 200
     options = response.json()
-    assert options["departments"] == [
-        {"id": str(DEPARTMENT.id), "parent_id": None, "name": "교육 1팀"}
+    assert options["departments"] == [{"id": str(DEPARTMENT.id), "name": "교육운영본부"}]
+    assert {"id": str(TEAM.id), "department_id": str(DEPARTMENT.id), "name": "교육 1팀"} in (
+        options["teams"]
+    )
+    assert options["positions"] == [
+        {"id": str(POSITION.id), "name": "운영 매니저", "assignment_scope": "COURSE"}
     ]
-    assert options["positions"] == [{"id": str(POSITION.id), "name": "매니저"}]
-    assert options["bootcamps"][0]["code"] == "AH"
+    assert options["bootcamps"][0] == {
+        "id": str(BOOTCAMP.id),
+        "name": "백엔드",
+        "code": "AH",
+        "team_id": str(TEAM.id),
+    }
     assert options["cohorts"][0]["cohort_number"] == 3
     assert "REGULAR" in options["employment_types"]
     assert options["staff_roles"] == ["MANAGER", "ASSISTANT"]
@@ -110,7 +130,8 @@ async def test_submit_update_and_read_registration(
     created = await api.put(URL, json=body(), headers=pending_staff)
     assert created.status_code == 200
     assert created.json()["status"] == "PENDING"
-    assert len(created.json()["assignments"]) == 2
+    assert created.json()["team_id"] == str(TEAM.id)
+    assert len(created.json()["assignments"]) == 1
 
     updated = await api.put(
         URL, json=body(employment_type="CONTRACT", assignments=[]), headers=pending_staff
@@ -131,6 +152,12 @@ async def test_submit_update_and_read_registration(
             "invalid_staff_target",
         ),
         (body(department_id=str(new_id())), 422, "department_not_found"),
+        (body(team_id=str(OTHER_TEAM.id), assignments=[]), 422, "team_not_in_department"),
+        (
+            body(assignments=[{"role": "ASSISTANT", "cohort_id": str(COHORT.id)}]),
+            422,
+            "invalid_staff_assignment",
+        ),
         (body(employment_type="UNKNOWN"), 422, None),
     ],
 )

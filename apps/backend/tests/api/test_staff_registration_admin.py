@@ -18,7 +18,7 @@ from app.core.config import Settings
 from app.core.security import JWTService
 from app.shared.ids import new_id
 from tests.factories.academy import create_cohort
-from tests.factories.organization import create_department
+from tests.factories.organization import create_department, create_team
 from tests.factories.staff_review import create_applicant, create_registration
 
 pytestmark = pytest.mark.api
@@ -62,11 +62,13 @@ async def test_approve_with_adjustment_then_applicant_has_roles(
         applicant, [RequestedAssignment(role=StaffRole.MANAGER, cohort_id=cohort.id)]
     )
     department = await create_department()
+    team = await create_team(department.id)
 
     response = await client.post(
         f"{URL}/{registration.id}/approve",
         json={
             "department_id": str(department.id),
+            "team_id": str(team.id),
             "assignments": [{"role": "ASSISTANT", "cohort_id": str(cohort.id)}],
         },
         headers=admin_headers,
@@ -75,7 +77,7 @@ async def test_approve_with_adjustment_then_applicant_has_roles(
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "APPROVED"
-    assert body["department_id"] == str(department.id)
+    assert (body["department_id"], body["team_id"]) == (str(department.id), str(team.id))
     assert body["applicant"]["approval_status"] == "APPROVED"
     me = (await client.get("/api/v1/me", headers=bearer(settings, applicant))).json()
     assert me["approval_status"] == "APPROVED"
@@ -95,7 +97,10 @@ async def test_approve_without_body_uses_requested_values(
     registration = await create_registration(await create_applicant())
     response = await client.post(f"{URL}/{registration.id}/approve", headers=admin_headers)
     assert response.status_code == 200
-    assert response.json()["department_id"] == str(registration.department_id)
+    assert (response.json()["department_id"], response.json()["team_id"]) == (
+        str(registration.department_id),
+        None,
+    )
 
 
 async def test_reject_then_applicant_can_see_reason(

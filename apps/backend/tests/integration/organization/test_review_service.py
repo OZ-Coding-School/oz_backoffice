@@ -23,7 +23,7 @@ from app.contexts.organization.infrastructure.repositories import (
 from app.shared.errors import BusinessRuleViolation, NotFoundError
 from app.shared.ids import new_id
 from tests.factories.academy import create_cohort
-from tests.factories.organization import create_department
+from tests.factories.organization import create_department, create_team
 from tests.factories.staff_review import (
     build_review_service,
     create_applicant,
@@ -116,6 +116,43 @@ async def test_approve_with_adjustment(actor: User) -> None:
     log = await AuditLogModel.get(target_id=registration.id)
     assert log.before["assignments"][0]["role"] == "MANAGER"  # type: ignore[index]
     assert log.after["assignments"][0]["role"] == "ASSISTANT"  # type: ignore[index]
+
+
+async def test_approve_sets_team_freely(actor: User) -> None:
+    """승인 조정은 자유다: 다른 부서의 팀·팀 밖 과정도 존재만 확인한다 (A62)."""
+    await seed_roles()
+    cohort = await create_cohort()  # 어느 팀에도 속하지 않은 과정
+    applicant = await create_applicant()
+    registration = await create_registration(applicant)
+    team = await create_team()  # 신청 부서와 다른 부서의 팀
+
+    approved = await build_review_service().approve(
+        registration.id,
+        actor_id=actor.id,
+        adjustment=RegistrationAdjustment(
+            team_changed=True,
+            team_id=team.id,
+            assignments=[
+                RequestedAssignment(role=StaffRole.MANAGER, bootcamp_id=cohort.bootcamp_id)
+            ],
+        ),
+    )
+
+    assert (approved.department_id, approved.team_id) == (registration.department_id, team.id)
+    employee = await TortoiseEmployeeRepository().get_by_user(applicant.id)
+    assert employee is not None
+    assert employee.team_id == team.id
+    log = await AuditLogModel.get(target_id=registration.id)
+    assert (log.before["team_id"], log.after["team_id"]) == (None, str(team.id))  # type: ignore[index]
+
+    missing = await create_registration(await create_applicant())
+    with pytest.raises(BusinessRuleViolation) as exc:
+        await build_review_service().approve(
+            missing.id,
+            actor_id=actor.id,
+            adjustment=RegistrationAdjustment(team_changed=True, team_id=new_id()),
+        )
+    assert exc.value.code == "team_not_found"
 
 
 async def test_second_approval_updates_employee_and_skips_existing_staff(actor: User) -> None:

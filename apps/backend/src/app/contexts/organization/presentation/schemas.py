@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from app.contexts.academy.domain.enums import CohortStatus
 from app.contexts.identity.domain.enums import UserApprovalStatus
 from app.contexts.organization.domain.enums import (
+    AssignmentScope,
     EmployeeRegistrationStatus,
     EmploymentType,
     StaffRole,
@@ -17,19 +18,29 @@ from app.contexts.organization.domain.registration import MAX_ASSIGNMENTS, REJEC
 
 class DepartmentOption(BaseModel):
     id: uuid.UUID
-    parent_id: uuid.UUID | None
+    name: str
+
+
+class TeamOption(BaseModel):
+    id: uuid.UUID
+    department_id: uuid.UUID
     name: str
 
 
 class PositionOption(BaseModel):
     id: uuid.UUID
     name: str
+    assignment_scope: AssignmentScope | None = Field(
+        description="담당 방식. COURSE: 팀의 과정 여러 개(운영 매니저), "
+        "COHORT: 팀 과정의 기수 하나(조교), null: 담당 없음 (A62)"
+    )
 
 
 class BootcampOption(BaseModel):
     id: uuid.UUID
     name: str
     code: str
+    team_id: uuid.UUID | None = Field(description="담당 팀 (A62)")
 
 
 class CohortOption(BaseModel):
@@ -43,6 +54,7 @@ class CohortOption(BaseModel):
 
 class StaffRegistrationOptionsResponse(BaseModel):
     departments: list[DepartmentOption]
+    teams: list[TeamOption]
     positions: list[PositionOption]
     employment_types: list[EmploymentType]
     staff_roles: list[StaffRole]
@@ -58,6 +70,7 @@ class AssignmentPayload(BaseModel):
 
 class StaffRegistrationRequest(BaseModel):
     department_id: uuid.UUID
+    team_id: uuid.UUID | None = None
     position_id: uuid.UUID
     employment_type: EmploymentType
     assignments: list[AssignmentPayload] = Field(default_factory=list, max_length=MAX_ASSIGNMENTS)
@@ -67,6 +80,7 @@ class StaffRegistrationResponse(BaseModel):
     id: uuid.UUID
     status: EmployeeRegistrationStatus
     department_id: uuid.UUID
+    team_id: uuid.UUID | None
     position_id: uuid.UUID
     employment_type: EmploymentType
     assignments: list[AssignmentPayload]
@@ -90,9 +104,12 @@ class ApproveStaffRegistrationRequest(BaseModel):
     """승인할 때 조정할 항목. 보내지 않은(null) 항목은 신청한 값을 그대로 쓴다.
 
     assignments를 보내면 담당 목록 전체를 그 값으로 바꾼다(빈 배열이면 담당 없음).
+    team_id는 보내지 않으면 신청값, null을 보내면 팀 없음(부서 직속)이다.
+    조정은 자유이고 존재만 검사한다 (A62).
     """
 
     department_id: uuid.UUID | None = None
+    team_id: uuid.UUID | None = None
     position_id: uuid.UUID | None = None
     employment_type: EmploymentType | None = None
     assignments: list[AssignmentPayload] | None = Field(default=None, max_length=MAX_ASSIGNMENTS)

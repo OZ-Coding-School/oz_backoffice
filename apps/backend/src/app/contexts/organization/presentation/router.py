@@ -24,6 +24,7 @@ from app.contexts.organization.presentation.schemas import (
     StaffRegistrationOptionsResponse,
     StaffRegistrationRequest,
     StaffRegistrationResponse,
+    TeamOption,
 )
 
 router = APIRouter(prefix="/me/staff-registration", tags=["staff-registration"])
@@ -36,6 +37,7 @@ def to_registration_response(registration: EmployeeRegistration) -> StaffRegistr
         id=registration.id,
         status=registration.status,
         department_id=registration.department_id,
+        team_id=registration.team_id,
         position_id=registration.position_id,
         employment_type=registration.employment_type,
         assignments=[
@@ -52,16 +54,24 @@ def to_registration_response(registration: EmployeeRegistration) -> StaffRegistr
 async def registration_options(
     user: CurrentUser, service: ServiceDep
 ) -> StaffRegistrationOptionsResponse:
+    """신청 선택지. 팀은 부서별로, 과정은 담당 팀(`team_id`)으로 거른다 (A62)."""
     options = await service.options(user)
+    bootcamp_teams = {link.bootcamp_id: link.team_id for link in options.bootcamp_teams}
     return StaffRegistrationOptionsResponse(
-        departments=[
-            DepartmentOption(id=d.id, parent_id=d.parent_id, name=d.name)
-            for d in options.departments
+        departments=[DepartmentOption(id=d.id, name=d.name) for d in options.departments],
+        teams=[
+            TeamOption(id=t.id, department_id=t.department_id, name=t.name) for t in options.teams
         ],
-        positions=[PositionOption(id=p.id, name=p.name) for p in options.positions],
+        positions=[
+            PositionOption(id=p.id, name=p.name, assignment_scope=p.assignment_scope)
+            for p in options.positions
+        ],
         employment_types=list(EmploymentType),
         staff_roles=list(StaffRole),
-        bootcamps=[BootcampOption(id=b.id, name=b.name, code=b.code) for b in options.bootcamps],
+        bootcamps=[
+            BootcampOption(id=b.id, name=b.name, code=b.code, team_id=bootcamp_teams.get(b.id))
+            for b in options.bootcamps
+        ],
         cohorts=[
             CohortOption(
                 id=c.id,
@@ -89,10 +99,15 @@ async def my_registration(
 async def submit_registration(
     body: StaffRegistrationRequest, user: CurrentUser, service: ServiceDep
 ) -> StaffRegistrationResponse:
-    """신청한다. 대기 중이면 내용을 고치고, 반려됐으면 새로 신청한다."""
+    """신청한다. 대기 중이면 내용을 고치고, 반려됐으면 새로 신청한다.
+
+    팀은 부서 소속이어야 하고, 담당은 직위 담당 방식대로 소속 팀의 과정에서 고른다
+    (위반 시 422 `team_not_in_department`·`invalid_staff_assignment`, A62).
+    """
     registration = await service.submit(
         user,
         department_id=body.department_id,
+        team_id=body.team_id,
         position_id=body.position_id,
         employment_type=body.employment_type,
         assignments=[

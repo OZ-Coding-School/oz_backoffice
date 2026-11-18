@@ -27,11 +27,13 @@ from app.contexts.organization.domain.registration import (
 )
 from app.contexts.organization.infrastructure.repositories import (
     TortoiseBootcampStaffRepository,
+    TortoiseBootcampTeamRepository,
     TortoiseCohortStaffRepository,
     TortoiseDepartmentRepository,
     TortoiseEmployeePositionRepository,
     TortoiseEmployeeRegistrationRepository,
     TortoiseEmployeeRepository,
+    TortoiseTeamRepository,
 )
 from app.core.clock import SystemClock
 from app.core.uow import UnitOfWork
@@ -49,6 +51,8 @@ def build_review_service() -> StaffRegistrationReviewService:
         cohort_staffs=TortoiseCohortStaffRepository(),
         validator=RegistrationChoiceValidator(
             departments=TortoiseDepartmentRepository(),
+            teams=TortoiseTeamRepository(),
+            bootcamp_teams=TortoiseBootcampTeamRepository(),
             positions=TortoiseEmployeePositionRepository(),
             catalog=AcademyCatalog(TortoiseBootcampRepository(), TortoiseCohortRepository()),
         ),

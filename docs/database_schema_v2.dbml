@@ -6,21 +6,41 @@
 // 사내 부서 및 직위 (조직도 용도)
 // ----------------------------------------------
 Table departments {
-  note: "넥스트러너스 내 부서 정보 관리 테이블 (조직도 용도, 데이터 소유 범위 아님)"
+  note: "넥스트러너스 내 부서 정보 관리 테이블 (조직도 용도, 데이터 소유 범위 아님). 하위 조직은 teams (A62)"
 
   id uuid [pk, note: "default=uuid7 사용"]
-  parent_id uuid [null, ref: > departments.id, note: "상위 부서, 최상위 부서는 null"]
-  name varchar(20) [not null, note: "부서명(교육 1팀)"]
+  name varchar(20) [not null, unique, note: "부서명(교육운영본부)"]
   description varchar(500) [not null, note: "부서 설명"]
   rules text [null, note: "부서별 규칙 명시"]
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
+}
+
+Table teams {
+  note: "팀. 한 부서에 소속된다 (A62)"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  department_id uuid [not null, ref: > departments.id]
+  name varchar(20) [not null, note: "팀 이름(교육 1팀)"]
+  description varchar(500) [null, note: "팀 설명"]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
 
   indexes {
-    (parent_id, name) [unique, note: "같은 부모 아래 부서명 중복 방지 (NULLS NOT DISTINCT)"]
+    (department_id, name) [unique, note: "같은 부서 안에서 팀 이름 중복 방지"]
   }
-  checks {
-    `parent_id IS NULL OR parent_id <> id` [name: "check_departments_parent_not_self"]
+}
+
+Table team_bootcamps {
+  note: "과정의 담당 팀. 과정당 한 팀, 관리자가 바꾼다 (A62)"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  team_id uuid [not null, ref: > teams.id]
+  bootcamp_id uuid [not null, unique, ref: - bootcamps.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    team_id [note: "팀의 담당 과정 조회"]
   }
 }
 
@@ -30,6 +50,7 @@ Table employee_positions {
   id uuid [pk, note: "default=uuid7 사용"]
   name varchar(20) [not null, unique]
   priority smallint [not null, note: "직급 우선순위"]
+  assignment_scope AssignmentScope [null, note: "담당 방식 (A62). COURSE: 소속 팀의 과정 여러 개(운영 매니저), COHORT: 소속 팀 과정의 기수 하나(조교), null: 담당 없음. 신청할 때만 검사"]
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
 }
@@ -177,6 +198,7 @@ Table employees {
 
   id uuid [pk, note: "default=uuid7 사용"]
   department_id uuid [not null, ref: > departments.id]
+  team_id uuid [null, ref: > teams.id, note: "소속 팀. null이면 부서 직속 (A62)"]
   position_id uuid [not null, ref: > employee_positions.id]
   user_id uuid [not null, unique, ref: - users.id]
   employment_type EmploymentType [not null, note: "고용 형태"]
@@ -216,11 +238,12 @@ Table cohort_staffs {
 
 
 Table employee_registrations {
-  note: "운영진 가입 신청 (decisions A11). 최초 Google 로그인한 운영진이 부서·직위·고용 형태·담당을 입력한다. 어드민이 항목을 조정해 승인하면 employees·bootcamp_staffs·cohort_staffs를 만든다 (P3). 반려되면 새 신청을 만든다(이력 보존)"
+  note: "운영진 가입 신청 (decisions A11·A62). 최초 Google 로그인한 운영진이 부서·팀·직위·고용 형태·담당을 입력한다. 어드민이 항목을 조정해 승인하면 employees·bootcamp_staffs·cohort_staffs를 만든다 (P3). 반려되면 새 신청을 만든다(이력 보존)"
 
   id uuid [pk, note: "default=uuid7 사용"]
   user_id uuid [not null, ref: > users.id, note: "신청한 회원"]
   department_id uuid [not null, ref: > departments.id]
+  team_id uuid [null, ref: > teams.id, note: "소속 팀. null이면 부서 직속. 신청할 때 부서 소속 팀인지 검사 (A62)"]
   position_id uuid [not null, ref: > employee_positions.id]
   employment_type EmploymentType [not null, note: "고용 형태"]
   status EmployeeRegistrationStatus [not null, default: 'PENDING']
@@ -241,7 +264,7 @@ Table employee_registrations {
 }
 
 Table employee_registration_assignments {
-  note: "가입 신청의 담당 (역할 + 과정 또는 기수). 신청자가 직접 고르고, 신청을 고치면 통째로 바꾼다"
+  note: "가입 신청의 담당 (역할 + 과정 또는 기수). 소속 팀의 과정 안에서 직위 담당 방식대로 고르고(A62), 신청을 고치면 통째로 바꾼다"
 
   id uuid [pk, note: "default=uuid7 사용"]
   registration_id uuid [not null, ref: > employee_registrations.id, note: "ON DELETE CASCADE"]
@@ -956,6 +979,11 @@ Table audit_logs {
 // ----------------------------------------------
 // Enum Definitions
 // ----------------------------------------------
+Enum AssignmentScope {
+  COURSE [note: "소속 팀의 과정 여러 개 (운영 매니저 → COHORT_MANAGER 과정 범위)"]
+  COHORT [note: "소속 팀 과정의 기수 하나 (조교 → COHORT_ASSISTANT 기수 범위)"]
+}
+
 Enum EmploymentType {
   REGULAR [note: "정규직"]
   CONTRACT [note: "사내 계약직"]

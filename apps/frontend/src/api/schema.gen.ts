@@ -370,7 +370,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Registration Options */
+        /**
+         * Registration Options
+         * @description 신청 선택지. 팀은 부서별로, 과정은 담당 팀(`team_id`)으로 거른다 (A62).
+         */
         get: operations["registration_options_api_v1_me_staff_registration_options_get"];
         put?: never;
         post?: never;
@@ -395,6 +398,9 @@ export interface paths {
         /**
          * Submit Registration
          * @description 신청한다. 대기 중이면 내용을 고치고, 반려됐으면 새로 신청한다.
+         *
+         *     팀은 부서 소속이어야 하고, 담당은 직위 담당 방식대로 소속 팀의 과정에서 고른다
+         *     (위반 시 422 `team_not_in_department`·`invalid_staff_assignment`, A62).
          */
         put: operations["submit_registration_api_v1_me_staff_registration_put"];
         post?: never;
@@ -452,7 +458,7 @@ export interface paths {
         put?: never;
         /**
          * Approve Staff Registration
-         * @description 승인. 본문으로 부서·직위·고용 형태·담당을 조정할 수 있다 (보내지 않은 항목은 신청값).
+         * @description 승인. 본문으로 부서·팀·직위·고용 형태·담당을 조정할 수 있다 (보내지 않은 항목은 신청값).
          */
         post: operations["approve_staff_registration_api_v1_admin_staff_registrations__registration_id__approve_post"];
         delete?: never;
@@ -615,7 +621,7 @@ export interface paths {
         };
         /**
          * List Departments
-         * @description 전체 부서 (평면 목록, parent_id로 트리를 만든다).
+         * @description 전체 부서 (이름순).
          */
         get: operations["list_departments_api_v1_admin_departments_get"];
         put?: never;
@@ -639,13 +645,80 @@ export interface paths {
         post?: never;
         /**
          * Delete Department
-         * @description 하위 부서·직원·가입 신청이 참조 중이면 409 in_use.
+         * @description 팀·직원·가입 신청이 참조 중이면 409 in_use.
          */
         delete: operations["delete_department_api_v1_admin_departments__department_id__delete"];
         options?: never;
         head?: never;
         /** Update Department */
         patch: operations["update_department_api_v1_admin_departments__department_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/teams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Teams
+         * @description 전체 팀과 담당 과정 (이름순).
+         */
+        get: operations["list_teams_api_v1_admin_teams_get"];
+        put?: never;
+        /** Create Team */
+        post: operations["create_team_api_v1_admin_teams_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/teams/{team_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Team
+         * @description 팀을 지운다. 참조가 있으면 `move_to_team_id`로 옮긴 뒤 지운다.
+         *
+         *     옮길 팀 없이 참조가 남아 있으면 409 `team_in_use`, 같은 팀이면 422 `invalid_move_to_team`.
+         */
+        delete: operations["delete_team_api_v1_admin_teams__team_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Team
+         * @description 부서를 바꾸면 팀이 다른 부서로 옮겨 간다 (담당 과정은 그대로).
+         */
+        patch: operations["update_team_api_v1_admin_teams__team_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/bootcamps/{bootcamp_id}/team": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Bootcamp Team
+         * @description 과정의 담당 팀을 정한다 (과정당 한 팀, A62).
+         */
+        put: operations["set_bootcamp_team_api_v1_admin_bootcamps__bootcamp_id__team_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/admin/positions": {
@@ -726,7 +799,7 @@ export interface paths {
         head?: never;
         /**
          * Update Employee
-         * @description 부서·직위·고용 형태 이동. 직원 생성은 가입 승인으로만 한다.
+         * @description 부서·팀·직위·고용 형태 이동 (존재만 검사). 직원 생성은 가입 승인으로만 한다.
          */
         patch: operations["update_employee_api_v1_admin_employees__employee_id__patch"];
         trace?: never;
@@ -2981,6 +3054,8 @@ export interface components {
              * Format: uuid
              */
             department_id: string;
+            /** Team Id */
+            team_id: string | null;
             /**
              * Position Id
              * Format: uuid
@@ -3115,10 +3190,14 @@ export interface components {
          * @description 승인할 때 조정할 항목. 보내지 않은(null) 항목은 신청한 값을 그대로 쓴다.
          *
          *     assignments를 보내면 담당 목록 전체를 그 값으로 바꾼다(빈 배열이면 담당 없음).
+         *     team_id는 보내지 않으면 신청값, null을 보내면 팀 없음(부서 직속)이다.
+         *     조정은 자유이고 존재만 검사한다 (A62).
          */
         ApproveStaffRegistrationRequest: {
             /** Department Id */
             department_id?: string | null;
+            /** Team Id */
+            team_id?: string | null;
             /** Position Id */
             position_id?: string | null;
             employment_type?: components["schemas"]["EmploymentType"] | null;
@@ -3334,6 +3413,12 @@ export interface components {
             updated_at: string | null;
         };
         /**
+         * AssignmentScope
+         * @description 직위의 담당 방식 (decisions A62). 직위에 값이 없으면 담당이 없다.
+         * @enum {string}
+         */
+        AssignmentScope: "COURSE" | "COHORT";
+        /**
          * AssignmentUpdate
          * @description 보낸 필드만 바꾼다. 종료일은 null로 비운다(기한 없음).
          */
@@ -3494,6 +3579,11 @@ export interface components {
             name: string;
             /** Code */
             code: string;
+            /**
+             * Team Id
+             * @description 담당 팀 (A62)
+             */
+            team_id: string | null;
         };
         /** BootcampResponse */
         BootcampResponse: {
@@ -3515,6 +3605,24 @@ export interface components {
             is_active: boolean;
             /** Airtable Cohort Prefix */
             airtable_cohort_prefix: string | null;
+        };
+        /** BootcampTeamRequest */
+        BootcampTeamRequest: {
+            /**
+             * Team Id
+             * @description 담당 팀. null이면 담당 팀을 없앤다
+             */
+            team_id: string | null;
+        };
+        /** BootcampTeamResponse */
+        BootcampTeamResponse: {
+            /**
+             * Bootcamp Id
+             * Format: uuid
+             */
+            bootcamp_id: string;
+            /** Team Id */
+            team_id: string | null;
         };
         /** BootcampUpdate */
         BootcampUpdate: {
@@ -3863,8 +3971,6 @@ export interface components {
             name: string;
             /** Description */
             description: string;
-            /** Parent Id */
-            parent_id?: string | null;
             /** Rules */
             rules?: string | null;
         };
@@ -3875,8 +3981,6 @@ export interface components {
              * Format: uuid
              */
             id: string;
-            /** Parent Id */
-            parent_id: string | null;
             /** Name */
             name: string;
         };
@@ -3887,8 +3991,6 @@ export interface components {
              * Format: uuid
              */
             id: string;
-            /** Parent Id */
-            parent_id: string | null;
             /** Name */
             name: string;
             /** Description */
@@ -3902,8 +4004,6 @@ export interface components {
             name?: string | null;
             /** Description */
             description?: string | null;
-            /** Parent Id */
-            parent_id?: string | null;
             /** Rules */
             rules?: string | null;
         };
@@ -3948,6 +4048,8 @@ export interface components {
              * Format: uuid
              */
             department_id: string;
+            /** Team Id */
+            team_id: string | null;
             /**
              * Position Id
              * Format: uuid
@@ -3959,6 +4061,8 @@ export interface components {
         EmployeeUpdateRequest: {
             /** Department Id */
             department_id?: string | null;
+            /** Team Id */
+            team_id?: string | null;
             /** Position Id */
             position_id?: string | null;
             employment_type?: components["schemas"]["EmploymentType"] | null;
@@ -4682,7 +4786,7 @@ export interface components {
             /** As Student */
             as_student: components["schemas"]["StudentTeamResponse"][];
             /** As Mentor */
-            as_mentor: components["schemas"]["TeamResponse"][];
+            as_mentor: components["schemas"]["app__contexts__mentoring__presentation__team_router__TeamResponse"][];
         };
         /** NoteBody */
         NoteBody: {
@@ -4872,6 +4976,8 @@ export interface components {
             name: string;
             /** Priority */
             priority: number;
+            /** @description COURSE: 팀의 과정 여러 개, COHORT: 팀 과정의 기수 하나, null: 담당 없음 */
+            assignment_scope?: components["schemas"]["AssignmentScope"] | null;
         };
         /** PositionOption */
         PositionOption: {
@@ -4882,6 +4988,8 @@ export interface components {
             id: string;
             /** Name */
             name: string;
+            /** @description 담당 방식. COURSE: 팀의 과정 여러 개(운영 매니저), COHORT: 팀 과정의 기수 하나(조교), null: 담당 없음 (A62) */
+            assignment_scope: components["schemas"]["AssignmentScope"] | null;
         };
         /** PositionResponse */
         PositionResponse: {
@@ -4894,6 +5002,7 @@ export interface components {
             name: string;
             /** Priority */
             priority: number;
+            assignment_scope: components["schemas"]["AssignmentScope"] | null;
         };
         /** PositionUpdateRequest */
         PositionUpdateRequest: {
@@ -4901,6 +5010,7 @@ export interface components {
             name?: string | null;
             /** Priority */
             priority?: number | null;
+            assignment_scope?: components["schemas"]["AssignmentScope"] | null;
         };
         /**
          * ProfileUpdate
@@ -5610,6 +5720,8 @@ export interface components {
         StaffRegistrationOptionsResponse: {
             /** Departments */
             departments: components["schemas"]["DepartmentOption"][];
+            /** Teams */
+            teams: components["schemas"]["TeamOption"][];
             /** Positions */
             positions: components["schemas"]["PositionOption"][];
             /** Employment Types */
@@ -5628,6 +5740,8 @@ export interface components {
              * Format: uuid
              */
             department_id: string;
+            /** Team Id */
+            team_id?: string | null;
             /**
              * Position Id
              * Format: uuid
@@ -5650,6 +5764,8 @@ export interface components {
              * Format: uuid
              */
             department_id: string;
+            /** Team Id */
+            team_id: string | null;
             /**
              * Position Id
              * Format: uuid
@@ -5810,30 +5926,32 @@ export interface components {
             /** Student Ids */
             student_ids?: string[];
         };
-        /** TeamResponse */
-        TeamResponse: {
+        /** TeamCreateRequest */
+        TeamCreateRequest: {
+            /**
+             * Department Id
+             * Format: uuid
+             */
+            department_id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+        };
+        /** TeamOption */
+        TeamOption: {
             /**
              * Id
              * Format: uuid
              */
             id: string;
             /**
-             * Cohort Id
+             * Department Id
              * Format: uuid
              */
-            cohort_id: string;
-            /** Team Number */
-            team_number: number;
+            department_id: string;
             /** Name */
-            name: string | null;
-            /**
-             * Label
-             * @description 팀 이름, 없으면 'N팀'
-             */
-            label: string;
-            mentor: components["schemas"]["MentorSummary"];
-            /** Members */
-            members: components["schemas"]["StudentSummary"][];
+            name: string;
         };
         /**
          * TeamUpdate
@@ -5844,6 +5962,15 @@ export interface components {
             name?: string | null;
             /** Mentor Id */
             mentor_id?: string | null;
+        };
+        /** TeamUpdateRequest */
+        TeamUpdateRequest: {
+            /** Department Id */
+            department_id?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Description */
+            description?: string | null;
         };
         /** ThreadResponse */
         ThreadResponse: {
@@ -6125,6 +6252,53 @@ export interface components {
              * @description assignment_not_found: 세션 시작일에 유효한 배정이 없음
              */
             code: string;
+        };
+        /** TeamResponse */
+        app__contexts__mentoring__presentation__team_router__TeamResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Cohort Id
+             * Format: uuid
+             */
+            cohort_id: string;
+            /** Team Number */
+            team_number: number;
+            /** Name */
+            name: string | null;
+            /**
+             * Label
+             * @description 팀 이름, 없으면 'N팀'
+             */
+            label: string;
+            mentor: components["schemas"]["MentorSummary"];
+            /** Members */
+            members: components["schemas"]["StudentSummary"][];
+        };
+        /** TeamResponse */
+        app__contexts__organization__presentation__org_router__TeamResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Department Id
+             * Format: uuid
+             */
+            department_id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string | null;
+            /**
+             * Bootcamp Ids
+             * @description 담당 과정 (과정당 한 팀)
+             */
+            bootcamp_ids: string[];
         };
     };
     responses: never;
@@ -7340,6 +7514,161 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DepartmentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_teams_api_v1_admin_teams_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__contexts__organization__presentation__org_router__TeamResponse"][];
+                };
+            };
+        };
+    };
+    create_team_api_v1_admin_teams_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TeamCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__contexts__organization__presentation__org_router__TeamResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_team_api_v1_admin_teams__team_id__delete: {
+        parameters: {
+            query?: {
+                /** @description 직원·가입 신청(이력 포함)·담당 과정을 옮길 팀 */
+                move_to_team_id?: string | null;
+            };
+            header?: never;
+            path: {
+                team_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_team_api_v1_admin_teams__team_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TeamUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__contexts__organization__presentation__org_router__TeamResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_bootcamp_team_api_v1_admin_bootcamps__bootcamp_id__team_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bootcamp_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BootcampTeamRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BootcampTeamResponse"];
                 };
             };
             /** @description Validation Error */
@@ -10078,7 +10407,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TeamResponse"][];
+                    "application/json": components["schemas"]["app__contexts__mentoring__presentation__team_router__TeamResponse"][];
                 };
             };
             /** @description Validation Error */
@@ -10113,7 +10442,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TeamResponse"];
+                    "application/json": components["schemas"]["app__contexts__mentoring__presentation__team_router__TeamResponse"];
                 };
             };
             /** @description Validation Error */
@@ -10246,7 +10575,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TeamResponse"];
+                    "application/json": components["schemas"]["app__contexts__mentoring__presentation__team_router__TeamResponse"];
                 };
             };
             /** @description Validation Error */

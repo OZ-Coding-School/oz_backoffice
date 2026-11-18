@@ -1,27 +1,44 @@
-"""조직 마스터 관리 (부서·직위·직원). 권한 org.manage (decisions D5: 부서는 조직도 용도).
+"""조직 마스터 관리 (부서·팀·직위·직원). 권한 org.manage (decisions D5: 부서는 조직도 용도).
 
-- 부서: 같은 상위 안에서 이름 유일, 상위 변경 시 여러 단계 순환 금지, 참조 중이면 삭제 불가
-- 직위: 이름 유일, 직원이 쓰는 직위는 삭제 불가
+- 부서: 이름 유일, 팀·직원·신청이 참조 중이면 삭제 불가
+- 팀: 한 부서 소속(다른 부서로 옮길 수 있음), 부서 안에서 이름 유일.
+  지울 때 직원·신청·담당 과정의 참조를 이동할 팀으로 옮긴다 (A62)
+- 과정 담당 팀: 과정당 한 팀, 관리자가 바꾼다 (A62)
+- 직위: 이름 유일, 담당 방식(COURSE·COHORT·없음), 직원이 쓰는 직위는 삭제 불가
 - 직원: 가입 승인(P3-2b)으로 만들어진다. 여기서는 조회와 부서·직위·고용 형태 이동만 한다
 모든 변경은 감사 로그를 남긴다.
 """
 
 import uuid
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol
 
+from app.contexts.academy.domain.entities import Bootcamp
 from app.contexts.audit.application.recorder import AuditRecorder
-from app.contexts.organization.domain.entities import Department, Employee, EmployeePosition
-from app.contexts.organization.domain.enums import EmploymentType
+from app.contexts.organization.domain.entities import (
+    Department,
+    Employee,
+    EmployeePosition,
+    Team,
+)
+from app.contexts.organization.domain.enums import AssignmentScope, EmploymentType
 from app.contexts.organization.domain.repositories import (
+    BootcampTeamRepository,
     DepartmentRepository,
     EmployeePositionRepository,
     EmployeeRepository,
+    TeamRepository,
 )
 from app.core.uow import UnitOfWork
 from app.shared.errors import BusinessRuleViolation, ConflictError, NotFoundError
 
 _UNSET: Any = object()
+
+
+class BootcampLookup(Protocol):
+    """academy `AcademyCatalog`가 구현."""
+
+    async def get_bootcamp(self, bootcamp_id: uuid.UUID) -> Bootcamp | None: ...
 
 
 def _snapshot(entity: object) -> dict[str, Any]:
@@ -39,7 +56,34 @@ class DepartmentChanges:
     name: str = _UNSET
     description: str = _UNSET
     rules: str | None = _UNSET
-    parent_id: uuid.UUID | None = _UNSET
+
+
+@dataclass(frozen=True, slots=True)
+class TeamChanges:
+    """팀 수정 항목. 보내지 않은 항목은 _UNSET(그대로)."""
+
+    department_id: uuid.UUID = _UNSET
+    name: str = _UNSET
+    description: str | None = _UNSET
+
+
+@dataclass(frozen=True, slots=True)
+class PositionChanges:
+    """직위 수정 항목. 보내지 않은 항목은 _UNSET(그대로). 담당 방식은 None(담당 없음) 가능."""
+
+    name: str = _UNSET
+    priority: int = _UNSET
+    assignment_scope: AssignmentScope | None = _UNSET
+
+
+@dataclass(frozen=True, slots=True)
+class EmployeeChanges:
+    """직원 수정 항목. 보내지 않은 항목은 _UNSET(그대로). 팀은 None(부서 직속)으로 바꿀 수 있다."""
+
+    department_id: uuid.UUID = _UNSET
+    team_id: uuid.UUID | None = _UNSET
+    position_id: uuid.UUID = _UNSET
+    employment_type: EmploymentType = _UNSET
 
 
 class OrganizationAdminService:
@@ -47,12 +91,18 @@ class OrganizationAdminService:
         self,
         *,
         departments: DepartmentRepository,
+        teams: TeamRepository,
+        bootcamp_teams: BootcampTeamRepository,
+        bootcamps: BootcampLookup,
         positions: EmployeePositionRepository,
         employees: EmployeeRepository,
         audit: AuditRecorder,
         uow: UnitOfWork,
     ) -> None:
         self._departments = departments
+        self._teams = teams
+        self._bootcamp_teams = bootcamp_teams
+        self._bootcamps = bootcamps
         self._positions = positions
         self._employees = employees
         self._audit = audit
@@ -63,21 +113,11 @@ class OrganizationAdminService:
         return await self._departments.list_all()
 
     async def create_department(
-        self,
-        *,
-        name: str,
-        description: str,
-        parent_id: uuid.UUID | None,
-        rules: str | None,
-        actor_id: uuid.UUID,
+        self, *, name: str, description: str, rules: str | None, actor_id: uuid.UUID
     ) -> Department:
-        department = Department(
-            name=name, description=description, parent_id=parent_id, rules=rules
-        )
+        department = Department(name=name, description=description, rules=rules)
         async with self._uow:
-            if parent_id is not None:
-                await self._get_department(parent_id, code="parent_department_not_found")
-            await self._ensure_department_name_free(parent_id, department.name)
+            await self._ensure_department_name_free(department.name)
             await self._departments.add(department)
             await self._record(
                 actor_id, "department.create", department, after=_snapshot(department)
@@ -90,10 +130,6 @@ class OrganizationAdminService:
         async with self._uow:
             department = await self._get_department(department_id)
             before = _snapshot(department)
-            parent_id = department.parent_id if changes.parent_id is _UNSET else changes.parent_id
-            if parent_id != department.parent_id:
-                await self._ensure_no_cycle(department.id, parent_id)
-                department.move_under(parent_id)
             department.update(
                 name=department.name if changes.name is _UNSET else changes.name,
                 description=department.description
@@ -101,13 +137,8 @@ class OrganizationAdminService:
                 else changes.description,
                 rules=department.rules if changes.rules is _UNSET else changes.rules,
             )
-            if (before["name"], before["parent_id"]) != (
-                department.name,
-                _str(department.parent_id),
-            ):
-                await self._ensure_department_name_free(
-                    department.parent_id, department.name, exclude=department.id
-                )
+            if department.name != before["name"]:
+                await self._ensure_department_name_free(department.name)
             await self._departments.save(department)
             await self._record(
                 actor_id,
@@ -121,19 +152,131 @@ class OrganizationAdminService:
     async def delete_department(self, department_id: uuid.UUID, *, actor_id: uuid.UUID) -> None:
         async with self._uow:
             department = await self._get_department(department_id)
-            await self._departments.delete(department_id)  # 하위 부서·직원·신청이 참조 중이면 409
+            await self._departments.delete(department_id)  # 팀·직원·신청이 참조 중이면 409
             await self._record(
                 actor_id, "department.delete", department, before=_snapshot(department)
             )
+
+    # ------------------------------------------------------------------ 팀
+    async def list_teams(self) -> list[tuple[Team, list[uuid.UUID]]]:
+        """팀과 각 팀이 담당하는 과정 id."""
+        bootcamps: dict[uuid.UUID, list[uuid.UUID]] = {}
+        for link in await self._bootcamp_teams.list_all():
+            bootcamps.setdefault(link.team_id, []).append(link.bootcamp_id)
+        return [(team, bootcamps.get(team.id, [])) for team in await self._teams.list_all()]
+
+    async def create_team(
+        self,
+        *,
+        department_id: uuid.UUID,
+        name: str,
+        description: str | None,
+        actor_id: uuid.UUID,
+    ) -> Team:
+        team = Team(department_id=department_id, name=name, description=description)
+        async with self._uow:
+            await self._get_department(department_id)
+            await self._ensure_team_name_free(department_id, team.name)
+            await self._teams.add(team)
+            await self._record(actor_id, "team.create", team, after=_snapshot(team))
+        return team
+
+    async def update_team(
+        self, team_id: uuid.UUID, changes: TeamChanges, *, actor_id: uuid.UUID
+    ) -> Team:
+        async with self._uow:
+            team = await self._get_team(team_id)
+            before = _snapshot(team)
+            department_id = (
+                team.department_id if changes.department_id is _UNSET else changes.department_id
+            )
+            if department_id != team.department_id:
+                await self._get_department(department_id)
+            team.update(
+                department_id=department_id,
+                name=team.name if changes.name is _UNSET else changes.name,
+                description=team.description
+                if changes.description is _UNSET
+                else changes.description,
+            )
+            if (str(team.department_id), team.name) != (before["department_id"], before["name"]):
+                await self._ensure_team_name_free(team.department_id, team.name, exclude=team.id)
+            await self._teams.save(team)
+            await self._record(actor_id, "team.update", team, before=before, after=_snapshot(team))
+        return team
+
+    async def delete_team(
+        self,
+        team_id: uuid.UUID,
+        *,
+        move_to_team_id: uuid.UUID | None,
+        actor_id: uuid.UUID,
+    ) -> None:
+        """팀을 지운다 (A62).
+
+        직원·가입 신청(이력 포함)·담당 과정이 참조 중이면 이동할 팀을 받아 한 트랜잭션에서
+        참조를 그 팀으로 옮긴 뒤 지운다. 이동할 팀 없이 참조가 남아 있으면 409 `team_in_use`.
+        """
+        async with self._uow:
+            team = await self._get_team(team_id)
+            moved_to: Team | None = None
+            if move_to_team_id is not None:
+                if move_to_team_id == team_id:
+                    raise BusinessRuleViolation(
+                        "지울 팀과 다른 팀으로 옮겨야 합니다.", code="invalid_move_to_team"
+                    )
+                moved_to = await self._get_team(move_to_team_id)
+                await self._teams.move_references(team_id, moved_to.id)
+            elif await self._teams.is_referenced(team_id):
+                raise ConflictError(
+                    "직원·가입 신청·담당 과정이 있는 팀입니다. 옮길 팀을 지정해 주세요.",
+                    code="team_in_use",
+                )
+            await self._teams.delete(team_id)
+            await self._record(
+                actor_id,
+                "team.delete",
+                team,
+                before=_snapshot(team),
+                after={"moved_to_team_id": _str(moved_to.id if moved_to else None)},
+            )
+
+    async def set_bootcamp_team(
+        self, bootcamp_id: uuid.UUID, team_id: uuid.UUID | None, *, actor_id: uuid.UUID
+    ) -> uuid.UUID | None:
+        """과정의 담당 팀을 정한다. None이면 담당 팀을 없앤다 (A62)."""
+        if await self._bootcamps.get_bootcamp(bootcamp_id) is None:
+            raise NotFoundError("과정을 찾을 수 없습니다.", code="bootcamp_not_found")
+        async with self._uow:
+            if team_id is not None:
+                await self._get_team(team_id)
+            current = await self._bootcamp_teams.get(bootcamp_id)
+            before = current.team_id if current else None
+            if before != team_id:
+                await self._bootcamp_teams.assign(bootcamp_id, team_id)
+                await self._audit.record(
+                    actor_user_id=actor_id,
+                    action="organization.bootcamp_team.set",
+                    target_type="bootcamp",
+                    target_id=bootcamp_id,
+                    before={"team_id": _str(before)},
+                    after={"team_id": _str(team_id)},
+                )
+        return team_id
 
     # ------------------------------------------------------------------ 직위
     async def list_positions(self) -> list[EmployeePosition]:
         return await self._positions.list_all()
 
     async def create_position(
-        self, *, name: str, priority: int, actor_id: uuid.UUID
+        self,
+        *,
+        name: str,
+        priority: int,
+        assignment_scope: AssignmentScope | None,
+        actor_id: uuid.UUID,
     ) -> EmployeePosition:
-        position = EmployeePosition(name=name, priority=priority)
+        position = EmployeePosition(name=name, priority=priority, assignment_scope=assignment_scope)
         async with self._uow:
             await self._ensure_position_name_free(position.name)
             await self._positions.add(position)
@@ -141,19 +284,17 @@ class OrganizationAdminService:
         return position
 
     async def update_position(
-        self,
-        position_id: uuid.UUID,
-        *,
-        name: str | None,
-        priority: int | None,
-        actor_id: uuid.UUID,
+        self, position_id: uuid.UUID, changes: PositionChanges, *, actor_id: uuid.UUID
     ) -> EmployeePosition:
         async with self._uow:
             position = await self._get_position(position_id)
             before = _snapshot(position)
             position.update(
-                name=position.name if name is None else name,
-                priority=position.priority if priority is None else priority,
+                name=position.name if changes.name is _UNSET else changes.name,
+                priority=position.priority if changes.priority is _UNSET else changes.priority,
+                assignment_scope=position.assignment_scope
+                if changes.assignment_scope is _UNSET
+                else changes.assignment_scope,
             )
             if position.name != before["name"]:
                 await self._ensure_position_name_free(position.name)
@@ -184,27 +325,29 @@ class OrganizationAdminService:
         return employee
 
     async def update_employee(
-        self,
-        employee_id: uuid.UUID,
-        *,
-        department_id: uuid.UUID | None,
-        position_id: uuid.UUID | None,
-        employment_type: EmploymentType | None,
-        actor_id: uuid.UUID,
+        self, employee_id: uuid.UUID, changes: EmployeeChanges, *, actor_id: uuid.UUID
     ) -> Employee:
+        """관리자 이동은 존재만 검사한다 (A62: 담당 규칙은 신청할 때만)."""
         async with self._uow:
             employee = await self.get_employee(employee_id)
             before = _snapshot(employee)
-            if department_id is not None:
-                await self._get_department(department_id)
-            if position_id is not None:
-                await self._get_position(position_id)
+            if changes.department_id is not _UNSET:
+                await self._get_department(changes.department_id)
+            if changes.team_id not in (_UNSET, None):
+                await self._get_team(changes.team_id)
+            if changes.position_id is not _UNSET:
+                await self._get_position(changes.position_id)
             employee.transfer(
-                department_id=department_id or employee.department_id,
-                position_id=position_id or employee.position_id,
+                department_id=employee.department_id
+                if changes.department_id is _UNSET
+                else changes.department_id,
+                team_id=employee.team_id if changes.team_id is _UNSET else changes.team_id,
+                position_id=employee.position_id
+                if changes.position_id is _UNSET
+                else changes.position_id,
             )
-            if employment_type is not None:
-                employee.change_employment_type(employment_type)
+            if changes.employment_type is not _UNSET:
+                employee.change_employment_type(changes.employment_type)
             await self._employees.save(employee)
             await self._record(
                 actor_id, "employee.update", employee, before=before, after=_snapshot(employee)
@@ -226,45 +369,39 @@ class OrganizationAdminService:
             raise NotFoundError("직위를 찾을 수 없습니다.", code="position_not_found")
         return position
 
-    async def _ensure_department_name_free(
-        self, parent_id: uuid.UUID | None, name: str, *, exclude: uuid.UUID | None = None
+    async def _get_team(self, team_id: uuid.UUID) -> Team:
+        team = await self._teams.get(team_id)
+        if team is None:
+            raise NotFoundError("팀을 찾을 수 없습니다.", code="team_not_found")
+        return team
+
+    async def _ensure_department_name_free(self, name: str) -> None:
+        if await self._departments.get_by_name(name) is not None:
+            raise ConflictError("같은 이름의 부서가 있습니다.", code="department_name_taken")
+
+    async def _ensure_team_name_free(
+        self, department_id: uuid.UUID, name: str, *, exclude: uuid.UUID | None = None
     ) -> None:
-        existing = await self._departments.find_by_parent_and_name(parent_id, name)
+        existing = await self._teams.find_by_department_and_name(department_id, name)
         if existing is not None and existing.id != exclude:
-            raise ConflictError(
-                "같은 상위 부서에 같은 이름이 있습니다.", code="department_name_taken"
-            )
+            raise ConflictError("같은 부서에 같은 이름의 팀이 있습니다.", code="team_name_taken")
 
     async def _ensure_position_name_free(self, name: str) -> None:
         if await self._positions.get_by_name(name) is not None:
             raise ConflictError("같은 이름의 직위가 있습니다.", code="position_name_taken")
 
-    async def _ensure_no_cycle(self, department_id: uuid.UUID, parent_id: uuid.UUID | None) -> None:
-        """새 상위 부서에서 위로 올라가며 자기 자신을 만나면 순환이다."""
-        if parent_id is None:
-            return
-        parents = {d.id: d.parent_id for d in await self._departments.list_all()}
-        if parent_id not in parents:
-            raise NotFoundError("상위 부서를 찾을 수 없습니다.", code="parent_department_not_found")
-        current: uuid.UUID | None = parent_id
-        while current is not None:
-            if current == department_id:
-                raise BusinessRuleViolation(
-                    "하위 부서를 상위 부서로 지정할 수 없습니다.", code="department_cycle"
-                )
-            current = parents.get(current)
-
     async def _record(
         self,
         actor_id: uuid.UUID,
         action: str,
-        entity: Department | EmployeePosition | Employee,
+        entity: Department | Team | EmployeePosition | Employee,
         *,
         before: dict[str, Any] | None = None,
         after: dict[str, Any] | None = None,
     ) -> None:
         target = {
             "department": "department",
+            "team": "team",
             "position": "employee_position",
             "employee": "employee",
         }

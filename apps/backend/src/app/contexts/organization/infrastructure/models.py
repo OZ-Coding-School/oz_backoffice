@@ -1,9 +1,8 @@
 """organization 컨텍스트 Tortoise 모델 (단일 app `models`).
 
-DBML: departments, employee_positions, employees, bootcamp_staffs, cohort_staffs,
-employee_registrations, employee_registration_assignments
-`departments (parent_id, name)` 유일 제약은 최상위 부서(parent_id NULL)끼리도 막아야 하므로
-Tortoise의 unique_together 대신 마이그레이션에 `UNIQUE NULLS NOT DISTINCT` 인덱스로 둔다.
+DBML: departments, teams, team_bootcamps, employee_positions, employees, bootcamp_staffs,
+cohort_staffs, employee_registrations, employee_registration_assignments
+부서는 상위 없이 이름이 유일하고, 팀은 한 부서에 속한다 (A62).
 """
 
 from typing import Any
@@ -11,6 +10,7 @@ from typing import Any
 from tortoise import fields, models
 
 from app.contexts.organization.domain.enums import (
+    AssignmentScope,
     EmployeeRegistrationStatus,
     EmploymentType,
     StaffRole,
@@ -20,10 +20,7 @@ from app.shared.ids import new_id
 
 class DepartmentModel(models.Model):
     id = fields.UUIDField(primary_key=True, default=new_id)
-    # 자기 참조 FK는 aerich가 "cyclic fk references"로 마이그레이션 생성을 거부한다.
-    # Tortoise에는 일반 컬럼으로 두고, FK 제약(ON DELETE RESTRICT)은 마이그레이션 raw SQL로 건다.
-    parent_id = fields.UUIDField(null=True)
-    name = fields.CharField(max_length=20)
+    name = fields.CharField(max_length=20, unique=True)
     description = fields.CharField(max_length=500)
     rules = fields.TextField(null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
@@ -33,10 +30,42 @@ class DepartmentModel(models.Model):
         table = "departments"
 
 
+class TeamModel(models.Model):
+    id = fields.UUIDField(primary_key=True, default=new_id)
+    department: fields.ForeignKeyRelation[DepartmentModel] = fields.ForeignKeyField(
+        "models.DepartmentModel", related_name="teams", on_delete=fields.RESTRICT
+    )
+    name = fields.CharField(max_length=20)
+    description = fields.CharField(max_length=500, null=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
+    class Meta:
+        table = "teams"
+        unique_together = (("department", "name"),)
+
+
+# 과정의 담당 팀 (과정당 한 팀, A62)
+class TeamBootcampModel(models.Model):
+    id = fields.UUIDField(primary_key=True, default=new_id)
+    team: fields.ForeignKeyRelation[TeamModel] = fields.ForeignKeyField(
+        "models.TeamModel", related_name="bootcamps", on_delete=fields.RESTRICT
+    )
+    bootcamp: fields.OneToOneRelation[Any] = fields.OneToOneField(
+        "models.BootcampModel", related_name=False, on_delete=fields.RESTRICT
+    )
+    created_at = fields.DatetimeField(auto_now_add=True)
+
+    class Meta:
+        table = "team_bootcamps"
+        indexes = (("team",),)
+
+
 class EmployeePositionModel(models.Model):
     id = fields.UUIDField(primary_key=True, default=new_id)
     name = fields.CharField(max_length=20, unique=True)
     priority = fields.SmallIntField()
+    assignment_scope = fields.CharEnumField(AssignmentScope, max_length=20, null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
 
@@ -48,6 +77,9 @@ class EmployeeModel(models.Model):
     id = fields.UUIDField(primary_key=True, default=new_id)
     department: fields.ForeignKeyRelation[DepartmentModel] = fields.ForeignKeyField(
         "models.DepartmentModel", related_name="employees", on_delete=fields.RESTRICT
+    )
+    team: fields.ForeignKeyNullableRelation[TeamModel] = fields.ForeignKeyField(
+        "models.TeamModel", related_name=False, null=True, on_delete=fields.RESTRICT
     )
     position: fields.ForeignKeyRelation[EmployeePositionModel] = fields.ForeignKeyField(
         "models.EmployeePositionModel", related_name="employees", on_delete=fields.RESTRICT
@@ -105,6 +137,9 @@ class EmployeeRegistrationModel(models.Model):
     )
     department: fields.ForeignKeyRelation[DepartmentModel] = fields.ForeignKeyField(
         "models.DepartmentModel", related_name=False, on_delete=fields.RESTRICT
+    )
+    team: fields.ForeignKeyNullableRelation[TeamModel] = fields.ForeignKeyField(
+        "models.TeamModel", related_name=False, null=True, on_delete=fields.RESTRICT
     )
     position: fields.ForeignKeyRelation[EmployeePositionModel] = fields.ForeignKeyField(
         "models.EmployeePositionModel", related_name=False, on_delete=fields.RESTRICT
