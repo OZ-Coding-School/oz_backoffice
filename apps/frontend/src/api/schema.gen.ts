@@ -2959,10 +2959,13 @@ export interface components {
         };
         /**
          * AccountType
-         * @description 계정 종류. 가입 경로로 정해지고 바뀌지 않는다 (decisions A61).
+         * @description 계정 종류 (decisions A61·A65). 한 계정은 수강생·멘토·운영진 중 하나다.
+         *
+         *     수강생·멘토는 이메일 가입 유형으로 정하고, 승인 전 재신청에서만 바뀐다.
+         *     운영진은 회사 Google 로그인·CLI 최고 관리자로 만든다.
          * @enum {string}
          */
-        AccountType: "MEMBER" | "STAFF";
+        AccountType: "STUDENT" | "MENTOR" | "STAFF";
         /** AdjustRequest */
         AdjustRequest: {
             /**
@@ -4509,7 +4512,7 @@ export interface components {
             email: string;
             /** Name */
             name: string;
-            /** @description MEMBER: 수강생·멘토(가입 상태 화면), STAFF: 운영진(정보 입력 화면) (A61) */
+            /** @description STUDENT: 수강생, MENTOR: 멘토, STAFF: 운영진 (A61·A65) */
             account_type: components["schemas"]["AccountType"];
             /** Phone Number */
             phone_number: string | null;

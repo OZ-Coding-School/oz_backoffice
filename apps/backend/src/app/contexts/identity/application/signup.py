@@ -23,7 +23,11 @@ from app.contexts.identity.application.signup_matching import SignupMatcher
 from app.contexts.identity.application.verification_codes import VerificationCodes, seconds
 from app.contexts.identity.domain.credentials import validate_password
 from app.contexts.identity.domain.entities import User
-from app.contexts.identity.domain.enums import AccountType, MemberSignupType, SignupMatchResult
+from app.contexts.identity.domain.enums import (
+    MemberSignupType,
+    SignupMatchResult,
+    member_account_type,
+)
 from app.contexts.identity.domain.repositories import MemberSignupRepository, UserRepository
 from app.contexts.identity.domain.signup import MemberSignup
 from app.contexts.identity.domain.verification import (
@@ -237,7 +241,7 @@ class SignupService:
         user = User(
             email=session.email,
             name=form.name,
-            account_type=AccountType.MEMBER,
+            account_type=member_account_type(form.signup_type),
             hashed_password=await self._hasher.hash(form.password),
             phone_number=session.phone_number,
             email_verified_at=session.email_verified_at,

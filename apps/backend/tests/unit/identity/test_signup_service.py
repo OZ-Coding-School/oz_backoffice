@@ -187,7 +187,7 @@ async def test_full_signup_creates_pending_user_and_signup(h: Harness) -> None:
         "hashed:abcd123!",
     )
     assert user.approval_status is UserApprovalStatus.PENDING
-    assert user.account_type is AccountType.MEMBER  # 이메일 가입은 회원 (A61)
+    assert user.account_type is AccountType.STUDENT  # 이메일 가입은 가입 유형대로 (A65)
     assert user.email_verified_at == NOW
     assert user.phone_verified_at is not None
     signup = result.signup
@@ -366,6 +366,7 @@ async def test_matched_mentor_is_approved_without_role(h: Harness) -> None:
         await h.verified_token(), h.form(signup_type=MemberSignupType.MENTOR, cohort_id=None)
     )
     assert result.user.approval_status is UserApprovalStatus.APPROVED
+    assert result.user.account_type is AccountType.MENTOR  # 가입 유형대로 (A65)
     assert h.roles.granted == []  # MENTOR 역할은 배정(P8)에서 (A17)
     assert len(h.dispatcher.dispatched) == 1
 

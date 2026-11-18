@@ -28,7 +28,7 @@ class MeResponse(BaseModel):
     email: str
     name: str
     account_type: AccountType = Field(
-        description="MEMBER: 수강생·멘토(가입 상태 화면), STAFF: 운영진(정보 입력 화면) (A61)"
+        description="STUDENT: 수강생, MENTOR: 멘토, STAFF: 운영진 (A61·A65)"
     )
     phone_number: str | None
     approval_status: UserApprovalStatus

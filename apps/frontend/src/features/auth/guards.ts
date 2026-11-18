@@ -2,7 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { redirect } from "@tanstack/react-router";
 
 import { ensureSession, type Me } from "./api";
-import { homePath } from "./navigation";
+import { homePath, isMember } from "./navigation";
 
 /**
  * 라우트 가드: 로그인했고 이 영역에 들어갈 수 있는 계정인지 확인한다.
@@ -12,12 +12,14 @@ import { homePath } from "./navigation";
  */
 export async function requireAccount(
   queryClient: QueryClient,
-  accountType: Me["account_type"],
+  accountTypes: readonly Me["account_type"][],
   location: { href: string },
 ): Promise<Me> {
   const me = await ensureSession(queryClient);
   if (!me) throw redirect({ to: "/login", search: { redirect: location.href } });
-  if (me.approval_status !== "APPROVED" && me.account_type === "MEMBER") throw redirect({ to: "/login" });
-  if (me.approval_status !== "APPROVED" || me.account_type !== accountType) throw redirect({ href: homePath(me) });
+  if (me.approval_status !== "APPROVED" && isMember(me)) throw redirect({ to: "/login" });
+  if (me.approval_status !== "APPROVED" || !accountTypes.includes(me.account_type)) {
+    throw redirect({ href: homePath(me) });
+  }
   return me;
 }

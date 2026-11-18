@@ -85,6 +85,16 @@ class User(AggregateRoot):
             )
         self.approval_status = UserApprovalStatus.PENDING
 
+    def change_member_type(self, account_type: AccountType) -> None:
+        """승인 전 회원이 다른 유형으로 다시 신청하면 계정 종류도 바꾼다 (A65).
+
+        승인된 계정·운영진 계정은 바꿀 수 없다(한 계정은 수강생·멘토 중 하나).
+        """
+        members = (AccountType.STUDENT, AccountType.MENTOR)
+        if self.is_approved or self.account_type not in members or account_type not in members:
+            raise BusinessRuleViolation("계정 종류를 바꿀 수 없습니다.", code="account_type_locked")
+        self.account_type = account_type
+
     def verify_email(self, *, now: datetime) -> None:
         self.email_verified_at = now
 

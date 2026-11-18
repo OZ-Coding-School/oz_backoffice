@@ -15,7 +15,7 @@ from app.contexts.access.infrastructure.models import UserRoleModel
 from app.contexts.access.infrastructure.repositories import TortoiseUserRoleRepository
 from app.contexts.educator.infrastructure.repositories import TortoiseMentorRepository
 from app.contexts.identity.domain.entities import User
-from app.contexts.identity.domain.enums import MemberSignupType
+from app.contexts.identity.domain.enums import AccountType, MemberSignupType
 from app.contexts.identity.infrastructure.models import UserModel
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
 from app.core.config import Settings
@@ -152,12 +152,39 @@ async def test_reject_then_resubmit(
     assert again.status_code == 201, again.text
     assert again.json()["approval_status"] == "PENDING"
     assert again.json()["signup"]["match_result"] == "NO_MATCH"
+    assert (await UserModel.get(id=user.id)).account_type == "STUDENT"
     twice = await client.post(
         "/api/v1/me/member-signup",
         json={"signup_type": "STUDENT", "cohort_id": str(cohort.id)},
         headers=member,
     )
     assert twice.json()["error"]["code"] == "signup_not_rejected"
+
+    # 승인 전이면 다른 유형으로 다시 신청할 때 계정 종류도 바뀐다 (A65)
+    await client.post(f"{API}/{user.id}/reject", json={"reason": "멘토로"}, headers=admin)
+    as_mentor = await client.post(
+        "/api/v1/me/member-signup",
+        json={"signup_type": "MENTOR", "nickname": "오즈"},
+        headers=member,
+    )
+    assert as_mentor.status_code == 201, as_mentor.text
+    assert (await UserModel.get(id=user.id)).account_type == "MENTOR"
+    me = await client.get("/api/v1/me", headers=member)
+    assert me.json()["account_type"] == "MENTOR"
+
+
+async def test_approval_rejects_account_type_mismatch(
+    client: AsyncClient, admin: dict[str, str]
+) -> None:
+    """계정 종류와 신청 유형이 다르면 승인하지 않는다 (A65, 두 역할을 함께 갖지 않게)."""
+    user, _ = await create_applicant_signup(
+        MemberSignupType.MENTOR, account_type=AccountType.STUDENT
+    )
+    response = await client.post(f"{API}/{user.id}/approve", json={}, headers=admin)
+    assert (response.status_code, response.json()["error"]["code"]) == (
+        422,
+        "signup_type_mismatch",
+    )
 
 
 async def test_requires_user_approve(client: AsyncClient, settings: Settings) -> None:
