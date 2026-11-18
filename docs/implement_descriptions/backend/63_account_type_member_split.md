@@ -1,7 +1,7 @@
 # 63. 계정 종류를 수강생·멘토·운영진으로 나눔
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #82
 - 관련 결정: `docs/decisions.md` A65 (A61 변경)
 - 이전 기록: [62. 수강생 멘토링 신청 준비 API (BE-1)](62_student_mentoring_prep.md)
 
