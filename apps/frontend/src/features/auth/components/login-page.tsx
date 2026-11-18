@@ -136,9 +136,9 @@ export function LoginPage({ me, redirect, email }: { me: Me | null; redirect?: s
         </p>
         <p className="text-center text-caption text-muted-foreground">
           운영진이신가요?{" "}
-          <a href="/staff/login" className="text-caption-strong text-primary-text hover:underline">
+          <Link to="/staff/login" className="text-caption-strong text-primary-text hover:underline">
             운영진 로그인
-          </a>
+          </Link>
         </p>
       </div>
       {member ? (
