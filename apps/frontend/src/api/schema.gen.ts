@@ -1107,6 +1107,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/enrollments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Enrollments
+         * @description 내 수강 등록 (기수 시작일이 늦은 것부터).
+         */
+        get: operations["my_enrollments_api_v1_me_enrollments_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/contract-files/uploads": {
         parameters: {
             query?: never;
@@ -1917,6 +1937,66 @@ export interface paths {
         };
         /** My Teams */
         get: operations["my_teams_api_v1_me_mentoring_teams_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/mentoring/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Mentoring Settings
+         * @description 설정이 없으면 404 `mentoring_settings_not_configured`.
+         */
+        get: operations["mentoring_settings_api_v1_me_mentoring_settings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/mentoring/mentors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Accepting Mentors
+         * @description 신청 받는 멘토 (표시 이름순). 기수 멘토 수는 적어 페이지를 나누지 않는다.
+         */
+        get: operations["accepting_mentors_api_v1_me_mentoring_mentors_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/mentoring/mentors/{mentor_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Mentor Profile
+         * @description 그 기수에 배정되지 않았으면 404 `mentor_not_assigned`.
+         */
+        get: operations["mentor_profile_api_v1_me_mentoring_mentors__mentor_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4072,6 +4152,54 @@ export interface components {
          * @enum {string}
          */
         EmploymentType: "REGULAR" | "CONTRACT" | "INTERN" | "PART_TIME_JOB" | "FREELANCER" | "DAILY";
+        /** EnrollmentResponse */
+        EnrollmentResponse: {
+            /**
+             * Student Id
+             * Format: uuid
+             * @description 수강 등록 id
+             */
+            student_id: string;
+            /**
+             * Cohort Id
+             * Format: uuid
+             */
+            cohort_id: string;
+            /**
+             * Bootcamp Id
+             * Format: uuid
+             */
+            bootcamp_id: string;
+            /** Bootcamp Name */
+            bootcamp_name: string;
+            /** Cohort Number */
+            cohort_number: number;
+            cohort_status: components["schemas"]["CohortStatus"];
+            /**
+             * Start Date
+             * Format: date
+             * @description 기수 시작일
+             */
+            start_date: string;
+            /**
+             * End Date
+             * Format: date
+             * @description 기수 종료일
+             */
+            end_date: string;
+            /** @description 수강 상태 */
+            status: components["schemas"]["EnrollmentStatus"];
+            /**
+             * Enrolled At
+             * Format: date
+             */
+            enrolled_at: string;
+            /**
+             * Ended At
+             * @description 수강 종료일 (수강 중이면 null)
+             */
+            ended_at: string | null;
+        };
         /**
          * EnrollmentStatus
          * @enum {string}
@@ -4522,6 +4650,28 @@ export interface components {
              */
             restorable: components["schemas"]["AssignmentResponse"][];
         };
+        /** MentorCard */
+        MentorCard: {
+            /**
+             * Mentor Id
+             * Format: uuid
+             */
+            mentor_id: string;
+            /**
+             * Display Name
+             * @description 수강생에게 보이는 이름 (실명 또는 닉네임, 멘토가 고름)
+             */
+            display_name: string;
+            /** Headline */
+            headline: string | null;
+            /** Expertise */
+            expertise: string | null;
+            /**
+             * Profile Image Url
+             * @description presigned GET (만료 10분)
+             */
+            profile_image_url: string | null;
+        };
         /** MentorDeactivateRequest */
         MentorDeactivateRequest: {
             /**
@@ -4588,45 +4738,6 @@ export interface components {
             /** Created At */
             created_at: string | null;
         };
-        /** MentorProfileResponse */
-        MentorProfileResponse: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /**
-             * User Id
-             * Format: uuid
-             */
-            user_id: string;
-            /**
-             * Name
-             * @description 실명 (회원 이름)
-             */
-            name: string;
-            /**
-             * Display Name
-             * @description 수강생에게 보이는 이름 (표시 이름 선택 반영)
-             */
-            display_name: string;
-            /** Nickname */
-            nickname: string | null;
-            display_name_preference: components["schemas"]["DisplayNamePreference"];
-            /** Headline */
-            headline: string | null;
-            /** Introduction */
-            introduction: string | null;
-            /** Expertise */
-            expertise: string | null;
-            /**
-             * Profile Image Url
-             * @description presigned GET (만료 10분)
-             */
-            profile_image_url: string | null;
-            /** Is Active */
-            is_active: boolean;
-        };
         /** MentorSummary */
         MentorSummary: {
             /**
@@ -4666,6 +4777,39 @@ export interface components {
          * @enum {string}
          */
         MentoringSessionStatus: "SCHEDULED" | "IN_PROGRESS" | "COMPLETED" | "NO_SHOW" | "CANCELED";
+        /** MentoringSettingsSummary */
+        MentoringSettingsSummary: {
+            /**
+             * Cohort Id
+             * Format: uuid
+             */
+            cohort_id: string;
+            /**
+             * Allow 1 On 1
+             * @description 1:1 멘토링 허용
+             */
+            allow_1_on_1: boolean;
+            /**
+             * Allow Team Mentoring
+             * @description 팀 멘토링 허용 ('내 팀' 메뉴도 이때만)
+             */
+            allow_team_mentoring: boolean;
+            /**
+             * Allowed Duration
+             * @description 진행 단위(분, 30 또는 60). 진행 시간은 이 값의 배수
+             */
+            allowed_duration: number;
+            /**
+             * Min Lead Hours
+             * @description 시작 N시간 전까지 신청
+             */
+            min_lead_hours: number;
+            /**
+             * Max Pending Requests
+             * @description 승인 대기 신청 최대 건수
+             */
+            max_pending_requests: number;
+        };
         /**
          * MentoringSettlementPolicy
          * @enum {string}
@@ -6231,6 +6375,45 @@ export interface components {
          * @enum {string}
          */
         WeekendSeType: "WEEKEND" | "WEEKDAY" | "HYBRID";
+        /** MentorProfileResponse */
+        app__contexts__educator__presentation__mentor_router__MentorProfileResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /**
+             * Name
+             * @description 실명 (회원 이름)
+             */
+            name: string;
+            /**
+             * Display Name
+             * @description 수강생에게 보이는 이름 (표시 이름 선택 반영)
+             */
+            display_name: string;
+            /** Nickname */
+            nickname: string | null;
+            display_name_preference: components["schemas"]["DisplayNamePreference"];
+            /** Headline */
+            headline: string | null;
+            /** Introduction */
+            introduction: string | null;
+            /** Expertise */
+            expertise: string | null;
+            /**
+             * Profile Image Url
+             * @description presigned GET (만료 10분)
+             */
+            profile_image_url: string | null;
+            /** Is Active */
+            is_active: boolean;
+        };
         /** SkippedResponse */
         app__contexts__mentoring__presentation__balance_router__SkippedResponse: {
             /**
@@ -6255,6 +6438,35 @@ export interface components {
              * @description assignment_not_found: 세션 시작일에 유효한 배정이 없음
              */
             code: string;
+        };
+        /** MentorProfileResponse */
+        app__contexts__mentoring__presentation__student_router__MentorProfileResponse: {
+            /**
+             * Mentor Id
+             * Format: uuid
+             */
+            mentor_id: string;
+            /**
+             * Display Name
+             * @description 수강생에게 보이는 이름 (실명 또는 닉네임, 멘토가 고름)
+             */
+            display_name: string;
+            /** Headline */
+            headline: string | null;
+            /** Expertise */
+            expertise: string | null;
+            /**
+             * Profile Image Url
+             * @description presigned GET (만료 10분)
+             */
+            profile_image_url: string | null;
+            /** Introduction */
+            introduction: string | null;
+            /**
+             * Accepting Requests
+             * @description false면 지금은 1:1 신청을 받지 않는다
+             */
+            accepting_requests: boolean;
         };
         /** TeamResponse */
         app__contexts__mentoring__presentation__team_router__TeamResponse: {
@@ -8698,6 +8910,26 @@ export interface operations {
             };
         };
     };
+    my_enrollments_api_v1_me_enrollments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrollmentResponse"][];
+                };
+            };
+        };
+    };
     request_contract_upload_api_v1_admin_contract_files_uploads_post: {
         parameters: {
             query?: never;
@@ -9100,7 +9332,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MentorProfileResponse"];
+                    "application/json": components["schemas"]["app__contexts__educator__presentation__mentor_router__MentorProfileResponse"];
                 };
             };
         };
@@ -9124,7 +9356,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MentorProfileResponse"];
+                    "application/json": components["schemas"]["app__contexts__educator__presentation__mentor_router__MentorProfileResponse"];
                 };
             };
             /** @description Validation Error */
@@ -9188,7 +9420,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MentorProfileResponse"];
+                    "application/json": components["schemas"]["app__contexts__educator__presentation__mentor_router__MentorProfileResponse"];
                 };
             };
             /** @description Validation Error */
@@ -9217,7 +9449,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MentorProfileResponse"];
+                    "application/json": components["schemas"]["app__contexts__educator__presentation__mentor_router__MentorProfileResponse"];
                 };
             };
         };
@@ -9274,7 +9506,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MentorProfileResponse"];
+                    "application/json": components["schemas"]["app__contexts__educator__presentation__mentor_router__MentorProfileResponse"];
                 };
             };
             /** @description Validation Error */
@@ -9309,7 +9541,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MentorProfileResponse"];
+                    "application/json": components["schemas"]["app__contexts__educator__presentation__mentor_router__MentorProfileResponse"];
                 };
             };
             /** @description Validation Error */
@@ -9376,7 +9608,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MentorProfileResponse"];
+                    "application/json": components["schemas"]["app__contexts__educator__presentation__mentor_router__MentorProfileResponse"];
                 };
             };
             /** @description Validation Error */
@@ -9407,7 +9639,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MentorProfileResponse"];
+                    "application/json": components["schemas"]["app__contexts__educator__presentation__mentor_router__MentorProfileResponse"];
                 };
             };
             /** @description Validation Error */
@@ -10641,6 +10873,101 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MyTeamsResponse"];
+                };
+            };
+        };
+    };
+    mentoring_settings_api_v1_me_mentoring_settings_get: {
+        parameters: {
+            query: {
+                cohort_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MentoringSettingsSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accepting_mentors_api_v1_me_mentoring_mentors_get: {
+        parameters: {
+            query: {
+                cohort_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MentorCard"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mentor_profile_api_v1_me_mentoring_mentors__mentor_id__get: {
+        parameters: {
+            query: {
+                cohort_id: string;
+            };
+            header?: never;
+            path: {
+                mentor_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["app__contexts__mentoring__presentation__student_router__MentorProfileResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
