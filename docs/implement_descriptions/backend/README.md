@@ -66,4 +66,4 @@
 | 62 | [수강생 멘토링 신청 준비 API (BE-1)](62_student_mentoring_prep.md) | 완료 (#81) |
 | 63 | [계정 종류를 수강생·멘토·운영진으로 나눔](63_account_type_member_split.md) | 완료 (#82) |
 | 64 | [신청 응답 보완: 단건 조회·확정 세션·취소 주체·차감 상태](64_request_response_supplement.md) | 완료 (#84) |
-| 65 | [신청 목록 상태 여러 개 필터와 상태별 건수](65_request_list_counts.md) | PR 진행 중 (#85) |
+| 65 | [신청 목록 상태 여러 개 필터와 상태별 건수](65_request_list_counts.md) | 완료 (#85) |

@@ -1,6 +1,6 @@
 # 65. 신청 목록 상태 여러 개 필터와 상태별 건수
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-19 병합)
 - 관련 PR: #85
 - 관련 결정: `docs/decisions.md` A67, F29 (FE-4a 탭 시안 유지)
 - 이전 기록: [64. 신청 응답 보완: 단건 조회·확정 세션·취소 주체·차감 상태](64_request_response_supplement.md)
@@ -48,6 +48,8 @@ FE-4a 신청 내역 시안의 탭은 4개다: `전체 5 · 승인 대기 2 · �
   - API: `status` 두 개 조회, `counts`, 멘토 목록 `counts`, 없는 상태 값 422
 - **로컬 검사 (compose `api`):** ruff, ruff format, mypy, mypy tests, lint-imports 통과. 전체 879 passed.
 - **프론트엔드:** 다시 만든 타입으로 `typecheck` 통과
+- GitHub Actions (PR #85): 백엔드 검사(스키마 일치 포함)·프론트엔드 검사(타입 일치 포함)·E2E 3개 통과
+- 사용자가 병합을 확인했다(2026-11-19)
 
 ## 남은 작업
 - FE-4a: 신청 내역 목록·상세·취소 화면 (Figma 태블릿·모바일 먼저)
