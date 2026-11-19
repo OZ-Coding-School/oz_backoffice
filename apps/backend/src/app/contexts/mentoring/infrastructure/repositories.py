@@ -646,30 +646,54 @@ class TortoiseMentoringRequestRepository:
         *,
         student_ids: list[uuid.UUID],
         team_ids: list[uuid.UUID],
-        status: MentoringRequestStatus | None,
+        statuses: list[MentoringRequestStatus] | None,
         limit: int,
         offset: int,
     ) -> tuple[list[MentoringRequest], int]:
         if not student_ids and not team_ids:
             return [], 0
-        query = MentoringRequestModel.filter(
+        query = self._participants(student_ids, team_ids)
+        if statuses:
+            query = query.filter(status__in=statuses)
+        return await self._page(query, limit, offset)
+
+    @staticmethod
+    def _participants(student_ids: list[uuid.UUID], team_ids: list[uuid.UUID]) -> Any:
+        return MentoringRequestModel.filter(
             Q(requester_id__in=student_ids, team_id__isnull=True) | Q(team_id__in=team_ids)
         )
-        if status is not None:
-            query = query.filter(status=status)
-        return await self._page(query, limit, offset)
+
+    @staticmethod
+    async def _status_counts(query: Any) -> dict[MentoringRequestStatus, int]:
+        counts = dict.fromkeys(MentoringRequestStatus, 0)
+        rows = await query.annotate(n=Count("id")).group_by("status").values("status", "n")
+        for row in rows:
+            counts[MentoringRequestStatus(row["status"])] = row["n"]
+        return counts
+
+    async def count_statuses_for_participants(
+        self, *, student_ids: list[uuid.UUID], team_ids: list[uuid.UUID]
+    ) -> dict[MentoringRequestStatus, int]:
+        if not student_ids and not team_ids:
+            return dict.fromkeys(MentoringRequestStatus, 0)
+        return await self._status_counts(self._participants(student_ids, team_ids))
+
+    async def count_statuses_for_mentor(
+        self, mentor_id: uuid.UUID
+    ) -> dict[MentoringRequestStatus, int]:
+        return await self._status_counts(MentoringRequestModel.filter(mentor_id=mentor_id))
 
     async def list_for_mentor(
         self,
         mentor_id: uuid.UUID,
         *,
-        status: MentoringRequestStatus | None,
+        statuses: list[MentoringRequestStatus] | None,
         limit: int,
         offset: int,
     ) -> tuple[list[MentoringRequest], int]:
         query = MentoringRequestModel.filter(mentor_id=mentor_id)
-        if status is not None:
-            query = query.filter(status=status)
+        if statuses:
+            query = query.filter(status__in=statuses)
         return await self._page(query, limit, offset)
 
     async def list_by_cohort(

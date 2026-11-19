@@ -329,30 +329,55 @@ class InMemoryRequestRepository:
         *,
         student_ids: list[uuid.UUID],
         team_ids: list[uuid.UUID],
-        status: MentoringRequestStatus | None,
+        statuses: list[MentoringRequestStatus] | None,
         limit: int,
         offset: int,
     ) -> tuple[list[MentoringRequest], int]:
         found = [
             r
-            for r in self.items.values()
-            if ((r.team_id is None and r.requester_id in student_ids) or r.team_id in team_ids)
-            and (status is None or r.status is status)
+            for r in self._of_participants(student_ids, team_ids)
+            if not statuses or r.status in statuses
         ]
         return self._page(found, limit, offset)
+
+    def _of_participants(
+        self, student_ids: list[uuid.UUID], team_ids: list[uuid.UUID]
+    ) -> list[MentoringRequest]:
+        return [
+            r
+            for r in self.items.values()
+            if (r.team_id is None and r.requester_id in student_ids) or r.team_id in team_ids
+        ]
+
+    @staticmethod
+    def _counts(found: list[MentoringRequest]) -> dict[MentoringRequestStatus, int]:
+        counts = dict.fromkeys(MentoringRequestStatus, 0)
+        for r in found:
+            counts[r.status] += 1
+        return counts
+
+    async def count_statuses_for_participants(
+        self, *, student_ids: list[uuid.UUID], team_ids: list[uuid.UUID]
+    ) -> dict[MentoringRequestStatus, int]:
+        return self._counts(self._of_participants(student_ids, team_ids))
+
+    async def count_statuses_for_mentor(
+        self, mentor_id: uuid.UUID
+    ) -> dict[MentoringRequestStatus, int]:
+        return self._counts([r for r in self.items.values() if r.mentor_id == mentor_id])
 
     async def list_for_mentor(
         self,
         mentor_id: uuid.UUID,
         *,
-        status: MentoringRequestStatus | None,
+        statuses: list[MentoringRequestStatus] | None,
         limit: int,
         offset: int,
     ) -> tuple[list[MentoringRequest], int]:
         found = [
             r
             for r in self.items.values()
-            if r.mentor_id == mentor_id and (status is None or r.status is status)
+            if r.mentor_id == mentor_id and (not statuses or r.status in statuses)
         ]
         return self._page(found, limit, offset)
 

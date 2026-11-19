@@ -298,8 +298,8 @@ async def test_team_request(h: Harness) -> None:
     with pytest.raises(NotFoundError):
         await h.create(team_id=new_id())
 
-    mine, total = await h.service.list_mine(h.student.user_id, status=None, limit=10, offset=0)  # type: ignore[arg-type]
-    assert (total, [r.id for r in mine]) == (1, [request.id])
+    mine = await h.service.list_mine(h.student.user_id, statuses=None, limit=10, offset=0)  # type: ignore[arg-type]
+    assert (mine.total, [r.id for r in mine.items]) == (1, [request.id])
 
 
 async def test_get_for_user(h: Harness) -> None:
@@ -365,13 +365,38 @@ async def test_cancel_and_expire(h: Harness) -> None:
 async def test_mentor_list(h: Harness) -> None:
     await h.fund(student_id=h.student.id)
     await h.create()
-    items, total = await h.service.list_for_mentor(
-        h.mentor.user_id, status=MentoringRequestStatus.PENDING, limit=10, offset=0
+    found = await h.service.list_for_mentor(
+        h.mentor.user_id, statuses=[MentoringRequestStatus.PENDING], limit=10, offset=0
     )
-    assert total == 1
+    assert (found.total, len(found.items)) == (1, 1)
     with pytest.raises(NotFoundError):
-        await h.service.list_for_mentor(new_id(), status=None, limit=10, offset=0)
-    assert len(items) == 1
+        await h.service.list_for_mentor(new_id(), statuses=None, limit=10, offset=0)
+
+
+async def test_lists_filter_many_statuses_and_count_all(h: Harness) -> None:
+    """상태 여러 개로 거르고, 건수는 필터와 무관하게 상태별로 센다 (A67)."""
+    await h.fund(student_id=h.student.id)
+    canceled = await h.create()
+    await h.service.cancel(h.student.user_id, canceled.id, "일정 변경")  # type: ignore[arg-type]
+    pending = await h.create(desired_times=[T + timedelta(hours=3)])
+    closed = [MentoringRequestStatus.REJECTED, MentoringRequestStatus.CANCELED]
+    expected = {
+        MentoringRequestStatus.PENDING: 1,
+        MentoringRequestStatus.APPROVED: 0,
+        MentoringRequestStatus.REJECTED: 0,
+        MentoringRequestStatus.CANCELED: 1,
+    }
+
+    mine = await h.service.list_mine(h.student.user_id, statuses=closed, limit=10, offset=0)  # type: ignore[arg-type]
+    assert ([r.id for r in mine.items], mine.total, mine.counts) == ([canceled.id], 1, expected)
+    every = await h.service.list_mine(h.student.user_id, statuses=None, limit=10, offset=0)  # type: ignore[arg-type]
+    assert {r.id for r in every.items} == {canceled.id, pending.id}
+    received = await h.service.list_for_mentor(
+        h.mentor.user_id, statuses=[MentoringRequestStatus.PENDING], limit=10, offset=0
+    )
+    assert ([r.id for r in received.items], received.counts) == ([pending.id], expected)
+    nobody = await h.service.list_mine(new_id(), statuses=None, limit=10, offset=0)
+    assert (nobody.total, set(nobody.counts.values())) == (0, {0})
 
 
 async def test_cancel_after_approval(h: Harness) -> None:

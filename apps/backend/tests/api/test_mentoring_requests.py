@@ -215,6 +215,32 @@ async def test_request_detail_and_supplement_fields(
         {"state": "RETURNED", "minutes": 60},
     )
 
+    # 상태 여러 개 필터와 상태별 건수 (A67)
+    waiting = (await client.post(URL, json=_body(ctx), headers=student_h)).json()["id"]
+    counts = {"PENDING": 1, "APPROVED": 0, "REJECTED": 0, "CANCELED": 2}
+    closed = await client.get(
+        "/api/v1/me/mentoring/requests",
+        params=[("status", "REJECTED"), ("status", "CANCELED")],
+        headers=student_h,
+    )
+    body = closed.json()
+    assert ({r["id"] for r in body["items"]}, body["total"], body["counts"]) == (
+        {request_id, other},
+        2,
+        counts,
+    )
+    received = await client.get(
+        "/api/v1/me/mentor-requests", params={"status": "PENDING"}, headers=mentor_h
+    )
+    assert ([r["id"] for r in received.json()["items"]], received.json()["counts"]) == (
+        [waiting],
+        counts,
+    )
+    wrong = await client.get(
+        "/api/v1/me/mentoring/requests", params={"status": "DONE"}, headers=student_h
+    )
+    assert wrong.status_code == 422
+
 
 async def test_create_rules_and_permissions(client: AsyncClient, settings: Settings) -> None:
     ctx = await _setup(client, settings)

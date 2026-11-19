@@ -5101,17 +5101,6 @@ export interface components {
             /** Offset */
             offset: number;
         };
-        /** Page[RequestResponse] */
-        Page_RequestResponse_: {
-            /** Items */
-            items: components["schemas"]["RequestResponse"][];
-            /** Total */
-            total: number;
-            /** Limit */
-            limit: number;
-            /** Offset */
-            offset: number;
-        };
         /** Page[SessionResponse] */
         Page_SessionResponse_: {
             /** Items */
@@ -5322,6 +5311,18 @@ export interface components {
              */
             duration: number;
         };
+        /** RequestListPage */
+        RequestListPage: {
+            /** Items */
+            items: components["schemas"]["RequestResponse"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            counts: components["schemas"]["RequestStatusCounts"];
+        };
         /** RequestResponse */
         RequestResponse: {
             /**
@@ -5400,6 +5401,20 @@ export interface components {
              * Format: date-time
              */
             ends_at: string;
+        };
+        /**
+         * RequestStatusCounts
+         * @description 상태 필터와 무관한 그 목록 대상 전체의 상태별 건수 (A67).
+         */
+        RequestStatusCounts: {
+            /** Pending */
+            PENDING: number;
+            /** Approved */
+            APPROVED: number;
+            /** Rejected */
+            REJECTED: number;
+            /** Canceled */
+            CANCELED: number;
         };
         /** ResetCodeRequest */
         ResetCodeRequest: {
@@ -11498,7 +11513,8 @@ export interface operations {
     my_requests_api_v1_me_mentoring_requests_get: {
         parameters: {
             query?: {
-                status?: components["schemas"]["MentoringRequestStatus"] | null;
+                /** @description 여러 개 가능 (예: status=REJECTED&status=CANCELED, A67) */
+                status?: components["schemas"]["MentoringRequestStatus"][] | null;
                 limit?: number;
                 offset?: number;
             };
@@ -11514,7 +11530,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Page_RequestResponse_"];
+                    "application/json": components["schemas"]["RequestListPage"];
                 };
             };
             /** @description Validation Error */
@@ -11531,7 +11547,8 @@ export interface operations {
     mentor_requests_api_v1_me_mentor_requests_get: {
         parameters: {
             query?: {
-                status?: components["schemas"]["MentoringRequestStatus"] | null;
+                /** @description 여러 개 가능 (예: status=REJECTED&status=CANCELED, A67) */
+                status?: components["schemas"]["MentoringRequestStatus"][] | null;
                 limit?: number;
                 offset?: number;
             };
@@ -11547,7 +11564,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Page_RequestResponse_"];
+                    "application/json": components["schemas"]["RequestListPage"];
                 };
             };
             /** @description Validation Error */
