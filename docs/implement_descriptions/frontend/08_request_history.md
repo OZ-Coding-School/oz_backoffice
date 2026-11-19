@@ -1,7 +1,7 @@
 # 08. FE-4a 수강생 신청 내역 목록·상세·취소
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #86
 - 관련 결정: `docs/decisions.md` F29 (F4·F14·F16·F27·F28, A42·A66·A67·M26)
 - 이전 기록: [07. FE-2 회원 공통 틀](07_member_shell.md)
 - 백엔드 보완: backend/64 (#84, A66), backend/65 (#85, A67)
