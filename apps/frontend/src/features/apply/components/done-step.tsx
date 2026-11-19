@@ -8,7 +8,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { formatKst, formatKstDay, formatMinutes } from "@/lib/datetime";
 import { requestQuery } from "@/features/requests/api";
 
-/** 신청 완료 (Figma `Screen / 1:1 완료`). [내 신청 보기]는 방금 만든 신청 상세(F30) */
+/** 신청 완료 (Figma `Screen / 1:1 완료`·`팀 완료`). [내 신청 보기]는 방금 만든 신청 상세(F30) */
 export function DoneStep({ requestId }: { requestId: string }) {
   const request = useQuery(requestQuery(requestId));
   if (request.isPending) {
@@ -31,7 +31,7 @@ export function DoneStep({ requestId }: { requestId: string }) {
         {r.mentor_display_name}가 희망 일시 중 하나로 승인하면 세션이 만들어지고 채팅으로 알려 드려요.
       </p>
       <dl className="flex w-full flex-col gap-2.5 rounded-xl border border-border bg-card p-5 text-left">
-        <Item label="멘토" value={`${r.mentor_display_name} · 1:1 멘토링`} />
+        <Item label="멘토" value={`${r.mentor_display_name} · ${r.team_id ? "팀 멘토링" : "1:1 멘토링"}`} />
         <Item label="주제" value={r.topic} />
         <Item
           label="희망 일시"
@@ -42,7 +42,10 @@ export function DoneStep({ requestId }: { requestId: string }) {
           }
         />
         <Item label="상태" value="멘토 승인 대기" />
-        <Item label="차감 예정" value={`${formatMinutes(r.duration)} · 내 계좌 (승인되면 차감)`} />
+        <Item
+          label="차감 예정"
+          value={`${formatMinutes(r.duration)} · ${r.team_id ? "팀 계좌" : "내 계좌"} (승인되면 차감)`}
+        />
       </dl>
       <div className="flex gap-2">
         <Button variant="outline" asChild>

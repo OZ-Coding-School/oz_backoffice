@@ -7,6 +7,8 @@ import { createJSONStorage, persist } from "zustand/middleware";
  */
 export interface ApplyDraft {
   owner: string | null;
+  /** 고른 종류 (F31). 바뀌면 멘토·일정을 비운다 */
+  kind: "one" | "team" | null;
   mentorId: string | null;
   duration: number | null;
   desiredTimes: string[];
@@ -14,12 +16,22 @@ export interface ApplyDraft {
   detail: string;
 }
 
-const EMPTY: ApplyDraft = { owner: null, mentorId: null, duration: null, desiredTimes: [], topic: "", detail: "" };
+const EMPTY: ApplyDraft = {
+  owner: null,
+  kind: null,
+  mentorId: null,
+  duration: null,
+  desiredTimes: [],
+  topic: "",
+  detail: "",
+};
 
 interface DraftStore extends ApplyDraft {
   /** 주인이 바뀌었으면 비우고 true */
   ensureOwner: (owner: string) => boolean;
   update: (patch: Partial<Omit<ApplyDraft, "owner">>) => void;
+  /** 종류를 정한다. 다른 종류였으면 멘토·진행 시간·일정을 비운다 */
+  chooseKind: (kind: "one" | "team") => void;
   reset: () => void;
 }
 
@@ -35,13 +47,17 @@ export const useApplyDraft = create<DraftStore>()(
         return true;
       },
       update: (patch) => set(patch),
+      chooseKind: (kind) => {
+        if (get().kind !== kind) set({ kind, mentorId: null, duration: null, desiredTimes: [] });
+      },
       reset: () => set({ ...EMPTY, owner: get().owner }),
     }),
     {
-      name: "oz:apply:1on1",
+      name: "oz:apply",
       storage: createJSONStorage(() => sessionStorage),
-      partialize: ({ owner, mentorId, duration, desiredTimes, topic, detail }) => ({
+      partialize: ({ owner, kind, mentorId, duration, desiredTimes, topic, detail }) => ({
         owner,
+        kind,
         mentorId,
         duration,
         desiredTimes,

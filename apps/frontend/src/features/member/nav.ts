@@ -34,7 +34,7 @@ const APPLY: MemberNavItem = { to: "/mentoring/apply", label: "멘토링 신청"
 const MENTOR_NAV: MemberNavGroup[] = [{ items: [HOME] }];
 
 export interface MemberNavOptions {
-  /** '멘토링 신청' 메뉴: FE-3a에서는 1:1만 허용한 기수와 수강이 끝난 수강생(안내)에만 (F30) */
+  /** '멘토링 신청' 메뉴: 1:1이나 팀을 허용하는 기수와 수강이 끝난 수강생(안내)에 (F31) */
   apply?: boolean;
 }
 
