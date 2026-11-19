@@ -1,7 +1,7 @@
 # 09. FE-3a 1:1 멘토링 신청
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #87
 - 관련 결정: `docs/decisions.md` F30 (F4·F14·F27·F28, A38·A42·A64)
 - 이전 기록: [08. FE-4a 수강생 신청 내역 목록·상세·취소](08_request_history.md)
 

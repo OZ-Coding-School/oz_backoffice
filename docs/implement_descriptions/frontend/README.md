@@ -10,4 +10,4 @@
 | 06 | [FE-1c 운영진 로그인·최초 정보 입력](06_staff_auth.md) | 완료 (#78) |
 | 07 | [FE-2 회원 공통 틀](07_member_shell.md) | 완료 (#83) |
 | 08 | [FE-4a 수강생 신청 내역 목록·상세·취소](08_request_history.md) | 완료 (#86) |
-| 09 | [FE-3a 1:1 멘토링 신청](09_one_on_one_apply.md) | PR 진행 중 |
+| 09 | [FE-3a 1:1 멘토링 신청](09_one_on_one_apply.md) | PR 진행 중 (#87) |
