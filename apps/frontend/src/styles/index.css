@@ -227,3 +227,8 @@
     outline-offset: 2px;
   }
 }
+
+/* 코드 하이라이트(Shiki 두 테마): 다크 모드에서는 다크 테마 색을 쓴다 (components/code-block.tsx) */
+.dark .shiki-token {
+  color: var(--shiki-dark) !important;
+}
