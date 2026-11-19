@@ -44,7 +44,8 @@ test("휴대폰: 사이드바·레일 없이 상단 막대만, 사용자 메뉴�
   await signedIn(page);
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "안녕하세요, 가수강님" })).toBeVisible();
-  await expect(page.getByRole("navigation", { name: "메뉴" })).toHaveCount(0); // 사이드바·레일은 숨김
+  await expect(page.getByRole("navigation", { name: "메뉴", exact: true })).toHaveCount(0); // 사이드바·레일은 숨김
+  await expect(page.getByRole("navigation", { name: "하단 메뉴" })).toBeVisible(); // 메뉴 2개(홈·신청 내역)
   await page.getByRole("button", { name: "사용자 메뉴" }).click();
   await expect(page.getByRole("menu").getByText("수강생 · 초격차 백엔드 12기")).toBeVisible();
   await page.getByRole("menuitem", { name: "로그아웃" }).click();
@@ -55,7 +56,7 @@ test("태블릿: 레일에 아이콘과 짧은 이름 (F27)", async ({ page }) =
   await page.setViewportSize({ width: 768, height: 1024 });
   await signedIn(page);
   await page.goto("/");
-  const rail = page.getByRole("navigation", { name: "메뉴" }); // 사이드바는 숨기고 레일만 보인다
+  const rail = page.getByRole("navigation", { name: "메뉴", exact: true }); // 사이드바는 숨기고 레일만 보인다
   await expect(rail).toBeVisible();
   await expect(rail.getByRole("link", { name: "홈" })).toHaveAttribute("aria-current", "page");
   await expect(page.getByRole("button", { name: "사용자 메뉴" })).toBeVisible();

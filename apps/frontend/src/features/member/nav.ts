@@ -1,4 +1,4 @@
-import { LayoutGrid, type LucideIcon } from "lucide-react";
+import { FileText, LayoutGrid, type LucideIcon } from "lucide-react";
 
 import type { Me } from "@/features/auth/api";
 
@@ -22,7 +22,14 @@ const HOME: MemberNavItem = { to: "/", label: "홈", shortLabel: "홈", icon: La
  * 회원 메뉴 (F27): 이미 만든 화면만 넣는다. 화면 PR마다 해당 그룹에 메뉴를 추가한다.
  * 범위 밖(헬프센터·내 문서함·알림)은 넣지 않는다 (F15).
  */
-const STUDENT_NAV: MemberNavGroup[] = [{ items: [HOME] }];
+const REQUESTS: MemberNavItem = {
+  to: "/mentoring/requests",
+  label: "신청 내역",
+  shortLabel: "신청 내역",
+  icon: FileText,
+};
+
+const STUDENT_NAV: MemberNavGroup[] = [{ items: [HOME] }, { title: "멘토링", items: [REQUESTS] }];
 const MENTOR_NAV: MemberNavGroup[] = [{ items: [HOME] }];
 
 export function memberNav(accountType: Me["account_type"]): MemberNavGroup[] {
