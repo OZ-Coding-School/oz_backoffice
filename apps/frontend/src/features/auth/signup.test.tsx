@@ -99,7 +99,7 @@ describe("회원가입", () => {
     await user.click(screen.getByRole("link", { name: "로그인하기" }));
     await waitFor(() => expect(router.state.location.pathname).toBe("/login"));
     expect(await screen.findByLabelText("이메일")).toHaveValue("student@gmail.com");
-  });
+  }, 20_000); // 네 단계를 끝까지 지나는 긴 흐름 (CI에서 5초를 넘긴 적이 있다)
 
   it("멘토는 닉네임과 보일 이름을 받고, 승인 대기면 확인 안내를 보여 준다", async () => {
     mockSignupApi({ approval: "PENDING" });
