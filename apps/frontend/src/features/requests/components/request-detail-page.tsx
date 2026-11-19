@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft, CalendarDays, Clock, FileSearch, User, Users } from "lucide-react";
+import { ArrowLeft, CalendarDays, Clock, FileSearch, Pencil, User, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { ApiError } from "@/api/errors";
@@ -20,7 +20,7 @@ import { cancelState, kindLabel, STATUS_STYLE } from "../labels";
 import { CancelRequestDialog } from "./cancel-request-dialog";
 import { StatusNote } from "./request-card";
 
-/** 신청 상세 (Figma `Screen / 신청 상세 · 승인 대기 / 승인`, A66·F29). [신청 변경]은 FE-4b에서 추가한다. */
+/** 신청 상세 (Figma `Screen / 신청 상세 · 승인 대기 / 승인`, A66·F29·F32). [신청 변경]·[신청 취소]는 같은 조건 */
 export function RequestDetailPage({ requestId }: { requestId: string }) {
   const detail = useQuery(requestQuery(requestId));
   return (
@@ -129,9 +129,15 @@ function Detail({ request }: { request: MentoringRequest }) {
             <section className="flex flex-col gap-2 rounded-xl border border-border bg-card p-5">
               <h2 className="text-body-strong text-foreground">
                 {request.status === "APPROVED"
-                  ? `시작 ${settings.data?.min_lead_hours ?? ""}시간 전까지 취소할 수 있어요`
-                  : "승인 전이라 취소할 수 있어요"}
+                  ? `시작 ${settings.data?.min_lead_hours ?? ""}시간 전까지 바꾸거나 취소할 수 있어요`
+                  : "승인 전이라 바꾸거나 취소할 수 있어요"}
               </h2>
+              <Button asChild>
+                <Link to="/mentoring/requests/$requestId/change" params={{ requestId: request.id }}>
+                  <Pencil aria-hidden />
+                  신청 변경
+                </Link>
+              </Button>
               <Button variant="outline" className="text-destructive-text" onClick={() => setOpen(true)}>
                 신청 취소
               </Button>

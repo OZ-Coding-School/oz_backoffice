@@ -99,3 +99,36 @@ export function useCancelRequest(id: string) {
     },
   });
 }
+
+export interface ChangeInput {
+  topic: string;
+  detail: string;
+  desiredTimes: string[];
+  duration: number;
+}
+
+/** 신청 변경 (A44·F32): 기존 신청을 취소하고 같은 대상의 새 신청을 만든다. 응답은 새 신청 */
+export function useChangeRequest(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ChangeInput) =>
+      unwrap(
+        api.POST("/api/v1/mentoring/requests/{request_id}/change", {
+          params: { path: { request_id: id } },
+          body: {
+            topic: input.topic,
+            detail: input.detail,
+            desired_times: input.desiredTimes,
+            duration: input.duration,
+          },
+        }),
+      ),
+    onSuccess: (created) => {
+      queryClient.setQueryData(requestKeys.detail(created.id), created);
+      void queryClient.invalidateQueries({ queryKey: requestKeys.detail(id) });
+      void queryClient.invalidateQueries({ queryKey: ["requests", "mine"] });
+      void queryClient.invalidateQueries({ queryKey: requestKeys.balances });
+      void queryClient.invalidateQueries({ queryKey: ["apply", "times"] });
+    },
+  });
+}
