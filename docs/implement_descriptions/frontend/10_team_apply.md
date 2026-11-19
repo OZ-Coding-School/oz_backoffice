@@ -1,7 +1,7 @@
 # 10. FE-3b 팀 멘토링 신청·종류 선택
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #88
 - 관련 결정: `docs/decisions.md` F31 (F28·F30, A39·A41·A42·A64)
 - 이전 기록: [09. FE-3a 1:1 멘토링 신청](09_one_on_one_apply.md)
 
