@@ -65,4 +65,4 @@
 | 61 | [조교 담당 기수는 비어 있는 기수만](61_cohort_assistant_filter.md) | 완료 (#80) |
 | 62 | [수강생 멘토링 신청 준비 API (BE-1)](62_student_mentoring_prep.md) | 완료 (#81) |
 | 63 | [계정 종류를 수강생·멘토·운영진으로 나눔](63_account_type_member_split.md) | 완료 (#82) |
-| 64 | [신청 응답 보완: 단건 조회·확정 세션·취소 주체·차감 상태](64_request_response_supplement.md) | PR 진행 중 |
+| 64 | [신청 응답 보완: 단건 조회·확정 세션·취소 주체·차감 상태](64_request_response_supplement.md) | PR 진행 중 (#84) |
