@@ -1,5 +1,5 @@
 import { expertiseChips } from "./api";
-import { blockReason } from "./gate";
+import { allowedKinds, blockReason } from "./gate";
 import { durationOptions, kstDateKey, monthRanges, startTimes } from "./slots";
 
 const cohort = {
@@ -68,17 +68,49 @@ describe("신청 가능 시각 (F30)", () => {
   });
 });
 
-describe("신청 첫머리 판정 (F28·F30)", () => {
-  it("수강 등록 없음·읽기 전용·1:1 불가·남은 시간 없음", () => {
-    expect(blockReason({ cohort: null, settings, account: account(120) })).toBe("no_enrollment");
-    expect(blockReason({ cohort: { ...cohort!, readOnly: true }, settings, account: account(120) })).toBe("read_only");
-    expect(blockReason({ cohort, settings: { ...settings, allow_1_on_1: false }, account: account(120) })).toBe(
+describe("신청 첫머리 판정 (F28·F30·F31)", () => {
+  const one = (o: Partial<Parameters<typeof blockReason>[0]>) =>
+    blockReason({ cohort, settings, kind: "one", account: account(120), ...o });
+  it("1:1: 수강 등록 없음·읽기 전용·1:1 불가·남은 시간 없음", () => {
+    expect(one({ cohort: null })).toBe("no_enrollment");
+    expect(one({ cohort: { ...cohort!, readOnly: true } })).toBe("read_only");
+    expect(one({ settings: { ...settings, allow_1_on_1: false, allow_team_mentoring: true } })).toBe(
       "one_on_one_not_allowed",
     );
-    expect(blockReason({ cohort, settings, account: undefined })).toBe("no_time");
-    expect(blockReason({ cohort, settings, account: account(120, true) })).toBe("no_time");
-    expect(blockReason({ cohort, settings, account: account(59) })).toBe("no_time");
-    expect(blockReason({ cohort, settings, account: account(60) })).toBeNull();
+    expect(one({ settings: { ...settings, allow_1_on_1: false } })).toBe("not_allowed");
+    expect(one({ account: undefined })).toBe("no_time");
+    expect(one({ account: account(120, true) })).toBe("no_time");
+    expect(one({ account: account(59) })).toBe("no_time");
+    expect(one({ account: account(60) })).toBeNull();
+  });
+
+  it("팀: 팀 불가·팀 없음·팀 시간 없음·담당 멘토가 신청을 안 받음", () => {
+    const teamSettings = { ...settings, allow_team_mentoring: true };
+    const team = {
+      id: "t1",
+      cohort_id: "c12",
+      team_number: 3,
+      label: "3팀",
+      mentor: { mentor_id: "m1", display_name: "이멘토" },
+      members: [],
+    };
+    const teamCase = (o: Partial<Parameters<typeof blockReason>[0]>) =>
+      blockReason({
+        cohort,
+        settings: teamSettings,
+        kind: "team",
+        account: account(120),
+        team,
+        teamMentor: { accepting_requests: true },
+        ...o,
+      });
+    expect(teamCase({ settings })).toBe("team_not_allowed");
+    expect(teamCase({ team: undefined })).toBe("no_team");
+    expect(teamCase({ account: account(30) })).toBe("team_no_time");
+    expect(teamCase({ teamMentor: { accepting_requests: false } })).toBe("mentor_not_accepting");
+    expect(teamCase({})).toBeNull();
+    expect(allowedKinds(teamSettings)).toEqual(["team", "one"]);
+    expect(allowedKinds(undefined)).toEqual([]);
   });
 
   it("전문 분야는 쉼표로 나눈다", () => {

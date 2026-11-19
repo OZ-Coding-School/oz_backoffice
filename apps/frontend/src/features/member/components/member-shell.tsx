@@ -38,10 +38,10 @@ export function MemberShell({ me, children }: { me: Me; children: ReactNode }) {
     ...mentoringSettingsQuery(cohort?.enrollment.cohort_id ?? ""),
     enabled: !!cohort && !cohort.readOnly,
   });
-  // FE-3a: 1:1만 허용한 기수와 수강이 끝난 수강생(안내)에만 '멘토링 신청' (F30). FE-3b에서 모든 기수로 넓힌다
+  // 1:1이나 팀을 허용하는 기수와 수강이 끝난 수강생(안내)에 '멘토링 신청' (F31)
   const apply =
     !!cohort &&
-    (cohort.readOnly || (!!settings.data && settings.data.allow_1_on_1 && !settings.data.allow_team_mentoring));
+    (cohort.readOnly || (!!settings.data && (settings.data.allow_1_on_1 || settings.data.allow_team_mentoring)));
   const groups = memberNav(me.account_type, { apply });
   const current = currentNavItem(groups, pathname);
   const roleLine = student ? (cohort ? `수강생 · ${cohortLabel(cohort.enrollment)}` : "수강생") : "멘토";

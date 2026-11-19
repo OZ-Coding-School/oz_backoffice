@@ -222,18 +222,160 @@ describe("1:1 멘토링 신청 (F30)", () => {
     expect(await screen.findByRole("heading", { name: "지금 신청을 받는 멘토가 없어요" })).toBeInTheDocument();
   });
 
-  it("'멘토링 신청' 메뉴는 1:1만 허용한 기수에만 있다 (FE-3a)", async () => {
+  it("'멘토링 신청' 메뉴는 1:1이나 팀을 허용하는 기수에 있다 (F31)", async () => {
+    mockApply({ settings: MENTORING_SETTINGS });
     const { unmount } = await renderRoute("/");
     const menus = await screen.findAllByRole("navigation", { name: "메뉴" });
     expect(await within(menus[0]!).findByRole("link", { name: "멘토링 신청" })).toBeInTheDocument();
     unmount();
 
-    mockApply({ settings: MENTORING_SETTINGS }); // 1:1·팀 모두 허용 → FE-3b에서
+    const fetched = vi.fn<() => void>();
+    server.use(
+      http.get(apiUrl("/api/v1/me/mentoring/settings"), () => {
+        fetched();
+        return HttpResponse.json({ ...MENTORING_SETTINGS, allow_1_on_1: false, allow_team_mentoring: false });
+      }),
+    );
     await renderRoute("/");
     await screen.findByRole("heading", { name: "안녕하세요, 가수강님" });
-    await waitFor(() =>
-      expect(within(screen.getAllByRole("navigation", { name: "메뉴" })[0]!).getAllByRole("link")).toHaveLength(2),
-    );
+    await waitFor(() => expect(fetched).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 50)); // 응답을 반영할 시간
     expect(screen.queryByRole("link", { name: "멘토링 신청" })).not.toBeInTheDocument();
+  });
+});
+
+const TEAM = {
+  id: "t1",
+  cohort_id: "c12",
+  team_number: 3,
+  label: "3팀 알파",
+  mentor: { mentor_id: "m2", display_name: "이멘토" },
+  members: [
+    { student_id: "st12", name: "가수강" },
+    { student_id: "st99", name: "나수강" },
+  ],
+};
+
+function mockTeam({ team = TEAM as typeof TEAM | null, accepting = true, teamMinutes = 300 } = {}) {
+  server.use(
+    http.get(apiUrl("/api/v1/me/mentoring-teams"), () =>
+      HttpResponse.json({ as_student: team ? [team] : [], as_mentor: [] }),
+    ),
+    http.get(apiUrl("/api/v1/me/mentoring/mentors/{mentor_id}"), ({ params }) =>
+      HttpResponse.json({
+        mentor_id: params.mentor_id,
+        display_name: params.mentor_id === "m2" ? "이멘토" : "멘토K",
+        headline: "스타트업 CTO",
+        expertise: "FastAPI, AWS",
+        profile_image_url: null,
+        introduction: "팀 프로젝트 설계를 같이 봐요.",
+        accepting_requests: accepting,
+      }),
+    ),
+    http.get(apiUrl("/api/v1/me/balances"), () =>
+      HttpResponse.json([
+        {
+          id: "a1",
+          owner_type: "STUDENT",
+          owner_id: "st12",
+          owner_name: "가수강",
+          valid_from: "2026-10-01",
+          valid_until: "2027-03-31",
+          is_expired: false,
+          total_minutes: 120,
+          held_minutes: 0,
+          used_minutes: 0,
+          remaining_minutes: 120,
+        },
+        {
+          id: "a2",
+          owner_type: "TEAM",
+          owner_id: "t1",
+          owner_name: "3팀 알파",
+          valid_from: "2026-10-01",
+          valid_until: "2027-01-31",
+          is_expired: false,
+          total_minutes: teamMinutes,
+          held_minutes: 0,
+          used_minutes: 0,
+          remaining_minutes: teamMinutes,
+        },
+      ]),
+    ),
+  );
+}
+
+describe("팀 멘토링 신청·종류 선택 (F31)", () => {
+  it("둘 다 허용하면 종류를 고르고, 팀은 담당 멘토를 확인한 뒤 팀으로 신청한다", async () => {
+    mockApply({ settings: MENTORING_SETTINGS });
+    mockTeam();
+    useApplyDraft.setState({ ...DRAFT, kind: "team", mentorId: "m2" });
+    const posted = vi.fn<(body: unknown) => void>();
+    server.use(
+      http.post(apiUrl("/api/v1/mentoring/requests"), async ({ request }) => {
+        posted(await request.json());
+        return HttpResponse.json(makeRequest({ id: "r9", team_id: "t1", team_label: "3팀 알파" }), { status: 201 });
+      }),
+      http.get(apiUrl("/api/v1/mentoring/requests/{request_id}"), () =>
+        HttpResponse.json(makeRequest({ id: "r9", team_id: "t1" })),
+      ),
+    );
+    const user = userEvent.setup();
+    const { router } = await renderRoute("/mentoring/apply");
+
+    expect(await screen.findByRole("heading", { name: "어떤 멘토링을 신청할까요?" })).toBeInTheDocument();
+    const teamCard = await screen.findByRole("radio", { name: "팀 멘토링" });
+    expect(within(teamCard).getByText("3팀 알파 (2명)")).toBeInTheDocument();
+    expect(within(teamCard).getByText("팀 계좌 5시간")).toBeInTheDocument();
+    expect(screen.queryByText(/대기 신청/)).not.toBeInTheDocument(); // F31
+    await user.click(teamCard);
+    await user.click(screen.getByRole("button", { name: "다음" }));
+    await waitFor(() => expect(router.state.location.search).toEqual({ kind: "team" }));
+
+    expect(await screen.findByRole("heading", { name: "3팀 알파의 담당 멘토에게 신청해요" })).toBeInTheDocument();
+    expect(await screen.findByText("신청 받는 중")).toBeInTheDocument();
+    expect(screen.getByText("가수강(나), 나수강")).toBeInTheDocument();
+    expect(screen.getByText("5시간 · 01/31까지")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "이전: 멘토링 종류" })).toHaveAttribute("href", "/mentoring/apply");
+    await user.click(screen.getByRole("button", { name: "다음: 일정 선택" }));
+    await waitFor(() => expect(router.state.location.search).toEqual({ kind: "team", step: "schedule" }));
+
+    // 같은 종류로 남긴 일정·내용이 있으므로 확인으로 바로 간다
+    await router.navigate({ to: "/mentoring/apply", search: { kind: "team", step: "confirm" } });
+    expect(await screen.findByText("팀 계좌 (3팀 알파)")).toBeInTheDocument();
+    expect(screen.getByText("팀원 모두에게 보여요")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "멘토 수정" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "신청하기" }));
+    expect(await screen.findByRole("heading", { name: "신청했어요" })).toBeInTheDocument();
+    expect(posted).toHaveBeenCalledWith(
+      expect.objectContaining({ cohort_id: null, mentor_id: null, team_id: "t1", duration: 60 }),
+    );
+  });
+
+  it("팀이 없으면 팀 카드를 고를 수 없다", async () => {
+    mockApply({ settings: MENTORING_SETTINGS });
+    mockTeam({ team: null });
+    await renderRoute("/mentoring/apply");
+    const teamCard = await screen.findByRole("radio", { name: "팀 멘토링" });
+    expect(teamCard).toBeDisabled();
+    expect(within(teamCard).getByText("아직 속한 팀이 없어요")).toBeInTheDocument();
+  });
+
+  it("팀만 허용하면 종류 선택 없이 팀으로, 담당 멘토가 신청을 안 받으면 막는다", async () => {
+    mockApply({ settings: { ...MENTORING_SETTINGS, allow_1_on_1: false } });
+    mockTeam({ accepting: false });
+    await renderRoute("/mentoring/apply");
+    expect(await screen.findByText("담당 멘토가 지금은 신청을 받지 않아요")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "3팀 알파의 담당 멘토에게 신청해요" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "이전: 멘토링 종류" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "다음: 일정 선택" })).toBeDisabled();
+  });
+
+  it("팀 계좌에 남은 시간이 없으면 막는다", async () => {
+    mockApply({ settings: { ...MENTORING_SETTINGS, allow_1_on_1: false } });
+    mockTeam({ teamMinutes: 30 });
+    await renderRoute("/mentoring/apply");
+    expect(await screen.findByText("팀 계좌에 남은 시간이 없어요")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "다음: 일정 선택" })).toBeDisabled();
   });
 });

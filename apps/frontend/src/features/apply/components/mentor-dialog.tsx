@@ -18,7 +18,8 @@ export function MentorDialog({
   cohortId: string;
   mentorId: string | null;
   onClose: () => void;
-  onSelect: (mentorId: string) => void;
+  /** 없으면 닫기만 있다 (팀 담당 멘토 확인, F31) */
+  onSelect?: (mentorId: string) => void;
 }) {
   const mentor = useQuery({ ...mentorQuery(cohortId, mentorId ?? ""), enabled: !!mentorId });
   return (
@@ -60,7 +61,7 @@ export function MentorDialog({
               <Button variant="ghost" onClick={onClose}>
                 닫기
               </Button>
-              {mentor.data.accepting_requests ? (
+              {onSelect && mentor.data.accepting_requests ? (
                 <Button onClick={() => onSelect(mentor.data.mentor_id)}>이 멘토 선택</Button>
               ) : null}
             </div>

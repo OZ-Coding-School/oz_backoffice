@@ -3,12 +3,17 @@ import { Markdown } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
 import { slotLabel } from "@/features/requests/labels";
 
+import { Alert } from "@/components/ui/alert";
+
 import type { MentorCard } from "../api";
+import type { ApplyKind } from "../gate";
 import type { FormStep } from "../steps";
 import { MentorAvatar } from "./mentor-step";
 
 /** ④ 신청 확인 (Figma `Screen / 1:1 신청 확인`, A42·A53·M26). 화면 문구는 '차감 예정'(F14) */
 export function ConfirmStep({
+  kind,
+  teamLabel,
   mentor,
   duration,
   desiredTimes,
@@ -21,6 +26,8 @@ export function ConfirmStep({
   onSubmit,
   error,
 }: {
+  kind: ApplyKind;
+  teamLabel: string | undefined;
   mentor: MentorCard | undefined;
   duration: number;
   desiredTimes: string[];
@@ -36,14 +43,16 @@ export function ConfirmStep({
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-5">
       <div className="flex min-w-0 flex-1 flex-col gap-4">
-        <Card title="멘토" onEdit={() => onEdit("mentor")}>
+        <Card title="멘토" onEdit={kind === "team" ? undefined : () => onEdit("mentor")}>
           {mentor ? (
             <div className="flex items-center gap-3">
               <MentorAvatar mentor={mentor} size="md" />
               <div className="flex min-w-0 flex-col">
                 <span className="text-body-strong text-foreground">{mentor.display_name}</span>
                 <span className="text-caption text-muted-foreground">
-                  {mentor.headline ? `${mentor.headline} · ` : ""}1:1 멘토링
+                  {kind === "team"
+                    ? `${teamLabel ?? "팀"} 담당 멘토 · 팀 멘토링`
+                    : `${mentor.headline ? `${mentor.headline} · ` : ""}1:1 멘토링`}
                 </span>
               </div>
             </div>
@@ -74,7 +83,9 @@ export function ConfirmStep({
       </div>
       <aside className="flex flex-col gap-4 lg:w-85 lg:shrink-0">
         <section className="flex flex-col gap-2.5 rounded-xl border border-border bg-card p-5">
-          <h2 className="text-body-strong text-foreground">내 1:1 계좌</h2>
+          <h2 className="text-body-strong text-foreground">
+            {kind === "team" ? `팀 계좌 (${teamLabel ?? "팀"})` : "내 1:1 계좌"}
+          </h2>
           <Line label="남은 시간" value={formatMinutes(remaining)} />
           <Line label="차감 예정" value={`− ${formatMinutes(duration)}`} />
           <Line label="신청 후 남은 시간" value={formatMinutes(Math.max(0, remaining - duration))} strong />
@@ -89,6 +100,9 @@ export function ConfirmStep({
             </ul>
           </div>
         </section>
+        {kind === "team" ? (
+          <Alert variant="info" title="팀원 모두에게 보여요" description="신청 내용과 결과가 팀 채팅방에 안내돼요." />
+        ) : null}
         {error}
         <Button className="w-full" disabled={submitting} onClick={onSubmit}>
           신청하기
@@ -98,14 +112,16 @@ export function ConfirmStep({
   );
 }
 
-function Card({ title, onEdit, children }: { title: string; onEdit: () => void; children: React.ReactNode }) {
+function Card({ title, onEdit, children }: { title: string; onEdit?: () => void; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-3 rounded-xl border border-border bg-card p-5">
       <div className="flex items-center justify-between">
         <h2 className="text-body-strong text-foreground">{title}</h2>
-        <Button variant="link" size="sm" onClick={onEdit} aria-label={`${title} 수정`}>
-          수정
-        </Button>
+        {onEdit ? (
+          <Button variant="link" size="sm" onClick={onEdit} aria-label={`${title} 수정`}>
+            수정
+          </Button>
+        ) : null}
       </div>
       {children}
     </section>

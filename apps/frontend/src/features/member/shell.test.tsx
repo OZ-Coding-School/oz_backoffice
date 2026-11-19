@@ -24,7 +24,8 @@ describe("회원 공통 틀 (F27)", () => {
     const menus = screen.getAllByRole("navigation", { name: "메뉴" });
     for (const menu of menus) {
       expect(within(menu).getByRole("link", { name: "홈" })).toHaveAttribute("aria-current", "page");
-      expect(within(menu).getAllByRole("link")).toHaveLength(2); // 만든 메뉴만: 홈·신청 내역(FE-4a)
+      // 만든 메뉴만: 홈·멘토링 신청(F31, 기수 설정을 받은 뒤)·신청 내역
+      await waitFor(() => expect(within(menu).getAllByRole("link")).toHaveLength(3));
     }
     expect(screen.getByRole("navigation", { name: "하단 메뉴" })).toBeInTheDocument(); // 메뉴 2개 이상
   });

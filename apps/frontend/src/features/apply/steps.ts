@@ -1,4 +1,4 @@
-/** 1:1 신청 단계 (F30) */
+/** 신청 단계 (F30·F31). 팀은 멘토 단계가 '멘토 확인'이다 */
 export const STEPS = [
   { value: "mentor", label: "멘토 선택" },
   { value: "schedule", label: "일정 선택" },
