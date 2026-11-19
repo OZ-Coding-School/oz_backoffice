@@ -55,6 +55,23 @@ export const COHORTS = [
   },
 ];
 
+/** 수강 중 기수 하나 (A64·F27) */
+export const ENROLLMENTS = [
+  {
+    student_id: "st12",
+    cohort_id: "c12",
+    bootcamp_id: "b1",
+    bootcamp_name: "초격차 백엔드",
+    cohort_number: 12,
+    cohort_status: "ONGOING" as const,
+    start_date: "2026-10-01",
+    end_date: "2027-03-31",
+    status: "ENROLLED" as const,
+    enrolled_at: "2026-10-01",
+    ended_at: null,
+  },
+];
+
 /** 세션·복원 상태를 비우고, 기본으로 refresh 쿠키가 없는 상태를 모킹한다. */
 export function resetAuth(): void {
   resetSessionForTest();
@@ -65,6 +82,7 @@ export function resetAuth(): void {
     ),
     http.post(apiUrl("/api/v1/auth/logout"), () => new HttpResponse(null, { status: 204 })),
     http.get(apiUrl("/api/v1/auth/signup/cohorts"), () => HttpResponse.json(COHORTS)),
+    http.get(apiUrl("/api/v1/me/enrollments"), () => HttpResponse.json(ENROLLMENTS)),
   );
 }
 

@@ -11,7 +11,16 @@ import { MEMBER_BRAND, type BrandCopy } from "../brand";
  * 오즈 워드마크 + 줄바꿈 + "운영 행정 지원 플랫폼" (decisions F23).
  * 보라 소개 영역에서는 흰 워드마크, 그 밖에서는 라이트 모드 어두운 워드마크 / 다크 모드 흰 워드마크.
  */
-export function Logo({ onBrand = false, className }: { onBrand?: boolean; className?: string }) {
+export function Logo({
+  onBrand = false,
+  size = "md",
+  className,
+}: {
+  onBrand?: boolean;
+  /** md: 로그인 화면(문구 H3), sm: 사이드바(문구 Caption) (F23) */
+  size?: "md" | "sm";
+  className?: string;
+}) {
   return (
     <div className={cn("flex flex-col items-start gap-1", className)}>
       {onBrand ? (
@@ -23,7 +32,11 @@ export function Logo({ onBrand = false, className }: { onBrand?: boolean; classN
         </>
       )}
       {/* 로그인 화면에서는 워드마크와 비슷한 크기 (F23, Figma Logo md·lg) */}
-      <span className={cn("text-h3", onBrand ? "text-white/80" : "text-muted-foreground")}>운영 행정 지원 플랫폼</span>
+      <span
+        className={cn(size === "sm" ? "text-caption" : "text-h3", onBrand ? "text-white/80" : "text-muted-foreground")}
+      >
+        운영 행정 지원 플랫폼
+      </span>
     </div>
   );
 }
