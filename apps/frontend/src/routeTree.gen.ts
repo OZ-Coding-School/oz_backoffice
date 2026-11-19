@@ -19,6 +19,7 @@ import { Route as AuthSignupRouteImport } from './routes/_auth/signup'
 import { Route as MemberIndexRouteImport } from './routes/_member/index'
 import { Route as StaffAdminRouteImport } from './routes/_staff/admin'
 import { Route as DevDesignSystemRouteImport } from './routes/dev/design-system'
+import { Route as MemberMentoringApplyRouteImport } from './routes/_member/mentoring/apply'
 import { Route as StaffAuthStaffLoginRouteImport } from './routes/_staffAuth/staff/login'
 import { Route as StaffAuthStaffRegistrationRouteImport } from './routes/_staffAuth/staff/registration'
 import { Route as MemberMentoringRequestsIndexRouteImport } from './routes/_member/mentoring/requests/index'
@@ -70,6 +71,11 @@ const DevDesignSystemRoute = DevDesignSystemRouteImport.update({
   path: '/dev/design-system',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MemberMentoringApplyRoute = MemberMentoringApplyRouteImport.update({
+  id: '/mentoring/apply',
+  path: '/mentoring/apply',
+  getParentRoute: () => MemberRoute,
+} as any)
 const StaffAuthStaffLoginRoute = StaffAuthStaffLoginRouteImport.update({
   id: '/staff/login',
   path: '/staff/login',
@@ -101,6 +107,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof AuthSignupRoute
   '/admin': typeof StaffAdminRoute
   '/dev/design-system': typeof DevDesignSystemRoute
+  '/mentoring/apply': typeof MemberMentoringApplyRoute
   '/staff/login': typeof StaffAuthStaffLoginRoute
   '/staff/registration': typeof StaffAuthStaffRegistrationRoute
   '/mentoring/requests/$requestId': typeof MemberMentoringRequestsRequestIdRoute
@@ -113,6 +120,7 @@ export interface FileRoutesByTo {
   '/signup': typeof AuthSignupRoute
   '/admin': typeof StaffAdminRoute
   '/dev/design-system': typeof DevDesignSystemRoute
+  '/mentoring/apply': typeof MemberMentoringApplyRoute
   '/staff/login': typeof StaffAuthStaffLoginRoute
   '/staff/registration': typeof StaffAuthStaffRegistrationRoute
   '/mentoring/requests/$requestId': typeof MemberMentoringRequestsRequestIdRoute
@@ -130,6 +138,7 @@ export interface FileRoutesById {
   '/_staff/admin': typeof StaffAdminRoute
   '/dev/design-system': typeof DevDesignSystemRoute
   '/_member/': typeof MemberIndexRoute
+  '/_member/mentoring/apply': typeof MemberMentoringApplyRoute
   '/_staffAuth/staff/login': typeof StaffAuthStaffLoginRoute
   '/_staffAuth/staff/registration': typeof StaffAuthStaffRegistrationRoute
   '/_member/mentoring/requests/$requestId': typeof MemberMentoringRequestsRequestIdRoute
@@ -144,6 +153,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/admin'
     | '/dev/design-system'
+    | '/mentoring/apply'
     | '/staff/login'
     | '/staff/registration'
     | '/mentoring/requests/$requestId'
@@ -156,6 +166,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/admin'
     | '/dev/design-system'
+    | '/mentoring/apply'
     | '/staff/login'
     | '/staff/registration'
     | '/mentoring/requests/$requestId'
@@ -172,6 +183,7 @@ export interface FileRouteTypes {
     | '/_staff/admin'
     | '/dev/design-system'
     | '/_member/'
+    | '/_member/mentoring/apply'
     | '/_staffAuth/staff/login'
     | '/_staffAuth/staff/registration'
     | '/_member/mentoring/requests/$requestId'
@@ -258,6 +270,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DevDesignSystemRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_member/mentoring/apply': {
+      id: '/_member/mentoring/apply'
+      path: '/mentoring/apply'
+      fullPath: '/mentoring/apply'
+      preLoaderRoute: typeof MemberMentoringApplyRouteImport
+      parentRoute: typeof MemberRoute
+    }
     '/_staffAuth/staff/login': {
       id: '/_staffAuth/staff/login'
       path: '/staff/login'
@@ -305,12 +324,14 @@ const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
 
 interface MemberRouteChildren {
   MemberIndexRoute: typeof MemberIndexRoute
+  MemberMentoringApplyRoute: typeof MemberMentoringApplyRoute
   MemberMentoringRequestsRequestIdRoute: typeof MemberMentoringRequestsRequestIdRoute
   MemberMentoringRequestsIndexRoute: typeof MemberMentoringRequestsIndexRoute
 }
 
 const MemberRouteChildren: MemberRouteChildren = {
   MemberIndexRoute: MemberIndexRoute,
+  MemberMentoringApplyRoute: MemberMentoringApplyRoute,
   MemberMentoringRequestsRequestIdRoute: MemberMentoringRequestsRequestIdRoute,
   MemberMentoringRequestsIndexRoute: MemberMentoringRequestsIndexRoute,
 }

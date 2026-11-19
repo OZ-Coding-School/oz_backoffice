@@ -5,8 +5,17 @@ import { ko } from "date-fns/locale";
 /** 화면 표시는 Asia/Seoul로 한다 (plan §2.5). */
 export const TIME_ZONE = "Asia/Seoul";
 
+/**
+ * 시각(ms). Date(TZDate 포함)는 getTime()으로 읽는다.
+ * `new Date(tzDate)`는 문자열을 거쳐 바뀌어 한국 밖 시간대에서 날짜가 어긋난다.
+ */
+export function toEpochMs(date: Date | string | number): number {
+  // instanceof Date는 쓰지 않는다: 가짜 시계(테스트)나 다른 영역의 Date에서 거짓이 된다
+  return typeof date === "object" ? date.getTime() : new Date(date).getTime();
+}
+
 export function formatKst(date: Date | string | number, pattern: string): string {
-  return format(new TZDate(new Date(date).getTime(), TIME_ZONE), pattern, { locale: ko });
+  return format(new TZDate(toEpochMs(date), TIME_ZONE), pattern, { locale: ko });
 }
 
 /** "11/16(월)" */

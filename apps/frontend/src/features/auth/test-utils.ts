@@ -72,6 +72,16 @@ export const ENROLLMENTS = [
   },
 ];
 
+/** 기수 멘토링 설정 요약 (A64). 기본은 1:1·팀 모두 허용이라 FE-3a의 '멘토링 신청' 메뉴가 없다 (F30) */
+export const MENTORING_SETTINGS = {
+  cohort_id: "c12",
+  allow_1_on_1: true,
+  allow_team_mentoring: true,
+  allowed_duration: 60,
+  min_lead_hours: 24,
+  max_pending_requests: 3,
+};
+
 /** 세션·복원 상태를 비우고, 기본으로 refresh 쿠키가 없는 상태를 모킹한다. */
 export function resetAuth(): void {
   resetSessionForTest();
@@ -83,6 +93,7 @@ export function resetAuth(): void {
     http.post(apiUrl("/api/v1/auth/logout"), () => new HttpResponse(null, { status: 204 })),
     http.get(apiUrl("/api/v1/auth/signup/cohorts"), () => HttpResponse.json(COHORTS)),
     http.get(apiUrl("/api/v1/me/enrollments"), () => HttpResponse.json(ENROLLMENTS)),
+    http.get(apiUrl("/api/v1/me/mentoring/settings"), () => HttpResponse.json(MENTORING_SETTINGS)),
   );
 }
 

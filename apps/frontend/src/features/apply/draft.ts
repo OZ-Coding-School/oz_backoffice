@@ -1,0 +1,53 @@
+import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
+
+/**
+ * 1:1 신청 단계 값 (F30): 새로고침해도 남도록 sessionStorage에 둔다.
+ * 다른 사용자·기수의 값이면 버린다(owner). 신청이 끝나면 비운다.
+ */
+export interface ApplyDraft {
+  owner: string | null;
+  mentorId: string | null;
+  duration: number | null;
+  desiredTimes: string[];
+  topic: string;
+  detail: string;
+}
+
+const EMPTY: ApplyDraft = { owner: null, mentorId: null, duration: null, desiredTimes: [], topic: "", detail: "" };
+
+interface DraftStore extends ApplyDraft {
+  /** 주인이 바뀌었으면 비우고 true */
+  ensureOwner: (owner: string) => boolean;
+  update: (patch: Partial<Omit<ApplyDraft, "owner">>) => void;
+  reset: () => void;
+}
+
+export const MAX_DESIRED = 3;
+
+export const useApplyDraft = create<DraftStore>()(
+  persist(
+    (set, get) => ({
+      ...EMPTY,
+      ensureOwner: (owner) => {
+        if (get().owner === owner) return false;
+        set({ ...EMPTY, owner });
+        return true;
+      },
+      update: (patch) => set(patch),
+      reset: () => set({ ...EMPTY, owner: get().owner }),
+    }),
+    {
+      name: "oz:apply:1on1",
+      storage: createJSONStorage(() => sessionStorage),
+      partialize: ({ owner, mentorId, duration, desiredTimes, topic, detail }) => ({
+        owner,
+        mentorId,
+        duration,
+        desiredTimes,
+        topic,
+        detail,
+      }),
+    },
+  ),
+);
