@@ -107,6 +107,13 @@ class ChangeInput:
 
 
 @dataclass(frozen=True, slots=True)
+class RequestList:
+    items: list[MentoringRequest]
+    total: int  # 상태 필터를 적용한 건수
+    counts: dict[MentoringRequestStatus, int]  # 필터와 무관한 상태별 건수 (A67)
+
+
+@dataclass(frozen=True, slots=True)
 class Prepared:
     """트랜잭션 전에 검사를 마친 새 신청."""
 
@@ -311,28 +318,45 @@ class MentoringRequestService:
         raise NotFoundError("신청을 찾을 수 없습니다.", code="request_not_found")
 
     async def list_mine(
-        self, user_id: uuid.UUID, *, status: MentoringRequestStatus | None, limit: int, offset: int
-    ) -> tuple[list[MentoringRequest], int]:
-        """본인 1:1 신청과 소속 팀의 신청 (팀원 모두 조회, A42)."""
+        self,
+        user_id: uuid.UUID,
+        *,
+        statuses: list[MentoringRequestStatus] | None,
+        limit: int,
+        offset: int,
+    ) -> RequestList:
+        """본인 1:1 신청과 소속 팀의 신청 (팀원 모두 조회, A42). 상태별 건수는 필터와 무관 (A67)."""
         registrations = await self._students.of_user(user_id)
-        teams = await self._teams.list_by_students([s.id for s in registrations])
-        return await self._requests.list_for_participants(
-            student_ids=[s.id for s in registrations],
-            team_ids=[t.id for t in teams],
-            status=status,
+        student_ids = [s.id for s in registrations]
+        team_ids = [t.id for t in await self._teams.list_by_students(student_ids)]
+        items, total = await self._requests.list_for_participants(
+            student_ids=student_ids,
+            team_ids=team_ids,
+            statuses=statuses,
             limit=limit,
             offset=offset,
         )
+        counts = await self._requests.count_statuses_for_participants(
+            student_ids=student_ids, team_ids=team_ids
+        )
+        return RequestList(items=items, total=total, counts=counts)
 
     async def list_for_mentor(
-        self, user_id: uuid.UUID, *, status: MentoringRequestStatus | None, limit: int, offset: int
-    ) -> tuple[list[MentoringRequest], int]:
+        self,
+        user_id: uuid.UUID,
+        *,
+        statuses: list[MentoringRequestStatus] | None,
+        limit: int,
+        offset: int,
+    ) -> RequestList:
         mentor = await self._mentors.get_by_user(user_id)
         if mentor is None:
             raise NotFoundError("멘토 프로필이 없습니다.", code="mentor_profile_not_found")
-        return await self._requests.list_for_mentor(
-            mentor.id, status=status, limit=limit, offset=offset
+        items, total = await self._requests.list_for_mentor(
+            mentor.id, statuses=statuses, limit=limit, offset=offset
         )
+        counts = await self._requests.count_statuses_for_mentor(mentor.id)
+        return RequestList(items=items, total=total, counts=counts)
 
     async def list_by_cohort(
         self,

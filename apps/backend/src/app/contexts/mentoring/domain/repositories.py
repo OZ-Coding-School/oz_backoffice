@@ -170,7 +170,7 @@ class MentoringRequestRepository(Protocol):
         *,
         student_ids: list[uuid.UUID],
         team_ids: list[uuid.UUID],
-        status: MentoringRequestStatus | None,
+        statuses: list[MentoringRequestStatus] | None,
         limit: int,
         offset: int,
     ) -> tuple[list[MentoringRequest], int]:
@@ -181,10 +181,22 @@ class MentoringRequestRepository(Protocol):
         self,
         mentor_id: uuid.UUID,
         *,
-        status: MentoringRequestStatus | None,
+        statuses: list[MentoringRequestStatus] | None,
         limit: int,
         offset: int,
     ) -> tuple[list[MentoringRequest], int]: ...
+    async def count_statuses_for_participants(
+        self, *, student_ids: list[uuid.UUID], team_ids: list[uuid.UUID]
+    ) -> dict[MentoringRequestStatus, int]:
+        """`list_for_participants` 대상의 상태별 건수 (모든 상태, 없으면 0, A67)."""
+        ...
+
+    async def count_statuses_for_mentor(
+        self, mentor_id: uuid.UUID
+    ) -> dict[MentoringRequestStatus, int]:
+        """멘토가 받은 신청의 상태별 건수 (모든 상태, 없으면 0, A67)."""
+        ...
+
     async def list_by_cohort(
         self,
         cohort_id: uuid.UUID,

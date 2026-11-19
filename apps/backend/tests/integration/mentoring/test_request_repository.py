@@ -68,7 +68,7 @@ async def test_request_round_trip_queries_and_constraints() -> None:
     assert await repo.count_pending(team_id=team.id) == 1
 
     mine, total = await repo.list_for_participants(
-        student_ids=[student.id], team_ids=[team.id], status=None, limit=10, offset=0
+        student_ids=[student.id], team_ids=[team.id], statuses=None, limit=10, offset=0
     )
     assert total == 2
     assert {r.id for r in mine} == {solo.id, team_request.id}
@@ -94,8 +94,33 @@ async def test_request_round_trip_queries_and_constraints() -> None:
         other.id: 1,
     }
     assert await repo.count_pending_by_requesters([]) == {}
-    _, mentor_total = await repo.list_for_mentor(mentor.id, status=None, limit=10, offset=0)
+    _, mentor_total = await repo.list_for_mentor(mentor.id, statuses=None, limit=10, offset=0)
     assert mentor_total == 3
+    # 상태 여러 개 필터와 상태별 건수 (A67)
+    _, closed_total = await repo.list_for_mentor(
+        mentor.id,
+        statuses=[MentoringRequestStatus.PENDING, MentoringRequestStatus.CANCELED],
+        limit=10,
+        offset=0,
+    )
+    assert closed_total == 3
+    none_left, _ = await repo.list_for_participants(
+        student_ids=[student.id],
+        team_ids=[team.id],
+        statuses=[MentoringRequestStatus.REJECTED],
+        limit=10,
+        offset=0,
+    )
+    assert none_left == []
+    zero = dict.fromkeys(MentoringRequestStatus, 0)
+    assert await repo.count_statuses_for_participants(
+        student_ids=[student.id], team_ids=[team.id]
+    ) == {**zero, MentoringRequestStatus.PENDING: 2}
+    assert await repo.count_statuses_for_participants(student_ids=[], team_ids=[]) == zero
+    assert await repo.count_statuses_for_mentor(mentor.id) == {
+        **zero,
+        MentoringRequestStatus.PENDING: 3,
+    }
 
     assert {r.id for r in await repo.list_stale(T + timedelta(hours=4))} == {team_request.id}
     assert len(await repo.list_stale(T + timedelta(days=2))) == 3

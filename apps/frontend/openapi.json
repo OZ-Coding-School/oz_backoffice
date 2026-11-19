@@ -8126,14 +8126,19 @@
             "schema": {
               "anyOf": [
                 {
-                  "$ref": "#/components/schemas/MentoringRequestStatus"
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MentoringRequestStatus"
+                  }
                 },
                 {
                   "type": "null"
                 }
               ],
+              "description": "여러 개 가능 (예: status=REJECTED&status=CANCELED, A67)",
               "title": "Status"
-            }
+            },
+            "description": "여러 개 가능 (예: status=REJECTED&status=CANCELED, A67)"
           },
           {
             "name": "limit",
@@ -8165,7 +8170,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_RequestResponse_"
+                  "$ref": "#/components/schemas/RequestListPage"
                 }
               }
             }
@@ -8203,14 +8208,19 @@
             "schema": {
               "anyOf": [
                 {
-                  "$ref": "#/components/schemas/MentoringRequestStatus"
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MentoringRequestStatus"
+                  }
                 },
                 {
                   "type": "null"
                 }
               ],
+              "description": "여러 개 가능 (예: status=REJECTED&status=CANCELED, A67)",
               "title": "Status"
-            }
+            },
+            "description": "여러 개 가능 (예: status=REJECTED&status=CANCELED, A67)"
           },
           {
             "name": "limit",
@@ -8242,7 +8252,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_RequestResponse_"
+                  "$ref": "#/components/schemas/RequestListPage"
                 }
               }
             }
@@ -16462,37 +16472,6 @@
         ],
         "title": "Page[MentorListItem]"
       },
-      "Page_RequestResponse_": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/RequestResponse"
-            },
-            "type": "array",
-            "title": "Items"
-          },
-          "total": {
-            "type": "integer",
-            "title": "Total"
-          },
-          "limit": {
-            "type": "integer",
-            "title": "Limit"
-          },
-          "offset": {
-            "type": "integer",
-            "title": "Offset"
-          }
-        },
-        "type": "object",
-        "required": [
-          "items",
-          "total",
-          "limit",
-          "offset"
-        ],
-        "title": "Page[RequestResponse]"
-      },
       "Page_SessionResponse_": {
         "properties": {
           "items": {
@@ -17108,6 +17087,41 @@
         "title": "RequestCreate",
         "description": "1:1은 cohort_id·mentor_id, 팀은 team_id(담당 멘토에게 자동)."
       },
+      "RequestListPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RequestResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/RequestStatusCounts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset",
+          "counts"
+        ],
+        "title": "RequestListPage"
+      },
       "RequestResponse": {
         "properties": {
           "id": {
@@ -17341,6 +17355,35 @@
           "ends_at"
         ],
         "title": "RequestSessionBrief"
+      },
+      "RequestStatusCounts": {
+        "properties": {
+          "PENDING": {
+            "type": "integer",
+            "title": "Pending"
+          },
+          "APPROVED": {
+            "type": "integer",
+            "title": "Approved"
+          },
+          "REJECTED": {
+            "type": "integer",
+            "title": "Rejected"
+          },
+          "CANCELED": {
+            "type": "integer",
+            "title": "Canceled"
+          }
+        },
+        "type": "object",
+        "required": [
+          "PENDING",
+          "APPROVED",
+          "REJECTED",
+          "CANCELED"
+        ],
+        "title": "RequestStatusCounts",
+        "description": "상태 필터와 무관한 그 목록 대상 전체의 상태별 건수 (A67)."
       },
       "ResetCodeRequest": {
         "properties": {

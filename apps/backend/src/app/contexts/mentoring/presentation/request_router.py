@@ -5,11 +5,11 @@
   POST /mentoring/requests/{id}/cancel        취소 (사유 필수): 대기는 신청자, 승인 후는 신청자·담당
                                               멘토가 시작 min_lead_hours 전까지 (M26)
   POST /mentoring/requests/{id}/change        변경: 같은 대상으로 기존 취소 + 새 신청 (A44)
-  GET  /me/mentoring/requests?status=         본인 1:1 + 소속 팀 신청
+  GET  /me/mentoring/requests?status=         본인 1:1 + 소속 팀 (status 여러 개·상태별 건수, A67)
 수강생·멘토:
   GET  /mentoring/requests/{id}               단건: 신청자·소속 팀원·담당 멘토만, 그 밖은 404 (A66)
 멘토:
-  GET  /me/mentor-requests?status=            받은 신청
+  GET  /me/mentor-requests?status=            받은 신청 (status 여러 개, 상태별 건수, A67)
   POST /mentoring/requests/{id}/approve       희망 일시 하나를 골라 승인 → 세션 생성 (A43)
   POST /mentoring/requests/{id}/reject        반려 (사유 필수)
 운영진 (기수 범위):
@@ -36,6 +36,7 @@ from app.contexts.mentoring.application.request_service import (
     ChangeInput,
     MentoringRequestService,
     RequestInput,
+    RequestList,
     StudentLookup,
 )
 from app.contexts.mentoring.domain.balance import request_balance
@@ -216,6 +217,37 @@ class AdminRequestResponse(RequestResponse):
     mentor_name: str = Field(description="멘토 실명 (운영진 응답에만)")
 
 
+class RequestStatusCounts(BaseModel):
+    """상태 필터와 무관한 그 목록 대상 전체의 상태별 건수 (A67)."""
+
+    PENDING: int
+    APPROVED: int
+    REJECTED: int
+    CANCELED: int
+
+
+class RequestListPage(Page[RequestResponse]):
+    counts: RequestStatusCounts
+
+
+StatusFilter = Annotated[
+    list[MentoringRequestStatus] | None,
+    Query(alias="status", description="여러 개 가능 (예: status=REJECTED&status=CANCELED, A67)"),
+]
+
+
+def _list_page(
+    found: RequestList, items: list[RequestResponse], limit: int, offset: int
+) -> RequestListPage:
+    return RequestListPage(
+        items=items,
+        total=found.total,
+        limit=limit,
+        offset=offset,
+        counts=RequestStatusCounts(**{k.value: v for k, v in found.counts.items()}),
+    )
+
+
 class ApprovalResponse(BaseModel):
     request: RequestResponse
     session: SessionResponse
@@ -351,33 +383,31 @@ async def get_request(
     return (await presenter.public([found]))[0]
 
 
-@me_router.get("/mentoring/requests", response_model=Page[RequestResponse])
+@me_router.get("/mentoring/requests", response_model=RequestListPage)
 async def my_requests(
     user: ApprovedUser,
     service: ServiceDep,
     presenter: PresenterDep,
-    status_: Annotated[MentoringRequestStatus | None, Query(alias="status")] = None,
+    status_: StatusFilter = None,
     limit: Limit = 20,
     offset: Offset = 0,
-) -> Page[RequestResponse]:
-    items, total = await service.list_mine(user.id, status=status_, limit=limit, offset=offset)
-    return Page(items=await presenter.public(items), total=total, limit=limit, offset=offset)
+) -> RequestListPage:
+    found = await service.list_mine(user.id, statuses=status_, limit=limit, offset=offset)
+    return _list_page(found, await presenter.public(found.items), limit, offset)
 
 
 # ---------------------------------------------------------------- 멘토
-@me_router.get("/mentor-requests", response_model=Page[RequestResponse])
+@me_router.get("/mentor-requests", response_model=RequestListPage)
 async def mentor_requests(
     user: ApprovedUser,
     service: ServiceDep,
     presenter: PresenterDep,
-    status_: Annotated[MentoringRequestStatus | None, Query(alias="status")] = None,
+    status_: StatusFilter = None,
     limit: Limit = 20,
     offset: Offset = 0,
-) -> Page[RequestResponse]:
-    items, total = await service.list_for_mentor(
-        user.id, status=status_, limit=limit, offset=offset
-    )
-    return Page(items=await presenter.public(items), total=total, limit=limit, offset=offset)
+) -> RequestListPage:
+    found = await service.list_for_mentor(user.id, statuses=status_, limit=limit, offset=offset)
+    return _list_page(found, await presenter.public(found.items), limit, offset)
 
 
 @router.post("/{request_id}/approve", response_model=ApprovalResponse)
