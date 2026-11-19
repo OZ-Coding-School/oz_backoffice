@@ -1,4 +1,4 @@
-import { FileText, LayoutGrid, type LucideIcon } from "lucide-react";
+import { FileText, LayoutGrid, Plus, type LucideIcon } from "lucide-react";
 
 import type { Me } from "@/features/auth/api";
 
@@ -29,11 +29,18 @@ const REQUESTS: MemberNavItem = {
   icon: FileText,
 };
 
-const STUDENT_NAV: MemberNavGroup[] = [{ items: [HOME] }, { title: "멘토링", items: [REQUESTS] }];
+const APPLY: MemberNavItem = { to: "/mentoring/apply", label: "멘토링 신청", shortLabel: "신청", icon: Plus };
+
 const MENTOR_NAV: MemberNavGroup[] = [{ items: [HOME] }];
 
-export function memberNav(accountType: Me["account_type"]): MemberNavGroup[] {
-  return accountType === "MENTOR" ? MENTOR_NAV : STUDENT_NAV;
+export interface MemberNavOptions {
+  /** '멘토링 신청' 메뉴: FE-3a에서는 1:1만 허용한 기수와 수강이 끝난 수강생(안내)에만 (F30) */
+  apply?: boolean;
+}
+
+export function memberNav(accountType: Me["account_type"], options: MemberNavOptions = {}): MemberNavGroup[] {
+  if (accountType === "MENTOR") return MENTOR_NAV;
+  return [{ items: [HOME] }, { title: "멘토링", items: options.apply ? [APPLY, REQUESTS] : [REQUESTS] }];
 }
 
 export function navItems(groups: readonly MemberNavGroup[]): MemberNavItem[] {

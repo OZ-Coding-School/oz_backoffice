@@ -21,6 +21,8 @@ import { Logo } from "@/features/auth/components/auth-layout";
 import { cn } from "@/lib/utils";
 
 import { activeCohort, cohortLabel, enrollmentsQuery } from "../api";
+import { mentoringSettingsQuery } from "@/features/requests/api";
+
 import { currentNavItem, memberNav, navItems, showBottomTabs, type MemberNavItem } from "../nav";
 
 /**
@@ -28,12 +30,20 @@ import { currentNavItem, memberNav, navItems, showBottomTabs, type MemberNavItem
  * 데스크톱(lg) 사이드바 240 · 태블릿(md) 레일 72 · 모바일 상단 막대(+ 메뉴 2개 이상이면 하단 탭).
  */
 export function MemberShell({ me, children }: { me: Me; children: ReactNode }) {
-  const groups = memberNav(me.account_type);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const current = currentNavItem(groups, pathname);
   const student = me.account_type === "STUDENT";
   const enrollments = useQuery({ ...enrollmentsQuery, enabled: student });
   const cohort = student && enrollments.data ? activeCohort(enrollments.data) : null;
+  const settings = useQuery({
+    ...mentoringSettingsQuery(cohort?.enrollment.cohort_id ?? ""),
+    enabled: !!cohort && !cohort.readOnly,
+  });
+  // FE-3a: 1:1만 허용한 기수와 수강이 끝난 수강생(안내)에만 '멘토링 신청' (F30). FE-3b에서 모든 기수로 넓힌다
+  const apply =
+    !!cohort &&
+    (cohort.readOnly || (!!settings.data && settings.data.allow_1_on_1 && !settings.data.allow_team_mentoring));
+  const groups = memberNav(me.account_type, { apply });
+  const current = currentNavItem(groups, pathname);
   const roleLine = student ? (cohort ? `수강생 · ${cohortLabel(cohort.enrollment)}` : "수강생") : "멘토";
 
   return (
