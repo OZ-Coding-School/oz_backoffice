@@ -22,6 +22,7 @@ class Names:
     requester_name: str
     mentor_display_name: str
     mentor_name: str
+    mentor_headline: str | None
 
 
 class NameBook:
@@ -51,5 +52,6 @@ class NameBook:
                 requester_name=student.name if student else "",
                 mentor_display_name=mentor.display_name(real) if mentor else "",
                 mentor_name=real,
+                mentor_headline=mentor.headline if mentor else None,
             )
         return result

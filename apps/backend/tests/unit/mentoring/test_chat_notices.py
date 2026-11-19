@@ -7,6 +7,7 @@ import pytest
 
 from app.contexts.mentoring.application.chat_notices import MentoringNotices
 from app.contexts.mentoring.domain.chat import ChatMessage
+from app.contexts.mentoring.domain.enums import MentoringCancelActor
 from app.contexts.mentoring.domain.request import MentoringRequest
 from app.contexts.mentoring.domain.session import MentoringSession
 from app.shared.ids import new_id
@@ -59,7 +60,7 @@ async def test_notice_texts() -> None:
     )
     await notices.requested(request)
     await notices.approved(request, session)
-    request.cancel("개인 사정", now=START - timedelta(days=1))
+    request.cancel("개인 사정", now=START - timedelta(days=1), by=MentoringCancelActor.REQUESTER)
     await notices.canceled(request, session)
     assert [body for _, _, body in poster.posts] == [
         "[멘토링 신청] 주제: 이력서 · 60분 · 희망 일시: 11/20(금) 14:00, 11/21(토) 14:00",

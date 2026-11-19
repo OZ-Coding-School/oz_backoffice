@@ -6,6 +6,8 @@
                                               멘토가 시작 min_lead_hours 전까지 (M26)
   POST /mentoring/requests/{id}/change        변경: 같은 대상으로 기존 취소 + 새 신청 (A44)
   GET  /me/mentoring/requests?status=         본인 1:1 + 소속 팀 신청
+수강생·멘토:
+  GET  /mentoring/requests/{id}               단건: 신청자·소속 팀원·담당 멘토만, 그 밖은 404 (A66)
 멘토:
   GET  /me/mentor-requests?status=            받은 신청
   POST /mentoring/requests/{id}/approve       희망 일시 하나를 골라 승인 → 세션 생성 (A43)
@@ -36,7 +38,13 @@ from app.contexts.mentoring.application.request_service import (
     RequestInput,
     StudentLookup,
 )
-from app.contexts.mentoring.domain.enums import MentoringRequestStatus
+from app.contexts.mentoring.domain.balance import request_balance
+from app.contexts.mentoring.domain.enums import (
+    MentoringBalanceTransactionType,
+    MentoringCancelActor,
+    MentoringRequestStatus,
+    RequestBalanceState,
+)
 from app.contexts.mentoring.domain.request import (
     DETAIL_MAX_LENGTH,
     MAX_DESIRED,
@@ -45,6 +53,7 @@ from app.contexts.mentoring.domain.request import (
     TOPIC_MAX_LENGTH,
     MentoringRequest,
 )
+from app.contexts.mentoring.domain.session import MentoringSession
 from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseBalanceAccountRepository,
     TortoiseBalanceTransactionRepository,
@@ -163,6 +172,19 @@ class ApproveBody(BaseModel):
     starts_at: AwareDatetime = Field(description="희망 일시 중 하나")
 
 
+class RequestSessionBrief(BaseModel):
+    id: uuid.UUID
+    starts_at: datetime
+    ends_at: datetime
+
+
+class RequestBalanceResponse(BaseModel):
+    state: RequestBalanceState = Field(
+        description="HELD 차감 예정 · USED 차감됨 · RETURNED 돌려받음 · NONE (A66)"
+    )
+    minutes: int
+
+
 class RequestResponse(BaseModel):
     id: uuid.UUID
     status: MentoringRequestStatus
@@ -172,6 +194,7 @@ class RequestResponse(BaseModel):
     requester_name: str
     mentor_id: uuid.UUID
     mentor_display_name: str
+    mentor_headline: str | None = Field(description="멘토 한 줄 소개 (A66)")
     topic: str
     detail: str
     desired_times: list[datetime]
@@ -180,6 +203,11 @@ class RequestResponse(BaseModel):
     rejected_at: datetime | None
     cancel_reason: str | None
     canceled_at: datetime | None
+    canceled_by: MentoringCancelActor | None = Field(
+        description="취소 주체 (A66). A66 이전 취소는 비어 있다"
+    )
+    session: RequestSessionBrief | None = Field(description="확정 세션 (승인된 신청만, A66)")
+    balance: RequestBalanceResponse
     replaced_request_id: uuid.UUID | None
     created_at: datetime | None
 
@@ -196,9 +224,16 @@ class ApprovalResponse(BaseModel):
 class Presenter:
     def __init__(self, request: Request) -> None:
         self._names = NameBook(request)
+        self._sessions = TortoiseMentoringSessionRepository()
+        self._ledger = TortoiseBalanceTransactionRepository()
 
     async def admin(self, items: list[MentoringRequest]) -> list[AdminRequestResponse]:
         names = await self._names.of(items)
+        ids = [r.id for r in items]
+        sessions = await self._sessions.map_by_requests(
+            [r.id for r in items if r.status is MentoringRequestStatus.APPROVED]
+        )
+        amounts = await self._ledger.amounts_by_requests(ids)
         return [
             AdminRequestResponse(
                 id=r.id,
@@ -210,6 +245,7 @@ class Presenter:
                 mentor_id=r.mentor_id,
                 mentor_display_name=names[r.id].mentor_display_name,
                 mentor_name=names[r.id].mentor_name,
+                mentor_headline=names[r.id].mentor_headline,
                 topic=r.topic,
                 detail=r.detail,
                 desired_times=r.desired_times,
@@ -218,6 +254,9 @@ class Presenter:
                 rejected_at=r.rejected_at,
                 cancel_reason=r.cancel_reason,
                 canceled_at=r.canceled_at,
+                canceled_by=r.canceled_by,
+                session=_session_brief(sessions.get(r.id)),
+                balance=_balance(amounts.get(r.id, [])),
                 replaced_request_id=r.replaced_request_id,
                 created_at=r.created_at,
             )
@@ -230,6 +269,17 @@ class Presenter:
             RequestResponse(**r.model_dump(exclude={"mentor_name"}))
             for r in await self.admin(items)
         ]
+
+
+def _session_brief(session: MentoringSession | None) -> RequestSessionBrief | None:
+    if session is None:
+        return None
+    return RequestSessionBrief(id=session.id, starts_at=session.starts_at, ends_at=session.ends_at)
+
+
+def _balance(entries: list[tuple[MentoringBalanceTransactionType, int]]) -> RequestBalanceResponse:
+    result = request_balance(entries)
+    return RequestBalanceResponse(state=result.state, minutes=result.minutes)
 
 
 PresenterDep = Annotated[Presenter, Depends(Presenter)]
@@ -290,6 +340,15 @@ async def change_request(
         ),
     )
     return (await presenter.public([created]))[0]
+
+
+@router.get("/{request_id}", response_model=RequestResponse)
+async def get_request(
+    request_id: uuid.UUID, user: ApprovedUser, service: ServiceDep, presenter: PresenterDep
+) -> RequestResponse:
+    """신청자(1:1)·소속 팀원(팀 신청)·담당 멘토만. 그 밖은 404 `request_not_found` (A66)."""
+    found = await service.get_for_user(user.id, request_id)
+    return (await presenter.public([found]))[0]
 
 
 @me_router.get("/mentoring/requests", response_model=Page[RequestResponse])

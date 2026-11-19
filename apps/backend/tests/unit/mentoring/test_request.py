@@ -8,6 +8,7 @@ import pytest
 from app.contexts.mentoring.domain.balance import BalanceAccount
 from app.contexts.mentoring.domain.enums import (
     MentoringBalanceTransactionType,
+    MentoringCancelActor,
     MentoringRequestStatus,
 )
 from app.contexts.mentoring.domain.request import MentoringRequest, ensure_before_deadline
@@ -83,12 +84,18 @@ def test_cancel_and_stale() -> None:
     assert not request.is_stale(T)
     assert request.is_stale(T + timedelta(days=1))
     with pytest.raises(BusinessRuleViolation):
-        request.cancel(" ", now=T)
-    request.cancel("일정 변경", now=T)
-    assert (request.status, request.cancel_reason) == (MentoringRequestStatus.CANCELED, "일정 변경")
+        request.cancel(" ", now=T, by=MentoringCancelActor.REQUESTER)
+    before = request.canceled_by
+    request.cancel("일정 변경", now=T, by=MentoringCancelActor.REQUESTER)
+    assert (request.status, request.cancel_reason, request.canceled_by) == (
+        MentoringRequestStatus.CANCELED,
+        "일정 변경",
+        MentoringCancelActor.REQUESTER,
+    )
+    assert before is None  # 사유 검증에 실패하면 바뀌지 않는다
     assert not request.is_stale(T + timedelta(days=2))
     with pytest.raises(BusinessRuleViolation) as twice:
-        request.cancel("다시", now=T)
+        request.cancel("다시", now=T, by=MentoringCancelActor.REQUESTER)
     assert twice.value.code == "request_not_cancelable"
 
 
@@ -154,7 +161,7 @@ def test_reject_requires_reason() -> None:
         now,
     )
     with pytest.raises(BusinessRuleViolation):
-        request.cancel("취소", now=now)
+        request.cancel("취소", now=now, by=MentoringCancelActor.REQUESTER)
 
 
 def test_use_moves_held_to_used() -> None:
@@ -180,7 +187,7 @@ def test_cancel_approved_and_deadline() -> None:
     request = _request()
     now = datetime(2026, 11, 11, tzinfo=UTC)
     request.approve(T, now=now)
-    request.cancel("사정이 생김", now=now)
+    request.cancel("사정이 생김", now=now, by=MentoringCancelActor.REQUESTER)
     assert request.status is MentoringRequestStatus.CANCELED
 
     ensure_before_deadline(T, min_lead_hours=24, now=T - timedelta(hours=24))  # 경계는 허용

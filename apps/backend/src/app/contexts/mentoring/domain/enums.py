@@ -39,11 +39,29 @@ class MentoringBalanceTransactionType(StrEnum):
     OVERTIME = "OVERTIME"  # 신청보다 길게 진행(A53): used += d (잔여에서)
 
 
+class RequestBalanceState(StrEnum):
+    """신청의 시간 차감 상태 (A66, 원장 기준)."""
+
+    HELD = "HELD"  # 차감 예정 (보류 중)
+    USED = "USED"  # 차감됨
+    RETURNED = "RETURNED"  # 돌려받음
+    NONE = "NONE"  # 원장 기록 없음
+
+
 class MentoringRequestStatus(StrEnum):
     PENDING = "PENDING"  # 대기 (시간 보류)
     APPROVED = "APPROVED"  # 멘토 승인 (세션 생성)
     REJECTED = "REJECTED"  # 멘토 반려
     CANCELED = "CANCELED"  # 취소 (변경도 취소 후 새 신청)
+
+
+class MentoringCancelActor(StrEnum):
+    """신청 취소 주체 (A66)."""
+
+    REQUESTER = "REQUESTER"  # 신청자
+    MENTOR = "MENTOR"  # 담당 멘토
+    STAFF = "STAFF"  # 운영진
+    SYSTEM = "SYSTEM"  # 자동 (대기 만료·수강 종료·멘토 변화·팀 이탈 등)
 
 
 class MentoringSessionStatus(StrEnum):

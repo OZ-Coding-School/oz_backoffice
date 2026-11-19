@@ -30,7 +30,7 @@ from app.contexts.educator.domain.profiles import Mentor
 from app.contexts.mentoring.application.availability_service import AvailableTimes
 from app.contexts.mentoring.application.chat_notices import MentoringNotices
 from app.contexts.mentoring.domain.balance import BalanceAccount, BalanceTransaction
-from app.contexts.mentoring.domain.enums import MentoringRequestStatus
+from app.contexts.mentoring.domain.enums import MentoringCancelActor, MentoringRequestStatus
 from app.contexts.mentoring.domain.repositories import (
     BalanceAccountRepository,
     BalanceTransactionRepository,
@@ -193,7 +193,8 @@ class MentoringRequestService:
                 ensure_before_deadline(
                     session.starts_at, min_lead_hours=lead, now=self._clock.now()
                 )
-            entries = self._cancel(request, account, session, reason, refund=True)
+            by = MentoringCancelActor.REQUESTER if is_requester else MentoringCancelActor.MENTOR
+            entries = self._cancel(request, account, session, reason, refund=True, by=by)
             await self._persist(request, account, entries, session)
             await self._record(user_id, "cancel", request)
             if self._notices:
@@ -217,7 +218,9 @@ class MentoringRequestService:
         async with self._uow:
             account, request = await self._lock_pair(request)
             session = await self._sessions.lock_by_request(request.id)
-            entries = self._cancel(request, account, session, reason, refund=refund)
+            entries = self._cancel(
+                request, account, session, reason, refund=refund, by=MentoringCancelActor.STAFF
+            )
             await self._persist(request, account, entries, session)
             await self._record(actor_id, "staff_cancel", request, refund=refund)
             if self._notices:
@@ -255,7 +258,9 @@ class MentoringRequestService:
                     min_lead_hours=prepared.settings.min_lead_hours,
                     now=self._clock.now(),
                 )
-            entries = self._cancel(old, account, session, CHANGE_REASON, refund=True)
+            entries = self._cancel(
+                old, account, session, CHANGE_REASON, refund=True, by=MentoringCancelActor.REQUESTER
+            )
             await self._persist(old, account, entries, session)
             await self._place(prepared, account)
             await self._record(user_id, "change", prepared.request)
@@ -272,7 +277,14 @@ class MentoringRequestService:
                 account, request = await self._lock_pair(stale)
                 if not request.is_stale(now):  # 잠그는 사이 처리됐다
                     continue
-                entries = self._cancel(request, account, None, EXPIRED_REASON, refund=True)
+                entries = self._cancel(
+                    request,
+                    account,
+                    None,
+                    EXPIRED_REASON,
+                    refund=True,
+                    by=MentoringCancelActor.SYSTEM,
+                )
                 await self._persist(request, account, entries, None)
                 await self._record(None, "expire", request)
                 if self._notices:
@@ -281,6 +293,23 @@ class MentoringRequestService:
         return expired
 
     # ------------------------------------------------------------------ 조회
+    async def get_for_user(self, user_id: uuid.UUID, request_id: uuid.UUID) -> MentoringRequest:
+        """신청자(1:1)·소속 팀원(팀 신청)·담당 멘토만. 그 밖은 없는 신청으로 본다 (A66)."""
+        request = await self._requests.get(request_id)
+        if request is None:
+            raise NotFoundError("신청을 찾을 수 없습니다.", code="request_not_found")
+        mentor = await self._mentors.get_by_user(user_id)
+        if mentor is not None and mentor.id == request.mentor_id:
+            return request
+        registrations = await self._students.of_user(user_id)
+        student_ids = [s.id for s in registrations]
+        if request.team_id is None:
+            if request.requester_id in student_ids:
+                return request
+        elif request.team_id in {t.id for t in await self._teams.list_by_students(student_ids)}:
+            return request
+        raise NotFoundError("신청을 찾을 수 없습니다.", code="request_not_found")
+
     async def list_mine(
         self, user_id: uuid.UUID, *, status: MentoringRequestStatus | None, limit: int, offset: int
     ) -> tuple[list[MentoringRequest], int]:
@@ -468,10 +497,11 @@ class MentoringRequestService:
         reason: str,
         *,
         refund: bool,
+        by: MentoringCancelActor,
     ) -> list[BalanceTransaction]:
         """대기 → RELEASE, 승인 → 세션 취소 + (환불이면) REFUND."""
         approved = request.status is MentoringRequestStatus.APPROVED
-        request.cancel(reason, now=self._clock.now())
+        request.cancel(reason, now=self._clock.now(), by=by)
         if not approved:
             return [account.release(request.duration, request_id=request.id, reason=RELEASE_REASON)]
         if session is None:

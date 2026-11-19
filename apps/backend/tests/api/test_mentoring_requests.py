@@ -54,7 +54,7 @@ async def _setup(client: AsyncClient, settings: Settings) -> dict[str, Any]:
         headers=admin,
     )
     mentor_user = await _approved("김멘토")
-    mentor = await create_mentor(mentor_user)
+    mentor = await create_mentor(mentor_user, headline="백엔드 10년차")
     await client.post(
         f"{api}/mentor-assignments",
         json={
@@ -157,6 +157,63 @@ async def test_create_cancel_and_lists(client: AsyncClient, settings: Settings) 
         await client.get(ctx["admin_path"], params={"status": "PENDING"}, headers=ctx["admin"])
     ).json()
     assert filtered["total"] == 0
+
+
+async def test_request_detail_and_supplement_fields(
+    client: AsyncClient, settings: Settings
+) -> None:
+    """단건 조회 권한과 확정 세션·한 줄 소개·취소 주체·차감 상태 (A66)."""
+    ctx = await _setup(client, settings)
+    student_h, mentor_h, admin = ctx["student_h"], ctx["mentor_h"], ctx["admin"]
+    request_id = (await client.post(URL, json=_body(ctx), headers=student_h)).json()["id"]
+    detail = f"{URL}/{request_id}"
+
+    pending = (await client.get(detail, headers=student_h)).json()
+    assert (
+        pending["mentor_headline"],
+        pending["session"],
+        pending["canceled_by"],
+        pending["balance"],
+    ) == ("백엔드 10년차", None, None, {"state": "HELD", "minutes": 60})
+    assert "mentor_name" not in pending
+    assert (await client.get(detail, headers=mentor_h)).json()["id"] == request_id
+    stranger = await client.get(detail, headers=bearer(settings, await _approved()))
+    assert (stranger.status_code, stranger.json()["error"]["code"]) == (404, "request_not_found")
+    assert (await client.get(f"{URL}/{new_id()}", headers=student_h)).status_code == 404
+    assert (await client.get(detail)).status_code == 401
+
+    approved = await client.post(
+        f"{detail}/approve", json={"starts_at": ctx["at"].isoformat()}, headers=mentor_h
+    )
+    session = approved.json()["session"]
+    after = (await client.get(detail, headers=student_h)).json()
+    assert after["session"]["id"] == session["id"]
+    assert datetime.fromisoformat(after["session"]["starts_at"]) == ctx["at"]
+    assert datetime.fromisoformat(after["session"]["ends_at"]) == ctx["at"] + timedelta(hours=1)
+    assert after["balance"] == {"state": "USED", "minutes": 60}
+
+    staff = await client.post(
+        f"{ctx['admin_path']}/{request_id}/cancel",
+        json={"reason": "운영 정리", "refund": True},
+        headers=admin,
+    )
+    body = staff.json()
+    assert (body["canceled_by"], body["balance"], body["session"]) == (
+        "STAFF",
+        {"state": "RETURNED", "minutes": 60},
+        None,  # 취소된 신청에는 확정 세션이 없다
+    )
+    mine = (await client.get("/api/v1/me/mentoring/requests", headers=student_h)).json()
+    assert mine["items"][0]["canceled_by"] == "STAFF"
+
+    other = (await client.post(URL, json=_body(ctx), headers=student_h)).json()["id"]
+    canceled = await client.post(
+        f"{URL}/{other}/cancel", json={"reason": "일정 변경"}, headers=student_h
+    )
+    assert (canceled.json()["canceled_by"], canceled.json()["balance"]) == (
+        "REQUESTER",
+        {"state": "RETURNED", "minutes": 60},
+    )
 
 
 async def test_create_rules_and_permissions(client: AsyncClient, settings: Settings) -> None:

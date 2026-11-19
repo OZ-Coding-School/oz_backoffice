@@ -2193,6 +2193,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/mentoring/requests/{request_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Request
+         * @description 신청자(1:1)·소속 팀원(팀 신청)·담당 멘토만. 그 밖은 404 `request_not_found` (A66).
+         */
+        get: operations["get_request_api_v1_mentoring_requests__request_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/mentoring/requests/{request_id}/approve": {
         parameters: {
             query?: never;
@@ -3006,6 +3026,11 @@ export interface components {
             mentor_id: string;
             /** Mentor Display Name */
             mentor_display_name: string;
+            /**
+             * Mentor Headline
+             * @description 멘토 한 줄 소개 (A66)
+             */
+            mentor_headline: string | null;
             /** Topic */
             topic: string;
             /** Detail */
@@ -3022,6 +3047,11 @@ export interface components {
             cancel_reason: string | null;
             /** Canceled At */
             canceled_at: string | null;
+            /** @description 취소 주체 (A66). A66 이전 취소는 비어 있다 */
+            canceled_by: components["schemas"]["MentoringCancelActor"] | null;
+            /** @description 확정 세션 (승인된 신청만, A66) */
+            session: components["schemas"]["RequestSessionBrief"] | null;
+            balance: components["schemas"]["RequestBalanceResponse"];
             /** Replaced Request Id */
             replaced_request_id: string | null;
             /** Created At */
@@ -4771,6 +4801,12 @@ export interface components {
          */
         MentoringBalanceTransactionType: "STAFF_GRANT" | "STAFF_ADJUST" | "HOLD" | "RELEASE" | "USING" | "REFUND" | "OVERTIME";
         /**
+         * MentoringCancelActor
+         * @description 신청 취소 주체 (A66).
+         * @enum {string}
+         */
+        MentoringCancelActor: "REQUESTER" | "MENTOR" | "STAFF" | "SYSTEM";
+        /**
          * MentoringRequestStatus
          * @enum {string}
          */
@@ -5247,6 +5283,19 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** RequestBalanceResponse */
+        RequestBalanceResponse: {
+            /** @description HELD 차감 예정 · USED 차감됨 · RETURNED 돌려받음 · NONE (A66) */
+            state: components["schemas"]["RequestBalanceState"];
+            /** Minutes */
+            minutes: number;
+        };
+        /**
+         * RequestBalanceState
+         * @description 신청의 시간 차감 상태 (A66, 원장 기준).
+         * @enum {string}
+         */
+        RequestBalanceState: "HELD" | "USED" | "RETURNED" | "NONE";
         /**
          * RequestCreate
          * @description 1:1은 cohort_id·mentor_id, 팀은 team_id(담당 멘토에게 자동).
@@ -5303,6 +5352,11 @@ export interface components {
             mentor_id: string;
             /** Mentor Display Name */
             mentor_display_name: string;
+            /**
+             * Mentor Headline
+             * @description 멘토 한 줄 소개 (A66)
+             */
+            mentor_headline: string | null;
             /** Topic */
             topic: string;
             /** Detail */
@@ -5319,10 +5373,33 @@ export interface components {
             cancel_reason: string | null;
             /** Canceled At */
             canceled_at: string | null;
+            /** @description 취소 주체 (A66). A66 이전 취소는 비어 있다 */
+            canceled_by: components["schemas"]["MentoringCancelActor"] | null;
+            /** @description 확정 세션 (승인된 신청만, A66) */
+            session: components["schemas"]["RequestSessionBrief"] | null;
+            balance: components["schemas"]["RequestBalanceResponse"];
             /** Replaced Request Id */
             replaced_request_id: string | null;
             /** Created At */
             created_at: string | null;
+        };
+        /** RequestSessionBrief */
+        RequestSessionBrief: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
         };
         /** ResetCodeRequest */
         ResetCodeRequest: {
@@ -11299,6 +11376,37 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_request_api_v1_mentoring_requests__request_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
