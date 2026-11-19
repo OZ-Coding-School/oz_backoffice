@@ -1,7 +1,7 @@
 import { ENROLLMENTS } from "@/features/auth/test-utils";
 
 import { activeCohort, cohortLabel, type Enrollment } from "./api";
-import { currentNavItem, memberNav, showBottomTabs, type MemberNavGroup } from "./nav";
+import { currentNavItem, memberNav, navItems, showBottomTabs, type MemberNavGroup } from "./nav";
 
 const base = ENROLLMENTS[0] as Enrollment;
 const past: Enrollment = { ...base, cohort_id: "c3", cohort_number: 3, start_date: "2021-03-01", status: "COMPLETED" };
@@ -26,8 +26,9 @@ describe("활성 기수 (F27)", () => {
 });
 
 describe("회원 메뉴 (F27)", () => {
-  it("FE-2에는 홈 하나라 하단 탭이 없다", () => {
-    expect(showBottomTabs(memberNav("STUDENT"))).toBe(false);
+  it("수강생은 홈·신청 내역(FE-4a)이라 하단 탭이 있고, 멘토는 홈 하나라 없다", () => {
+    expect(navItems(memberNav("STUDENT")).map((i) => i.label)).toEqual(["홈", "신청 내역"]);
+    expect(showBottomTabs(memberNav("STUDENT"))).toBe(true);
     expect(showBottomTabs(memberNav("MENTOR"))).toBe(false);
   });
 
