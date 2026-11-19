@@ -8,7 +8,11 @@ import { apiUrl, errorBody } from "@/mocks/api";
 import { server } from "@/mocks/node";
 import { renderRoute } from "@/test/render";
 
+import { formatKst } from "@/lib/datetime";
+import { slotLabel } from "@/features/requests/labels";
+
 import { useApplyDraft } from "./draft";
+import { kstDateKey } from "./slots";
 
 const ONE_ON_ONE = { ...MENTORING_SETTINGS, allow_team_mentoring: false };
 const MENTORS = [
@@ -68,8 +72,24 @@ afterEach(() => vi.useRealTimers());
 
 describe("1:1 멘토링 신청 (F30)", () => {
   it("멘토 → 일정 → 신청 내용 → 확인 → 신청하면 완료 화면에서 방금 만든 신청으로 간다", async () => {
+    // 가짜 시계(Date)와 TZDate가 겹치면 jsdom에서 한국 밖 시간대(CI UTC) 시각 표시가 어긋난다.
+    // 이 흐름은 실제 시계로, 이틀 뒤(KST) 10:00~12:00을 가능 시간으로 둔다
+    vi.useRealTimers();
+    const day = kstDateKey(new Date(Date.now() + 2 * 86_400_000));
+    const at = (hm: string) => new Date(`${day}T${hm}:00+09:00`).toISOString();
+    const nextMonth = day.slice(0, 7) !== kstDateKey(new Date()).slice(0, 7);
     const posted = vi.fn<(body: unknown) => void>();
     server.use(
+      http.get(apiUrl("/api/v1/mentors/{mentor_id}/available-times"), () =>
+        HttpResponse.json({
+          mentor_id: "m1",
+          cohort_id: "c12",
+          accepting_requests: true,
+          allowed_duration: 60,
+          min_lead_hours: 24,
+          intervals: [{ starts_at: at("10:00"), ends_at: at("12:00") }],
+        }),
+      ),
       http.post(apiUrl("/api/v1/mentoring/requests"), async ({ request }) => {
         posted(await request.json());
         return HttpResponse.json(makeRequest({ id: "r9", topic: "포트폴리오 리뷰" }), { status: 201 });
@@ -90,13 +110,14 @@ describe("1:1 멘토링 신청 (F30)", () => {
     await user.click(next);
 
     expect(await screen.findByRole("heading", { name: "언제 받고 싶나요?" })).toBeInTheDocument();
-    expect(await screen.findByRole("heading", { name: "11월 24일 (화)" })).toBeInTheDocument();
+    if (nextMonth) await user.click(await screen.findByRole("button", { name: "다음 달로 이동" }));
+    expect(await screen.findByRole("heading", { name: formatKst(at("12:00"), "M월 d일 (EEE)") })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "60분" })).toBeChecked();
     expect(screen.getByRole("radio", { name: "120분" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "10:00" }));
     expect(screen.getByRole("button", { name: "10:30" })).toBeDisabled(); // 고른 시간과 겹친다
     await user.click(screen.getByRole("button", { name: "11:00" }));
-    expect(screen.getByText("11/24(화) 10:00 ~ 11:00")).toBeInTheDocument();
+    expect(screen.getByText(slotLabel(at("10:00"), 60))).toBeInTheDocument();
     expect(screen.getByText("2 / 3")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "다음: 신청 내용" }));
 
@@ -120,13 +141,13 @@ describe("1:1 멘토링 신청 (F30)", () => {
       team_id: null,
       topic: "포트폴리오 리뷰",
       detail: "## 질문\n- README",
-      desired_times: ["2026-11-24T01:00:00.000Z", "2026-11-24T02:00:00.000Z"],
+      desired_times: [at("10:00"), at("11:00")],
       duration: 60,
     });
     expect(router.state.location.search).toEqual({ step: "done", id: "r9" });
     expect(screen.getByRole("link", { name: "내 신청 보기" })).toHaveAttribute("href", "/mentoring/requests/r9");
     expect(useApplyDraft.getState().mentorId).toBeNull(); // 임시 값을 지운다
-  });
+  }, 20_000); // 다섯 단계를 끝까지 지나는 긴 흐름
 
   it("소개 모달에서 멘토를 고를 수 있다", async () => {
     const user = userEvent.setup();

@@ -24,6 +24,9 @@ const ENROLLMENT = {
   ended_at: null,
 };
 
+// 한국 밖 시간대에서도 KST 날짜·시각이 맞는지 본다
+test.use({ timezoneId: "America/Los_Angeles" });
+
 test("휴대폰: 하단 탭 '신청'으로 1:1 멘토링을 신청하고 완료 화면에서 상세로 간다 (F30)", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   // 3일 뒤 10:00~12:00 KST가 비어 있다

@@ -1,6 +1,6 @@
 import { expertiseChips } from "./api";
 import { blockReason } from "./gate";
-import { durationOptions, monthRanges, startTimes } from "./slots";
+import { durationOptions, kstDateKey, monthRanges, startTimes } from "./slots";
 
 const cohort = {
   enrollment: { student_id: "st12", cohort_id: "c12" },
@@ -44,6 +44,13 @@ describe("신청 가능 시각 (F30)", () => {
     ]);
     expect(byDay.get("2026-11-21")).toEqual(["2026-11-20T15:00:00.000Z"]);
     expect(startTimes([{ starts_at: "2026-11-20T01:00:00Z", ends_at: "2026-11-20T01:30:00Z" }], 60).size).toBe(0);
+  });
+
+  it("TZDate로 받은 달도 브라우저 시간대와 무관하게 KST 날짜로 읽는다", async () => {
+    const { TZDate } = await import("@date-fns/tz");
+    const month = new TZDate(2026, 10, 1, "Asia/Seoul"); // 11/1 00:00 KST
+    expect(kstDateKey(month)).toBe("2026-11-01");
+    expect(monthRanges(month, new Date("2026-11-19T03:00:00Z"))).toEqual([["2026-11-19", "2026-11-30"]]);
   });
 
   it("진행 시간 선택지: 진행 단위 배수, 120분까지, 남은 시간 이하", () => {
