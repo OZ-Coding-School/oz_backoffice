@@ -31,7 +31,7 @@ describe("라우트 가드", () => {
     mockSignedIn(makeMe());
     await renderRoute("/");
     expect(await screen.findByRole("heading", { name: "안녕하세요, 가수강님" })).toBeInTheDocument();
-    expect(screen.getByText("수강생")).toBeInTheDocument();
+    expect((await screen.findAllByText("수강생 · 초격차 백엔드 12기")).length).toBeGreaterThan(0);
   });
 
   it("운영진이 회원 홈에 오면 운영진 홈으로 보낸다", async () => {

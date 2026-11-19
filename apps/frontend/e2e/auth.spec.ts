@@ -30,6 +30,7 @@ async function mockAuth(page: Page) {
     signedIn = false;
     return route.fulfill({ status: 204 });
   });
+  await page.route("**/api/v1/me/enrollments", (route) => route.fulfill({ json: [] }));
   await page.route("**/api/v1/me", (route) =>
     route.request().headers()["authorization"]
       ? route.fulfill({ json: ME })

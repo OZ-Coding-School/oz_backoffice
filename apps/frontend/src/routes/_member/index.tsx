@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { TempHome } from "@/features/auth/components/temp-home";
+import { MemberHome } from "@/features/member/components/member-home";
 
 export const Route = createFileRoute("/_member/")({
-  component: function MemberHome() {
+  component: function Home() {
     const { me } = Route.useRouteContext();
-    return <TempHome me={me} />;
+    return <MemberHome me={me} />;
   },
 });
