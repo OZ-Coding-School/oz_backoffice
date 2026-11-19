@@ -12,4 +12,4 @@
 | 08 | [FE-4a 수강생 신청 내역 목록·상세·취소](08_request_history.md) | 완료 (#86) |
 | 09 | [FE-3a 1:1 멘토링 신청](09_one_on_one_apply.md) | 완료 (#87) |
 | 10 | [FE-3b 팀 멘토링 신청·종류 선택](10_team_apply.md) | 완료 (#88) |
-| 11 | [FE-4b 신청 변경](11_request_change.md) | PR 진행 중 |
+| 11 | [FE-4b 신청 변경](11_request_change.md) | PR 진행 중 (#90) |
