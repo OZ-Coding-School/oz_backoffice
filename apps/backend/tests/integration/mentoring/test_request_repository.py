@@ -10,6 +10,7 @@ from app.contexts.academy.infrastructure.repositories import TortoiseStudentRepo
 from app.contexts.mentoring.domain.balance import BalanceAccount, BalanceTransaction
 from app.contexts.mentoring.domain.enums import (
     MentoringBalanceTransactionType,
+    MentoringCancelActor,
     MentoringRequestStatus,
 )
 from app.contexts.mentoring.domain.request import MentoringRequest
@@ -101,14 +102,18 @@ async def test_request_round_trip_queries_and_constraints() -> None:
 
     locked = await repo.lock(solo.id)
     assert locked is not None
-    locked.cancel("일정 변경", now=T)
+    locked.cancel("일정 변경", now=T, by=MentoringCancelActor.REQUESTER)
     await repo.save(locked)
     assert await repo.count_pending(requester_id=student.id) == 0
+    reloaded = await repo.get(solo.id)
+    assert reloaded is not None
+    assert reloaded.canceled_by is MentoringCancelActor.REQUESTER
 
     db = connections.get("default")
     for sql in (
         "status = 'CANCELED', canceled_at = NULL",  # 취소 시각 없음
         "cancel_reason = NULL",  # 취소 사유 필수
+        "canceled_by = 'ROBOT'",  # 없는 취소 주체 (A66)
         "duration = 150",
         "duration = 45",
         "detail = ''",
@@ -169,3 +174,8 @@ async def test_overtime_ledger_type_is_allowed_once_per_request() -> None:
     await ledger.add_many([overtime()])
     with pytest.raises(IntegrityError):  # 신청당 하나
         await ledger.add_many([overtime()])
+    # 신청별 원장 (유형, 분) — 차감 상태 계산용 (A66)
+    assert await ledger.amounts_by_requests([request.id, new_id()]) == {
+        request.id: [(MentoringBalanceTransactionType.OVERTIME, 30)]
+    }
+    assert await ledger.amounts_by_requests([]) == {}

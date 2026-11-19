@@ -5,8 +5,13 @@ from typing import Any
 
 import pytest
 
-from app.contexts.mentoring.domain.balance import BalanceAccount, ensure_validity
-from app.contexts.mentoring.domain.enums import MentoringBalanceTransactionType
+from app.contexts.mentoring.domain.balance import (
+    BalanceAccount,
+    RequestBalance,
+    ensure_validity,
+    request_balance,
+)
+from app.contexts.mentoring.domain.enums import MentoringBalanceTransactionType, RequestBalanceState
 from app.shared.errors import BusinessRuleViolation
 from app.shared.ids import new_id
 
@@ -92,3 +97,25 @@ def test_validity_inside_cohort() -> None:
     with pytest.raises(BusinessRuleViolation) as reverse:
         ensure_validity(date(2026, 12, 2), date(2026, 12, 1), **COHORT)
     assert reverse.value.code == "invalid_balance_validity"
+
+
+T = MentoringBalanceTransactionType
+S = RequestBalanceState
+
+
+@pytest.mark.parametrize(
+    ("entries", "expected"),
+    [
+        ([], RequestBalance(S.NONE, 0)),
+        ([(T.HOLD, 60)], RequestBalance(S.HELD, 60)),  # 대기 → 차감 예정
+        ([(T.HOLD, 60), (T.RELEASE, 60)], RequestBalance(S.RETURNED, 60)),  # 승인 전 취소·반려
+        ([(T.HOLD, 60), (T.USING, 60)], RequestBalance(S.USED, 60)),  # 승인
+        ([(T.HOLD, 60), (T.USING, 60), (T.OVERTIME, 30)], RequestBalance(S.USED, 90)),
+        ([(T.HOLD, 60), (T.USING, 60), (T.REFUND, 30)], RequestBalance(S.USED, 30)),  # 짧게 진행
+        ([(T.HOLD, 60), (T.USING, 60), (T.REFUND, 60)], RequestBalance(S.RETURNED, 60)),  # 환불
+    ],
+)
+def test_request_balance(
+    entries: list[tuple[MentoringBalanceTransactionType, int]], expected: RequestBalance
+) -> None:
+    assert request_balance(entries) == expected

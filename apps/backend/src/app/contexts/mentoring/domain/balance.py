@@ -10,10 +10,11 @@
 """
 
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, datetime
 
-from app.contexts.mentoring.domain.enums import MentoringBalanceTransactionType
+from app.contexts.mentoring.domain.enums import MentoringBalanceTransactionType, RequestBalanceState
 from app.shared.domain import AggregateRoot, Entity
 from app.shared.errors import BusinessRuleViolation
 
@@ -211,3 +212,33 @@ class BalanceAccount(AggregateRoot):
             reason=clean_reason(reason),
             request_id=request_id,
         )
+
+
+@dataclass(frozen=True, slots=True)
+class RequestBalance:
+    state: RequestBalanceState
+    minutes: int
+
+
+def request_balance(
+    entries: Iterable[tuple[MentoringBalanceTransactionType, int]],
+) -> RequestBalance:
+    """신청 하나의 원장 줄(유형, 분)로 차감 상태를 정한다 (A66).
+
+    보류 = HOLD − RELEASE − USING, 사용 = USING + OVERTIME − REFUND, 돌려받음 = RELEASE + REFUND.
+    보류가 남았으면 HELD, 아니면 사용이 남았으면 USED, 아니면 돌려받은 게 있으면 RETURNED.
+    """
+    total = dict.fromkeys(MentoringBalanceTransactionType, 0)
+    for type_, amount in entries:
+        total[type_] += amount
+    t = MentoringBalanceTransactionType
+    held = total[t.HOLD] - total[t.RELEASE] - total[t.USING]
+    used = total[t.USING] + total[t.OVERTIME] - total[t.REFUND]
+    returned = total[t.RELEASE] + total[t.REFUND]
+    if held > 0:
+        return RequestBalance(RequestBalanceState.HELD, held)
+    if used > 0:
+        return RequestBalance(RequestBalanceState.USED, used)
+    if returned > 0:
+        return RequestBalance(RequestBalanceState.RETURNED, returned)
+    return RequestBalance(RequestBalanceState.NONE, 0)

@@ -10,6 +10,7 @@ from app.contexts.mentoring.application.request_cleanup import RequestCleanup
 from app.contexts.mentoring.domain.balance import BalanceAccount
 from app.contexts.mentoring.domain.enums import (
     MentoringBalanceTransactionType,
+    MentoringCancelActor,
     MentoringRequestStatus,
     MentoringSessionStatus,
 )
@@ -101,6 +102,7 @@ async def test_cancel_pending_releases_and_is_idempotent(h: Harness) -> None:
     actor = new_id()
     assert await h.cleanup.cancel_pending(requests, "멘토 비활성화", actor_id=actor) == 2
     assert all(r.status is MentoringRequestStatus.CANCELED for r in h.requests.items.values())
+    assert {r.canceled_by for r in h.requests.items.values()} == {MentoringCancelActor.SYSTEM}
     assert [h.accounts.items[a.id].held_minutes for a in (solo, team)] == [0, 0]
     assert [e.type for e in h.ledger.entries] == [MentoringBalanceTransactionType.RELEASE] * 2
     assert {log.actor_user_id for log in h.audit_logs.logs} == {actor}
@@ -130,5 +132,6 @@ async def test_cancel_sessions_with_and_without_refund(h: Harness) -> None:
     assert (stored.used_minutes, stored.remaining_minutes) == (60, 240)
     assert {s.status for s in h.sessions.items.values()} == {MentoringSessionStatus.CANCELED}
     assert {r.status for r in h.requests.items.values()} == {MentoringRequestStatus.CANCELED}
+    assert {r.canceled_by for r in h.requests.items.values()} == {MentoringCancelActor.SYSTEM}
     assert [e.type for e in h.ledger.entries] == [MentoringBalanceTransactionType.REFUND]
     assert await h.cleanup.cancel_sessions([kept], "다시", refund=True, actor_id=None) == 0

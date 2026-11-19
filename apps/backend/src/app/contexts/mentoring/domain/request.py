@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from itertools import pairwise
 
-from app.contexts.mentoring.domain.enums import MentoringRequestStatus
+from app.contexts.mentoring.domain.enums import MentoringCancelActor, MentoringRequestStatus
 from app.shared.domain import AggregateRoot
 from app.shared.errors import BusinessRuleViolation
 from app.shared.time import KST
@@ -62,6 +62,7 @@ class MentoringRequest(AggregateRoot):
     reject_reason: str | None = None
     canceled_at: datetime | None = None
     cancel_reason: str | None = None
+    canceled_by: MentoringCancelActor | None = None  # A66. 이전 취소 행은 비어 있다
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
@@ -142,7 +143,7 @@ class MentoringRequest(AggregateRoot):
             "request_not_pending",
         )
 
-    def cancel(self, reason: str, *, now: datetime) -> None:
+    def cancel(self, reason: str, *, now: datetime, by: MentoringCancelActor) -> None:
         """대기 중이거나 승인된 신청을 취소한다. 마감·권한은 서비스가 본다."""
         _rule(
             self.status in (MentoringRequestStatus.PENDING, MentoringRequestStatus.APPROVED),
@@ -153,6 +154,7 @@ class MentoringRequest(AggregateRoot):
         self.status = MentoringRequestStatus.CANCELED
         self.canceled_at = now
         self.cancel_reason = cleaned
+        self.canceled_by = by
 
 
 def ensure_before_deadline(starts_at: datetime, *, min_lead_hours: int, now: datetime) -> None:

@@ -14,7 +14,11 @@ from typing import Any
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.mentoring.application.chat_notices import MentoringNotices
 from app.contexts.mentoring.domain.balance import BalanceAccount, BalanceTransaction
-from app.contexts.mentoring.domain.enums import MentoringRequestStatus, MentoringSessionStatus
+from app.contexts.mentoring.domain.enums import (
+    MentoringCancelActor,
+    MentoringRequestStatus,
+    MentoringSessionStatus,
+)
 from app.contexts.mentoring.domain.repositories import (
     BalanceAccountRepository,
     BalanceTransactionRepository,
@@ -99,7 +103,7 @@ class RequestCleanup:
             if reject:
                 request.reject(reason, now=now)
             else:
-                request.cancel(reason, now=now)
+                request.cancel(reason, now=now, by=MentoringCancelActor.SYSTEM)
             entries.append(
                 account.release(
                     request.duration,
@@ -146,7 +150,7 @@ class RequestCleanup:
                 or session.status is not MentoringSessionStatus.SCHEDULED
             ):
                 continue
-            request.cancel(reason, now=now)
+            request.cancel(reason, now=now, by=MentoringCancelActor.SYSTEM)
             session.cancel()
             account = accounts.get(_owner(request))
             if refund and account is not None:

@@ -7939,6 +7939,55 @@
         }
       }
     },
+    "/api/v1/mentoring/requests/{request_id}": {
+      "get": {
+        "tags": [
+          "mentoring-requests"
+        ],
+        "summary": "Get Request",
+        "description": "신청자(1:1)·소속 팀원(팀 신청)·담당 멘토만. 그 밖은 404 `request_not_found` (A66).",
+        "operationId": "get_request_api_v1_mentoring_requests__request_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Request Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/mentoring/requests/{request_id}/approve": {
       "post": {
         "tags": [
@@ -11055,6 +11104,18 @@
             "type": "string",
             "title": "Mentor Display Name"
           },
+          "mentor_headline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mentor Headline",
+            "description": "멘토 한 줄 소개 (A66)"
+          },
           "topic": {
             "type": "string",
             "title": "Topic"
@@ -11121,6 +11182,31 @@
             ],
             "title": "Canceled At"
           },
+          "canceled_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MentoringCancelActor"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "취소 주체 (A66). A66 이전 취소는 비어 있다"
+          },
+          "session": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RequestSessionBrief"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "확정 세션 (승인된 신청만, A66)"
+          },
+          "balance": {
+            "$ref": "#/components/schemas/RequestBalanceResponse"
+          },
           "replaced_request_id": {
             "anyOf": [
               {
@@ -11161,6 +11247,7 @@
           "requester_name",
           "mentor_id",
           "mentor_display_name",
+          "mentor_headline",
           "topic",
           "detail",
           "desired_times",
@@ -11169,6 +11256,9 @@
           "rejected_at",
           "cancel_reason",
           "canceled_at",
+          "canceled_by",
+          "session",
+          "balance",
           "replaced_request_id",
           "created_at",
           "mentor_name"
@@ -15662,6 +15752,17 @@
         "title": "MentoringBalanceTransactionType",
         "description": "시간 계좌 원장 유형 (M9·M10)."
       },
+      "MentoringCancelActor": {
+        "type": "string",
+        "enum": [
+          "REQUESTER",
+          "MENTOR",
+          "STAFF",
+          "SYSTEM"
+        ],
+        "title": "MentoringCancelActor",
+        "description": "신청 취소 주체 (A66)."
+      },
       "MentoringRequestStatus": {
         "type": "string",
         "enum": [
@@ -16899,6 +17000,35 @@
         ],
         "title": "RejectStaffRegistrationRequest"
       },
+      "RequestBalanceResponse": {
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/RequestBalanceState",
+            "description": "HELD 차감 예정 · USED 차감됨 · RETURNED 돌려받음 · NONE (A66)"
+          },
+          "minutes": {
+            "type": "integer",
+            "title": "Minutes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "state",
+          "minutes"
+        ],
+        "title": "RequestBalanceResponse"
+      },
+      "RequestBalanceState": {
+        "type": "string",
+        "enum": [
+          "HELD",
+          "USED",
+          "RETURNED",
+          "NONE"
+        ],
+        "title": "RequestBalanceState",
+        "description": "신청의 시간 차감 상태 (A66, 원장 기준)."
+      },
       "RequestCreate": {
         "properties": {
           "cohort_id": {
@@ -17031,6 +17161,18 @@
             "type": "string",
             "title": "Mentor Display Name"
           },
+          "mentor_headline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mentor Headline",
+            "description": "멘토 한 줄 소개 (A66)"
+          },
           "topic": {
             "type": "string",
             "title": "Topic"
@@ -17097,6 +17239,31 @@
             ],
             "title": "Canceled At"
           },
+          "canceled_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MentoringCancelActor"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "취소 주체 (A66). A66 이전 취소는 비어 있다"
+          },
+          "session": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RequestSessionBrief"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "확정 세션 (승인된 신청만, A66)"
+          },
+          "balance": {
+            "$ref": "#/components/schemas/RequestBalanceResponse"
+          },
           "replaced_request_id": {
             "anyOf": [
               {
@@ -17132,6 +17299,7 @@
           "requester_name",
           "mentor_id",
           "mentor_display_name",
+          "mentor_headline",
           "topic",
           "detail",
           "desired_times",
@@ -17140,10 +17308,39 @@
           "rejected_at",
           "cancel_reason",
           "canceled_at",
+          "canceled_by",
+          "session",
+          "balance",
           "replaced_request_id",
           "created_at"
         ],
         "title": "RequestResponse"
+      },
+      "RequestSessionBrief": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "starts_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Starts At"
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ends At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "starts_at",
+          "ends_at"
+        ],
+        "title": "RequestSessionBrief"
       },
       "ResetCodeRequest": {
         "properties": {

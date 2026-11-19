@@ -21,6 +21,7 @@ from app.contexts.mentoring.domain.availability import Interval
 from app.contexts.mentoring.domain.balance import BalanceAccount
 from app.contexts.mentoring.domain.enums import (
     MentoringBalanceTransactionType,
+    MentoringCancelActor,
     MentoringRequestStatus,
     MentoringSessionStatus,
 )
@@ -301,6 +302,36 @@ async def test_team_request(h: Harness) -> None:
     assert (total, [r.id for r in mine]) == (1, [request.id])
 
 
+async def test_get_for_user(h: Harness) -> None:
+    """신청자·소속 팀원·담당 멘토만 단건을 본다. 그 밖은 없는 신청 (A66)."""
+    await h.fund(student_id=h.student.id)
+    one = await h.create()
+    mate = h.students.add(h.cohort_id)
+    team = MentoringTeam(
+        cohort_id=h.cohort_id,
+        team_number=1,
+        mentor_id=h.mentor.id,
+        member_ids=[h.student.id, mate.id],
+    )
+    await h.teams.add(team)
+    await h.fund(team_id=team.id)
+    team_request = await h.create(team_id=team.id, cohort_id=None, mentor_id=None)
+    outsider = h.students.add(h.cohort_id)
+
+    assert (await h.service.get_for_user(h.student.user_id, one.id)).id == one.id  # type: ignore[arg-type]
+    assert (await h.service.get_for_user(h.mentor.user_id, one.id)).id == one.id
+    assert (await h.service.get_for_user(mate.user_id, team_request.id)).id == team_request.id  # type: ignore[arg-type]
+    for user, request_id in (
+        (mate.user_id, one.id),  # 다른 사람의 1:1
+        (outsider.user_id, team_request.id),  # 팀원이 아님
+        (new_id(), one.id),
+        (h.student.user_id, new_id()),  # 없는 신청
+    ):
+        with pytest.raises(NotFoundError) as missing:
+            await h.service.get_for_user(user, request_id)  # type: ignore[arg-type]
+        assert missing.value.code == "request_not_found"
+
+
 async def test_cancel_and_expire(h: Harness) -> None:
     account = await h.fund(student_id=h.student.id)
     first = await h.create()
@@ -312,6 +343,7 @@ async def test_cancel_and_expire(h: Harness) -> None:
         await h.service.cancel(h.student.user_id, first.id, " ")  # type: ignore[arg-type]
     canceled = await h.service.cancel(h.student.user_id, first.id, "일정 변경")  # type: ignore[arg-type]
     assert canceled.status is MentoringRequestStatus.CANCELED
+    assert canceled.canceled_by is MentoringCancelActor.REQUESTER
     assert h.accounts.items[account.id].held_minutes == 60
 
     h.clock.set(datetime(2026, 11, 16, 16, 30, tzinfo=KST))  # 둘째 신청(17시)은 아직 승인 가능
@@ -320,9 +352,10 @@ async def test_cancel_and_expire(h: Harness) -> None:
     assert await h.service.expire_stale() == 1
     assert await h.service.expire_stale() == 0
     expired = h.requests.items[second.id]
-    assert (expired.status, expired.cancel_reason) == (
+    assert (expired.status, expired.cancel_reason, expired.canceled_by) == (
         MentoringRequestStatus.CANCELED,
         "승인 기한 지남",
+        MentoringCancelActor.SYSTEM,
     )
     stored = h.accounts.items[account.id]
     assert (stored.held_minutes, stored.remaining_minutes) == (0, 180)
@@ -358,6 +391,7 @@ async def test_cancel_after_approval(h: Harness) -> None:
     h.clock.set(T - timedelta(hours=24))
     canceled = await h.service.cancel(h.mentor.user_id, request.id, "멘토 사정")  # 멘토도 가능
     assert canceled.status is MentoringRequestStatus.CANCELED
+    assert canceled.canceled_by is MentoringCancelActor.MENTOR
     assert h.sessions.items[session.id].status is MentoringSessionStatus.CANCELED
     stored = h.accounts.items[account.id]
     assert (stored.used_minutes, stored.remaining_minutes) == (0, 180)
@@ -375,6 +409,7 @@ async def test_staff_cancel(h: Harness) -> None:
         h.cohort_id, request.id, "노쇼 정리", refund=False, actor_id=new_id()
     )
     assert no_refund.status is MentoringRequestStatus.CANCELED
+    assert no_refund.canceled_by is MentoringCancelActor.STAFF
     assert h.sessions.items[session.id].status is MentoringSessionStatus.CANCELED
     assert h.accounts.items[account.id].used_minutes == 60  # 환불 안 함 → USING 유지
 
@@ -412,7 +447,11 @@ async def test_change(h: Harness) -> None:
         h.mentor.id,
         MentoringRequestStatus.PENDING,
     )
-    assert h.requests.items[request.id].status is MentoringRequestStatus.CANCELED
+    old = h.requests.items[request.id]
+    assert (old.status, old.canceled_by) == (
+        MentoringRequestStatus.CANCELED,
+        MentoringCancelActor.REQUESTER,
+    )
     assert h.sessions.items[session.id].status is MentoringSessionStatus.CANCELED
     stored = h.accounts.items[account.id]
     assert (stored.used_minutes, stored.held_minutes, stored.remaining_minutes) == (0, 30, 150)

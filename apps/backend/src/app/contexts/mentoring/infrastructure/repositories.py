@@ -14,6 +14,7 @@ from app.contexts.mentoring.domain.availability import Interval
 from app.contexts.mentoring.domain.balance import BalanceAccount, BalanceTransaction
 from app.contexts.mentoring.domain.enums import (
     MentoringArtifactStatus,
+    MentoringBalanceTransactionType,
     MentoringRequestStatus,
     MentoringSessionStatus,
     MentoringSettlementStatus,
@@ -520,6 +521,22 @@ class TortoiseBalanceTransactionRepository:
             for row in rows
         ]
 
+    async def amounts_by_requests(
+        self, request_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, list[tuple[MentoringBalanceTransactionType, int]]]:
+        """신청 id → 그 신청의 원장 (유형, 분) 목록 (A66 차감 상태)."""
+        result: dict[uuid.UUID, list[tuple[MentoringBalanceTransactionType, int]]] = {}
+        if not request_ids:
+            return result
+        rows = await MentoringBalanceTransactionModel.filter(
+            request_id__in=request_ids
+        ).values_list("request_id", "type", "amount")
+        for request_id, type_, amount in rows:
+            result.setdefault(request_id, []).append(
+                (MentoringBalanceTransactionType(type_), amount)
+            )
+        return result
+
 
 class TortoiseMentoringRequestRepository:
     """희망 일시 1~3은 컬럼 desired_at_1~3으로 저장한다."""
@@ -543,6 +560,7 @@ class TortoiseMentoringRequestRepository:
             "reject_reason": r.reject_reason,
             "canceled_at": r.canceled_at,
             "cancel_reason": r.cancel_reason,
+            "canceled_by": r.canceled_by,
         }
 
     @staticmethod
@@ -563,6 +581,7 @@ class TortoiseMentoringRequestRepository:
             reject_reason=row.reject_reason,
             canceled_at=row.canceled_at,
             cancel_reason=row.cancel_reason,
+            canceled_by=row.canceled_by,
             created_at=row.created_at,
             updated_at=row.updated_at,
         )
@@ -812,6 +831,15 @@ class TortoiseMentoringSessionRepository:
     async def get_by_request(self, request_id: uuid.UUID) -> MentoringSession | None:
         row = await MentoringSessionModel.get_or_none(request_id=request_id)
         return self._entity(row) if row else None
+
+    async def map_by_requests(
+        self, request_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, MentoringSession]:
+        """신청 id → 세션 (A66 확정 세션)."""
+        if not request_ids:
+            return {}
+        rows = await MentoringSessionModel.filter(request_id__in=request_ids)
+        return {s.request_id: s for s in (self._entity(r) for r in rows)}
 
     async def lock_by_request(self, request_id: uuid.UUID) -> MentoringSession | None:
         row = await MentoringSessionModel.select_for_update().get_or_none(request_id=request_id)

@@ -7,7 +7,7 @@ from typing import Any
 
 from tortoise import fields, models
 
-from app.contexts.mentoring.domain.enums import MentoringRequestStatus
+from app.contexts.mentoring.domain.enums import MentoringCancelActor, MentoringRequestStatus
 from app.shared.ids import new_id
 
 
@@ -36,6 +36,7 @@ class MentoringRequestModel(models.Model):
     reject_reason = fields.CharField(max_length=300, null=True)
     canceled_at = fields.DatetimeField(null=True)
     cancel_reason = fields.CharField(max_length=300, null=True)
+    canceled_by = fields.CharEnumField(MentoringCancelActor, max_length=20, null=True)  # A66
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
 

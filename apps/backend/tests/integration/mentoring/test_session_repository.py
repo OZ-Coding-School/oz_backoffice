@@ -77,6 +77,12 @@ async def test_session_round_trip_overlap_and_lists() -> None:
         solo.request_id,
     )
 
+    missing = new_id()
+    assert await sessions.map_by_requests([solo.request_id, missing]) == {
+        solo.request_id: stored
+    }  # 신청 id → 세션 (A66)
+    assert await sessions.map_by_requests([]) == {}
+
     # 같은 멘토의 겹치는 세션 → 409, 이어지는 세션은 허용
     with pytest.raises(ConflictError) as overlap:
         await sessions.add(
