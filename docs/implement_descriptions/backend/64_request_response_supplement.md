@@ -1,6 +1,6 @@
 # 64. 신청 응답 보완: 단건 조회·확정 세션·취소 주체·차감 상태
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-19 병합)
 - 관련 PR: #84
 - 관련 결정: `docs/decisions.md` A66, F28 (FE-4a 착수 전 보완)
 - 이전 기록: [63. 계정 종류를 수강생·멘토·운영진으로 나눔](63_account_type_member_split.md)
@@ -75,6 +75,8 @@ A66 이전에 취소된 행은 비어 있다(`null`). 화면은 취소 시각만
   - API: 단건 조회 권한(404·401), 대기 HELD → 승인 USED + 확정 세션 → 운영진 환불 취소 STAFF·RETURNED, 신청자 취소 REQUESTER
 - **로컬 검사 (compose `api`):** ruff, ruff format, mypy, mypy tests, lint-imports 통과. 전체 878 passed.
 - **프론트엔드:** 다시 만든 타입으로 `typecheck` 통과
+- GitHub Actions (PR #84): 백엔드 검사(스키마 일치 포함)·프론트엔드 검사(타입 일치 포함)·E2E 3개 통과
+- 사용자가 병합을 확인했다(2026-11-19)
 
 ## 남은 작업
 - FE-4a: 신청 내역 목록·상세·취소 화면 (Figma 태블릿·모바일 먼저)
