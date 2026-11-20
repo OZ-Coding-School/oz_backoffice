@@ -572,6 +572,129 @@
         }
       }
     },
+    "/api/v1/auth/password-change/verify": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Verify Password Change Link",
+        "operationId": "verify_password_change_link_api_v1_auth_password_change_verify_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordLinkVerifyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/password-change": {
+      "get": {
+        "tags": [
+          "me"
+        ],
+        "summary": "Password Change Status",
+        "operationId": "password_change_status_api_v1_me_password_change_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordChangeStatusResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "me"
+        ],
+        "summary": "Change Password",
+        "operationId": "change_password_api_v1_me_password_change_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordChangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/me/password-change/link": {
+      "post": {
+        "tags": [
+          "me"
+        ],
+        "summary": "Send Password Change Link",
+        "operationId": "send_password_change_link_api_v1_me_password_change_link_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordChangeStatusResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/me/member-signup": {
       "get": {
         "tags": [
@@ -16974,6 +17097,78 @@
           "name"
         ],
         "title": "Participant"
+      },
+      "PasswordChangeRequest": {
+        "properties": {
+          "new_password": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "New Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "new_password"
+        ],
+        "title": "PasswordChangeRequest"
+      },
+      "PasswordChangeState": {
+        "type": "string",
+        "enum": [
+          "NONE",
+          "SENT",
+          "VERIFIED"
+        ],
+        "title": "PasswordChangeState"
+      },
+      "PasswordChangeStatusResponse": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available",
+            "description": "비밀번호로 로그인하는 계정인지 (Google 전용이면 false)"
+          },
+          "state": {
+            "$ref": "#/components/schemas/PasswordChangeState",
+            "description": "NONE · SENT(링크 보냄) · VERIFIED(저장 가능)"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At",
+            "description": "SENT: 링크 만료, VERIFIED: 저장 마감"
+          }
+        },
+        "type": "object",
+        "required": [
+          "available",
+          "state",
+          "expires_at"
+        ],
+        "title": "PasswordChangeStatusResponse"
+      },
+      "PasswordLinkVerifyRequest": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "PasswordLinkVerifyRequest"
       },
       "PayUnit": {
         "type": "string",

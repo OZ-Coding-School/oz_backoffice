@@ -72,3 +72,4 @@
 | 68 | [Meet 전사 문장 저장·조회 (BE-2c)](68_transcript_entries.md) | 완료 (#93) |
 | 69 | [세션 목록 상태 여러 개 필터 (BE-2d)](69_session_list_statuses.md) | 완료 (#94) |
 | 70 | [녹화 끝 시각 (BE-2e)](70_artifact_recording_end.md) | 완료 (#96) |
+| 71 | [내 정보 비밀번호 변경 링크 (BE-2f)](71_password_change_link.md) | 완료 (#98) |

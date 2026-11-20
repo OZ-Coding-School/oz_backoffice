@@ -11,6 +11,12 @@ from app.contexts.educator.presentation.mentor_router import admin_router as men
 from app.contexts.educator.presentation.mentor_router import me_router as mentor_me_router
 from app.contexts.identity.presentation.approval_router import admin_router as approval_admin_router
 from app.contexts.identity.presentation.approval_router import me_router as member_signup_router
+from app.contexts.identity.presentation.password_change_router import (
+    me_router as password_change_me_router,
+)
+from app.contexts.identity.presentation.password_change_router import (
+    verify_router as password_change_verify_router,
+)
 from app.contexts.identity.presentation.password_router import router as password_router
 from app.contexts.identity.presentation.router import auth_router, me_router
 from app.contexts.identity.presentation.signup_router import router as signup_router
@@ -79,6 +85,8 @@ router = APIRouter()
 router.include_router(auth_router)
 router.include_router(signup_router)
 router.include_router(password_router)
+router.include_router(password_change_verify_router)
+router.include_router(password_change_me_router)
 router.include_router(member_signup_router)
 router.include_router(approval_admin_router)
 router.include_router(me_router)

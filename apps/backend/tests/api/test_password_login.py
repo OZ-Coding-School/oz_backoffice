@@ -1,6 +1,7 @@
 """이메일 + 비밀번호 로그인과 비밀번호 재설정 API (실제 DB, fakeredis, 메모리 발송)."""
 
 import re
+from urllib.parse import unquote
 
 import pytest
 from fastapi import FastAPI
@@ -84,3 +85,38 @@ async def test_unknown_email_gets_same_error(client: AsyncClient) -> None:
     )
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "invalid_credentials"
+
+
+async def test_my_password_change_by_link(client: AsyncClient, mail: InMemoryMailSender) -> None:
+    """내 정보 비밀번호 변경: 링크 → 인증 → 저장 (A72)."""
+    await _member()
+    token = (
+        await client.post(f"{AUTH}/login", json={"email": EMAIL, "password": PASSWORD})
+    ).json()["access_token"]
+    me = {"Authorization": f"Bearer {token}"}
+    base = "/api/v1/me/password-change"
+
+    status = (await client.get(base, headers=me)).json()
+    assert (status["available"], status["state"]) == (True, "NONE")
+    sent = await client.post(f"{base}/link", headers=me)
+    assert sent.status_code == 200, sent.text
+    assert sent.json()["state"] == "SENT"
+    assert (await client.post(f"{base}/link", headers=me)).status_code == 429
+    early = await client.post(base, headers=me, json={"new_password": "newpass1!"})
+    assert early.json()["error"]["code"] == "password_change_not_verified"
+
+    match = re.search(r"token=(\S+)", mail.sent[-1].text)
+    assert match
+    link_token = unquote(match.group(1))
+    verified = await client.post(f"{AUTH}/password-change/verify", json={"token": link_token})
+    assert verified.status_code == 204, verified.text
+    again = await client.post(f"{AUTH}/password-change/verify", json={"token": link_token})
+    assert again.json()["error"]["code"] == "password_link_invalid"
+    assert (await client.get(base, headers=me)).json()["state"] == "VERIFIED"
+
+    changed = await client.post(base, headers=me, json={"new_password": "newpass1!"})
+    assert changed.status_code == 204, changed.text
+    assert await _login(client, "newpass1!") == 200
+    assert await _login(client, PASSWORD) == 401
+    assert (await client.get("/api/v1/me", headers=me)).status_code == 200  # 세션은 유지 (A32)
+    assert (await client.get(base)).status_code == 401

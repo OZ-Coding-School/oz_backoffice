@@ -271,6 +271,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/password-change/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Verify Password Change Link */
+        post: operations["verify_password_change_link_api_v1_auth_password_change_verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/password-change": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Password Change Status */
+        get: operations["password_change_status_api_v1_me_password_change_get"];
+        put?: never;
+        /** Change Password */
+        post: operations["change_password_api_v1_me_password_change_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/password-change/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send Password Change Link */
+        post: operations["send_password_change_link_api_v1_me_password_change_link_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/member-signup": {
         parameters: {
             query?: never;
@@ -5283,6 +5335,36 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** PasswordChangeRequest */
+        PasswordChangeRequest: {
+            /** New Password */
+            new_password: string;
+        };
+        /**
+         * PasswordChangeState
+         * @enum {string}
+         */
+        PasswordChangeState: "NONE" | "SENT" | "VERIFIED";
+        /** PasswordChangeStatusResponse */
+        PasswordChangeStatusResponse: {
+            /**
+             * Available
+             * @description 비밀번호로 로그인하는 계정인지 (Google 전용이면 false)
+             */
+            available: boolean;
+            /** @description NONE · SENT(링크 보냄) · VERIFIED(저장 가능) */
+            state: components["schemas"]["PasswordChangeState"];
+            /**
+             * Expires At
+             * @description SENT: 링크 만료, VERIFIED: 저장 마감
+             */
+            expires_at: string | null;
+        };
+        /** PasswordLinkVerifyRequest */
+        PasswordLinkVerifyRequest: {
+            /** Token */
+            token: string;
+        };
         /**
          * PayUnit
          * @enum {string}
@@ -7292,6 +7374,108 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_password_change_link_api_v1_auth_password_change_verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordLinkVerifyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    password_change_status_api_v1_me_password_change_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasswordChangeStatusResponse"];
+                };
+            };
+        };
+    };
+    change_password_api_v1_me_password_change_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasswordChangeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_password_change_link_api_v1_me_password_change_link_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasswordChangeStatusResponse"];
                 };
             };
         };

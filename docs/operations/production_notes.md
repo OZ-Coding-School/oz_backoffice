@@ -24,7 +24,7 @@
 | `DEBUG` | `false` | |
 | `LOG_LEVEL` | `INFO` | |
 | `CORS_ORIGINS` | `["https://<프론트 도메인>"]` | JSON 배열 |
-| `FRONTEND_BASE_URL` | `https://<프론트 도메인>` | 로그인 후 이동 주소 |
+| `FRONTEND_BASE_URL` | `https://<프론트 도메인>` | 로그인 후 이동 주소, 비밀번호 변경 인증 링크 주소(A72) |
 | `DATABASE_URL` | 운영 PostgreSQL | `postgres://user:pass@host:5432/db` |
 | `REDIS_URL`, `TASKIQ_REDIS_URL` | 운영 Redis (DB 번호를 나눈다) | 리프레시 토큰·레이트 리밋·락 / 작업 큐 |
 | `JWT_SECRET_KEY` | `openssl rand -hex 32`로 새로 만든 값 | 코드 기본값 금지. 바꾸면 모든 세션이 끊긴다 |
