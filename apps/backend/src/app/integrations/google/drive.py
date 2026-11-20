@@ -28,6 +28,8 @@ logger = logging.getLogger(__name__)
 DRIVE_SCOPE = "https://www.googleapis.com/auth/drive"
 FOLDER_MIME = "application/vnd.google-apps.folder"
 PDF_MIME = "application/pdf"
+MARKDOWN_MIME = "text/markdown"
+MAX_MARKDOWN_BYTES = 2 * 1024 * 1024
 FILES_URL = "https://www.googleapis.com/drive/v3/files"
 PASSED_HEADERS = ("content-type", "content-length", "content-range", "accept-ranges")
 
@@ -200,6 +202,25 @@ class GoogleDriveArchive:
         if export_pdf:
             passed["content-type"] = PDF_MIME
         return DriveStream(response.status_code, passed, chunks(), close)
+
+    async def export_markdown(self, file_id: str) -> str:
+        """Google 문서를 마크다운으로 내보낸다(Drive export, 2MB까지). 저장하지 않는다 (A68)."""
+        await asyncio.to_thread(self._credentials.refresh, AuthRequest())
+        headers = {"Authorization": f"Bearer {self._credentials.token}"}
+        http = self._http or httpx.AsyncClient(timeout=httpx.Timeout(30))
+        try:
+            response = await http.get(
+                f"{FILES_URL}/{file_id}/export",
+                params={"mimeType": MARKDOWN_MIME},
+                headers=headers,
+            )
+        finally:
+            if self._http is None:
+                await http.aclose()
+        if response.status_code != 200 or len(response.content) > MAX_MARKDOWN_BYTES:
+            logger.warning("Drive 마크다운 내보내기 실패(%s): %s", file_id, response.status_code)
+            raise DriveUnavailableError()
+        return response.content.decode("utf-8", errors="replace")
 
 
 def build_drive_archive(

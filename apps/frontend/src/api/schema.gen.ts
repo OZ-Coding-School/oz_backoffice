@@ -2358,6 +2358,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/mentoring/sessions/{session_id}/artifacts/{artifact_id}/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Artifact Link
+         * @description 참여자만. 그 파일·그 사용자에 묶인 3시간짜리 서명 링크 (A68).
+         */
+        post: operations["artifact_link_api_v1_mentoring_sessions__session_id__artifacts__artifact_id__link_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/mentoring/sessions/{session_id}/artifacts/{artifact_id}/markdown": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Artifact Markdown
+         * @description 참여자만. 스마트 메모(SUMMARY)를 마크다운으로 (A68). 다른 종류는 404 artifact_not_found.
+         */
+        get: operations["artifact_markdown_api_v1_mentoring_sessions__session_id__artifacts__artifact_id__markdown_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/mentoring/artifacts/{artifact_id}/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Artifact Stream
+         * @description 서명 링크 중계: 헤더 없이 Range를 받고, 매번 참여자인지 다시 확인한다 (A68).
+         */
+        get: operations["artifact_stream_api_v1_mentoring_artifacts__artifact_id__stream_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/cohorts/{cohort_id}/mentoring/sessions/{session_id}/artifacts": {
         parameters: {
             query?: never;
@@ -3350,6 +3410,37 @@ export interface components {
             employment_type?: components["schemas"]["EmploymentType"] | null;
             /** Assignments */
             assignments?: components["schemas"]["AssignmentPayload"][] | null;
+        };
+        /** ArtifactLinkResponse */
+        ArtifactLinkResponse: {
+            /**
+             * Url
+             * @description API 기준 경로 + 서명 토큰. <video src>·내려받기에 그대로 쓴다
+             */
+            url: string;
+            /**
+             * Download Url
+             * @description 같은 링크의 내려받기(attachment) 버전
+             */
+            download_url: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+        };
+        /** ArtifactMarkdownResponse */
+        ArtifactMarkdownResponse: {
+            /**
+             * Artifact Id
+             * Format: uuid
+             */
+            artifact_id: string;
+            /**
+             * Markdown
+             * @description 스마트 메모를 Drive에서 마크다운으로 내보낸 원문 (저장 안 함)
+             */
+            markdown: string;
         };
         /** ArtifactResponse */
         ArtifactResponse: {
@@ -11796,6 +11887,108 @@ export interface operations {
             };
             path: {
                 session_id: string;
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    artifact_link_api_v1_mentoring_sessions__session_id__artifacts__artifact_id__link_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactLinkResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    artifact_markdown_api_v1_mentoring_sessions__session_id__artifacts__artifact_id__markdown_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArtifactMarkdownResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    artifact_stream_api_v1_mentoring_artifacts__artifact_id__stream_get: {
+        parameters: {
+            query: {
+                /** @description 서명 링크의 토큰 */
+                token: string;
+                /** @description 참이면 내려받기(attachment) */
+                download?: boolean;
+            };
+            header?: {
+                Range?: string | null;
+            };
+            path: {
                 artifact_id: string;
             };
             cookie?: never;

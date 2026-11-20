@@ -1,8 +1,11 @@
 """녹화·전사·요약 열람 API (decisions M19·A53·A54, P13-2).
 
 참여자(담당 멘토·1:1 신청 수강생·팀원):
-  GET /mentoring/sessions/{id}/artifacts                       목록 (정리 끝난 파일만)
-  GET /mentoring/sessions/{id}/artifacts/{artifact_id}/content 중계 (영상 Range, 문서 PDF)
+  GET  /mentoring/sessions/{id}/artifacts                        목록 (정리 끝난 파일만)
+  GET  /mentoring/sessions/{id}/artifacts/{artifact_id}/content  중계 (영상 Range, 문서 PDF)
+  POST /mentoring/sessions/{id}/artifacts/{artifact_id}/link     서명 링크 (3시간, A68)
+  GET  /mentoring/artifacts/{artifact_id}/stream?token=&download= 서명 링크 중계 (헤더 없이 Range)
+  GET  /mentoring/sessions/{id}/artifacts/{artifact_id}/markdown 스마트 메모 마크다운 (A68)
 운영진 (mentoring.request.read, 기수 범위):
   GET /admin/cohorts/{cohort_id}/mentoring/sessions/{id}/artifacts[/{artifact_id}/content]
 Drive 권한은 아무에게도 주지 않고 백엔드가 서비스 계정으로 중계한다.
@@ -13,7 +16,7 @@ from datetime import datetime
 from typing import Annotated, cast
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Header, Request
+from fastapi import APIRouter, Depends, Header, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -34,6 +37,7 @@ from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseMentoringRequestRepository,
     TortoiseMentoringSessionRepository,
 )
+from app.contexts.mentoring.presentation.artifact_links import ArtifactGrant, ArtifactLinkSigner
 from app.contexts.mentoring.presentation.session_router import get_session_queries
 from app.core.clock import Clock
 from app.core.config import Settings
@@ -42,6 +46,7 @@ from app.core.meet import build_drive_archive_client
 from app.integrations.google.drive import DriveStream
 
 router = APIRouter(prefix="/mentoring/sessions", tags=["mentoring-artifacts"])
+link_router = APIRouter(prefix="/mentoring/artifacts", tags=["mentoring-artifacts"])
 admin_router = APIRouter(
     prefix="/admin/cohorts/{cohort_id}/mentoring/sessions", tags=["admin-mentoring-artifacts"]
 )
@@ -104,10 +109,33 @@ def _download_name(a: MentoringArtifact) -> str | None:
     )
 
 
-def _relay(artifact: MentoringArtifact, stream: DriveStream) -> StreamingResponse:
+class ArtifactLinkResponse(BaseModel):
+    url: str = Field(description="API 기준 경로 + 서명 토큰. <video src>·내려받기에 그대로 쓴다")
+    download_url: str = Field(description="같은 링크의 내려받기(attachment) 버전")
+    expires_at: datetime
+
+
+class ArtifactMarkdownResponse(BaseModel):
+    artifact_id: uuid.UUID
+    markdown: str = Field(
+        description="스마트 메모를 Drive에서 마크다운으로 내보낸 원문 (저장 안 함)"
+    )
+
+
+def get_link_signer(settings: Annotated[Settings, Depends(get_app_settings)]) -> ArtifactLinkSigner:
+    return ArtifactLinkSigner(settings)
+
+
+SignerDep = Annotated[ArtifactLinkSigner, Depends(get_link_signer)]
+
+
+def _relay(
+    artifact: MentoringArtifact, stream: DriveStream, *, download: bool = False
+) -> StreamingResponse:
     headers = dict(stream.headers)
     name = _download_name(artifact) or "file"
-    headers["content-disposition"] = f"inline; filename*=UTF-8''{quote(name)}"
+    disposition = "attachment" if download else "inline"
+    headers["content-disposition"] = f"{disposition}; filename*=UTF-8''{quote(name)}"
     headers["cache-control"] = "private, no-store"
     if not artifact.is_document:
         headers.setdefault("accept-ranges", "bytes")
@@ -137,6 +165,53 @@ async def artifact_content(
     """영상은 Range를 그대로 넘겨 206으로, 문서는 PDF로 내보내 중계한다."""
     artifact, stream = await service.open_for_user(user.id, session_id, artifact_id, range_header)
     return _relay(artifact, stream)
+
+
+@router.post("/{session_id}/artifacts/{artifact_id}/link", response_model=ArtifactLinkResponse)
+async def artifact_link(
+    session_id: uuid.UUID,
+    artifact_id: uuid.UUID,
+    user: ApprovedUser,
+    service: ServiceDep,
+    signer: SignerDep,
+    clock: Annotated[Clock, Depends(get_clock)],
+) -> ArtifactLinkResponse:
+    """참여자만. 그 파일·그 사용자에 묶인 3시간짜리 서명 링크 (A68)."""
+    await service.viewable_for_user(user.id, session_id, artifact_id)
+    token, expires_at = signer.sign(
+        ArtifactGrant(user_id=user.id, session_id=session_id, artifact_id=artifact_id),
+        now=clock.now(),
+    )
+    path = f"/api/v1/mentoring/artifacts/{artifact_id}/stream?token={quote(token)}"
+    return ArtifactLinkResponse(url=path, download_url=f"{path}&download=1", expires_at=expires_at)
+
+
+@link_router.get("/{artifact_id}/stream")
+async def artifact_stream(
+    artifact_id: uuid.UUID,
+    signer: SignerDep,
+    service: ServiceDep,
+    token: Annotated[str, Query(description="서명 링크의 토큰")],
+    download: Annotated[bool, Query(description="참이면 내려받기(attachment)")] = False,
+    range_header: RangeHeader = None,
+) -> StreamingResponse:
+    """서명 링크 중계: 헤더 없이 Range를 받고, 매번 참여자인지 다시 확인한다 (A68)."""
+    grant = signer.verify(token, artifact_id)
+    artifact, stream = await service.open_for_user(
+        grant.user_id, grant.session_id, artifact_id, range_header
+    )
+    return _relay(artifact, stream, download=download)
+
+
+@router.get(
+    "/{session_id}/artifacts/{artifact_id}/markdown", response_model=ArtifactMarkdownResponse
+)
+async def artifact_markdown(
+    session_id: uuid.UUID, artifact_id: uuid.UUID, user: ApprovedUser, service: ServiceDep
+) -> ArtifactMarkdownResponse:
+    """참여자만. 스마트 메모(SUMMARY)를 마크다운으로 (A68). 다른 종류는 404 artifact_not_found."""
+    artifact, markdown = await service.markdown_for_user(user.id, session_id, artifact_id)
+    return ArtifactMarkdownResponse(artifact_id=artifact.id, markdown=markdown)
 
 
 @admin_router.get("/{session_id}/artifacts", response_model=list[ArtifactResponse])

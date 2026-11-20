@@ -11,6 +11,7 @@ from app.core.meet import build_drive_archive_client
 from app.integrations.google.drive import (
     FILES_URL,
     FOLDER_MIME,
+    MAX_MARKDOWN_BYTES,
     DriveUnavailableError,
     GoogleDriveArchive,
 )
@@ -145,6 +146,25 @@ async def test_stream_video_range_and_pdf_export() -> None:
 
         with pytest.raises(DriveUnavailableError):
             await archive.stream("gone", export_pdf=False, range_header=None)
+
+
+@respx.mock
+async def test_export_markdown() -> None:
+    """스마트 메모를 마크다운으로 내보낸다 (A68). 실패·너무 크면 Drive 사용 불가."""
+    respx.get(f"{FILES_URL}/m1/export").mock(
+        return_value=httpx.Response(200, content="## 요약\n- 할 일".encode())
+    )
+    respx.get(f"{FILES_URL}/big/export").mock(
+        return_value=httpx.Response(200, content=b"x" * (MAX_MARKDOWN_BYTES + 1))
+    )
+    respx.get(f"{FILES_URL}/gone/export").mock(return_value=httpx.Response(403))
+    async with httpx.AsyncClient() as http:
+        archive = _archive(FakeFiles(), http)
+        assert await archive.export_markdown("m1") == "## 요약\n- 할 일"
+        assert respx.calls[0].request.url.params["mimeType"] == "text/markdown"
+        for file_id in ("big", "gone"):
+            with pytest.raises(DriveUnavailableError):
+                await archive.export_markdown(file_id)
 
 
 def test_drive_client_needs_settings(settings: Settings) -> None:
