@@ -264,6 +264,17 @@ class InMemoryRequestRepository:
     async def add(self, request: MentoringRequest) -> None:
         self.items[request.id] = self._copy(request)
 
+    async def chat_pairs(
+        self, *, student_ids: list[uuid.UUID], team_ids: list[uuid.UUID]
+    ) -> set[tuple[uuid.UUID, uuid.UUID]]:
+        pairs: set[tuple[uuid.UUID, uuid.UUID]] = set()
+        for r in self.items.values():
+            if r.team_id is not None and r.team_id in team_ids:
+                pairs.add((r.mentor_id, r.team_id))
+            elif r.team_id is None and r.requester_id in student_ids:
+                pairs.add((r.mentor_id, r.requester_id))
+        return pairs
+
     async def save(self, request: MentoringRequest) -> None:
         self.items[request.id] = self._copy(request)
 

@@ -559,3 +559,35 @@ async def test_team_activity_and_pending_by_teams() -> None:
         )
     assert await requests.pending_by_teams([team.id, other.id]) == {team.id: (2, second.id)}
     assert await sessions.team_activity([]) == {}
+
+
+async def test_chat_pairs_from_request_history() -> None:
+    """채팅 자격(A74): 1:1은 (멘토, 수강 등록), 팀은 (멘토, 팀). 상태 무관, 겹치면 한 번."""
+    cohort = await create_cohort()
+    mentor, other_mentor = await create_mentor(), await create_mentor()
+    student, mate = make_student(cohort_id=cohort.id), make_student(cohort_id=cohort.id)
+    for s in (student, mate):
+        await TortoiseStudentRepository().add(s)
+    team = MentoringTeam(cohort_id=cohort.id, team_number=1, mentor_id=mentor.id)
+    await TortoiseMentoringTeamRepository().add(team)
+    for requester, mentor_id, team_id, status in (
+        (student, mentor.id, None, MentoringRequestStatus.APPROVED),
+        (student, mentor.id, None, MentoringRequestStatus.PENDING),
+        (student, other_mentor.id, team.id, MentoringRequestStatus.PENDING),
+        (mate, mentor.id, None, MentoringRequestStatus.APPROVED),
+    ):
+        await requests.add(
+            MentoringRequest(
+                requester_id=requester.id,
+                mentor_id=mentor_id,
+                team_id=team_id,
+                topic="질문",
+                detail="내용",
+                desired_times=[T],
+                duration=60,
+                status=status,
+            )
+        )
+    pairs = await requests.chat_pairs(student_ids=[student.id], team_ids=[team.id])
+    assert pairs == {(mentor.id, student.id), (other_mentor.id, team.id)}
+    assert await requests.chat_pairs(student_ids=[], team_ids=[]) == set()

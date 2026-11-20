@@ -1,4 +1,4 @@
-"""멘토링 채팅 API (실제 DB, A57)."""
+"""멘토링 채팅 API (실제 DB, A57·A74: 자격은 신청 이력)."""
 
 import uuid
 from datetime import UTC, datetime
@@ -20,6 +20,8 @@ from app.contexts.educator.domain.enums import DisplayNamePreference
 from app.contexts.identity.domain.entities import User
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
 from app.contexts.mentoring.domain.chat import ChatEvent, ChatEventKind
+from app.contexts.mentoring.domain.request import MentoringRequest
+from app.contexts.mentoring.infrastructure.repositories import TortoiseMentoringRequestRepository
 from app.contexts.mentoring.presentation.chat_router import (
     ChatPresenter,
     StreamRenderer,
@@ -89,6 +91,24 @@ async def _setup(client: AsyncClient, settings: Settings) -> dict[str, Any]:
         headers=admin,
     )
     assert team.status_code == 201, team.text
+    # 채팅 자격은 신청 이력 (A74): 가수강·다수강 1:1, 팀 신청
+    requests = TortoiseMentoringRequestRepository()
+    for student, team_id in (
+        (students[0], None),
+        (students[2], None),
+        (students[0], uuid.UUID(team.json()["id"])),
+    ):
+        await requests.add(
+            MentoringRequest(
+                requester_id=student.id,
+                mentor_id=mentor.id,
+                team_id=team_id,
+                topic="질문",
+                detail="내용",
+                desired_times=[datetime(2026, 12, 1, 5, tzinfo=UTC)],
+                duration=60,
+            )
+        )
     return {
         "admin": admin,
         "cohort": cohort,
@@ -157,7 +177,7 @@ async def test_direct_chat_flow(client: AsyncClient, settings: Settings) -> None
 
     empty = await client.post(f"{thread_url}/messages", json={"body": "  "}, headers=me)
     assert (empty.status_code, empty.json()["error"]["code"]) == (422, "invalid_chat_message")
-    outsider = ctx["student_h"][2]  # 같은 기수의 다른 수강생
+    outsider = ctx["student_h"][1]  # 같은 기수의 다른 수강생 (이 방의 참여자가 아니다)
     for response in (
         await client.get(thread_url, headers=outsider),
         await client.get(f"{thread_url}/messages", headers=outsider),
