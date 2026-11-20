@@ -21,6 +21,7 @@ import { Route as StaffAdminRouteImport } from './routes/_staff/admin'
 import { Route as DevDesignSystemRouteImport } from './routes/dev/design-system'
 import { Route as AuthPasswordChangeVerifyRouteImport } from './routes/_auth/password-change.verify'
 import { Route as MemberMentoringApplyRouteImport } from './routes/_member/mentoring/apply'
+import { Route as MemberMentoringBalancesRouteImport } from './routes/_member/mentoring/balances'
 import { Route as MemberMyProfileRouteImport } from './routes/_member/my/profile'
 import { Route as StaffAuthStaffLoginRouteImport } from './routes/_staffAuth/staff/login'
 import { Route as StaffAuthStaffRegistrationRouteImport } from './routes/_staffAuth/staff/registration'
@@ -87,6 +88,11 @@ const MemberMentoringApplyRoute = MemberMentoringApplyRouteImport.update({
   path: '/mentoring/apply',
   getParentRoute: () => MemberRoute,
 } as any)
+const MemberMentoringBalancesRoute = MemberMentoringBalancesRouteImport.update({
+  id: '/mentoring/balances',
+  path: '/mentoring/balances',
+  getParentRoute: () => MemberRoute,
+} as any)
 const MemberMyProfileRoute = MemberMyProfileRouteImport.update({
   id: '/my/profile',
   path: '/my/profile',
@@ -143,6 +149,7 @@ export interface FileRoutesByFullPath {
   '/dev/design-system': typeof DevDesignSystemRoute
   '/password-change/verify': typeof AuthPasswordChangeVerifyRoute
   '/mentoring/apply': typeof MemberMentoringApplyRoute
+  '/mentoring/balances': typeof MemberMentoringBalancesRoute
   '/my/profile': typeof MemberMyProfileRoute
   '/staff/login': typeof StaffAuthStaffLoginRoute
   '/staff/registration': typeof StaffAuthStaffRegistrationRoute
@@ -161,6 +168,7 @@ export interface FileRoutesByTo {
   '/dev/design-system': typeof DevDesignSystemRoute
   '/password-change/verify': typeof AuthPasswordChangeVerifyRoute
   '/mentoring/apply': typeof MemberMentoringApplyRoute
+  '/mentoring/balances': typeof MemberMentoringBalancesRoute
   '/my/profile': typeof MemberMyProfileRoute
   '/staff/login': typeof StaffAuthStaffLoginRoute
   '/staff/registration': typeof StaffAuthStaffRegistrationRoute
@@ -184,6 +192,7 @@ export interface FileRoutesById {
   '/_member/': typeof MemberIndexRoute
   '/_auth/password-change/verify': typeof AuthPasswordChangeVerifyRoute
   '/_member/mentoring/apply': typeof MemberMentoringApplyRoute
+  '/_member/mentoring/balances': typeof MemberMentoringBalancesRoute
   '/_member/my/profile': typeof MemberMyProfileRoute
   '/_staffAuth/staff/login': typeof StaffAuthStaffLoginRoute
   '/_staffAuth/staff/registration': typeof StaffAuthStaffRegistrationRoute
@@ -204,6 +213,7 @@ export interface FileRouteTypes {
     | '/dev/design-system'
     | '/password-change/verify'
     | '/mentoring/apply'
+    | '/mentoring/balances'
     | '/my/profile'
     | '/staff/login'
     | '/staff/registration'
@@ -222,6 +232,7 @@ export interface FileRouteTypes {
     | '/dev/design-system'
     | '/password-change/verify'
     | '/mentoring/apply'
+    | '/mentoring/balances'
     | '/my/profile'
     | '/staff/login'
     | '/staff/registration'
@@ -244,6 +255,7 @@ export interface FileRouteTypes {
     | '/_member/'
     | '/_auth/password-change/verify'
     | '/_member/mentoring/apply'
+    | '/_member/mentoring/balances'
     | '/_member/my/profile'
     | '/_staffAuth/staff/login'
     | '/_staffAuth/staff/registration'
@@ -348,6 +360,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MemberMentoringApplyRouteImport
       parentRoute: typeof MemberRoute
     }
+    '/_member/mentoring/balances': {
+      id: '/_member/mentoring/balances'
+      path: '/mentoring/balances'
+      fullPath: '/mentoring/balances'
+      preLoaderRoute: typeof MemberMentoringBalancesRouteImport
+      parentRoute: typeof MemberRoute
+    }
     '/_member/my/profile': {
       id: '/_member/my/profile'
       path: '/my/profile'
@@ -426,6 +445,7 @@ const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
 interface MemberRouteChildren {
   MemberIndexRoute: typeof MemberIndexRoute
   MemberMentoringApplyRoute: typeof MemberMentoringApplyRoute
+  MemberMentoringBalancesRoute: typeof MemberMentoringBalancesRoute
   MemberMyProfileRoute: typeof MemberMyProfileRoute
   MemberMentoringRequestsRequestIdRoute: typeof MemberMentoringRequestsRequestIdRoute
   MemberMentoringSessionsSessionIdRoute: typeof MemberMentoringSessionsSessionIdRoute
@@ -437,6 +457,7 @@ interface MemberRouteChildren {
 const MemberRouteChildren: MemberRouteChildren = {
   MemberIndexRoute: MemberIndexRoute,
   MemberMentoringApplyRoute: MemberMentoringApplyRoute,
+  MemberMentoringBalancesRoute: MemberMentoringBalancesRoute,
   MemberMyProfileRoute: MemberMyProfileRoute,
   MemberMentoringRequestsRequestIdRoute: MemberMentoringRequestsRequestIdRoute,
   MemberMentoringSessionsSessionIdRoute: MemberMentoringSessionsSessionIdRoute,

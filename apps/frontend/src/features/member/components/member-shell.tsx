@@ -1,13 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LogOut } from "lucide-react";
-import type { ReactNode } from "react";
+import { Ellipsis, LogOut } from "lucide-react";
+import { useState, type ReactNode } from "react";
 
 import markDark from "@/assets/brand/oz-mark.svg";
 import markLight from "@/assets/brand/oz-mark-light.svg";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,7 +25,15 @@ import { activeCohort, cohortLabel, enrollmentsQuery } from "../api";
 import { mentoringSettingsQuery } from "@/features/requests/api";
 
 import { useLogout } from "../logout";
-import { currentNavItem, memberNav, navItems, showBottomTabs, type MemberNavItem } from "../nav";
+import {
+  bottomTabLayout,
+  currentNavItem,
+  memberNav,
+  navItems,
+  showBottomTabs,
+  type MemberNavGroup,
+  type MemberNavItem,
+} from "../nav";
 
 /**
  * 수강생·멘토 공통 틀 (Figma `Column / 공통 틀 (FE-2)`, decisions F27).
@@ -96,7 +105,7 @@ export function MemberShell({ me, children }: { me: Me; children: ReactNode }) {
         <main className="flex-1 px-4 pt-6 pb-8 md:px-8 md:pt-8">
           <div className="mx-auto w-full max-w-270">{children}</div>
         </main>
-        {showBottomTabs(groups) ? <BottomTabs items={navItems(groups)} current={current} /> : null}
+        {showBottomTabs(groups) ? <BottomTabs groups={groups} current={current} /> : null}
       </div>
     </div>
   );
@@ -184,30 +193,93 @@ function UserMenu({ me, roleLine }: { me: Me; roleLine: string }) {
   );
 }
 
-function BottomTabs({ items, current }: { items: MemberNavItem[]; current: MemberNavItem | undefined }) {
+function BottomTabs({ groups, current }: { groups: MemberNavGroup[]; current: MemberNavItem | undefined }) {
+  const { tabs, more } = bottomTabLayout(groups);
+  const [open, setOpen] = useState(false);
+  const inMore = !!current && more.some((g) => g.items.includes(current));
+  const tabClass = (active: boolean) =>
+    cn(
+      "flex flex-1 flex-col items-center gap-0.5 py-2 text-caption",
+      active ? "text-primary-text" : "text-muted-foreground",
+    );
   return (
     <nav
       aria-label="하단 메뉴"
       className="sticky bottom-0 flex border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden"
     >
-      {items.map((item) => {
+      {tabs.map((item) => {
         const Icon = item.icon;
         const active = item === current;
         return (
-          <Link
-            key={item.to}
-            to={item.to}
-            aria-current={active ? "page" : undefined}
-            className={cn(
-              "flex flex-1 flex-col items-center gap-0.5 py-2 text-caption",
-              active ? "text-primary-text" : "text-muted-foreground",
-            )}
-          >
+          <Link key={item.to} to={item.to} aria-current={active ? "page" : undefined} className={tabClass(active)}>
             <Icon aria-hidden className="size-5" />
             {item.shortLabel}
           </Link>
         );
       })}
+      {more.length > 0 ? (
+        <>
+          <button
+            type="button"
+            aria-haspopup="dialog"
+            aria-current={inMore ? "page" : undefined}
+            onClick={() => setOpen(true)}
+            className={tabClass(inMore)}
+          >
+            <Ellipsis aria-hidden className="size-5" />
+            더보기
+          </button>
+          <MoreSheet groups={more} current={current} open={open} onOpenChange={setOpen} />
+        </>
+      ) : null}
     </nav>
+  );
+}
+
+/** 더보기 (F36): 하단 탭에 없는 메뉴를 그룹 이름과 함께 아래에서 올린다 */
+function MoreSheet({
+  groups,
+  current,
+  open,
+  onOpenChange,
+}: {
+  groups: MemberNavGroup[];
+  current: MemberNavItem | undefined;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="inset-x-0 top-auto bottom-0 mx-0 translate-y-0 rounded-b-none px-4 pt-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+        <DialogTitle className="text-h3 text-foreground">더보기</DialogTitle>
+        <DialogDescription className="sr-only">하단 탭에 없는 메뉴</DialogDescription>
+        <div className="mt-3 flex flex-col gap-3">
+          {groups.map((g) => (
+            <div key={g.title ?? "기본"} className="flex flex-col gap-1">
+              {g.title ? <p className="px-1 text-caption text-muted-foreground">{g.title}</p> : null}
+              {g.items.map((item) => {
+                const Icon = item.icon;
+                const active = item === current;
+                return (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    onClick={() => onOpenChange(false)}
+                    aria-current={active ? "page" : undefined}
+                    className={cn(
+                      "flex items-center gap-2.5 rounded-md px-3 py-3 text-body-strong outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      active ? "bg-accent text-primary-text" : "text-foreground hover:bg-muted",
+                    )}
+                  >
+                    <Icon aria-hidden className="size-4" />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

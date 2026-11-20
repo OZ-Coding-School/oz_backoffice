@@ -24,10 +24,16 @@ describe("회원 공통 틀 (F27)", () => {
     const menus = screen.getAllByRole("navigation", { name: "메뉴" });
     for (const menu of menus) {
       expect(within(menu).getByRole("link", { name: "홈" })).toHaveAttribute("aria-current", "page");
-      // 만든 메뉴만: 홈·멘토링 신청(F31, 기수 설정을 받은 뒤)·신청 내역·진행 기록(F33)·내 정보(F37)
-      await waitFor(() => expect(within(menu).getAllByRole("link")).toHaveLength(5));
+      // 만든 메뉴만: 홈·멘토링 신청(F31, 기수 설정을 받은 뒤)·신청 내역·진행 기록(F33)·시간 내역(F38)·내 정보(F37)
+      await waitFor(() => expect(within(menu).getAllByRole("link")).toHaveLength(6));
     }
-    expect(screen.getByRole("navigation", { name: "하단 메뉴" })).toBeInTheDocument(); // 메뉴 2개 이상
+    const bottom = screen.getByRole("navigation", { name: "하단 메뉴" }); // 메뉴 2개 이상
+    // 메뉴 6개: 4개 + 더보기 (F36)
+    await waitFor(() => expect(within(bottom).getAllByRole("link")).toHaveLength(4));
+    await userEvent.setup().click(within(bottom).getByRole("button", { name: "더보기" }));
+    const sheet = await screen.findByRole("dialog", { name: "더보기" });
+    expect(within(sheet).getByRole("link", { name: "시간 지급·차감 내역" })).toBeInTheDocument();
+    expect(within(sheet).getByRole("link", { name: "내 정보" })).toBeInTheDocument();
   });
 
   it("멘토는 기수를 보지 않고 수강 등록도 부르지 않는다", async () => {
