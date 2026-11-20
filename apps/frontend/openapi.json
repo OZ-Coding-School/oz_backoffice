@@ -9905,14 +9905,19 @@
             "schema": {
               "anyOf": [
                 {
-                  "$ref": "#/components/schemas/MentoringSessionStatus"
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MentoringSessionStatus"
+                  }
                 },
                 {
                   "type": "null"
                 }
               ],
+              "description": "여러 개 가능 (예: status=SCHEDULED&status=IN_PROGRESS, A70)",
               "title": "Status"
-            }
+            },
+            "description": "여러 개 가능 (예: status=SCHEDULED&status=IN_PROGRESS, A70)"
           },
           {
             "name": "from",
@@ -10016,14 +10021,19 @@
             "schema": {
               "anyOf": [
                 {
-                  "$ref": "#/components/schemas/MentoringSessionStatus"
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MentoringSessionStatus"
+                  }
                 },
                 {
                   "type": "null"
                 }
               ],
+              "description": "여러 개 가능 (예: status=SCHEDULED&status=IN_PROGRESS, A70)",
               "title": "Status"
-            }
+            },
+            "description": "여러 개 가능 (예: status=SCHEDULED&status=IN_PROGRESS, A70)"
           },
           {
             "name": "from",
