@@ -1,6 +1,6 @@
 # 67. 녹화 서명 링크와 스마트 메모 마크다운 (BE-2b)
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-20 병합)
 - 관련 PR: #92
 - 관련 결정: `docs/decisions.md` A68 (A54·M19)
 - 이전 기록: [66. 세션 응답 보완 (BE-2a)](66_session_response_supplement.md)
@@ -54,6 +54,8 @@ FE-5 세션 상세에는 녹화 다시 보기와 옆 패널이 있다. 지금 AP
     - 목록에 정리된 스마트 메모 포함
 - **로컬 검사 (compose `api`):** ruff, ruff format, mypy, mypy tests, lint-imports 통과. 전체 884 passed.
 - **프론트엔드:** 다시 만든 타입으로 `typecheck` 통과
+- GitHub Actions (PR #92): 백엔드 검사(스키마 일치 포함)·프론트엔드 검사(타입 일치 포함)·E2E 3개 통과
+- 사용자가 병합을 확인했다(2026-11-20)
 - 실제 Drive 마크다운 내보내기는 아직 실 계정으로 확인하지 않았다(테스트는 respx). FE-5에서 실제 세션으로 확인한다.
 
 ## 남은 작업
