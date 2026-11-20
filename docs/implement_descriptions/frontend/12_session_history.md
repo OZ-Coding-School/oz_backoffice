@@ -1,7 +1,7 @@
 # 12. FE-5a 진행 기록 목록·세션 상세
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #95
 - 관련 결정: `docs/decisions.md` F33·F34 (A68·A70·A53·F29)
 - 이전 기록: [11. FE-4b 신청 변경](11_request_change.md)
 - 선행: 백엔드 [69. 세션 목록 상태 여러 개 필터 (BE-2d)](../backend/69_session_list_statuses.md)
