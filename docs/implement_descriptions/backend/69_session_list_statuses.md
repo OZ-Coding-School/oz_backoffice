@@ -1,6 +1,6 @@
 # 69. 세션 목록 상태 여러 개 필터 (BE-2d)
 
-- 상태: PR 진행 중
+- 상태: 완료
 - 관련 PR: #94
 - 관련 결정: `docs/decisions.md` A70, F33 (A67·A68)
 - 이전 기록: [68. Meet 전사 문장 저장·조회 (BE-2c)](68_transcript_entries.md)
@@ -38,6 +38,7 @@ FE-5 진행 기록 목록의 '예정' 탭은 예정(SCHEDULED)과 진행 중(IN_
   - API: 상태 두 개 조회(예정·진행 중 1건, 완료·노쇼 0건)
 - **로컬 검사 (compose `api`):** ruff, ruff format, mypy, mypy tests, lint-imports 통과. 전체 889 passed.
 - **프론트엔드:** 다시 만든 타입으로 `typecheck` 통과
+- **CI:** 통과. 사용자가 병합을 확인했다
 
 ## 남은 작업
 - FE-5a 진행 기록 목록·세션 상세, FE-5b 다시 보기
