@@ -1,7 +1,7 @@
 # 68. Meet 전사 문장 저장·조회 (BE-2c)
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #93
 - 관련 결정: `docs/decisions.md` A68·A69 (A53·A54)
 - 이전 기록: [67. 녹화 서명 링크와 스마트 메모 마크다운 (BE-2b)](67_artifact_link_markdown.md)
 
