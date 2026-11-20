@@ -15,3 +15,4 @@
 | 11 | [FE-4b 신청 변경](11_request_change.md) | 완료 (#90) |
 | 12 | [FE-5a 진행 기록 목록·세션 상세](12_session_history.md) | 완료 (#95) |
 | 13 | [FE-5b 다시 보기](13_session_replay.md) | 완료 (#97) |
+| 14 | [FE-6a 내 정보](14_my_profile.md) | PR 진행 중 |
