@@ -832,6 +832,7 @@ Table mentoring_artifacts {
   status MentoringArtifactStatus [not null, default: "PENDING"]
   conference_record varchar(255) [null, note: "Meet 회의 기록 이름 (같은 회의의 영상·전사본 짝짓기, A69)"]
   started_at timestamptz [null, note: "녹화 시작 시각 (영상만, 전사 문장 시각 − 녹화 시작 = 영상 위치, A69)"]
+  ended_at timestamptz [null, note: "녹화 끝 시각 (영상만, 녹화 고르기에 시작~끝 표시, 마이그레이션 28, A71)"]
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
 

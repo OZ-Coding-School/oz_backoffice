@@ -330,7 +330,8 @@ async def test_existing_files_get_conference_info(h: Harness) -> None:
     session = await h.session()
     h.source.files = [MeetFile("VIDEO", "v1")]
     await h.service.collect(session.id)
-    h.source.files = [MeetFile("VIDEO", "v1", record_name="c1", started_at=START)]
+    end = START + timedelta(minutes=40)
+    h.source.files = [MeetFile("VIDEO", "v1", record_name="c1", started_at=START, ended_at=end)]
     await h.service.collect(session.id)
     (video,) = h.artifacts.items.values()
-    assert (video.conference_record, video.started_at) == ("c1", START)
+    assert (video.conference_record, video.started_at, video.ended_at) == ("c1", START, end)

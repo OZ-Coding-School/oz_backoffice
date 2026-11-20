@@ -68,6 +68,7 @@ class FakeApis:
                     state=state.FILE_GENERATED,
                     drive_destination={"file": "v1"},
                     start_time=datetime(2026, 11, 20, 5, 1, tzinfo=UTC),
+                    end_time=datetime(2026, 11, 20, 5, 40, tzinfo=UTC),
                 ),
                 meet.Recording(state=state.ENDED, drive_destination={"file": "v2"}),  # 아직
             ]
@@ -281,10 +282,11 @@ async def test_session_files() -> None:
     ]  # 생성이 끝난 파일만
     assert apis.calls[-1][1].filter == 'space.name="spaces/a"'
     video, transcript = files[0], files[1]
-    assert (video.record_name, video.started_at) == (
+    assert (video.record_name, video.started_at, video.ended_at) == (
         "conferenceRecords/c1",
         datetime(2026, 11, 20, 5, 1, tzinfo=UTC),
-    )  # 같은 회의 기록·녹화 시작 (A69)
+        datetime(2026, 11, 20, 5, 40, tzinfo=UTC),
+    )  # 같은 회의 기록·녹화 시작 (A69)·끝 (A71)
     assert transcript.source_name == "conferenceRecords/c1/transcripts/t"
     apis.errors["records"] = _error(google_exceptions.PermissionDenied, "권한")
     with pytest.raises(MeetUnavailableError):

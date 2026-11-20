@@ -830,7 +830,7 @@ async def test_artifact_list_and_stream(app: Any, client: AsyncClient, settings:
     assert "meet_name" not in lines[0]  # Meet 원래 이름은 내려주지 않는다
     assert (await client.get(f"{base}/{video.id}/entries", headers=student_h)).status_code == 404
     assert (await client.get(f"{base}/{doc.id}/entries", headers=stranger)).status_code == 404
-    assert {"conference_record", "started_at"} <= set(listed[0])
+    assert {"conference_record", "started_at", "ended_at"} <= set(listed[0])
 
     # 스마트 메모 마크다운 (A68): SUMMARY만
     md = await client.get(f"{base}/{memo.id}/markdown", headers=student_h)

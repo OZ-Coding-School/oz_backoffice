@@ -1088,6 +1088,7 @@ _ARTIFACT_FIELDS = (
     "status",
     "conference_record",
     "started_at",
+    "ended_at",
 )
 
 

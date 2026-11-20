@@ -176,6 +176,7 @@ class ArtifactService:
                 artifact_type=MentoringArtifactType(file.kind),
                 conference_record=file.record_name or None,
                 started_at=file.started_at,
+                ended_at=file.ended_at,
             )
             if await self._artifacts.add_if_absent(artifact):
                 added += 1
@@ -190,7 +191,9 @@ class ArtifactService:
         by_file = {a.drive_file_id: a for a in await self._artifacts.list_by_session(session.id)}
         for file in files:
             artifact = by_file.get(file.file_id)
-            if artifact and artifact.link_conference(file.record_name or None, file.started_at):
+            if artifact and artifact.link_conference(
+                file.record_name or None, file.started_at, file.ended_at
+            ):
                 await self._artifacts.save(artifact)
         if self._entries is None or self._source is None:
             return

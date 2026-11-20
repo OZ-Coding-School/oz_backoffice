@@ -30,6 +30,7 @@ class MentoringArtifact(AggregateRoot):
     status: MentoringArtifactStatus = MentoringArtifactStatus.PENDING
     conference_record: str | None = None  # 같은 회의의 영상·전사본을 짝짓는다 (A69)
     started_at: datetime | None = None  # 녹화 시작 (영상만, 전사 문장 위치 계산, A69)
+    ended_at: datetime | None = None  # 녹화 끝 (영상만, 녹화 고르기 표시, A71)
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
@@ -54,14 +55,19 @@ class MentoringArtifact(AggregateRoot):
         self.file_size = file_size
         self.status = MentoringArtifactStatus.COMPLETED
 
-    def link_conference(self, record: str | None, started_at: datetime | None) -> bool:
-        """비어 있는 회의 기록·녹화 시작을 채운다. 바뀌었으면 True (수집 전에 만든 파일 보완)."""
+    def link_conference(
+        self, record: str | None, started_at: datetime | None, ended_at: datetime | None = None
+    ) -> bool:
+        """비어 있는 회의 기록·녹화 시작·끝을 채운다. 바뀌었으면 True (수집 전에 만든 파일 보완)."""
         changed = False
         if record and self.conference_record is None:
             self.conference_record = record
             changed = True
         if started_at and self.started_at is None:
             self.started_at = started_at
+            changed = True
+        if ended_at and self.ended_at is None:
+            self.ended_at = ended_at
             changed = True
         return changed
 

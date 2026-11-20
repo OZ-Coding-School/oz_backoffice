@@ -23,6 +23,7 @@ class MentoringArtifactModel(models.Model):
     )
     conference_record = fields.CharField(max_length=255, null=True)  # A69
     started_at = fields.DatetimeField(null=True)  # 녹화 시작 (영상만, A69)
+    ended_at = fields.DatetimeField(null=True)  # 녹화 끝 (영상만, A71)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
 
