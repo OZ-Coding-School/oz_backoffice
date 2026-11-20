@@ -131,7 +131,7 @@ describe("내 팀 (F39·A73)", () => {
     mockTeamPage({ team: null });
     await renderRoute("/mentoring/team");
     const menu = (await screen.findAllByRole("navigation", { name: "메뉴" }))[0]!;
-    await waitFor(() => expect(within(menu).getAllByRole("link")).toHaveLength(6));
+    await waitFor(() => expect(within(menu).getAllByRole("link")).toHaveLength(7));
     expect(within(menu).queryByRole("link", { name: "내 팀" })).not.toBeInTheDocument();
   });
 });

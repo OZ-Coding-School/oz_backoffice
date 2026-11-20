@@ -58,6 +58,9 @@ export function MemberShell({ me, children }: { me: Me; children: ReactNode }) {
   const team = !!settings.data?.allow_team_mentoring && (teams.data?.as_student.length ?? 0) > 0;
   const groups = memberNav(me.account_type, { apply, team });
   const current = currentNavItem(groups, pathname);
+  // 채팅은 여백 없이 화면 높이를 채우고, 휴대폰 대화는 머리·하단 탭 없이 전체 화면이다 (F40)
+  const fullBleed = pathname === "/mentoring/chat" || pathname.startsWith("/mentoring/chat/");
+  const immersive = /^\/mentoring\/chat\/[^/]+/.test(pathname);
   const roleLine = student ? (cohort ? `수강생 · ${cohortLabel(cohort.enrollment)}` : "수강생") : "멘토";
 
   return (
@@ -96,8 +99,13 @@ export function MemberShell({ me, children }: { me: Me; children: ReactNode }) {
         ))}
       </nav>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-10 flex h-14 items-center gap-2 border-b border-border bg-background px-4 md:h-15 md:px-6">
+      <div className={cn("flex min-w-0 flex-1 flex-col", fullBleed && "h-dvh")}>
+        <header
+          className={cn(
+            "sticky top-0 z-10 flex h-14 items-center gap-2 border-b border-border bg-background px-4 md:h-15 md:px-6",
+            immersive && "max-md:hidden",
+          )}
+        >
           <Mark className="size-8 md:hidden" />
           <p className="hidden text-body-sm text-muted-foreground md:block">{current?.label}</p>
           <div className="flex-1" />
@@ -106,10 +114,14 @@ export function MemberShell({ me, children }: { me: Me; children: ReactNode }) {
             <UserMenu me={me} roleLine={roleLine} />
           </div>
         </header>
-        <main className="flex-1 px-4 pt-6 pb-8 md:px-8 md:pt-8">
-          <div className="mx-auto w-full max-w-270">{children}</div>
-        </main>
-        {showBottomTabs(groups) ? <BottomTabs groups={groups} current={current} /> : null}
+        {fullBleed ? (
+          <main className="flex min-h-0 flex-1 flex-col">{children}</main>
+        ) : (
+          <main className="flex-1 px-4 pt-6 pb-8 md:px-8 md:pt-8">
+            <div className="mx-auto w-full max-w-270">{children}</div>
+          </main>
+        )}
+        {showBottomTabs(groups) ? <BottomTabs groups={groups} current={current} hidden={immersive} /> : null}
       </div>
     </div>
   );
@@ -197,7 +209,16 @@ function UserMenu({ me, roleLine }: { me: Me; roleLine: string }) {
   );
 }
 
-function BottomTabs({ groups, current }: { groups: MemberNavGroup[]; current: MemberNavItem | undefined }) {
+function BottomTabs({
+  groups,
+  current,
+  hidden,
+}: {
+  groups: MemberNavGroup[];
+  current: MemberNavItem | undefined;
+  /** 휴대폰 채팅 대화처럼 전체 화면일 때 숨긴다 (F40) */
+  hidden: boolean;
+}) {
   const { tabs, more } = bottomTabLayout(groups);
   const [open, setOpen] = useState(false);
   const inMore = !!current && more.some((g) => g.items.includes(current));
@@ -209,7 +230,10 @@ function BottomTabs({ groups, current }: { groups: MemberNavGroup[]; current: Me
   return (
     <nav
       aria-label="하단 메뉴"
-      className="sticky bottom-0 flex border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden"
+      className={cn(
+        "sticky bottom-0 flex border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden",
+        hidden && "hidden",
+      )}
     >
       {tabs.map((item) => {
         const Icon = item.icon;

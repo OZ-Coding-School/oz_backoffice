@@ -1,4 +1,14 @@
-import { CalendarDays, FileText, LayoutGrid, Plus, User, Users, Wallet, type LucideIcon } from "lucide-react";
+import {
+  CalendarDays,
+  FileText,
+  LayoutGrid,
+  MessageSquare,
+  Plus,
+  User,
+  Users,
+  Wallet,
+  type LucideIcon,
+} from "lucide-react";
 
 import type { Me } from "@/features/auth/api";
 
@@ -38,6 +48,8 @@ const SESSIONS: MemberNavItem = {
 
 const TEAM: MemberNavItem = { to: "/mentoring/team", label: "내 팀", shortLabel: "내 팀", icon: Users };
 
+const CHAT: MemberNavItem = { to: "/mentoring/chat", label: "채팅", shortLabel: "채팅", icon: MessageSquare };
+
 const BALANCES: MemberNavItem = {
   to: "/mentoring/balances",
   label: "시간 지급·차감 내역",
@@ -49,7 +61,7 @@ const PROFILE: MemberNavItem = { to: "/my/profile", label: "내 정보", shortLa
 
 const APPLY: MemberNavItem = { to: "/mentoring/apply", label: "멘토링 신청", shortLabel: "신청", icon: Plus };
 
-const MENTOR_NAV: MemberNavGroup[] = [{ items: [HOME] }];
+const MENTOR_NAV: MemberNavGroup[] = [{ items: [HOME] }, { title: "멘토링", items: [CHAT] }];
 
 export interface MemberNavOptions {
   /** '멘토링 신청' 메뉴: 1:1이나 팀을 허용하는 기수와 수강이 끝난 수강생(안내)에 (F31) */
@@ -64,7 +76,7 @@ export function memberNav(accountType: Me["account_type"], options: MemberNavOpt
     { items: [HOME] },
     {
       title: "멘토링",
-      items: [...(options.apply ? [APPLY] : []), REQUESTS, SESSIONS, ...(options.team ? [TEAM] : []), BALANCES],
+      items: [...(options.apply ? [APPLY] : []), REQUESTS, SESSIONS, ...(options.team ? [TEAM] : []), CHAT, BALANCES],
     },
     { title: "내 공간", items: [PROFILE] },
   ];
