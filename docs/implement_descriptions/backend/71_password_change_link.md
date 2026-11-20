@@ -1,7 +1,7 @@
 # 71. 내 정보 비밀번호 변경 링크 (BE-2f)
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #98
 - 관련 결정: `docs/decisions.md` A72, F36 (A32)
 - 이전 기록: [70. 녹화 끝 시각 (BE-2e)](70_artifact_recording_end.md)
 
