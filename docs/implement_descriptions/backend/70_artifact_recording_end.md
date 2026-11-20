@@ -1,7 +1,7 @@
 # 70. 녹화 끝 시각 (BE-2e)
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #96
 - 관련 결정: `docs/decisions.md` A71 (A69·F35)
 - 이전 기록: [69. 세션 목록 상태 여러 개 필터 (BE-2d)](69_session_list_statuses.md)
 
