@@ -12,6 +12,7 @@ from typing import Protocol
 
 from app.contexts.academy.domain.entities import Student
 from app.contexts.educator.domain.profiles import Mentor
+from app.contexts.mentoring.domain.enums import MentoringSessionStatus
 from app.contexts.mentoring.domain.repositories import (
     MentoringRequestRepository,
     MentoringSessionRepository,
@@ -69,6 +70,19 @@ class MentoringSessionQueries:
         if mentor is None:
             raise NotFoundError("멘토 프로필이 없습니다.", code="mentor_profile_not_found")
         return await self._sessions.list_for_mentor(mentor.id, query)
+
+    async def counts_mine(self, user_id: uuid.UUID) -> dict[MentoringSessionStatus, int]:
+        """본인 1:1·소속 팀 세션의 상태별 수 (목록 필터와 무관, A68)."""
+        student_ids, team_ids = await self._memberships(user_id)
+        return await self._sessions.count_statuses_for_participants(
+            student_ids=student_ids, team_ids=team_ids
+        )
+
+    async def counts_for_mentor(self, user_id: uuid.UUID) -> dict[MentoringSessionStatus, int]:
+        mentor = await self._mentors.get_by_user(user_id)
+        if mentor is None:
+            raise NotFoundError("멘토 프로필이 없습니다.", code="mentor_profile_not_found")
+        return await self._sessions.count_statuses_for_mentor(mentor.id)
 
     async def list_by_cohort(
         self,

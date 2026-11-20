@@ -8,12 +8,34 @@ from dataclasses import dataclass
 from typing import cast
 
 from fastapi import Request
+from pydantic import BaseModel, Field
 
 from app.contexts.identity.application.auth_service import UserQueries
 from app.contexts.mentoring.application.assignment_service import MentorDirectory
 from app.contexts.mentoring.application.request_service import StudentLookup
+from app.contexts.mentoring.domain.balance import request_balance
+from app.contexts.mentoring.domain.enums import MentoringBalanceTransactionType, RequestBalanceState
 from app.contexts.mentoring.domain.request import MentoringRequest
 from app.contexts.mentoring.infrastructure.repositories import TortoiseMentoringTeamRepository
+
+
+class RequestBalanceResponse(BaseModel):
+    state: RequestBalanceState = Field(
+        description="HELD 차감 예정 · USED 차감됨 · RETURNED 돌려받음 · NONE (A66)"
+    )
+    minutes: int
+
+
+def balance_response(
+    entries: list[tuple[MentoringBalanceTransactionType, int]],
+) -> RequestBalanceResponse:
+    result = request_balance(entries)
+    return RequestBalanceResponse(state=result.state, minutes=result.minutes)
+
+
+class Participant(BaseModel):
+    student_id: uuid.UUID = Field(description="수강 등록(students.id)")
+    name: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,4 +76,25 @@ class NameBook:
                 mentor_name=real,
                 mentor_headline=mentor.headline if mentor else None,
             )
+        return result
+
+    async def participants(
+        self, items: list[MentoringRequest]
+    ) -> dict[uuid.UUID, list[Participant]]:
+        """신청 id → 참여자: 1:1은 신청자, 팀은 지금 팀원 (A68). IN 쿼리 두 번."""
+        teams = {
+            t.id: t
+            for t in await self._teams.list_by_ids(list({r.team_id for r in items if r.team_id}))
+        }
+        ids = {r.requester_id for r in items} | {m for t in teams.values() for m in t.member_ids}
+        students = await self._students.get_many(list(ids))
+        result: dict[uuid.UUID, list[Participant]] = {}
+        for r in items:
+            team = teams.get(r.team_id) if r.team_id else None
+            member_ids = team.member_ids if team else [r.requester_id]
+            result[r.id] = [
+                Participant(student_id=i, name=students[i].name)
+                for i in member_ids
+                if i in students
+            ]
         return result

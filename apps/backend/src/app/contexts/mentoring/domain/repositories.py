@@ -304,6 +304,18 @@ class MentoringSessionRepository(Protocol):
     async def list_for_mentor(
         self, mentor_id: uuid.UUID, query: SessionQuery
     ) -> tuple[list[MentoringSession], int]: ...
+    async def count_statuses_for_participants(
+        self, *, student_ids: list[uuid.UUID], team_ids: list[uuid.UUID]
+    ) -> dict[MentoringSessionStatus, int]:
+        """`list_for_participants` 대상의 상태별 세션 수 (모든 상태, 없으면 0, A68)."""
+        ...
+
+    async def count_statuses_for_mentor(
+        self, mentor_id: uuid.UUID
+    ) -> dict[MentoringSessionStatus, int]:
+        """멘토 세션의 상태별 수 (모든 상태, 없으면 0, A68)."""
+        ...
+
     async def list_by_cohort(
         self,
         cohort_id: uuid.UUID,

@@ -21,14 +21,20 @@ from app.contexts.identity.domain.entities import User
 from app.contexts.mentoring.application.assignment_service import MentorDirectory
 from app.contexts.mentoring.application.request_service import StudentLookup
 from app.contexts.mentoring.application.session_service import MentoringSessionQueries
-from app.contexts.mentoring.domain.enums import MentoringSessionStatus
+from app.contexts.mentoring.domain.enums import MentoringCancelActor, MentoringSessionStatus
 from app.contexts.mentoring.domain.session import MentoringSession, SessionQuery
 from app.contexts.mentoring.infrastructure.repositories import (
+    TortoiseBalanceTransactionRepository,
     TortoiseMentoringRequestRepository,
     TortoiseMentoringSessionRepository,
     TortoiseMentoringTeamRepository,
 )
-from app.contexts.mentoring.presentation.presenters import NameBook
+from app.contexts.mentoring.presentation.presenters import (
+    NameBook,
+    Participant,
+    RequestBalanceResponse,
+    balance_response,
+)
 from app.core.pagination import Page
 
 router = APIRouter(prefix="/mentoring/sessions", tags=["mentoring-sessions"])
@@ -90,6 +96,16 @@ class SessionResponse(BaseModel):
     requester_name: str
     mentor_id: uuid.UUID
     mentor_display_name: str
+    mentor_headline: str | None = Field(description="멘토 한 줄 소개 (A68)")
+    participants: list[Participant] = Field(description="1:1은 신청자, 팀은 지금 팀원 (A68)")
+    actual_started_at: datetime | None = Field(description="Meet 실제 시작 (처음 회의, A68)")
+    actual_ended_at: datetime | None = Field(description="Meet 실제 종료 (마지막 회의, A68)")
+    cancel_reason: str | None = Field(description="취소 사유 (신청의 값, A68)")
+    canceled_by: MentoringCancelActor | None = Field(description="취소 주체 (A66·A68)")
+    canceled_at: datetime | None
+    balance: RequestBalanceResponse = Field(description="신청의 차감 상태 (A66·A68)")
+    approved_rank: int | None = Field(description="몇 순위 희망 일시로 승인됐는지 (A68)")
+    requested_at: datetime | None = Field(description="신청 시각 (A68)")
     google_meet_url: str | None = Field(
         description="Meet 링크. 공간을 만들기 전이거나 취소된 세션은 null (A48)"
     )
@@ -101,18 +117,33 @@ class SessionResponse(BaseModel):
 
 class AdminSessionResponse(SessionResponse):
     mentor_name: str = Field(description="멘토 실명 (운영진 응답에만)")
-    actual_started_at: datetime | None = Field(description="Meet 실제 시작 (처음 회의)")
-    actual_ended_at: datetime | None = Field(description="Meet 실제 종료 (마지막 회의)")
+
+
+class SessionStatusCounts(BaseModel):
+    """상태 필터와 무관한 그 목록 대상 전체의 상태별 세션 수 (A68)."""
+
+    SCHEDULED: int
+    IN_PROGRESS: int
+    COMPLETED: int
+    NO_SHOW: int
+    CANCELED: int
+
+
+class SessionListPage(Page[SessionResponse]):
+    counts: SessionStatusCounts
 
 
 class SessionPresenter:
     def __init__(self, request: Request) -> None:
         self._names = NameBook(request)
         self._requests = TortoiseMentoringRequestRepository()
+        self._ledger = TortoiseBalanceTransactionRepository()
 
     async def admin(self, items: list[MentoringSession]) -> list[AdminSessionResponse]:
         requests = await self._requests.get_many(list({s.request_id for s in items}))
         names = await self._names.of(list(requests.values()))
+        people = await self._names.participants(list(requests.values()))
+        amounts = await self._ledger.amounts_by_requests(list(requests))
         result = []
         for s in items:
             r = requests[s.request_id]
@@ -134,6 +165,14 @@ class SessionPresenter:
                     mentor_id=s.mentor_id,
                     mentor_display_name=n.mentor_display_name,
                     mentor_name=n.mentor_name,
+                    mentor_headline=n.mentor_headline,
+                    participants=people.get(r.id, []),
+                    cancel_reason=r.cancel_reason,
+                    canceled_by=r.canceled_by,
+                    canceled_at=r.canceled_at,
+                    balance=balance_response(amounts.get(r.id, [])),
+                    approved_rank=_rank(r.desired_times, s.starts_at),
+                    requested_at=r.created_at,
                     google_meet_url=(
                         None if s.status is MentoringSessionStatus.CANCELED else s.google_meet_url
                     ),
@@ -150,33 +189,49 @@ class SessionPresenter:
     async def public(self, items: list[MentoringSession]) -> list[SessionResponse]:
         """수강생·멘토용 (멘토 실명 제외)."""
         return [
-            SessionResponse(
-                **s.model_dump(exclude={"mentor_name", "actual_started_at", "actual_ended_at"})
-            )
+            SessionResponse(**s.model_dump(exclude={"mentor_name"}))
             for s in await self.admin(items)
         ]
+
+
+def _rank(desired: list[datetime], starts_at: datetime) -> int | None:
+    """승인된 희망 일시의 순위 (1부터). 희망 일시에 없으면 None."""
+    return next((i + 1 for i, t in enumerate(desired) if t == starts_at), None)
+
+
+def _counts(counts: dict[MentoringSessionStatus, int]) -> SessionStatusCounts:
+    return SessionStatusCounts(**{k.value: v for k, v in counts.items()})
 
 
 PresenterDep = Annotated[SessionPresenter, Depends(SessionPresenter)]
 
 
-@me_router.get("/mentoring/sessions", response_model=Page[SessionResponse])
+@me_router.get("/mentoring/sessions", response_model=SessionListPage)
 async def my_sessions(
     user: ApprovedUser, queries: QueriesDep, presenter: PresenterDep, query: QueryDep
-) -> Page[SessionResponse]:
+) -> SessionListPage:
+    """본인 1:1·소속 팀 세션. `counts`는 필터와 무관한 상태별 수 (A68)."""
     items, total = await queries.list_mine(user.id, query)
-    return Page(
-        items=await presenter.public(items), total=total, limit=query.limit, offset=query.offset
+    return SessionListPage(
+        items=await presenter.public(items),
+        total=total,
+        limit=query.limit,
+        offset=query.offset,
+        counts=_counts(await queries.counts_mine(user.id)),
     )
 
 
-@me_router.get("/mentor-sessions", response_model=Page[SessionResponse])
+@me_router.get("/mentor-sessions", response_model=SessionListPage)
 async def mentor_sessions(
     user: ApprovedUser, queries: QueriesDep, presenter: PresenterDep, query: QueryDep
-) -> Page[SessionResponse]:
+) -> SessionListPage:
     items, total = await queries.list_for_mentor(user.id, query)
-    return Page(
-        items=await presenter.public(items), total=total, limit=query.limit, offset=query.offset
+    return SessionListPage(
+        items=await presenter.public(items),
+        total=total,
+        limit=query.limit,
+        offset=query.offset,
+        counts=_counts(await queries.counts_for_mentor(user.id)),
     )
 
 

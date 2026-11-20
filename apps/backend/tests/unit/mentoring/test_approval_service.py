@@ -302,6 +302,12 @@ async def test_session_queries(h: Harness) -> None:
     assert mentor_total == 2
     with pytest.raises(NotFoundError):
         await h.queries.list_for_mentor(new_id(), SessionQuery())
+    # 상태별 세션 수: 목록 필터와 무관 (A68)
+    assert (await h.queries.counts_mine(member_user))[MentoringSessionStatus.SCHEDULED] == 1
+    mentor_counts = await h.queries.counts_for_mentor(h.mentor.user_id)
+    assert (mentor_counts[MentoringSessionStatus.SCHEDULED], sum(mentor_counts.values())) == (2, 2)
+    with pytest.raises(NotFoundError):
+        await h.queries.counts_for_mentor(new_id())
 
     assert (await h.queries.get_for_user(student_user, solo.id)).id == solo.id
     assert (await h.queries.get_for_user(h.mentor.user_id, team_session.id)).id == team_session.id

@@ -39,12 +39,9 @@ from app.contexts.mentoring.application.request_service import (
     RequestList,
     StudentLookup,
 )
-from app.contexts.mentoring.domain.balance import request_balance
 from app.contexts.mentoring.domain.enums import (
-    MentoringBalanceTransactionType,
     MentoringCancelActor,
     MentoringRequestStatus,
-    RequestBalanceState,
 )
 from app.contexts.mentoring.domain.request import (
     DETAIL_MAX_LENGTH,
@@ -65,7 +62,11 @@ from app.contexts.mentoring.infrastructure.repositories import (
 )
 from app.contexts.mentoring.presentation.availability_router import get_available_times_service
 from app.contexts.mentoring.presentation.notices import build_notices
-from app.contexts.mentoring.presentation.presenters import NameBook
+from app.contexts.mentoring.presentation.presenters import (
+    NameBook,
+    RequestBalanceResponse,
+    balance_response,
+)
 from app.contexts.mentoring.presentation.session_router import SessionPresenter, SessionResponse
 from app.core.clock import Clock
 from app.core.dependencies import get_clock
@@ -179,13 +180,6 @@ class RequestSessionBrief(BaseModel):
     ends_at: datetime
 
 
-class RequestBalanceResponse(BaseModel):
-    state: RequestBalanceState = Field(
-        description="HELD 차감 예정 · USED 차감됨 · RETURNED 돌려받음 · NONE (A66)"
-    )
-    minutes: int
-
-
 class RequestResponse(BaseModel):
     id: uuid.UUID
     status: MentoringRequestStatus
@@ -288,7 +282,7 @@ class Presenter:
                 canceled_at=r.canceled_at,
                 canceled_by=r.canceled_by,
                 session=_session_brief(sessions.get(r.id)),
-                balance=_balance(amounts.get(r.id, [])),
+                balance=balance_response(amounts.get(r.id, [])),
                 replaced_request_id=r.replaced_request_id,
                 created_at=r.created_at,
             )
@@ -307,11 +301,6 @@ def _session_brief(session: MentoringSession | None) -> RequestSessionBrief | No
     if session is None:
         return None
     return RequestSessionBrief(id=session.id, starts_at=session.starts_at, ends_at=session.ends_at)
-
-
-def _balance(entries: list[tuple[MentoringBalanceTransactionType, int]]) -> RequestBalanceResponse:
-    result = request_balance(entries)
-    return RequestBalanceResponse(state=result.state, minutes=result.minutes)
 
 
 PresenterDep = Annotated[Presenter, Depends(Presenter)]

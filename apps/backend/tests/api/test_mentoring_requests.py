@@ -322,10 +322,18 @@ async def test_approve_reject_and_sessions(client: AsyncClient, settings: Settin
     # 세션 조회
     mine = (await client.get("/api/v1/me/mentoring/sessions", headers=student_h)).json()
     assert [s["id"] for s in mine["items"]] == [session["id"]]
+    assert mine["counts"] == {  # 상태별 세션 수 (A68)
+        "SCHEDULED": 1,
+        "IN_PROGRESS": 0,
+        "COMPLETED": 0,
+        "NO_SHOW": 0,
+        "CANCELED": 0,
+    }
     mentor_list = await client.get(
         "/api/v1/me/mentor-sessions", params={"status": "SCHEDULED"}, headers=mentor_h
     )
     assert mentor_list.json()["total"] == 1
+    assert mentor_list.json()["counts"]["SCHEDULED"] == 1
     window = await client.get(
         "/api/v1/me/mentoring/sessions",
         params={"from": ctx["at"].isoformat(), "to": second.isoformat()},
@@ -419,6 +427,11 @@ async def test_cancel_change_and_staff_cancel(client: AsyncClient, settings: Set
     assert await balance() == (150, 30, 0)
     session = await client.get(f"/api/v1/mentoring/sessions/{session_id}", headers=student_h)
     assert session.json()["status"] == "CANCELED"
+    # 취소된 세션에도 신청의 취소 사유·주체·차감 상태가 보인다 (A68: 변경은 신청자 취소)
+    canceled = session.json()
+    assert (canceled["canceled_by"], canceled["balance"]["state"]) == ("REQUESTER", "RETURNED")
+    assert canceled["cancel_reason"]
+    assert canceled["canceled_at"]
 
     # 운영진 취소: 승인된 신청, 환불 안 함 → 사용 유지
     await client.post(
@@ -620,12 +633,17 @@ async def test_record_note_and_unrecorded(
     assert edited.json()["summary"] == "고친 요약"
     assert (await client.get(f"{admin_sessions}/unrecorded", headers=admin)).json()["total"] == 0
 
-    # 수강생은 요약을 보고, 운영진은 Meet 실제 시각 필드도 받는다
+    # 수강생도 요약·Meet 실제 시각·참여자·차감 상태·신청 요약을 받는다 (A68)
     shown = (
         await client.get(f"/api/v1/mentoring/sessions/{session['id']}", headers=student_h)
     ).json()
     assert shown["summary"] == "고친 요약"
-    assert "actual_started_at" not in shown
+    assert (shown["actual_started_at"], shown["mentor_headline"]) == (None, "백엔드 10년차")
+    assert [p["name"] for p in shown["participants"]] == ["가수강"]
+    assert shown["balance"] == {"state": "USED", "minutes": 30}  # 짧게 진행 → 차이 환불
+    assert (shown["approved_rank"], shown["canceled_by"]) == (1, None)
+    assert shown["requested_at"] is not None
+    assert "mentor_name" not in shown
     staff = (await client.get(f"{admin_sessions}/{session['id']}", headers=admin)).json()
     assert "actual_started_at" in staff
 
@@ -946,3 +964,55 @@ async def test_chat_notices_follow_request_events(
     assert items[5]["body"].endswith("사유: 개인 사정")
     assert "자동 취소" in items[7]["body"]
     assert items[8]["body"].endswith("진행 60분")
+
+
+async def test_team_session_lists_team_members(client: AsyncClient, settings: Settings) -> None:
+    """팀 세션의 참여자는 지금 팀원이다 (A68)."""
+    ctx = await _setup(client, settings)
+    admin, cohort = ctx["admin"], ctx["cohort"]
+    api = f"/api/v1/admin/cohorts/{cohort.id}"
+    hours = {"start": "10:00", "end": "19:00"}
+    await client.put(
+        f"{api}/mentoring-settings",
+        json={
+            "allow_1_on_1": True,
+            "allow_team_mentoring": True,
+            "default_1on1_minutes": 180,
+            "default_team_minutes": 180,
+            "max_pending_requests": 3,
+            "weekday_hours": hours,
+            "weekend_hours": hours,
+        },
+        headers=admin,
+    )
+    mate = make_student(cohort_id=cohort.id, name="나수강")
+    await TortoiseStudentRepository().add(mate)
+    team = await client.post(
+        f"{api}/mentoring-teams",
+        json={
+            "mentor_id": str(ctx["mentor"].id),
+            "student_ids": [str(ctx["student"].id), str(mate.id)],
+        },
+        headers=admin,
+    )
+    assert team.status_code == 201, team.text
+    granted = await client.post(
+        f"{api}/mentoring-balances/grants",
+        json={"target": "ALL_TEAMS", "reason": "팀 지급"},
+        headers={**admin, "Idempotency-Key": str(new_id())},
+    )
+    assert granted.status_code == 200, granted.text
+    request_id = (
+        await client.post(
+            URL,
+            json=_body(ctx, cohort_id=None, mentor_id=None, team_id=team.json()["id"]),
+            headers=ctx["student_h"],
+        )
+    ).json()["id"]
+    approved = await client.post(
+        f"{URL}/{request_id}/approve",
+        json={"starts_at": ctx["at"].isoformat()},
+        headers=ctx["mentor_h"],
+    )
+    session = approved.json()["session"]
+    assert sorted(p["name"] for p in session["participants"]) == ["가수강", "나수강"]
