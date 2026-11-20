@@ -83,7 +83,7 @@ describe("다시 보기 (F35)", () => {
     );
     expect(line).not.toHaveAttribute("aria-current");
     expect(within(replay).getByRole("link", { name: "PDF로 보기" })).toHaveAttribute("href", stream("t1"));
-  });
+  }, 20_000); // 여러 화면을 지나는 긴 흐름 (전체 실행 부하에서 5초를 넘긴 적이 있다)
 
   it("회의가 여럿이면 녹화를 골라 영상·전사본을 함께 바꾼다", async () => {
     mockSessionDetail(makeCompleted());

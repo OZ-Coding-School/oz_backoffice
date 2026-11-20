@@ -70,7 +70,7 @@ describe("신청 변경 (F32)", () => {
       duration: 60,
     });
     expect(await screen.findByText("신청을 바꿨어요")).toBeInTheDocument();
-  });
+  }, 20_000); // 여러 화면을 지나는 긴 흐름 (전체 실행 부하에서 5초를 넘긴 적이 있다)
 
   it("승인된 신청을 바꾸면 확정 세션이 취소된다고 알린다", async () => {
     mockRequestDetail(
