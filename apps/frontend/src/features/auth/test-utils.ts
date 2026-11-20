@@ -94,6 +94,8 @@ export function resetAuth(): void {
     http.get(apiUrl("/api/v1/auth/signup/cohorts"), () => HttpResponse.json(COHORTS)),
     http.get(apiUrl("/api/v1/me/enrollments"), () => HttpResponse.json(ENROLLMENTS)),
     http.get(apiUrl("/api/v1/me/mentoring/settings"), () => HttpResponse.json(MENTORING_SETTINGS)),
+    // 공통 틀이 '내 팀' 메뉴를 정하려고 부른다 (F39). 기본은 팀 없음
+    http.get(apiUrl("/api/v1/me/mentoring-teams"), () => HttpResponse.json({ as_student: [], as_mentor: [] })),
   );
 }
 

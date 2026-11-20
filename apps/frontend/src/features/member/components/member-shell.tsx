@@ -22,6 +22,7 @@ import { Logo } from "@/features/auth/components/auth-layout";
 import { cn } from "@/lib/utils";
 
 import { activeCohort, cohortLabel, enrollmentsQuery } from "../api";
+import { myTeamsQuery } from "@/features/apply/api";
 import { mentoringSettingsQuery } from "@/features/requests/api";
 
 import { useLogout } from "../logout";
@@ -52,7 +53,10 @@ export function MemberShell({ me, children }: { me: Me; children: ReactNode }) {
   const apply =
     !!cohort &&
     (cohort.readOnly || (!!settings.data && (settings.data.allow_1_on_1 || settings.data.allow_team_mentoring)));
-  const groups = memberNav(me.account_type, { apply });
+  // 팀 멘토링 허용 기수이면서 소속 팀이 있을 때 '내 팀' (F39)
+  const teams = useQuery({ ...myTeamsQuery, enabled: !!settings.data?.allow_team_mentoring });
+  const team = !!settings.data?.allow_team_mentoring && (teams.data?.as_student.length ?? 0) > 0;
+  const groups = memberNav(me.account_type, { apply, team });
   const current = currentNavItem(groups, pathname);
   const roleLine = student ? (cohort ? `수강생 · ${cohortLabel(cohort.enrollment)}` : "수강생") : "멘토";
 
