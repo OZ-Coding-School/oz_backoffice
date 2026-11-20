@@ -140,7 +140,7 @@ describe("신청 상세·취소 (A66·F29)", () => {
     expect(screen.getByRole("heading", { name: "질문 정리" })).toBeInTheDocument(); // 마크다운
     expect(await screen.findByText("내 1:1 계좌 남은 시간")).toBeInTheDocument();
     expect(screen.getByText("이 신청 차감 예정")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "신청 변경" })).not.toBeInTheDocument(); // FE-4b
+    expect(screen.getByRole("link", { name: "신청 변경" })).toHaveAttribute("href", "/mentoring/requests/r1/change"); // F32
 
     await user.click(screen.getByRole("button", { name: "신청 취소" }));
     const dialog = await screen.findByRole("dialog", { name: "이 신청을 취소할까요?" });
@@ -168,7 +168,8 @@ describe("신청 상세·취소 (A66·F29)", () => {
     expect(await screen.findByRole("heading", { name: "확정 일시" })).toBeInTheDocument();
     expect(screen.getByText("멘토가 1순위로 승인했어요")).toBeInTheDocument();
     expect(screen.getByText("이 신청 차감됨")).toBeInTheDocument();
-    expect(await screen.findByText("시작 24시간 전까지 취소할 수 있어요")).toBeInTheDocument();
+    expect(await screen.findByText("시작 24시간 전까지 바꾸거나 취소할 수 있어요")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "신청 변경" })).toBeInTheDocument();
     expect(
       screen.getByText("시작 24시간 전(11/23(월) 19:00)까지 취소하면 1시간을 모두 돌려받아요"),
     ).toBeInTheDocument();
@@ -183,6 +184,7 @@ describe("신청 상세·취소 (A66·F29)", () => {
     await renderRoute("/mentoring/requests/r1");
     expect(await screen.findByText("취소 마감이 지났어요. 운영진에게 문의해 주세요.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "신청 취소" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "신청 변경" })).not.toBeInTheDocument();
   });
 
   it("서버가 마감 지남으로 거절하면 창 안에 알려 준다", async () => {
