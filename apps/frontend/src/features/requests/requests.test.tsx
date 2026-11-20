@@ -62,7 +62,7 @@ describe("신청 내역 목록 (F29)", () => {
     await waitFor(() => expect(seen.at(-1)?.status).toEqual(["REJECTED", "CANCELED"]));
     expect(await screen.findByRole("link", { name: "이력서 첨삭 · 취소" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Django ORM 질문 · 승인 대기" })).not.toBeInTheDocument();
-  });
+  }, 20_000); // 여러 화면을 지나는 긴 흐름 (전체 실행 부하에서 5초를 넘긴 적이 있다)
 
   it("신청이 없으면 빈 상태, 고른 탭에만 없으면 그 상태가 없다고 알려 준다", async () => {
     mockRequestList([], { PENDING: 0, APPROVED: 0, REJECTED: 0, CANCELED: 0 });

@@ -83,7 +83,7 @@ describe("진행 기록 목록 (F33·A70)", () => {
     await waitFor(() =>
       expect(screen.queryByRole("link", { name: "멘토K 멘토링 2회차 · 완료" })).not.toBeInTheDocument(),
     );
-  });
+  }, 20_000); // 여러 화면을 지나는 긴 흐름 (전체 실행 부하에서 5초를 넘긴 적이 있다)
 
   it("세션이 없으면 빈 상태, 고른 탭에만 없으면 그 상태가 없다고 알려 준다", async () => {
     mockSessionList([], { SCHEDULED: 0, IN_PROGRESS: 0, COMPLETED: 0, NO_SHOW: 0, CANCELED: 0 });

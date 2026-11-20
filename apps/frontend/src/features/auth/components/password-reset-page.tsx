@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, CircleCheck, CircleX, Mail, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Mail, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
@@ -14,11 +14,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatKst, secondsFromNow } from "@/lib/datetime";
 import { formatSeconds, useCountdown } from "@/lib/use-countdown";
-import { cn } from "@/lib/utils";
 
 import { VERIFICATION_ERRORS, type AlertMessage } from "../messages";
-import { emailSchema, PASSWORD_RULES, passwordSchema } from "../password";
+import { emailSchema, passwordSchema } from "../password";
 import { PasswordInput } from "./password-input";
+import { PasswordRules } from "./password-rules";
 
 /** 코드는 60초에 한 번 다시 받을 수 있다 (A32, 가입 코드와 같은 규칙). */
 const RESEND_SECONDS = 60;
@@ -230,25 +230,7 @@ function CodeStep({ email }: { email: string }) {
               />
             )}
           </FormField>
-          <ul aria-label="비밀번호 규칙" className="flex flex-col gap-1 rounded-lg bg-muted px-3 py-2.5">
-            {PASSWORD_RULES.map((rule) => {
-              const ok = rule.test(password);
-              const Icon = ok ? CircleCheck : CircleX;
-              return (
-                <li
-                  key={rule.id}
-                  className={cn(
-                    "flex items-center gap-2 text-caption",
-                    ok ? "text-success-text" : "text-muted-foreground",
-                  )}
-                >
-                  <Icon aria-hidden className="size-4" />
-                  {rule.label}
-                  <span className="sr-only">{ok ? " (충족)" : " (미충족)"}</span>
-                </li>
-              );
-            })}
-          </ul>
+          <PasswordRules value={password} />
           <FormField label="새 비밀번호 확인" error={errors.confirm?.message}>
             {(field) => (
               <PasswordInput

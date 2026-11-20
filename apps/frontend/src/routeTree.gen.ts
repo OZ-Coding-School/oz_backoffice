@@ -19,7 +19,9 @@ import { Route as AuthSignupRouteImport } from './routes/_auth/signup'
 import { Route as MemberIndexRouteImport } from './routes/_member/index'
 import { Route as StaffAdminRouteImport } from './routes/_staff/admin'
 import { Route as DevDesignSystemRouteImport } from './routes/dev/design-system'
+import { Route as AuthPasswordChangeVerifyRouteImport } from './routes/_auth/password-change.verify'
 import { Route as MemberMentoringApplyRouteImport } from './routes/_member/mentoring/apply'
+import { Route as MemberMyProfileRouteImport } from './routes/_member/my/profile'
 import { Route as StaffAuthStaffLoginRouteImport } from './routes/_staffAuth/staff/login'
 import { Route as StaffAuthStaffRegistrationRouteImport } from './routes/_staffAuth/staff/registration'
 import { Route as MemberMentoringRequestsIndexRouteImport } from './routes/_member/mentoring/requests/index'
@@ -74,9 +76,20 @@ const DevDesignSystemRoute = DevDesignSystemRouteImport.update({
   path: '/dev/design-system',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthPasswordChangeVerifyRoute =
+  AuthPasswordChangeVerifyRouteImport.update({
+    id: '/password-change/verify',
+    path: '/password-change/verify',
+    getParentRoute: () => AuthRoute,
+  } as any)
 const MemberMentoringApplyRoute = MemberMentoringApplyRouteImport.update({
   id: '/mentoring/apply',
   path: '/mentoring/apply',
+  getParentRoute: () => MemberRoute,
+} as any)
+const MemberMyProfileRoute = MemberMyProfileRouteImport.update({
+  id: '/my/profile',
+  path: '/my/profile',
   getParentRoute: () => MemberRoute,
 } as any)
 const StaffAuthStaffLoginRoute = StaffAuthStaffLoginRouteImport.update({
@@ -128,7 +141,9 @@ export interface FileRoutesByFullPath {
   '/signup': typeof AuthSignupRoute
   '/admin': typeof StaffAdminRoute
   '/dev/design-system': typeof DevDesignSystemRoute
+  '/password-change/verify': typeof AuthPasswordChangeVerifyRoute
   '/mentoring/apply': typeof MemberMentoringApplyRoute
+  '/my/profile': typeof MemberMyProfileRoute
   '/staff/login': typeof StaffAuthStaffLoginRoute
   '/staff/registration': typeof StaffAuthStaffRegistrationRoute
   '/mentoring/requests/$requestId': typeof MemberMentoringRequestsRequestIdRoute
@@ -144,7 +159,9 @@ export interface FileRoutesByTo {
   '/signup': typeof AuthSignupRoute
   '/admin': typeof StaffAdminRoute
   '/dev/design-system': typeof DevDesignSystemRoute
+  '/password-change/verify': typeof AuthPasswordChangeVerifyRoute
   '/mentoring/apply': typeof MemberMentoringApplyRoute
+  '/my/profile': typeof MemberMyProfileRoute
   '/staff/login': typeof StaffAuthStaffLoginRoute
   '/staff/registration': typeof StaffAuthStaffRegistrationRoute
   '/mentoring/requests/$requestId': typeof MemberMentoringRequestsRequestIdRoute
@@ -165,7 +182,9 @@ export interface FileRoutesById {
   '/_staff/admin': typeof StaffAdminRoute
   '/dev/design-system': typeof DevDesignSystemRoute
   '/_member/': typeof MemberIndexRoute
+  '/_auth/password-change/verify': typeof AuthPasswordChangeVerifyRoute
   '/_member/mentoring/apply': typeof MemberMentoringApplyRoute
+  '/_member/my/profile': typeof MemberMyProfileRoute
   '/_staffAuth/staff/login': typeof StaffAuthStaffLoginRoute
   '/_staffAuth/staff/registration': typeof StaffAuthStaffRegistrationRoute
   '/_member/mentoring/requests/$requestId': typeof MemberMentoringRequestsRequestIdRoute
@@ -183,7 +202,9 @@ export interface FileRouteTypes {
     | '/signup'
     | '/admin'
     | '/dev/design-system'
+    | '/password-change/verify'
     | '/mentoring/apply'
+    | '/my/profile'
     | '/staff/login'
     | '/staff/registration'
     | '/mentoring/requests/$requestId'
@@ -199,7 +220,9 @@ export interface FileRouteTypes {
     | '/signup'
     | '/admin'
     | '/dev/design-system'
+    | '/password-change/verify'
     | '/mentoring/apply'
+    | '/my/profile'
     | '/staff/login'
     | '/staff/registration'
     | '/mentoring/requests/$requestId'
@@ -219,7 +242,9 @@ export interface FileRouteTypes {
     | '/_staff/admin'
     | '/dev/design-system'
     | '/_member/'
+    | '/_auth/password-change/verify'
     | '/_member/mentoring/apply'
+    | '/_member/my/profile'
     | '/_staffAuth/staff/login'
     | '/_staffAuth/staff/registration'
     | '/_member/mentoring/requests/$requestId'
@@ -309,11 +334,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DevDesignSystemRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_auth/password-change/verify': {
+      id: '/_auth/password-change/verify'
+      path: '/password-change/verify'
+      fullPath: '/password-change/verify'
+      preLoaderRoute: typeof AuthPasswordChangeVerifyRouteImport
+      parentRoute: typeof AuthRoute
+    }
     '/_member/mentoring/apply': {
       id: '/_member/mentoring/apply'
       path: '/mentoring/apply'
       fullPath: '/mentoring/apply'
       preLoaderRoute: typeof MemberMentoringApplyRouteImport
+      parentRoute: typeof MemberRoute
+    }
+    '/_member/my/profile': {
+      id: '/_member/my/profile'
+      path: '/my/profile'
+      fullPath: '/my/profile'
+      preLoaderRoute: typeof MemberMyProfileRouteImport
       parentRoute: typeof MemberRoute
     }
     '/_staffAuth/staff/login': {
@@ -372,12 +411,14 @@ interface AuthRouteChildren {
   AuthLoginRoute: typeof AuthLoginRoute
   AuthPasswordResetRoute: typeof AuthPasswordResetRoute
   AuthSignupRoute: typeof AuthSignupRoute
+  AuthPasswordChangeVerifyRoute: typeof AuthPasswordChangeVerifyRoute
 }
 
 const AuthRouteChildren: AuthRouteChildren = {
   AuthLoginRoute: AuthLoginRoute,
   AuthPasswordResetRoute: AuthPasswordResetRoute,
   AuthSignupRoute: AuthSignupRoute,
+  AuthPasswordChangeVerifyRoute: AuthPasswordChangeVerifyRoute,
 }
 
 const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
@@ -385,6 +426,7 @@ const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
 interface MemberRouteChildren {
   MemberIndexRoute: typeof MemberIndexRoute
   MemberMentoringApplyRoute: typeof MemberMentoringApplyRoute
+  MemberMyProfileRoute: typeof MemberMyProfileRoute
   MemberMentoringRequestsRequestIdRoute: typeof MemberMentoringRequestsRequestIdRoute
   MemberMentoringSessionsSessionIdRoute: typeof MemberMentoringSessionsSessionIdRoute
   MemberMentoringRequestsIndexRoute: typeof MemberMentoringRequestsIndexRoute
@@ -395,6 +437,7 @@ interface MemberRouteChildren {
 const MemberRouteChildren: MemberRouteChildren = {
   MemberIndexRoute: MemberIndexRoute,
   MemberMentoringApplyRoute: MemberMentoringApplyRoute,
+  MemberMyProfileRoute: MemberMyProfileRoute,
   MemberMentoringRequestsRequestIdRoute: MemberMentoringRequestsRequestIdRoute,
   MemberMentoringSessionsSessionIdRoute: MemberMentoringSessionsSessionIdRoute,
   MemberMentoringRequestsIndexRoute: MemberMentoringRequestsIndexRoute,
