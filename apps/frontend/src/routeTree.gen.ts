@@ -24,6 +24,8 @@ import { Route as StaffAuthStaffLoginRouteImport } from './routes/_staffAuth/sta
 import { Route as StaffAuthStaffRegistrationRouteImport } from './routes/_staffAuth/staff/registration'
 import { Route as MemberMentoringRequestsIndexRouteImport } from './routes/_member/mentoring/requests/index'
 import { Route as MemberMentoringRequestsRequestIdRouteImport } from './routes/_member/mentoring/requests/$requestId'
+import { Route as MemberMentoringSessionsIndexRouteImport } from './routes/_member/mentoring/sessions/index'
+import { Route as MemberMentoringSessionsSessionIdRouteImport } from './routes/_member/mentoring/sessions/$sessionId'
 import { Route as MemberMentoringRequestsRequestIdChangeRouteImport } from './routes/_member/mentoring/requests/$requestId_.change'
 
 const AuthRoute = AuthRouteImport.update({
@@ -100,6 +102,18 @@ const MemberMentoringRequestsRequestIdRoute =
     path: '/mentoring/requests/$requestId',
     getParentRoute: () => MemberRoute,
   } as any)
+const MemberMentoringSessionsIndexRoute =
+  MemberMentoringSessionsIndexRouteImport.update({
+    id: '/mentoring/sessions/',
+    path: '/mentoring/sessions/',
+    getParentRoute: () => MemberRoute,
+  } as any)
+const MemberMentoringSessionsSessionIdRoute =
+  MemberMentoringSessionsSessionIdRouteImport.update({
+    id: '/mentoring/sessions/$sessionId',
+    path: '/mentoring/sessions/$sessionId',
+    getParentRoute: () => MemberRoute,
+  } as any)
 const MemberMentoringRequestsRequestIdChangeRoute =
   MemberMentoringRequestsRequestIdChangeRouteImport.update({
     id: '/mentoring/requests/$requestId_/change',
@@ -118,7 +132,9 @@ export interface FileRoutesByFullPath {
   '/staff/login': typeof StaffAuthStaffLoginRoute
   '/staff/registration': typeof StaffAuthStaffRegistrationRoute
   '/mentoring/requests/$requestId': typeof MemberMentoringRequestsRequestIdRoute
+  '/mentoring/sessions/$sessionId': typeof MemberMentoringSessionsSessionIdRoute
   '/mentoring/requests/': typeof MemberMentoringRequestsIndexRoute
+  '/mentoring/sessions/': typeof MemberMentoringSessionsIndexRoute
   '/mentoring/requests/$requestId/change': typeof MemberMentoringRequestsRequestIdChangeRoute
 }
 export interface FileRoutesByTo {
@@ -132,7 +148,9 @@ export interface FileRoutesByTo {
   '/staff/login': typeof StaffAuthStaffLoginRoute
   '/staff/registration': typeof StaffAuthStaffRegistrationRoute
   '/mentoring/requests/$requestId': typeof MemberMentoringRequestsRequestIdRoute
+  '/mentoring/sessions/$sessionId': typeof MemberMentoringSessionsSessionIdRoute
   '/mentoring/requests': typeof MemberMentoringRequestsIndexRoute
+  '/mentoring/sessions': typeof MemberMentoringSessionsIndexRoute
   '/mentoring/requests/$requestId/change': typeof MemberMentoringRequestsRequestIdChangeRoute
 }
 export interface FileRoutesById {
@@ -151,7 +169,9 @@ export interface FileRoutesById {
   '/_staffAuth/staff/login': typeof StaffAuthStaffLoginRoute
   '/_staffAuth/staff/registration': typeof StaffAuthStaffRegistrationRoute
   '/_member/mentoring/requests/$requestId': typeof MemberMentoringRequestsRequestIdRoute
+  '/_member/mentoring/sessions/$sessionId': typeof MemberMentoringSessionsSessionIdRoute
   '/_member/mentoring/requests/': typeof MemberMentoringRequestsIndexRoute
+  '/_member/mentoring/sessions/': typeof MemberMentoringSessionsIndexRoute
   '/_member/mentoring/requests/$requestId_/change': typeof MemberMentoringRequestsRequestIdChangeRoute
 }
 export interface FileRouteTypes {
@@ -167,7 +187,9 @@ export interface FileRouteTypes {
     | '/staff/login'
     | '/staff/registration'
     | '/mentoring/requests/$requestId'
+    | '/mentoring/sessions/$sessionId'
     | '/mentoring/requests/'
+    | '/mentoring/sessions/'
     | '/mentoring/requests/$requestId/change'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -181,7 +203,9 @@ export interface FileRouteTypes {
     | '/staff/login'
     | '/staff/registration'
     | '/mentoring/requests/$requestId'
+    | '/mentoring/sessions/$sessionId'
     | '/mentoring/requests'
+    | '/mentoring/sessions'
     | '/mentoring/requests/$requestId/change'
   id:
     | '__root__'
@@ -199,7 +223,9 @@ export interface FileRouteTypes {
     | '/_staffAuth/staff/login'
     | '/_staffAuth/staff/registration'
     | '/_member/mentoring/requests/$requestId'
+    | '/_member/mentoring/sessions/$sessionId'
     | '/_member/mentoring/requests/'
+    | '/_member/mentoring/sessions/'
     | '/_member/mentoring/requests/$requestId_/change'
   fileRoutesById: FileRoutesById
 }
@@ -318,6 +344,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MemberMentoringRequestsRequestIdRouteImport
       parentRoute: typeof MemberRoute
     }
+    '/_member/mentoring/sessions/': {
+      id: '/_member/mentoring/sessions/'
+      path: '/mentoring/sessions'
+      fullPath: '/mentoring/sessions/'
+      preLoaderRoute: typeof MemberMentoringSessionsIndexRouteImport
+      parentRoute: typeof MemberRoute
+    }
+    '/_member/mentoring/sessions/$sessionId': {
+      id: '/_member/mentoring/sessions/$sessionId'
+      path: '/mentoring/sessions/$sessionId'
+      fullPath: '/mentoring/sessions/$sessionId'
+      preLoaderRoute: typeof MemberMentoringSessionsSessionIdRouteImport
+      parentRoute: typeof MemberRoute
+    }
     '/_member/mentoring/requests/$requestId_/change': {
       id: '/_member/mentoring/requests/$requestId_/change'
       path: '/mentoring/requests/$requestId/change'
@@ -346,7 +386,9 @@ interface MemberRouteChildren {
   MemberIndexRoute: typeof MemberIndexRoute
   MemberMentoringApplyRoute: typeof MemberMentoringApplyRoute
   MemberMentoringRequestsRequestIdRoute: typeof MemberMentoringRequestsRequestIdRoute
+  MemberMentoringSessionsSessionIdRoute: typeof MemberMentoringSessionsSessionIdRoute
   MemberMentoringRequestsIndexRoute: typeof MemberMentoringRequestsIndexRoute
+  MemberMentoringSessionsIndexRoute: typeof MemberMentoringSessionsIndexRoute
   MemberMentoringRequestsRequestIdChangeRoute: typeof MemberMentoringRequestsRequestIdChangeRoute
 }
 
@@ -354,7 +396,9 @@ const MemberRouteChildren: MemberRouteChildren = {
   MemberIndexRoute: MemberIndexRoute,
   MemberMentoringApplyRoute: MemberMentoringApplyRoute,
   MemberMentoringRequestsRequestIdRoute: MemberMentoringRequestsRequestIdRoute,
+  MemberMentoringSessionsSessionIdRoute: MemberMentoringSessionsSessionIdRoute,
   MemberMentoringRequestsIndexRoute: MemberMentoringRequestsIndexRoute,
+  MemberMentoringSessionsIndexRoute: MemberMentoringSessionsIndexRoute,
   MemberMentoringRequestsRequestIdChangeRoute:
     MemberMentoringRequestsRequestIdChangeRoute,
 }

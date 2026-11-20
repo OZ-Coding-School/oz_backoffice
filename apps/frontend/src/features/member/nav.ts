@@ -1,4 +1,4 @@
-import { FileText, LayoutGrid, Plus, type LucideIcon } from "lucide-react";
+import { CalendarDays, FileText, LayoutGrid, Plus, type LucideIcon } from "lucide-react";
 
 import type { Me } from "@/features/auth/api";
 
@@ -29,6 +29,13 @@ const REQUESTS: MemberNavItem = {
   icon: FileText,
 };
 
+const SESSIONS: MemberNavItem = {
+  to: "/mentoring/sessions",
+  label: "진행 기록",
+  shortLabel: "진행 기록",
+  icon: CalendarDays,
+};
+
 const APPLY: MemberNavItem = { to: "/mentoring/apply", label: "멘토링 신청", shortLabel: "신청", icon: Plus };
 
 const MENTOR_NAV: MemberNavGroup[] = [{ items: [HOME] }];
@@ -40,7 +47,10 @@ export interface MemberNavOptions {
 
 export function memberNav(accountType: Me["account_type"], options: MemberNavOptions = {}): MemberNavGroup[] {
   if (accountType === "MENTOR") return MENTOR_NAV;
-  return [{ items: [HOME] }, { title: "멘토링", items: options.apply ? [APPLY, REQUESTS] : [REQUESTS] }];
+  return [
+    { items: [HOME] },
+    { title: "멘토링", items: options.apply ? [APPLY, REQUESTS, SESSIONS] : [REQUESTS, SESSIONS] },
+  ];
 }
 
 export function navItems(groups: readonly MemberNavGroup[]): MemberNavItem[] {
