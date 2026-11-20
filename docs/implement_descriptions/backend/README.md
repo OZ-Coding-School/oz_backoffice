@@ -70,4 +70,4 @@
 | 66 | [세션 응답 보완: 실제 진행 시각·참여자·취소·차감·상태별 건수 (BE-2a)](66_session_response_supplement.md) | 완료 (#91) |
 | 67 | [녹화 서명 링크와 스마트 메모 마크다운 (BE-2b)](67_artifact_link_markdown.md) | 완료 (#92) |
 | 68 | [Meet 전사 문장 저장·조회 (BE-2c)](68_transcript_entries.md) | 완료 (#93) |
-| 69 | [세션 목록 상태 여러 개 필터 (BE-2d)](69_session_list_statuses.md) | PR 진행 중 |
+| 69 | [세션 목록 상태 여러 개 필터 (BE-2d)](69_session_list_statuses.md) | PR 진행 중 (#94) |

@@ -1,7 +1,7 @@
 # 69. 세션 목록 상태 여러 개 필터 (BE-2d)
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #94
 - 관련 결정: `docs/decisions.md` A70, F33 (A67·A68)
 - 이전 기록: [68. Meet 전사 문장 저장·조회 (BE-2c)](68_transcript_entries.md)
 
