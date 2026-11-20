@@ -4,7 +4,10 @@
 Tortoise는 이 패키지(__init__)만 스캔한다.
 """
 
-from app.contexts.mentoring.infrastructure.models.artifact import MentoringArtifactModel
+from app.contexts.mentoring.infrastructure.models.artifact import (
+    MentoringArtifactModel,
+    MentoringTranscriptEntryModel,
+)
 from app.contexts.mentoring.infrastructure.models.assignment import CohortMentorModel
 from app.contexts.mentoring.infrastructure.models.balance import (
     MentoringBalanceAccountModel,
@@ -50,4 +53,5 @@ __all__ = [
     "MentoringSettlementModel",
     "MentoringTeamMemberModel",
     "MentoringTeamModel",
+    "MentoringTranscriptEntryModel",
 ]

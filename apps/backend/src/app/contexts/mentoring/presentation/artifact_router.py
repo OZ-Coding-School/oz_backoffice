@@ -6,6 +6,7 @@
   POST /mentoring/sessions/{id}/artifacts/{artifact_id}/link     서명 링크 (3시간, A68)
   GET  /mentoring/artifacts/{artifact_id}/stream?token=&download= 서명 링크 중계 (헤더 없이 Range)
   GET  /mentoring/sessions/{id}/artifacts/{artifact_id}/markdown 스마트 메모 마크다운 (A68)
+  GET  /mentoring/sessions/{id}/artifacts/{artifact_id}/entries  전사 문장 (A69)
 운영진 (mentoring.request.read, 기수 범위):
   GET /admin/cohorts/{cohort_id}/mentoring/sessions/{id}/artifacts[/{artifact_id}/content]
 Drive 권한은 아무에게도 주지 않고 백엔드가 서비스 계정으로 중계한다.
@@ -36,6 +37,7 @@ from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseMentoringArtifactRepository,
     TortoiseMentoringRequestRepository,
     TortoiseMentoringSessionRepository,
+    TortoiseTranscriptEntryRepository,
 )
 from app.contexts.mentoring.presentation.artifact_links import ArtifactGrant, ArtifactLinkSigner
 from app.contexts.mentoring.presentation.session_router import get_session_queries
@@ -74,6 +76,7 @@ def get_artifact_service(
         mentors=cast("MentorDirectory", state.mentor_queries),
         users=cast("UserQueries", state.user_queries),
         clock=clock,
+        entries=TortoiseTranscriptEntryRepository(),
     )
 
 
@@ -87,6 +90,12 @@ class ArtifactResponse(BaseModel):
     file_name: str | None
     mime_type: str = Field(description="받게 될 형식 (문서는 application/pdf)")
     file_size: int | None = Field(description="원본 크기(bytes), 문서는 PDF 크기와 다를 수 있다")
+    conference_record: str | None = Field(
+        description="Meet 회의 기록 이름. 같은 값의 영상·전사본이 한 회의다 (A69)"
+    )
+    started_at: datetime | None = Field(
+        description="녹화 시작(영상만). 전사 문장 시각 − 이 값 = 영상 위치 (A69)"
+    )
     created_at: datetime | None
 
     @classmethod
@@ -97,6 +106,8 @@ class ArtifactResponse(BaseModel):
             file_name=_download_name(a),
             mime_type=a.served_mime_type,
             file_size=a.file_size,
+            conference_record=a.conference_record,
+            started_at=a.started_at,
             created_at=a.created_at,
         )
 
@@ -201,6 +212,33 @@ async def artifact_stream(
         grant.user_id, grant.session_id, artifact_id, range_header
     )
     return _relay(artifact, stream, download=download)
+
+
+class TranscriptEntryResponse(BaseModel):
+    sequence: int
+    speaker_name: str = Field(description="서비스 이름으로 바꾼 화자 (모르면 Meet 표시 이름, A69)")
+    text: str
+    started_at: datetime
+    ended_at: datetime | None
+
+
+@router.get(
+    "/{session_id}/artifacts/{artifact_id}/entries", response_model=list[TranscriptEntryResponse]
+)
+async def transcript_entries(
+    session_id: uuid.UUID, artifact_id: uuid.UUID, user: ApprovedUser, service: ServiceDep
+) -> list[TranscriptEntryResponse]:
+    """참여자만. 전사본(TRANSCRIPT)의 문장을 순서대로 (A68·A69). 아직 못 받았으면 빈 목록."""
+    return [
+        TranscriptEntryResponse(
+            sequence=e.sequence,
+            speaker_name=e.speaker_name,
+            text=e.text,
+            started_at=e.started_at,
+            ended_at=e.ended_at,
+        )
+        for e in await service.entries_for_user(user.id, session_id, artifact_id)
+    ]
 
 
 @router.get(

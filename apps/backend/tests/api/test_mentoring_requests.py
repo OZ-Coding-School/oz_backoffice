@@ -672,6 +672,7 @@ async def test_artifact_list_and_stream(app: Any, client: AsyncClient, settings:
         TortoiseMentoringArtifactRepository,
         TortoiseMentoringRequestRepository,
         TortoiseMentoringSessionRepository,
+        TortoiseTranscriptEntryRepository,
     )
     from app.contexts.mentoring.presentation.artifact_router import get_artifact_service
     from app.contexts.mentoring.presentation.session_router import get_session_queries
@@ -712,6 +713,7 @@ async def test_artifact_list_and_stream(app: Any, client: AsyncClient, settings:
             mentors=state.mentor_queries,
             users=state.user_queries,
             clock=SystemClock(),
+            entries=TortoiseTranscriptEntryRepository(),
         )
 
     app.dependency_overrides[get_artifact_service] = service
@@ -799,6 +801,28 @@ async def test_artifact_list_and_stream(app: Any, client: AsyncClient, settings:
     access_token = student_h["Authorization"].removeprefix("Bearer ")
     reused = await client.get(f"/api/v1/mentoring/artifacts/{video.id}/stream?token={access_token}")
     assert reused.status_code == 401  # access 토큰은 서명 링크로 쓸 수 없다
+
+    # 전사 문장 (A69): TRANSCRIPT만, 회의 기록·녹화 시작은 목록에
+    from app.contexts.mentoring.domain.transcript import TranscriptEntry
+
+    await TortoiseTranscriptEntryRepository().add_many(
+        [
+            TranscriptEntry(
+                artifact_id=doc.id,
+                sequence=0,
+                speaker_name="멘토K",
+                meet_name="김멘토",
+                text="README부터 봐요",
+                started_at=ctx["at"],
+            )
+        ]
+    )
+    lines = (await client.get(f"{base}/{doc.id}/entries", headers=student_h)).json()
+    assert [(e["speaker_name"], e["text"]) for e in lines] == [("멘토K", "README부터 봐요")]
+    assert "meet_name" not in lines[0]  # Meet 원래 이름은 내려주지 않는다
+    assert (await client.get(f"{base}/{video.id}/entries", headers=student_h)).status_code == 404
+    assert (await client.get(f"{base}/{doc.id}/entries", headers=stranger)).status_code == 404
+    assert {"conference_record", "started_at"} <= set(listed[0])
 
     # 스마트 메모 마크다운 (A68): SUMMARY만
     md = await client.get(f"{base}/{memo.id}/markdown", headers=student_h)

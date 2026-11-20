@@ -35,6 +35,7 @@ from app.contexts.mentoring.domain.settings import (
 )
 from app.contexts.mentoring.domain.settlement import MentoringSettlement, SettlementItem
 from app.contexts.mentoring.domain.team import MentoringTeam
+from app.contexts.mentoring.domain.transcript import TranscriptEntry
 from app.contexts.mentoring.infrastructure.models import (
     CohortMentoringBlockTimeModel,
     CohortMentoringSettingsModel,
@@ -50,6 +51,7 @@ from app.contexts.mentoring.infrastructure.models import (
     MentoringSettlementModel,
     MentoringTeamMemberModel,
     MentoringTeamModel,
+    MentoringTranscriptEntryModel,
     MentorUnavailablePeriodModel,
 )
 from app.core.persistence import TortoiseRepository
@@ -1082,6 +1084,8 @@ _ARTIFACT_FIELDS = (
     "mime_type",
     "file_size",
     "status",
+    "conference_record",
+    "started_at",
 )
 
 
@@ -1132,6 +1136,55 @@ class TortoiseMentoringArtifactRepository:
             "id"
         )
         return [self._entity(row) for row in rows]
+
+
+class TortoiseTranscriptEntryRepository:
+    async def add_many(self, entries: list[TranscriptEntry]) -> None:
+        if not entries:
+            return
+        await MentoringTranscriptEntryModel.bulk_create(
+            [
+                MentoringTranscriptEntryModel(
+                    id=e.id,
+                    artifact_id=e.artifact_id,
+                    sequence=e.sequence,
+                    speaker_name=e.speaker_name,
+                    meet_name=e.meet_name,
+                    text=e.text,
+                    started_at=e.started_at,
+                    ended_at=e.ended_at,
+                )
+                for e in entries
+            ]
+        )
+
+    async def artifacts_with_entries(self, artifact_ids: list[uuid.UUID]) -> set[uuid.UUID]:
+        if not artifact_ids:
+            return set()
+        rows = (
+            await MentoringTranscriptEntryModel.filter(artifact_id__in=artifact_ids)
+            .distinct()
+            .values_list("artifact_id", flat=True)
+        )
+        return {uuid.UUID(str(r)) for r in rows}
+
+    async def list_by_artifact(self, artifact_id: uuid.UUID) -> list[TranscriptEntry]:
+        rows = await MentoringTranscriptEntryModel.filter(artifact_id=artifact_id).order_by(
+            "sequence"
+        )
+        return [
+            TranscriptEntry(
+                id=row.id,
+                artifact_id=artifact_id,
+                sequence=row.sequence,
+                speaker_name=row.speaker_name,
+                meet_name=row.meet_name,
+                text=row.text,
+                started_at=row.started_at,
+                ended_at=row.ended_at,
+            )
+            for row in rows
+        ]
 
 
 _ITEM_FIELDS = (

@@ -63,7 +63,12 @@ class FakeApis:
         state = meet.Recording.State
         return self._aiter(
             [
-                meet.Recording(state=state.FILE_GENERATED, drive_destination={"file": "v1"}),
+                meet.Recording(
+                    name=f"{request.parent}/recordings/r1",
+                    state=state.FILE_GENERATED,
+                    drive_destination={"file": "v1"},
+                    start_time=datetime(2026, 11, 20, 5, 1, tzinfo=UTC),
+                ),
                 meet.Recording(state=state.ENDED, drive_destination={"file": "v2"}),  # 아직
             ]
         )
@@ -72,7 +77,9 @@ class FakeApis:
         return self._aiter(
             [
                 meet.Transcript(
-                    state=meet.Transcript.State.FILE_GENERATED, docs_destination={"document": "t1"}
+                    name=f"{request.parent}/transcripts/t",
+                    state=meet.Transcript.State.FILE_GENERATED,
+                    docs_destination={"document": "t1"},
                 )
             ]
         )
@@ -83,6 +90,26 @@ class FakeApis:
                 meet.SmartNote(
                     state=meet.SmartNote.State.FILE_GENERATED, docs_destination={"document": "n1"}
                 )
+            ]
+        )
+
+    async def list_participants(self, *, request: Any) -> Any:
+        self._record("participants", request)
+        return self._aiter(
+            [
+                meet.Participant(name="p/1", signedin_user={"display_name": "김멘토"}),
+                meet.Participant(name="p/2", anonymous_user={"display_name": "익명"}),
+            ]
+        )
+
+    async def list_transcript_entries(self, *, request: Any) -> Any:
+        self._record("entries", request)
+        at = datetime(2026, 11, 20, 5, 2, tzinfo=UTC)
+        return self._aiter(
+            [
+                meet.TranscriptEntry(participant="p/1", text="안녕하세요", start_time=at),
+                meet.TranscriptEntry(participant="p/2", text="", start_time=at),  # 빈 문장
+                meet.TranscriptEntry(participant="p/9", text="누구", start_time=at, end_time=at),
             ]
         )
 
@@ -253,6 +280,26 @@ async def test_session_files() -> None:
         ("SUMMARY", "n1"),
     ]  # 생성이 끝난 파일만
     assert apis.calls[-1][1].filter == 'space.name="spaces/a"'
+    video, transcript = files[0], files[1]
+    assert (video.record_name, video.started_at) == (
+        "conferenceRecords/c1",
+        datetime(2026, 11, 20, 5, 1, tzinfo=UTC),
+    )  # 같은 회의 기록·녹화 시작 (A69)
+    assert transcript.source_name == "conferenceRecords/c1/transcripts/t"
     apis.errors["records"] = _error(google_exceptions.PermissionDenied, "권한")
     with pytest.raises(MeetUnavailableError):
         await _client(apis).session_files("spaces/a")
+
+
+async def test_transcript_lines() -> None:
+    """전사 항목: 참가자 표시 이름을 붙이고 빈 문장은 뺀다 (A69)."""
+    apis = FakeApis()
+    lines = await _client(apis).transcript_lines("conferenceRecords/c1/transcripts/t")
+    assert [(line.meet_name, line.text) for line in lines] == [
+        ("김멘토", "안녕하세요"),
+        ("", "누구"),
+    ]
+    assert apis.calls[-2][1].parent == "conferenceRecords/c1"  # 참가자는 회의 기록에서
+    apis.errors["entries"] = _error(google_exceptions.NotFound, "없음")
+    with pytest.raises(MeetUnavailableError):
+        await _client(apis).transcript_lines("conferenceRecords/c1/transcripts/t")

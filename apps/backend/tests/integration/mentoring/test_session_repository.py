@@ -1,5 +1,6 @@
 """멘토링 세션 저장·조회와 DB 제약 (A42·A43)."""
 
+import dataclasses
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -375,6 +376,42 @@ async def test_artifact_repository_and_constraints() -> None:
             await db.execute_query(
                 f"UPDATE mentoring_artifacts SET {sql} WHERE id = $1", [str(video.id)]
             )
+
+    # 회의 기록·녹화 시작 저장 왕복과 전사 문장 (A69)
+    from app.contexts.mentoring.domain.transcript import TranscriptEntry
+    from app.contexts.mentoring.infrastructure.repositories import (
+        TortoiseTranscriptEntryRepository,
+    )
+
+    video.link_conference("conferenceRecords/c1", T)
+    await artifacts.save(video)
+    linked = await artifacts.get(video.id)
+    assert linked is not None
+    assert (linked.conference_record, linked.started_at) == ("conferenceRecords/c1", T)
+    entries = TortoiseTranscriptEntryRepository()
+    rows = [
+        TranscriptEntry(
+            artifact_id=video.id,
+            sequence=i,
+            speaker_name="멘토K",
+            meet_name="김멘토",
+            text=f"문장 {i}",
+            started_at=T + timedelta(seconds=i),
+        )
+        for i in (1, 0)
+    ]
+    await entries.add_many(rows)
+    await entries.add_many([])
+    assert [e.text for e in await entries.list_by_artifact(video.id)] == ["문장 0", "문장 1"]
+    assert await entries.artifacts_with_entries([video.id, new_id()]) == {video.id}
+    assert await entries.artifacts_with_entries([]) == set()
+    with pytest.raises(IntegrityError):  # 파일마다 순서는 하나
+        await entries.add_many([dataclasses.replace(rows[0], id=new_id())])
+    with pytest.raises(IntegrityError):
+        await db.execute_query(
+            "UPDATE mentoring_transcript_entries SET sequence = -1 WHERE artifact_id = $1",
+            [str(video.id)],
+        )
 
 
 async def test_settlement_repository_and_constraints() -> None:
