@@ -74,4 +74,4 @@
 | 70 | [녹화 끝 시각 (BE-2e)](70_artifact_recording_end.md) | 완료 (#96) |
 | 71 | [내 정보 비밀번호 변경 링크 (BE-2f)](71_password_change_link.md) | 완료 (#98) |
 | 72 | [내 팀 응답 보완 (BE-2g)](72_my_team_summary.md) | 완료 (#101) |
-| 73 | [채팅 자격을 신청 이력 기준으로 (BE-2h)](73_chat_request_history.md) | PR 진행 중 |
+| 73 | [채팅 자격을 신청 이력 기준으로 (BE-2h)](73_chat_request_history.md) | PR 진행 중 (#103) |
