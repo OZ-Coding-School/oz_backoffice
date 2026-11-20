@@ -394,11 +394,15 @@ async def test_artifact_repository_and_constraints() -> None:
         TortoiseTranscriptEntryRepository,
     )
 
-    video.link_conference("conferenceRecords/c1", T)
+    video.link_conference("conferenceRecords/c1", T, T + timedelta(minutes=40))
     await artifacts.save(video)
     linked = await artifacts.get(video.id)
     assert linked is not None
-    assert (linked.conference_record, linked.started_at) == ("conferenceRecords/c1", T)
+    assert (linked.conference_record, linked.started_at, linked.ended_at) == (
+        "conferenceRecords/c1",
+        T,
+        T + timedelta(minutes=40),
+    )
     entries = TortoiseTranscriptEntryRepository()
     rows = [
         TranscriptEntry(

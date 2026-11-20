@@ -95,6 +95,7 @@ class MeetFile:
     record_name: str = ""  # conferenceRecords/X (A69)
     source_name: str = ""  # 녹화·전사·스마트 메모 리소스 이름 (전사 항목 조회에 쓴다)
     started_at: datetime | None = None  # 녹화 시작 (영상만)
+    ended_at: datetime | None = None  # 녹화 끝 (영상만, A71)
 
 
 @dataclass(frozen=True, slots=True)
@@ -210,6 +211,7 @@ class GoogleMeetEvents:
                         record_name=record_name,
                         source_name=recording.name,
                         started_at=_datetime(recording.start_time),
+                        ended_at=_datetime(recording.end_time),
                     )
                 )
         transcripts = await self._conferences.list_transcripts(

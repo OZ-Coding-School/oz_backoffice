@@ -12411,6 +12411,19 @@
             "title": "Started At",
             "description": "녹화 시작(영상만). 전사 문장 시각 − 이 값 = 영상 위치 (A69)"
           },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At",
+            "description": "녹화 끝(영상만). 녹화 고르기에 시작~끝을 보여 준다 (A71)"
+          },
           "created_at": {
             "anyOf": [
               {
@@ -12433,6 +12446,7 @@
           "file_size",
           "conference_record",
           "started_at",
+          "ended_at",
           "created_at"
         ],
         "title": "ArtifactResponse"

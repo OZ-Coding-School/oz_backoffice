@@ -3493,6 +3493,11 @@ export interface components {
              * @description 녹화 시작(영상만). 전사 문장 시각 − 이 값 = 영상 위치 (A69)
              */
             started_at: string | null;
+            /**
+             * Ended At
+             * @description 녹화 끝(영상만). 녹화 고르기에 시작~끝을 보여 준다 (A71)
+             */
+            ended_at: string | null;
             /** Created At */
             created_at: string | null;
         };

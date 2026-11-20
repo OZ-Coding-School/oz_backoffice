@@ -96,6 +96,9 @@ class ArtifactResponse(BaseModel):
     started_at: datetime | None = Field(
         description="녹화 시작(영상만). 전사 문장 시각 − 이 값 = 영상 위치 (A69)"
     )
+    ended_at: datetime | None = Field(
+        description="녹화 끝(영상만). 녹화 고르기에 시작~끝을 보여 준다 (A71)"
+    )
     created_at: datetime | None
 
     @classmethod
@@ -108,6 +111,7 @@ class ArtifactResponse(BaseModel):
             file_size=a.file_size,
             conference_record=a.conference_record,
             started_at=a.started_at,
+            ended_at=a.ended_at,
             created_at=a.created_at,
         )
 
