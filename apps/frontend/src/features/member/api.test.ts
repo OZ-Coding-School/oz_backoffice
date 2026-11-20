@@ -66,6 +66,18 @@ describe("하단 탭 더보기 (F36)", () => {
     expect(layout.more).toEqual([]);
   });
 
+  it("팀이 있으면 '내 팀'이 진행 기록 다음에 들어간다 (F39)", () => {
+    expect(navItems(memberNav("STUDENT", { apply: true, team: true })).map((i) => i.label)).toEqual([
+      "홈",
+      "멘토링 신청",
+      "신청 내역",
+      "진행 기록",
+      "내 팀",
+      "시간 지급·차감 내역",
+      "내 정보",
+    ]);
+  });
+
   it("넘으면 홈·신청·진행 기록·신청 내역 + 나머지는 그룹째 더보기", () => {
     const layout = bottomTabLayout(memberNav("STUDENT", { apply: true }));
     expect(layout.tabs.map((i) => i.shortLabel)).toEqual(["홈", "신청", "진행 기록", "신청 내역"]);

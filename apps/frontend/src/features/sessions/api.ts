@@ -58,6 +58,15 @@ export function mySessionsQuery(tab: SessionTab) {
   });
 }
 
+/** 최근 팀 세션 (팀 필터, A73): 시작 시각 최신순 limit개 */
+export function teamSessionsQuery(teamId: string, limit = 3) {
+  return queryOptions({
+    queryKey: ["sessions", "team", teamId, limit] as const,
+    queryFn: () =>
+      unwrap(api.GET("/api/v1/me/mentoring/sessions", { params: { query: { team_id: teamId, limit, offset: 0 } } })),
+  });
+}
+
 /** 세션 단건 (참여자·담당 멘토만, 아니면 404) */
 export function sessionQuery(id: string) {
   return queryOptions({
