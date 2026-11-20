@@ -10022,6 +10022,25 @@
         ],
         "parameters": [
           {
+            "name": "team_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "그 팀 세션만 (소속 팀이 아니면 빈 목록, A73)",
+              "title": "Team Id"
+            },
+            "description": "그 팀 세션만 (소속 팀이 아니면 빈 목록, A73)"
+          },
+          {
             "name": "status",
             "in": "query",
             "required": false,
@@ -19831,6 +19850,17 @@
           "name": {
             "type": "string",
             "title": "Name"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EnrollmentStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "수강 상태 (A73)"
           }
         },
         "type": "object",
@@ -19850,6 +19880,36 @@
           "display_name": {
             "type": "string",
             "title": "Display Name"
+          },
+          "headline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headline",
+            "description": "한 줄 소개 (A73)"
+          },
+          "expertise": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expertise",
+            "description": "전문 분야, 쉼표로 구분 (A73)"
+          },
+          "accepting_requests": {
+            "type": "boolean",
+            "title": "Accepting Requests",
+            "description": "신청 받는 중 (A73)",
+            "default": false
           }
         },
         "type": "object",
@@ -19879,6 +19939,19 @@
             "type": "string",
             "title": "Label"
           },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At",
+            "description": "팀 구성일 (A73)"
+          },
           "mentor": {
             "$ref": "#/components/schemas/StudentTeamMentor"
           },
@@ -19888,6 +19961,9 @@
             },
             "type": "array",
             "title": "Members"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/TeamStats"
           }
         },
         "type": "object",
@@ -19897,10 +19973,11 @@
           "team_number",
           "label",
           "mentor",
-          "members"
+          "members",
+          "stats"
         ],
         "title": "StudentTeamResponse",
-        "description": "수강생이 보는 내 팀 (멘토 실명·팀원 상태 제외)."
+        "description": "수강생이 보는 내 팀 (멘토 실명·가입 여부 제외)."
       },
       "TeamChangeResponse": {
         "properties": {
@@ -20056,6 +20133,64 @@
           "name"
         ],
         "title": "TeamOption"
+      },
+      "TeamStats": {
+        "properties": {
+          "completed_sessions": {
+            "type": "integer",
+            "title": "Completed Sessions"
+          },
+          "completed_minutes": {
+            "type": "integer",
+            "title": "Completed Minutes"
+          },
+          "upcoming_sessions": {
+            "type": "integer",
+            "title": "Upcoming Sessions",
+            "description": "예정·진행 중 세션 수"
+          },
+          "next_session_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Session At",
+            "description": "가장 이른 예정·진행 중 세션 시작"
+          },
+          "pending_requests": {
+            "type": "integer",
+            "title": "Pending Requests",
+            "description": "승인 대기 팀 신청 수"
+          },
+          "pending_requester_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Requester Name",
+            "description": "가장 먼저 낸 대기 신청의 신청자"
+          }
+        },
+        "type": "object",
+        "required": [
+          "completed_sessions",
+          "completed_minutes",
+          "upcoming_sessions",
+          "next_session_at",
+          "pending_requests",
+          "pending_requester_name"
+        ],
+        "title": "TeamStats",
+        "description": "내 팀 집계 (A73). 진행 시간은 기록 기준."
       },
       "TeamUpdate": {
         "properties": {

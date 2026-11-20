@@ -6401,6 +6401,8 @@ export interface components {
             student_id: string;
             /** Name */
             name: string;
+            /** @description 수강 상태 (A73) */
+            status?: components["schemas"]["EnrollmentStatus"] | null;
         };
         /** StudentTeamMentor */
         StudentTeamMentor: {
@@ -6411,10 +6413,26 @@ export interface components {
             mentor_id: string;
             /** Display Name */
             display_name: string;
+            /**
+             * Headline
+             * @description 한 줄 소개 (A73)
+             */
+            headline?: string | null;
+            /**
+             * Expertise
+             * @description 전문 분야, 쉼표로 구분 (A73)
+             */
+            expertise?: string | null;
+            /**
+             * Accepting Requests
+             * @description 신청 받는 중 (A73)
+             * @default false
+             */
+            accepting_requests: boolean;
         };
         /**
          * StudentTeamResponse
-         * @description 수강생이 보는 내 팀 (멘토 실명·팀원 상태 제외).
+         * @description 수강생이 보는 내 팀 (멘토 실명·가입 여부 제외).
          */
         StudentTeamResponse: {
             /**
@@ -6431,9 +6449,15 @@ export interface components {
             team_number: number;
             /** Label */
             label: string;
+            /**
+             * Created At
+             * @description 팀 구성일 (A73)
+             */
+            created_at?: string | null;
             mentor: components["schemas"]["StudentTeamMentor"];
             /** Members */
             members: components["schemas"]["StudentTeamMember"][];
+            stats: components["schemas"]["TeamStats"];
         };
         /** TeamChangeResponse */
         TeamChangeResponse: {
@@ -6505,6 +6529,36 @@ export interface components {
             department_id: string;
             /** Name */
             name: string;
+        };
+        /**
+         * TeamStats
+         * @description 내 팀 집계 (A73). 진행 시간은 기록 기준.
+         */
+        TeamStats: {
+            /** Completed Sessions */
+            completed_sessions: number;
+            /** Completed Minutes */
+            completed_minutes: number;
+            /**
+             * Upcoming Sessions
+             * @description 예정·진행 중 세션 수
+             */
+            upcoming_sessions: number;
+            /**
+             * Next Session At
+             * @description 가장 이른 예정·진행 중 세션 시작
+             */
+            next_session_at: string | null;
+            /**
+             * Pending Requests
+             * @description 승인 대기 팀 신청 수
+             */
+            pending_requests: number;
+            /**
+             * Pending Requester Name
+             * @description 가장 먼저 낸 대기 신청의 신청자
+             */
+            pending_requester_name: string | null;
         };
         /**
          * TeamUpdate
@@ -12843,6 +12897,8 @@ export interface operations {
     my_sessions_api_v1_me_mentoring_sessions_get: {
         parameters: {
             query?: {
+                /** @description 그 팀 세션만 (소속 팀이 아니면 빈 목록, A73) */
+                team_id?: string | null;
                 /** @description 여러 개 가능 (예: status=SCHEDULED&status=IN_PROGRESS, A70) */
                 status?: components["schemas"]["MentoringSessionStatus"][] | null;
                 from?: string | null;

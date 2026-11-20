@@ -1,6 +1,7 @@
 import { expertiseChips } from "./api";
 import { allowedKinds, blockReason } from "./gate";
 import { durationOptions, kstDateKey, monthRanges, startTimes } from "./slots";
+import { makeStudentTeam } from "./team-fixture";
 
 const cohort = {
   enrollment: { student_id: "st12", cohort_id: "c12" },
@@ -86,14 +87,7 @@ describe("신청 첫머리 판정 (F28·F30·F31)", () => {
 
   it("팀: 팀 불가·팀 없음·팀 시간 없음·담당 멘토가 신청을 안 받음", () => {
     const teamSettings = { ...settings, allow_team_mentoring: true };
-    const team = {
-      id: "t1",
-      cohort_id: "c12",
-      team_number: 3,
-      label: "3팀",
-      mentor: { mentor_id: "m1", display_name: "이멘토" },
-      members: [],
-    };
+    const team = makeStudentTeam();
     const teamCase = (o: Partial<Parameters<typeof blockReason>[0]>) =>
       blockReason({
         cohort,

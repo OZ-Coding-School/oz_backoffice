@@ -231,10 +231,16 @@ PresenterDep = Annotated[SessionPresenter, Depends(SessionPresenter)]
 
 @me_router.get("/mentoring/sessions", response_model=SessionListPage)
 async def my_sessions(
-    user: ApprovedUser, queries: QueriesDep, presenter: PresenterDep, query: MemberQueryDep
+    user: ApprovedUser,
+    queries: QueriesDep,
+    presenter: PresenterDep,
+    query: MemberQueryDep,
+    team_id: Annotated[
+        uuid.UUID | None, Query(description="그 팀 세션만 (소속 팀이 아니면 빈 목록, A73)")
+    ] = None,
 ) -> SessionListPage:
     """본인 1:1·소속 팀 세션. `counts`는 필터와 무관한 상태별 수 (A68)."""
-    items, total = await queries.list_mine(user.id, query)
+    items, total = await queries.list_mine(user.id, query, team_id=team_id)
     return SessionListPage(
         items=await presenter.public(items),
         total=total,

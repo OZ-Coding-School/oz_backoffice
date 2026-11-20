@@ -56,9 +56,14 @@ class MentoringSessionQueries:
         self._mentors = mentors
 
     async def list_mine(
-        self, user_id: uuid.UUID, query: SessionQuery
+        self, user_id: uuid.UUID, query: SessionQuery, *, team_id: uuid.UUID | None = None
     ) -> tuple[list[MentoringSession], int]:
+        """본인 1:1·소속 팀 세션. team_id를 주면 그 팀 세션만 (소속 팀이 아니면 빈 목록, A73)."""
         student_ids, team_ids = await self._memberships(user_id)
+        if team_id is not None:
+            if team_id not in team_ids:
+                return [], 0
+            student_ids, team_ids = [], [team_id]
         return await self._sessions.list_for_participants(
             student_ids=student_ids, team_ids=team_ids, query=query
         )

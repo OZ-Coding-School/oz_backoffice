@@ -1077,6 +1077,9 @@ async def test_team_session_lists_team_members(client: AsyncClient, settings: Se
             headers=ctx["student_h"],
         )
     ).json()["id"]
+    teams_url = "/api/v1/me/mentoring-teams"
+    stats = (await client.get(teams_url, headers=ctx["student_h"])).json()["as_student"][0]["stats"]
+    assert (stats["pending_requests"], stats["pending_requester_name"]) == (1, "가수강")  # A73
     approved = await client.post(
         f"{URL}/{request_id}/approve",
         json={"starts_at": ctx["at"].isoformat()},
@@ -1084,3 +1087,15 @@ async def test_team_session_lists_team_members(client: AsyncClient, settings: Se
     )
     session = approved.json()["session"]
     assert sorted(p["name"] for p in session["participants"]) == ["가수강", "나수강"]
+    stats = (await client.get(teams_url, headers=ctx["student_h"])).json()["as_student"][0]["stats"]
+    assert (stats["pending_requests"], stats["upcoming_sessions"]) == (0, 1)
+    assert stats["next_session_at"] == session["starts_at"]
+
+    # 세션 목록 팀 필터 (A73): 소속 팀만, 아니면 빈 목록
+    mine = "/api/v1/me/mentoring/sessions"
+    team_only = await client.get(
+        mine, params={"team_id": team.json()["id"]}, headers=ctx["student_h"]
+    )
+    assert [s["id"] for s in team_only.json()["items"]] == [session["id"]]
+    stranger = await client.get(mine, params={"team_id": str(new_id())}, headers=ctx["student_h"])
+    assert (stranger.json()["items"], stranger.json()["total"]) == ([], 0)
