@@ -17,11 +17,12 @@ import { cn } from "@/lib/utils";
 
 import { sessionQuery, type MentoringSession } from "../api";
 import { actualMinutes, balanceNote, isMine, kindLabel, plannedMinutes, scheduleLabel, STATUS_STYLE } from "../labels";
+import { ReplaySection } from "./replay-section";
 import { ParticipantChips, SessionNote } from "./session-card";
 
 /**
  * 세션 상세 (Figma `Screen / 세션 상세 · 완료 / 예정`, F33·F34).
- * 신청 내용은 신청 상세에서 보므로 머리에 [신청 보기]를 둔다. 다시 보기는 FE-5b.
+ * 신청 내용은 신청 상세에서 보므로 머리에 [신청 보기]를 둔다. 완료 세션은 다시 보기(F35)를 둔다.
  */
 export function SessionDetailPage({ sessionId }: { sessionId: string }) {
   const detail = useQuery(sessionQuery(sessionId));
@@ -151,6 +152,7 @@ function Detail({ session }: { session: MentoringSession }) {
           </div>
         ) : null}
       </article>
+      {completed ? <ReplaySection session={session} /> : null}
       {completed && session.recorded_at ? <MentorRecord session={session} recordedAt={session.recorded_at} /> : null}
     </div>
   );

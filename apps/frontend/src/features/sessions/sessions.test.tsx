@@ -7,7 +7,7 @@ import { apiUrl, errorBody } from "@/mocks/api";
 import { server } from "@/mocks/node";
 import { renderRoute } from "@/test/render";
 
-import { makeCompleted, makeSession, mockSessionDetail, mockSessionList } from "./test-utils";
+import { makeCompleted, makeSession, mockArtifacts, mockSessionDetail, mockSessionList } from "./test-utils";
 
 beforeEach(() => {
   resetAuth();
@@ -161,6 +161,7 @@ describe("세션 상세 (F33·F34)", () => {
 
   it("완료: 실제 진행·진행 시간·차감과 멘토 기록(마크다운)을 보여 주고 Meet 입장은 없다", async () => {
     mockSessionDetail(makeCompleted({ google_meet_url: "https://meet.google.com/x" }));
+    mockArtifacts([]);
     await renderRoute("/mentoring/sessions/s2");
     expect(await screen.findByRole("heading", { level: 1, name: "멘토K 멘토링 2회차" })).toBeInTheDocument();
     expect(screen.getByText("10:02 ~ 11:01")).toBeInTheDocument();
