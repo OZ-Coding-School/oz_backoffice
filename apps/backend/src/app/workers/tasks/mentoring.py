@@ -106,7 +106,7 @@ def build_chat_notices(redis: "Redis", clock: SystemClock) -> MentoringNotices:
             messages=TortoiseChatMessageRepository(),
             reads=TortoiseChatReadRepository(),
             teams=TortoiseMentoringTeamRepository(),
-            assignments=TortoiseCohortMentorRepository(),
+            history=TortoiseMentoringRequestRepository(),
             students=StudentQueries(TortoiseStudentRepository()),
             mentors=MentorQueries(TortoiseMentorRepository()),
             events=RedisChatEvents(redis),

@@ -1,10 +1,10 @@
 """멘토링 채팅 (decisions M23·A57, P15-1).
 
-참여 자격 (양쪽 같은 기준, 없으면 목록에서 빠지고 단건은 404):
-- 1:1: 수강 등록이 수강 중이고 그 기수에 그 멘토의 활성 배정이 있다. 참여자는 그 수강생과 멘토.
-- 팀: 팀의 현재 담당 멘토가 방의 멘토이고 그 기수에 활성 배정이 있다. 참여자는 현재 팀원과 멘토.
-  담당 멘토가 바뀌면 새 멘토와 새 방이 생긴다.
-방은 처음 메시지를 보낼 때 만든다(수강생·멘토 누구나 먼저 시작).
+참여 자격 (A74, 양쪽 같은 기준, 없으면 목록에서 빠지고 단건은 404):
+- 신청 이력만 본다(상태 무관 1건 이상). 수강 상태·배정 여부는 보지 않는다.
+- 1:1: 그 수강 등록이 그 멘토에게 낸 1:1 신청이 있다. 참여자는 그 수강생과 멘토.
+- 팀: 그 팀이 그 멘토에게 낸 팀 신청이 있다. 참여자는 지금 팀원과 멘토.
+방은 신청 안내 메시지나 처음 메시지로 만든다(수강생·멘토 누구나 먼저 시작).
 보내면 보낸 사람의 읽음 위치도 그 메시지로 옮긴다.
 운영진(기수 범위)은 방과 메시지를 열람만 한다.
 실시간 알림(A58): 커밋 뒤 참여자 각자에게 새 메시지·삭제를, 읽은 사람에게 읽음을 알린다. 알림 실패는
@@ -33,7 +33,6 @@ from app.contexts.mentoring.domain.repositories import (
     ChatMessageRepository,
     ChatReadRepository,
     ChatThreadRepository,
-    CohortMentorRepository,
     MentoringTeamRepository,
 )
 from app.contexts.mentoring.domain.team import MentoringTeam
@@ -58,6 +57,16 @@ class MentorLookup(Protocol):
 
     async def get(self, mentor_id: uuid.UUID) -> Mentor | None: ...
     async def get_by_user(self, user_id: uuid.UUID) -> Mentor | None: ...
+
+
+class ChatHistory(Protocol):
+    """mentoring 신청 저장소: 채팅 자격이 되는 신청 이력 (A74)."""
+
+    async def chat_pairs(
+        self, *, student_ids: list[uuid.UUID], team_ids: list[uuid.UUID]
+    ) -> set[tuple[uuid.UUID, uuid.UUID]]:
+        """(멘토, 신청 주인): 1:1은 수강 등록, 팀은 팀. 상태 무관."""
+        ...
 
 
 class ChatEventPublisher(Protocol):
@@ -99,11 +108,11 @@ class _Viewer:
 
 @dataclass(frozen=True, slots=True)
 class _Scope:
-    """자격 판정에 필요한 방들의 수강 등록·팀·활성 배정."""
+    """자격 판정에 필요한 방들의 수강 등록·팀·신청 이력."""
 
     students: dict[uuid.UUID, Student]
     teams: dict[uuid.UUID, MentoringTeam]
-    active: set[tuple[uuid.UUID, uuid.UUID]]  # (멘토, 기수)
+    history: set[tuple[uuid.UUID, uuid.UUID]]  # (멘토, 수강 등록 또는 팀)
 
     def cohort_of(self, thread: ChatThread) -> uuid.UUID | None:
         if thread.team_id is not None:
@@ -113,17 +122,12 @@ class _Scope:
         return student.cohort_id if student else None
 
     def open(self, thread: ChatThread) -> bool:
-        """방이 아직 쓰이는가 (참여자와 무관한 조건)."""
-        cohort_id = self.cohort_of(thread)
-        if cohort_id is None or (thread.mentor_id, cohort_id) not in self.active:
-            return False
+        """방이 아직 쓰이는가 (참여자와 무관한 조건): 그 상대와의 신청 이력이 있다 (A74)."""
         if thread.team_id is not None:
-            return self.teams[thread.team_id].mentor_id == thread.mentor_id
-        return thread.student_id is not None and _enrolled(self.students[thread.student_id])
-
-
-def _enrolled(student: Student) -> bool:
-    return student.is_enrolled and not student.is_removed_in_source
+            owner: uuid.UUID | None = thread.team_id if thread.team_id in self.teams else None
+        else:
+            owner = thread.student_id if thread.student_id in self.students else None
+        return owner is not None and (thread.mentor_id, owner) in self.history
 
 
 def _thread_not_found() -> NotFoundError:
@@ -142,7 +146,7 @@ class ChatService:
         messages: ChatMessageRepository,
         reads: ChatReadRepository,
         teams: MentoringTeamRepository,
-        assignments: CohortMentorRepository,
+        history: ChatHistory,
         students: StudentLookup,
         mentors: MentorLookup,
         events: ChatEventPublisher,
@@ -154,7 +158,7 @@ class ChatService:
         self._messages = messages
         self._reads = reads
         self._teams = teams
-        self._assignments = assignments
+        self._history = history
         self._students = students
         self._mentors = mentors
         self._uow = uow
@@ -375,11 +379,11 @@ class ChatService:
             t.id: t
             for t in await self._teams.list_by_ids(list({t.team_id for t in threads if t.team_id}))
         }
-        active: set[tuple[uuid.UUID, uuid.UUID]] = set()
-        for mentor_id in {t.mentor_id for t in threads}:
-            for a in await self._assignments.list_by_mentor(mentor_id, include_inactive=False):
-                active.add((a.mentor_id, a.cohort_id))
-        return _Scope(students=students, teams=teams, active=active)
+        history = await self._history.chat_pairs(
+            student_ids=[t.student_id for t in threads if t.student_id and t.team_id is None],
+            team_ids=[t.team_id for t in threads if t.team_id],
+        )
+        return _Scope(students=students, teams=teams, history=history)
 
     @staticmethod
     def _participates(viewer: _Viewer, scope: _Scope, thread: ChatThread) -> bool:

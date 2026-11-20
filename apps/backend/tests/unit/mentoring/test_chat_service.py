@@ -1,4 +1,4 @@
-"""멘토링 채팅 서비스 (인메모리, A57)."""
+"""멘토링 채팅 서비스 (인메모리, A57·A74: 자격은 신청 이력)."""
 
 import uuid
 from datetime import UTC, date, datetime, timedelta
@@ -14,15 +14,21 @@ from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.chat import ChatEvent, ChatEventKind, ChatMessage
 from app.contexts.mentoring.domain.enums import (
     CohortMentorDeactivationReason,
+    MentoringRequestStatus,
     MentoringSettlementPolicy,
     PayUnit,
 )
+from app.contexts.mentoring.domain.request import MentoringRequest
 from app.contexts.mentoring.domain.team import MentoringTeam
 from app.core.clock import FixedClock
 from app.shared.errors import BusinessRuleViolation, NotFoundError, PermissionDeniedError
 from app.shared.ids import new_id
 from tests.fakes.educator import InMemoryMentorRepository
-from tests.fakes.mentoring import InMemoryCohortMentorRepository, InMemoryTeamRepository
+from tests.fakes.mentoring import (
+    InMemoryCohortMentorRepository,
+    InMemoryRequestRepository,
+    InMemoryTeamRepository,
+)
 from tests.fakes.mentoring_chat import InMemoryChatStore, RecordingChatEvents
 from tests.fakes.uow import FakeUnitOfWork
 
@@ -76,6 +82,7 @@ class Harness:
             self.assignment, _assignment(self.other_mentor, self.cohort_id)
         )
         self.teams = InMemoryTeamRepository()
+        self.requests = InMemoryRequestRepository()
         self.students = Students()
         self.student = self.students.add(self.cohort_id)
         self.clock = FixedClock(NOW)
@@ -87,7 +94,7 @@ class Harness:
             messages=self.store.message_repo,
             reads=self.store.read_repo,
             teams=self.teams,
-            assignments=self.assignments,
+            history=self.requests,
             students=self.students,
             mentors=MentorQueries(InMemoryMentorRepository(self.mentor, self.other_mentor)),
             events=self.events,
@@ -114,6 +121,29 @@ class Harness:
         self.store.cohort_of[team.id] = self.cohort_id
         return team
 
+    async def applied(
+        self,
+        student: Student | None = None,
+        *,
+        mentor: Mentor | None = None,
+        team: MentoringTeam | None = None,
+        status: MentoringRequestStatus = MentoringRequestStatus.PENDING,
+    ) -> None:
+        """신청 이력을 남긴다 (A74: 상태 무관). 팀이면 팀 신청."""
+        requester = student or self.student
+        await self.requests.add(
+            MentoringRequest(
+                requester_id=requester.id,
+                mentor_id=(mentor or self.mentor).id,
+                team_id=team.id if team else None,
+                topic="질문",
+                detail="내용",
+                desired_times=[NOW + timedelta(days=3)],
+                duration=60,
+                status=status,
+            )
+        )
+
     def tick(self, seconds: int = 1) -> None:
         self.clock.set(self.clock.now() + timedelta(seconds=seconds))
 
@@ -124,6 +154,7 @@ def h() -> Harness:
 
 
 async def test_student_starts_direct_chat_and_mentor_replies(h: Harness) -> None:
+    await h.applied(status=MentoringRequestStatus.REJECTED)  # 반려된 신청도 이력이다
     first = await h.service.start(h.student_user, h.to_mentor(), "  질문 있습니다 ")
     assert first.body == "질문 있습니다"
     assert len(h.store.threads) == 1
@@ -155,12 +186,12 @@ async def test_student_starts_direct_chat_and_mentor_replies(h: Harness) -> None
     assert by_mentor.thread_id == thread_id
 
 
-async def test_start_rejects_targets_without_relationship(h: Harness) -> None:
-    unassigned = Mentor(user_id=new_id())
+async def test_start_rejects_targets_without_request_history(h: Harness) -> None:
     for user, target in [
-        (h.student_user, h.to_mentor(unassigned)),  # 이 기수에 배정 없음
+        (h.student_user, h.to_mentor()),  # 배정은 있지만 신청 이력이 없다
         (h.student_user, ChatTarget(cohort_id=new_id(), mentor_id=h.mentor.id)),  # 다른 기수
         (h.student_user, ChatTarget(student_id=h.student.id)),  # 멘토가 아님
+        (h.mentor.user_id, ChatTarget(student_id=h.student.id)),  # 멘토 쪽도 같은 기준
         (h.mentor.user_id, ChatTarget(student_id=new_id())),  # 없는 수강생
         (h.student_user, ChatTarget(team_id=new_id())),  # 없는 팀
     ]:
@@ -170,21 +201,25 @@ async def test_start_rejects_targets_without_relationship(h: Harness) -> None:
     with pytest.raises(BusinessRuleViolation) as missing:
         await h.service.start(h.student_user, ChatTarget(cohort_id=h.cohort_id), "안녕하세요")
     assert missing.value.code == "chat_target_required"
+    await h.applied()
     with pytest.raises(BusinessRuleViolation) as empty:
         await h.service.start(h.student_user, h.to_mentor(), "   ")
     assert empty.value.code == "invalid_chat_message"
     assert h.store.threads == {}  # 검사에 실패하면 방을 만들지 않는다
 
+    # 수강 상태·배정은 보지 않는다 (A74): 수강이 끝났어도 신청 이력이 있으면 대화한다
     ended = h.students.add(h.cohort_id, status=EnrollmentStatus.COMPLETED)
     assert ended.user_id is not None
-    with pytest.raises(NotFoundError):
-        await h.service.start(ended.user_id, h.to_mentor(), "안녕하세요")
+    await h.applied(ended)
+    assert (await h.service.start(ended.user_id, h.to_mentor(), "안녕하세요")).body == "안녕하세요"
 
 
 async def test_team_chat_members_and_mentor_change(h: Harness) -> None:
     other = h.students.add(h.cohort_id)
     outsider = h.students.add(h.cohort_id)
     team = await h.team(h.student, other)
+    await h.applied(team=team)
+    await h.applied(outsider)  # 1:1 신청 이력은 팀 방 자격이 아니다
     first = await h.service.start(h.student_user, ChatTarget(team_id=team.id), "팀 질문")
     assert other.user_id is not None
     assert outsider.user_id is not None
@@ -197,40 +232,46 @@ async def test_team_chat_members_and_mentor_change(h: Harness) -> None:
     with pytest.raises(NotFoundError):
         await h.service.start(outsider.user_id, ChatTarget(team_id=team.id), "끼어들기")
 
-    # 담당 멘토가 바뀌면 이전 방은 양쪽 모두에서 숨고, 새 멘토와 새 방이 생긴다
+    # 담당 멘토가 바뀌어도 이전 방은 남는다(신청 이력). 새 멘토는 팀 신청이 있어야 새 방이 생긴다
     team.assign_mentor(h.other_mentor.id)
     await h.teams.save(team)
-    assert await h.service.list_threads(h.mentor.user_id, limit=20, offset=0) == ([], 0)
-    assert await h.service.list_threads(h.student_user, limit=20, offset=0) == ([], 0)
+    assert [
+        v.thread.id for v in (await h.service.list_threads(h.mentor.user_id, limit=20, offset=0))[0]
+    ] == [first.thread_id]
+    with pytest.raises(NotFoundError):
+        await h.service.start(h.other_mentor.user_id, ChatTarget(team_id=team.id), "새 멘토")
+    await h.applied(team=team, mentor=h.other_mentor)
     h.tick()
     second = await h.service.start(h.other_mentor.user_id, ChatTarget(team_id=team.id), "새 멘토")
     assert second.thread_id != first.thread_id
     views, _ = await h.service.list_threads(h.student_user, limit=20, offset=0)
-    assert [v.thread.id for v in views] == [second.thread_id]
+    assert {v.thread.id for v in views} == {first.thread_id, second.thread_id}
+
+    # 팀에서 빠지면 그 팀 방은 보이지 않는다 (참여자는 지금 팀원)
+    team.remove_member(other.id)
+    await h.teams.save(team)
+    assert await h.service.list_threads(other.user_id, limit=20, offset=0) == ([], 0)
 
 
-async def test_threads_hide_when_enrollment_or_assignment_ends(h: Harness) -> None:
+async def test_threads_stay_after_enrollment_or_assignment_ends(h: Harness) -> None:
+    """A74: 자격은 신청 이력만 본다. 수강이 끝나거나 배정이 끝나도 방은 그대로다."""
+    await h.applied()
     sent = await h.service.start(h.student_user, h.to_mentor(), "질문")
     h.student.end(EnrollmentStatus.COMPLETED, on=date(2026, 11, 15))
+    h.assignment.deactivate(CohortMentorDeactivationReason.MANUAL, now=NOW)
+    await h.assignments.save(h.assignment)
     for user in (h.student_user, h.mentor.user_id):
-        assert await h.service.list_threads(user, limit=20, offset=0) == ([], 0)
-        with pytest.raises(NotFoundError):
-            await h.service.list_messages(user, sent.thread_id, before=None)
-    # 운영진은 계속 본다
+        assert (await h.service.list_threads(user, limit=20, offset=0))[1] == 1
+    h.tick()
+    assert (await h.service.send(h.mentor.user_id, sent.thread_id, "답변")).body == "답변"
     staff, total = await h.service.list_by_cohort(h.cohort_id, mentor_id=None, limit=20, offset=0)
     assert total == 1
     assert staff[0].unread_count == 0
 
-    h.students.add(h.cohort_id, id=h.student.id, user_id=h.student_user)  # 다시 수강 중
-    assert (await h.service.list_threads(h.student_user, limit=20, offset=0))[1] == 1
-    h.assignment.deactivate(CohortMentorDeactivationReason.MANUAL, now=NOW)
-    await h.assignments.save(h.assignment)
-    assert await h.service.list_threads(h.student_user, limit=20, offset=0) == ([], 0)
-    with pytest.raises(NotFoundError):
-        await h.service.send(h.mentor.user_id, sent.thread_id, "답변")
-
 
 async def test_messages_cursor_delete_and_read(h: Harness) -> None:
+    await h.applied()
+    await h.applied(mentor=h.other_mentor)
     sent = []
     for i in range(5):
         h.tick()
@@ -265,6 +306,7 @@ async def test_messages_cursor_delete_and_read(h: Harness) -> None:
 
 
 async def test_staff_reads_threads_in_cohort(h: Harness) -> None:
+    await h.applied()
     sent = await h.service.start(h.student_user, h.to_mentor(), "질문")
     view = await h.service.get_for_cohort(h.cohort_id, sent.thread_id)
     assert view.last_message is not None
@@ -294,6 +336,7 @@ async def test_staff_reads_threads_in_cohort(h: Harness) -> None:
 async def test_events_go_to_participants_after_commit(h: Harness) -> None:
     other = h.students.add(h.cohort_id)
     team = await h.team(h.student, other)
+    await h.applied(team=team)
     assert other.user_id is not None
     sent = await h.service.start(h.student_user, ChatTarget(team_id=team.id), "팀 질문")
     everyone = {h.student_user, other.user_id, h.mentor.user_id}
@@ -318,6 +361,7 @@ async def test_events_go_to_participants_after_commit(h: Harness) -> None:
 
 
 async def test_post_notice_creates_thread_and_notifies(h: Harness) -> None:
+    await h.applied()  # 안내는 신청과 함께 남는다
     async with h.uow:
         notice = await h.service.post_notice(
             mentor_id=h.mentor.id, student_id=h.student.id, team_id=None, body="[멘토링 신청] 주제"
@@ -337,11 +381,10 @@ async def test_post_notice_creates_thread_and_notifies(h: Harness) -> None:
         "[멘토링 신청] 주제"
     )
 
-    # 자격이 없는 방에도 남기되(운영진 열람) 알리지 않는다
+    # 자격(신청 이력)이 없는 방에도 남기되(운영진 열람) 알리지 않는다
     h.events.sent.clear()
-    h.student.end(EnrollmentStatus.COMPLETED, on=date(2026, 11, 15))
     hidden = await h.service.post_notice(
-        mentor_id=h.mentor.id, student_id=h.student.id, team_id=None, body="[멘토링 취소]"
+        mentor_id=h.other_mentor.id, student_id=h.student.id, team_id=None, body="[안내]"
     )
     assert hidden is not None
     assert h.events.sent == []

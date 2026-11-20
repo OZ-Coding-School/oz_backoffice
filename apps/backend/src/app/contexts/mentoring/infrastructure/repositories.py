@@ -619,6 +619,19 @@ class TortoiseMentoringRequestRepository:
             return await query.filter(team_id=team_id).count()
         return await query.filter(requester_id=requester_id, team_id__isnull=True).count()
 
+    async def chat_pairs(
+        self, *, student_ids: list[uuid.UUID], team_ids: list[uuid.UUID]
+    ) -> set[tuple[uuid.UUID, uuid.UUID]]:
+        """채팅 자격이 되는 신청 이력 (A74): (멘토, 1:1 수강 등록 또는 팀), 상태 무관."""
+        if not student_ids and not team_ids:
+            return set()
+        rows = (
+            await self._participants(student_ids, team_ids)
+            .distinct()
+            .values("mentor_id", "requester_id", "team_id")
+        )
+        return {(r["mentor_id"], r["team_id"] or r["requester_id"]) for r in rows}
+
     async def pending_by_teams(
         self, team_ids: list[uuid.UUID]
     ) -> dict[uuid.UUID, tuple[int, uuid.UUID]]:

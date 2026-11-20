@@ -17,7 +17,7 @@ from app.contexts.mentoring.infrastructure.chat_repositories import (
     TortoiseChatThreadRepository,
 )
 from app.contexts.mentoring.infrastructure.repositories import (
-    TortoiseCohortMentorRepository,
+    TortoiseMentoringRequestRepository,
     TortoiseMentoringTeamRepository,
 )
 from app.core.clock import Clock
@@ -31,7 +31,7 @@ def build_chat_service(request: Request, clock: Clock) -> ChatService:
         messages=TortoiseChatMessageRepository(),
         reads=TortoiseChatReadRepository(),
         teams=TortoiseMentoringTeamRepository(),
-        assignments=TortoiseCohortMentorRepository(),
+        history=TortoiseMentoringRequestRepository(),
         students=cast("StudentLookup", state.student_queries),
         mentors=cast("MentorDirectory", state.mentor_queries),
         events=cast("ChatEventPublisher", state.chat_events),
