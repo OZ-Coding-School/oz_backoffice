@@ -12654,7 +12654,8 @@ export interface operations {
     my_sessions_api_v1_me_mentoring_sessions_get: {
         parameters: {
             query?: {
-                status?: components["schemas"]["MentoringSessionStatus"] | null;
+                /** @description 여러 개 가능 (예: status=SCHEDULED&status=IN_PROGRESS, A70) */
+                status?: components["schemas"]["MentoringSessionStatus"][] | null;
                 from?: string | null;
                 to?: string | null;
                 limit?: number;
@@ -12689,7 +12690,8 @@ export interface operations {
     mentor_sessions_api_v1_me_mentor_sessions_get: {
         parameters: {
             query?: {
-                status?: components["schemas"]["MentoringSessionStatus"] | null;
+                /** @description 여러 개 가능 (예: status=SCHEDULED&status=IN_PROGRESS, A70) */
+                status?: components["schemas"]["MentoringSessionStatus"][] | null;
                 from?: string | null;
                 to?: string | null;
                 limit?: number;

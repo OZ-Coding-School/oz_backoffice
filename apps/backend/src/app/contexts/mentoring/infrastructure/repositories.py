@@ -938,6 +938,8 @@ class TortoiseMentoringSessionRepository:
     async def _page(self, query: Any, q: SessionQuery) -> tuple[list[MentoringSession], int]:
         if q.status is not None:
             query = query.filter(status=q.status)
+        if q.statuses:
+            query = query.filter(status__in=list(q.statuses))
         if q.starts_from is not None:
             query = query.filter(starts_at__gte=q.starts_from)
         if q.starts_before is not None:

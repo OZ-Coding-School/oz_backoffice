@@ -30,6 +30,7 @@ class SessionQuery:
     """세션 목록 조건 (시작 시각 최신순)."""
 
     status: MentoringSessionStatus | None = None
+    statuses: tuple[MentoringSessionStatus, ...] = ()  # 여러 개 (수강생·멘토 목록, A70)
     starts_from: datetime | None = None  # 포함
     starts_before: datetime | None = None  # 미포함
     limit: int = 20

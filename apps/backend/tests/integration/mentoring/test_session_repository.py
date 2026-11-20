@@ -125,6 +125,17 @@ async def test_session_round_trip_overlap_and_lists() -> None:
         query=SessionQuery(starts_from=T, starts_before=T + timedelta(hours=1)),
     )
     assert {s.id for s in first_hour} == {solo.id, other.id}
+    scheduled, _ = await sessions.list_for_mentor(
+        mentor.id,
+        SessionQuery(
+            statuses=(MentoringSessionStatus.SCHEDULED, MentoringSessionStatus.IN_PROGRESS)
+        ),
+    )
+    assert len(scheduled) == 2  # 상태 여러 개 (A70)
+    nothing, _ = await sessions.list_for_mentor(
+        mentor.id, SessionQuery(statuses=(MentoringSessionStatus.CANCELED,))
+    )
+    assert nothing == []
     by_mentor, mentor_total = await sessions.list_for_mentor(mentor.id, SessionQuery(limit=1))
     assert (mentor_total, [s.id for s in by_mentor]) == (2, [team_session.id])
     _, cohort_total = await sessions.list_by_cohort(

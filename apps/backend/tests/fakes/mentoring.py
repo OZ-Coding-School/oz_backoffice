@@ -549,6 +549,7 @@ class InMemorySessionRepository:
             s
             for s in found
             if (q.status is None or s.status is q.status)
+            and (not q.statuses or s.status in q.statuses)
             and (q.starts_from is None or s.starts_at >= q.starts_from)
             and (q.starts_before is None or s.starts_at < q.starts_before)
         ]

@@ -329,6 +329,14 @@ async def test_approve_reject_and_sessions(client: AsyncClient, settings: Settin
         "NO_SHOW": 0,
         "CANCELED": 0,
     }
+    for statuses, total in (  # 상태 여러 개 (A70)
+        ({"status": ["SCHEDULED", "IN_PROGRESS"]}, 1),
+        ({"status": ["COMPLETED", "NO_SHOW"]}, 0),
+    ):
+        filtered = await client.get(
+            "/api/v1/me/mentoring/sessions", params=statuses, headers=student_h
+        )
+        assert filtered.json()["total"] == total
     mentor_list = await client.get(
         "/api/v1/me/mentor-sessions", params={"status": "SCHEDULED"}, headers=mentor_h
     )

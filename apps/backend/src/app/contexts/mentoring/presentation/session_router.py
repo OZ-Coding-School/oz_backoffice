@@ -81,6 +81,29 @@ def session_query(
 QueryDep = Annotated[SessionQuery, Depends(session_query)]
 
 
+def member_session_query(
+    status: Annotated[
+        list[MentoringSessionStatus] | None,
+        Query(description="여러 개 가능 (예: status=SCHEDULED&status=IN_PROGRESS, A70)"),
+    ] = None,
+    starts_from: Annotated[AwareDatetime | None, Query(alias="from")] = None,
+    starts_before: Annotated[AwareDatetime | None, Query(alias="to")] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> SessionQuery:
+    """수강생·멘토 목록: 상태를 여러 개 받는다 (A70). 운영진 목록은 하나만(`session_query`)."""
+    return SessionQuery(
+        statuses=tuple(status or ()),
+        starts_from=starts_from,
+        starts_before=starts_before,
+        limit=limit,
+        offset=offset,
+    )
+
+
+MemberQueryDep = Annotated[SessionQuery, Depends(member_session_query)]
+
+
 class SessionResponse(BaseModel):
     id: uuid.UUID
     status: MentoringSessionStatus
@@ -208,7 +231,7 @@ PresenterDep = Annotated[SessionPresenter, Depends(SessionPresenter)]
 
 @me_router.get("/mentoring/sessions", response_model=SessionListPage)
 async def my_sessions(
-    user: ApprovedUser, queries: QueriesDep, presenter: PresenterDep, query: QueryDep
+    user: ApprovedUser, queries: QueriesDep, presenter: PresenterDep, query: MemberQueryDep
 ) -> SessionListPage:
     """본인 1:1·소속 팀 세션. `counts`는 필터와 무관한 상태별 수 (A68)."""
     items, total = await queries.list_mine(user.id, query)
@@ -223,7 +246,7 @@ async def my_sessions(
 
 @me_router.get("/mentor-sessions", response_model=SessionListPage)
 async def mentor_sessions(
-    user: ApprovedUser, queries: QueriesDep, presenter: PresenterDep, query: QueryDep
+    user: ApprovedUser, queries: QueriesDep, presenter: PresenterDep, query: MemberQueryDep
 ) -> SessionListPage:
     items, total = await queries.list_for_mentor(user.id, query)
     return SessionListPage(
