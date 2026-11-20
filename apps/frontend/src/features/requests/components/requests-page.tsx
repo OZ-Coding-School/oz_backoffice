@@ -1,10 +1,11 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { FileText } from "lucide-react";
-import { useEffect, useEffectEvent, useMemo, useRef } from "react";
+import { useMemo } from "react";
 
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
+import { LoadMore } from "@/components/load-more";
 import { Spinner } from "@/components/ui/spinner";
 import { enrollmentsQuery } from "@/features/member/api";
 import { cn } from "@/lib/utils";
@@ -77,29 +78,12 @@ export function RequestsPage({ tab }: { tab: RequestTab }) {
         </ul>
       )}
       {list.hasNextPage ? (
-        <LoadMore loading={list.isFetchingNextPage} onVisible={() => void list.fetchNextPage()} />
+        <LoadMore
+          loading={list.isFetchingNextPage}
+          label="다음 신청을 불러오는 중…"
+          onVisible={() => void list.fetchNextPage()}
+        />
       ) : null}
-    </div>
-  );
-}
-
-/** 무한 스크롤 (F29): 목록 끝이 화면에 들어오면 다음 20개를 불러온다 */
-function LoadMore({ loading, onVisible }: { loading: boolean; onVisible: () => void }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const visible = useEffectEvent(onVisible);
-  // 불러온 뒤에도 끝이 보이면 다시 관찰을 시작해 바로 다음 묶음을 부른다
-  useEffect(() => {
-    const el = ref.current;
-    if (loading || !el || typeof IntersectionObserver === "undefined") return;
-    const observer = new IntersectionObserver((entries) => {
-      if (entries.some((e) => e.isIntersecting)) visible();
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [loading]);
-  return (
-    <div ref={ref} className="flex justify-center py-2 text-body-sm text-muted-foreground">
-      {loading ? "다음 신청을 불러오는 중…" : ""}
     </div>
   );
 }

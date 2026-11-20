@@ -26,8 +26,14 @@ describe("활성 기수 (F27)", () => {
 });
 
 describe("회원 메뉴 (F27)", () => {
-  it("수강생은 홈·신청 내역(FE-4a)이라 하단 탭이 있고, 멘토는 홈 하나라 없다", () => {
-    expect(navItems(memberNav("STUDENT")).map((i) => i.label)).toEqual(["홈", "신청 내역"]);
+  it("수강생은 홈·신청 내역·진행 기록이라 하단 탭이 있고, 멘토는 홈 하나라 없다", () => {
+    expect(navItems(memberNav("STUDENT")).map((i) => i.label)).toEqual(["홈", "신청 내역", "진행 기록"]);
+    expect(navItems(memberNav("STUDENT", { apply: true })).map((i) => i.label)).toEqual([
+      "홈",
+      "멘토링 신청",
+      "신청 내역",
+      "진행 기록",
+    ]);
     expect(showBottomTabs(memberNav("STUDENT"))).toBe(true);
     expect(showBottomTabs(memberNav("MENTOR"))).toBe(false);
   });
