@@ -1,6 +1,6 @@
 # 68. Meet 전사 문장 저장·조회 (BE-2c)
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-20 병합)
 - 관련 PR: #93
 - 관련 결정: `docs/decisions.md` A68·A69 (A53·A54)
 - 이전 기록: [67. 녹화 서명 링크와 스마트 메모 마크다운 (BE-2b)](67_artifact_link_markdown.md)
@@ -76,6 +76,8 @@ FE-5 세션 상세의 영상 옆 패널은 전사본을 문장·시각·화자�
   - API: 문장 목록(서비스 이름, `meet_name` 없음), 영상·남 404, 목록의 새 필드
 - **로컬 검사 (compose `api`):** ruff, ruff format, mypy, mypy tests, lint-imports 통과. 전체 889 passed. 로컬 worker·scheduler를 다시 시작했다.
 - **프론트엔드:** 다시 만든 타입으로 `typecheck` 통과
+- GitHub Actions (PR #93): 백엔드 검사(스키마 일치 포함)·프론트엔드 검사(타입 일치 포함)·E2E 3개 통과
+- 사용자가 병합을 확인했다(2026-11-20)
 - 실제 Meet 전사 항목 수집은 아직 실제 세션으로 확인하지 않았다(테스트는 가짜 클라이언트). FE-5에서 실제 세션으로 확인한다.
 
 ## 남은 작업
