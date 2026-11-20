@@ -14,6 +14,7 @@ from app.contexts.mentoring.domain.schedule import MentorUnavailablePeriod
 from app.contexts.mentoring.domain.session import MentoringSession, SessionQuery
 from app.contexts.mentoring.domain.settings import CohortMentoringSettings, MentoringBlockTime
 from app.contexts.mentoring.domain.team import MentoringTeam
+from app.contexts.mentoring.domain.transcript import TranscriptEntry
 from app.shared.errors import ConflictError
 
 if TYPE_CHECKING:
@@ -801,6 +802,23 @@ class InMemoryArtifactRepository:
 
     async def list_pending(self) -> list["MentoringArtifact"]:
         return [dataclasses.replace(a) for a in self.items.values() if a.needs_archive]
+
+
+class InMemoryTranscriptEntryRepository:
+    def __init__(self) -> None:
+        self.items: list[TranscriptEntry] = []
+
+    async def add_many(self, entries: list["TranscriptEntry"]) -> None:
+        self.items.extend(dataclasses.replace(e) for e in entries)
+
+    async def artifacts_with_entries(self, artifact_ids: list[uuid.UUID]) -> set[uuid.UUID]:
+        return {e.artifact_id for e in self.items if e.artifact_id in artifact_ids}
+
+    async def list_by_artifact(self, artifact_id: uuid.UUID) -> list["TranscriptEntry"]:
+        return sorted(
+            (dataclasses.replace(e) for e in self.items if e.artifact_id == artifact_id),
+            key=lambda e: e.sequence,
+        )
 
 
 class InMemorySettlementRepository:

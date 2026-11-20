@@ -26,12 +26,20 @@ from app.contexts.mentoring.domain.repositories import (
     MentoringArtifactRepository,
     MentoringRequestRepository,
     MentoringSessionRepository,
+    TranscriptEntryRepository,
 )
 from app.contexts.mentoring.domain.session import MentoringSession
+from app.contexts.mentoring.domain.team import MentoringTeam
+from app.contexts.mentoring.domain.transcript import (
+    SPEAKER_MAX_LENGTH,
+    TranscriptEntry,
+    name_key,
+    speaker_name,
+)
 from app.core.clock import Clock
 from app.integrations.google.drive import DriveFile, DriveStream, DriveUnavailableError
 from app.integrations.google.meet import MeetUnavailableError
-from app.integrations.google.meet_events import MeetFile
+from app.integrations.google.meet_events import MeetFile, MeetTranscriptLine
 from app.shared.errors import NotFoundError
 from app.shared.time import KST
 
@@ -43,6 +51,13 @@ ROOT_NAME = "멘토링 녹화"
 
 class MeetFileSource(Protocol):
     async def session_files(self, space_name: str) -> list[MeetFile]: ...
+    async def transcript_lines(self, transcript_name: str) -> list[MeetTranscriptLine]:
+        """전사 항목 (A69)."""
+        ...
+
+
+class TeamMembers(Protocol):
+    async def list_by_ids(self, team_ids: list[uuid.UUID]) -> list[MentoringTeam]: ...
 
 
 class DriveArchive(Protocol):
@@ -112,7 +127,11 @@ class ArtifactService:
         mentors: MentorLookup,
         users: UserLookup,
         clock: Clock,
+        entries: TranscriptEntryRepository | None = None,
+        teams: TeamMembers | None = None,
     ) -> None:
+        self._entries = entries
+        self._teams = teams
         self._sessions = sessions
         self._requests = requests
         self._artifacts = artifacts
@@ -149,15 +168,85 @@ class ArtifactService:
         ):
             return 0
         added = 0
-        for file in await self._source.session_files(session.google_space_name):
+        files = await self._source.session_files(session.google_space_name)
+        for file in files:
             artifact = MentoringArtifact(
                 session_id=session.id,
                 drive_file_id=file.file_id,
                 artifact_type=MentoringArtifactType(file.kind),
+                conference_record=file.record_name or None,
+                started_at=file.started_at,
             )
             if await self._artifacts.add_if_absent(artifact):
                 added += 1
+        await self._link_and_transcribe(session, files)
         return added
+
+    async def _link_and_transcribe(self, session: MentoringSession, files: list[MeetFile]) -> None:
+        """이전에 만든 파일의 회의 정보를 채우고, 문장이 없는 전사본의 전사 항목을 받는다 (A69).
+
+        전사 항목을 못 받으면 다음 보완 수집에서 다시 한다(세션 종료 7일까지).
+        """
+        by_file = {a.drive_file_id: a for a in await self._artifacts.list_by_session(session.id)}
+        for file in files:
+            artifact = by_file.get(file.file_id)
+            if artifact and artifact.link_conference(file.record_name or None, file.started_at):
+                await self._artifacts.save(artifact)
+        if self._entries is None or self._source is None:
+            return
+        transcripts = [
+            (by_file[f.file_id], f.source_name)
+            for f in files
+            if f.kind == MentoringArtifactType.TRANSCRIPT.value
+            and f.source_name
+            and f.file_id in by_file
+        ]
+        done = await self._entries.artifacts_with_entries([a.id for a, _ in transcripts])
+        aliases: dict[str, str] | None = None
+        for artifact, source_name in transcripts:
+            if artifact.id in done:
+                continue
+            try:
+                lines = await self._source.transcript_lines(source_name)
+            except MeetUnavailableError:
+                logger.warning("전사 항목 수집 실패 (파일 %s), 다음 주기에 다시 한다", artifact.id)
+                continue
+            if aliases is None:
+                aliases = await self._speaker_aliases(session)
+            await self._entries.add_many(
+                [
+                    TranscriptEntry(
+                        artifact_id=artifact.id,
+                        sequence=i,
+                        speaker_name=speaker_name(line.meet_name, aliases),
+                        meet_name=line.meet_name.strip()[:SPEAKER_MAX_LENGTH],
+                        text=line.text,
+                        started_at=line.started_at,
+                        ended_at=line.ended_at,
+                    )
+                    for i, line in enumerate(lines)
+                ]
+            )
+
+    async def _speaker_aliases(self, session: MentoringSession) -> dict[str, str]:
+        """Meet 이름 → 서비스 이름 (A69): 멘토 실명·닉네임 → 표시 이름, 참여 수강생 → 이름."""
+        aliases: dict[str, str] = {}
+        request = await self._requests.get(session.request_id)
+        student_ids: list[uuid.UUID] = [request.requester_id] if request else []
+        if request and request.team_id and self._teams is not None:
+            teams = await self._teams.list_by_ids([request.team_id])
+            student_ids = [m for t in teams for m in t.member_ids] or student_ids
+        for student in (await self._students.get_many(student_ids)).values():
+            aliases[name_key(student.name)] = student.name
+        mentor = await self._mentors.get(session.mentor_id)
+        if mentor is not None:
+            user = (await self._users.get_many([mentor.user_id])).get(mentor.user_id)
+            real = user.name if user else ""
+            shown = mentor.display_name(real)
+            for name in (real, mentor.nickname or ""):
+                if name.strip():
+                    aliases[name_key(name)] = shown
+        return aliases
 
     async def sync(self) -> tuple[int, int]:
         """1시간마다: 종료 7일 이내 세션 보완 수집 + 남은 정리 (새로 수집 수, 정리 수)."""
@@ -279,6 +368,16 @@ class ArtifactService:
         if artifact is None or artifact.session_id != session.id or not artifact.is_viewable:
             raise _not_found()
         return artifact
+
+    async def entries_for_user(
+        self, user_id: uuid.UUID, session_id: uuid.UUID, artifact_id: uuid.UUID
+    ) -> list[TranscriptEntry]:
+        """전사본(TRANSCRIPT)의 문장 (A68·A69). 다른 종류는 없는 파일로 본다."""
+        session = await self._access.get_for_user(user_id, session_id)
+        artifact = await self._artifact_of(session, artifact_id)
+        if artifact.artifact_type is not MentoringArtifactType.TRANSCRIPT or self._entries is None:
+            raise _not_found()
+        return await self._entries.list_by_artifact(artifact.id)
 
     async def _viewable(self, session: MentoringSession) -> list[MentoringArtifact]:
         return [a for a in await self._artifacts.list_by_session(session.id) if a.is_viewable]

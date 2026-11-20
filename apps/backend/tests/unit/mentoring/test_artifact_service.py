@@ -11,6 +11,7 @@ import pytest
 from app.contexts.academy.domain.entities import Student
 from app.contexts.academy.domain.enums import StudentStatus
 from app.contexts.educator.application.mentor_queries import MentorQueries
+from app.contexts.educator.domain.enums import DisplayNamePreference
 from app.contexts.educator.domain.profiles import Mentor
 from app.contexts.identity.domain.entities import User
 from app.contexts.mentoring.application.artifact_service import ArtifactService
@@ -20,7 +21,8 @@ from app.contexts.mentoring.domain.request import MentoringRequest
 from app.contexts.mentoring.domain.session import MentoringSession
 from app.core.clock import FixedClock
 from app.integrations.google.drive import DriveFile, DriveStream, DriveUnavailableError
-from app.integrations.google.meet_events import MeetFile
+from app.integrations.google.meet import MeetUnavailableError
+from app.integrations.google.meet_events import MeetFile, MeetTranscriptLine
 from app.shared.errors import NotFoundError
 from app.shared.ids import new_id
 from tests.factories.identity import make_user
@@ -30,6 +32,7 @@ from tests.fakes.mentoring import (
     InMemoryRequestRepository,
     InMemorySessionRepository,
     InMemoryTeamRepository,
+    InMemoryTranscriptEntryRepository,
 )
 
 pytestmark = pytest.mark.unit
@@ -73,6 +76,15 @@ class Users:
 class FakeSource:
     def __init__(self) -> None:
         self.files: list[MeetFile] = []
+        self.lines: dict[str, list[MeetTranscriptLine]] = {}
+        self.line_calls: list[str] = []
+        self.lines_fail = False
+
+    async def transcript_lines(self, transcript_name: str) -> list[MeetTranscriptLine]:
+        self.line_calls.append(transcript_name)
+        if self.lines_fail:
+            raise MeetUnavailableError()
+        return self.lines.get(transcript_name, [])
 
     async def session_files(self, space_name: str) -> list[MeetFile]:
         return list(self.files)
@@ -122,10 +134,15 @@ class Harness:
             user_id=new_id(),
         )
         mentor_user = make_user(name="김멘토")
-        self.mentor = Mentor(user_id=mentor_user.id)
+        self.mentor = Mentor(
+            user_id=mentor_user.id,
+            nickname="멘토K",
+            display_name_preference=DisplayNamePreference.NICKNAME,
+        )
         self.requests = InMemoryRequestRepository()
         self.sessions = InMemorySessionRepository(self.requests)
         self.artifacts = InMemoryArtifactRepository()
+        self.entries = InMemoryTranscriptEntryRepository()
         self.source = FakeSource()
         self.archive = FakeArchive()
         self.clock = FixedClock(START + timedelta(hours=2))
@@ -149,6 +166,8 @@ class Harness:
             mentors=mentors,
             users=Users(mentor_user),
             clock=self.clock,
+            entries=self.entries,
+            teams=InMemoryTeamRepository(),
         )
 
     async def session(self, hours: int = 0) -> MentoringSession:
@@ -189,7 +208,7 @@ async def test_collect_archives_into_folder(h: Harness) -> None:
     ]
     assert await h.service.collect(session.id) == 3
     assert await h.service.collect(session.id) == 0  # 중복 수집 없음
-    assert h.archive.folders[0] == ["BX 디자이너", "4기", "김멘토", "2026-11"]  # KST 시작일
+    assert h.archive.folders[0] == ["BX 디자이너", "4기", "김멘토", "2026-11"]  # KST 시작일(실명)
     assert sorted(f for f, _ in h.archive.moved) == ["n1", "t1", "v1"]
     stored = list(h.artifacts.items.values())
     assert {a.status for a in stored} == {MentoringArtifactStatus.COMPLETED}
@@ -266,3 +285,52 @@ async def test_disabled_and_canceled(h: Harness) -> None:
     h.service._source = None
     assert not h.service.enabled
     assert await h.service.sync() == (0, 0)
+
+
+async def test_transcript_entries_collected_once_with_service_names(h: Harness) -> None:
+    """전사본을 수집하면 전사 항목을 받아 화자를 서비스 이름으로 바꾼다 (A69)."""
+    session = await h.session()
+    at = START + timedelta(minutes=5)
+    h.source.files = [
+        MeetFile("VIDEO", "v1", record_name="c1", started_at=START),
+        MeetFile("TRANSCRIPT", "t1", record_name="c1", source_name="c1/transcripts/t"),
+    ]
+    h.source.lines["c1/transcripts/t"] = [
+        MeetTranscriptLine("김멘토", "README를 봅시다", at, at + timedelta(seconds=4)),  # 실명
+        MeetTranscriptLine("가 수강", "네", at + timedelta(seconds=5), None),  # 수강생
+        MeetTranscriptLine("Guest", "안녕하세요", at + timedelta(seconds=9), None),  # 모름
+    ]
+    h.source.lines_fail = True  # 처음엔 실패 → 다음 수집에서 다시
+    await h.service.collect(session.id)
+    assert h.entries.items == []
+    h.source.lines_fail = False
+    await h.service.collect(session.id)
+    await h.service.collect(session.id)  # 이미 받았으면 다시 받지 않는다
+    assert h.source.line_calls == ["c1/transcripts/t"] * 2
+
+    video, transcript = sorted(h.artifacts.items.values(), key=lambda a: a.drive_file_id)[::-1]
+    assert (video.conference_record, video.started_at) == ("c1", START)
+    student_user = h.student.user_id
+    assert student_user is not None
+    entries = await h.service.entries_for_user(student_user, session.id, transcript.id)
+    assert [(e.sequence, e.speaker_name) for e in entries] == [
+        (0, "멘토K"),  # 표시 이름(닉네임 선택)으로, 실명은 감춘다
+        (1, "가수강"),
+        (2, "Guest"),
+    ]
+    assert entries[0].meet_name == "김멘토"
+    with pytest.raises(NotFoundError):
+        await h.service.entries_for_user(student_user, session.id, video.id)  # 영상은 없음
+    with pytest.raises(NotFoundError):
+        await h.service.entries_for_user(new_id(), session.id, transcript.id)  # 참여자 아님
+
+
+async def test_existing_files_get_conference_info(h: Harness) -> None:
+    """회의 정보 없이 먼저 만든 파일은 다음 수집에서 채운다 (A69)."""
+    session = await h.session()
+    h.source.files = [MeetFile("VIDEO", "v1")]
+    await h.service.collect(session.id)
+    h.source.files = [MeetFile("VIDEO", "v1", record_name="c1", started_at=START)]
+    await h.service.collect(session.id)
+    (video,) = h.artifacts.items.values()
+    assert (video.conference_record, video.started_at) == ("c1", START)

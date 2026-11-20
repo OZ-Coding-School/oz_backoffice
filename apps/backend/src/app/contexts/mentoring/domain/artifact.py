@@ -28,6 +28,8 @@ class MentoringArtifact(AggregateRoot):
     mime_type: str | None = None
     file_size: int | None = None
     status: MentoringArtifactStatus = MentoringArtifactStatus.PENDING
+    conference_record: str | None = None  # 같은 회의의 영상·전사본을 짝짓는다 (A69)
+    started_at: datetime | None = None  # 녹화 시작 (영상만, 전사 문장 위치 계산, A69)
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
@@ -51,6 +53,17 @@ class MentoringArtifact(AggregateRoot):
         self.mime_type = mime_type
         self.file_size = file_size
         self.status = MentoringArtifactStatus.COMPLETED
+
+    def link_conference(self, record: str | None, started_at: datetime | None) -> bool:
+        """비어 있는 회의 기록·녹화 시작을 채운다. 바뀌었으면 True (수집 전에 만든 파일 보완)."""
+        changed = False
+        if record and self.conference_record is None:
+            self.conference_record = record
+            changed = True
+        if started_at and self.started_at is None:
+            self.started_at = started_at
+            changed = True
+        return changed
 
     def failed(self) -> None:
         if self.status is MentoringArtifactStatus.PENDING:

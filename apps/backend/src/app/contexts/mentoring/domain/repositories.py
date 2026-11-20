@@ -19,6 +19,7 @@ from app.contexts.mentoring.domain.settings import (
 )
 from app.contexts.mentoring.domain.settlement import MentoringSettlement
 from app.contexts.mentoring.domain.team import MentoringTeam
+from app.contexts.mentoring.domain.transcript import TranscriptEntry
 
 
 class CohortMentoringSettingsRepository(Protocol):
@@ -362,6 +363,17 @@ class MentoringArtifactRepository(Protocol):
     async def save(self, artifact: MentoringArtifact) -> None: ...
     async def list_by_session(self, session_id: uuid.UUID) -> list[MentoringArtifact]: ...
     async def list_pending(self) -> list[MentoringArtifact]: ...
+
+
+class TranscriptEntryRepository(Protocol):
+    async def add_many(self, entries: list[TranscriptEntry]) -> None: ...
+    async def artifacts_with_entries(self, artifact_ids: list[uuid.UUID]) -> set[uuid.UUID]:
+        """문장이 이미 저장된 전사본 (다시 받지 않는다)."""
+        ...
+
+    async def list_by_artifact(self, artifact_id: uuid.UUID) -> list[TranscriptEntry]:
+        """순서대로."""
+        ...
 
 
 class MentoringSettlementRepository(Protocol):

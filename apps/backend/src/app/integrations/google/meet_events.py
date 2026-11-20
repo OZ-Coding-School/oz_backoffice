@@ -92,6 +92,19 @@ class MeetFile:
 
     kind: str
     file_id: str
+    record_name: str = ""  # conferenceRecords/X (A69)
+    source_name: str = ""  # 녹화·전사·스마트 메모 리소스 이름 (전사 항목 조회에 쓴다)
+    started_at: datetime | None = None  # 녹화 시작 (영상만)
+
+
+@dataclass(frozen=True, slots=True)
+class MeetTranscriptLine:
+    """전사 항목 한 문장 (A69). meet_name은 참가자의 Meet 표시 이름."""
+
+    meet_name: str
+    text: str
+    started_at: datetime
+    ended_at: datetime | None
 
 
 class SubscriptionsApi(Protocol):
@@ -106,6 +119,8 @@ class ConferencesApi(Protocol):
     async def list_recordings(self, *, request: Any) -> Any: ...
     async def list_transcripts(self, *, request: Any) -> Any: ...
     async def list_smart_notes(self, *, request: Any) -> Any: ...
+    async def list_participants(self, *, request: Any) -> Any: ...
+    async def list_transcript_entries(self, *, request: Any) -> Any: ...
 
 
 def _datetime(value: Any) -> datetime | None:
@@ -188,20 +203,74 @@ class GoogleMeetEvents:
         )
         async for recording in recordings:
             if recording.state == meet.Recording.State.FILE_GENERATED:
-                files.append(MeetFile("VIDEO", recording.drive_destination.file))
+                files.append(
+                    MeetFile(
+                        "VIDEO",
+                        recording.drive_destination.file,
+                        record_name=record_name,
+                        source_name=recording.name,
+                        started_at=_datetime(recording.start_time),
+                    )
+                )
         transcripts = await self._conferences.list_transcripts(
             request=meet.ListTranscriptsRequest(parent=record_name)
         )
         async for transcript in transcripts:
             if transcript.state == meet.Transcript.State.FILE_GENERATED:
-                files.append(MeetFile("TRANSCRIPT", transcript.docs_destination.document))
+                files.append(
+                    MeetFile(
+                        "TRANSCRIPT",
+                        transcript.docs_destination.document,
+                        record_name=record_name,
+                        source_name=transcript.name,
+                    )
+                )
         notes = await self._conferences.list_smart_notes(
             request=meet.ListSmartNotesRequest(parent=record_name)
         )
         async for note in notes:
             if note.state == meet.SmartNote.State.FILE_GENERATED:
-                files.append(MeetFile("SUMMARY", note.docs_destination.document))
+                files.append(
+                    MeetFile(
+                        "SUMMARY",
+                        note.docs_destination.document,
+                        record_name=record_name,
+                        source_name=note.name,
+                    )
+                )
         return [f for f in files if f.file_id]
+
+    async def transcript_lines(self, transcript_name: str) -> list[MeetTranscriptLine]:
+        """전사 항목(문장·시각·화자 표시 이름) (A69). 참가자 이름은 회의 기록에서 한 번에 받는다."""
+        record_name = "/".join(transcript_name.split("/")[:2])
+        try:
+            names: dict[str, str] = {}
+            participants = await self._conferences.list_participants(
+                request=meet.ListParticipantsRequest(parent=record_name)
+            )
+            async for p in participants:
+                person = p.signedin_user or p.anonymous_user or p.phone_user
+                names[p.name] = getattr(person, "display_name", "") or ""
+            entries = await self._conferences.list_transcript_entries(
+                request=meet.ListTranscriptEntriesRequest(parent=transcript_name)
+            )
+            lines: list[MeetTranscriptLine] = []
+            async for entry in entries:
+                started = _datetime(entry.start_time)
+                if started is None or not entry.text:
+                    continue
+                lines.append(
+                    MeetTranscriptLine(
+                        meet_name=names.get(entry.participant, ""),
+                        text=entry.text,
+                        started_at=started,
+                        ended_at=_datetime(entry.end_time),
+                    )
+                )
+            return lines
+        except google_exceptions.GoogleAPICallError as exc:
+            logger.warning("전사 항목 조회 실패(%s): %s", transcript_name, type(exc).__name__)
+            raise MeetUnavailableError() from exc
 
     async def get_conference(self, record_name: str) -> ConferenceInfo | None:
         try:

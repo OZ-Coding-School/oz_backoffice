@@ -2378,6 +2378,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/mentoring/sessions/{session_id}/artifacts/{artifact_id}/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Transcript Entries
+         * @description 참여자만. 전사본(TRANSCRIPT)의 문장을 순서대로 (A68·A69). 아직 못 받았으면 빈 목록.
+         */
+        get: operations["transcript_entries_api_v1_mentoring_sessions__session_id__artifacts__artifact_id__entries_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/mentoring/sessions/{session_id}/artifacts/{artifact_id}/markdown": {
         parameters: {
             query?: never;
@@ -3463,6 +3483,16 @@ export interface components {
              * @description 원본 크기(bytes), 문서는 PDF 크기와 다를 수 있다
              */
             file_size: number | null;
+            /**
+             * Conference Record
+             * @description Meet 회의 기록 이름. 같은 값의 영상·전사본이 한 회의다 (A69)
+             */
+            conference_record: string | null;
+            /**
+             * Started At
+             * @description 녹화 시작(영상만). 전사 문장 시각 − 이 값 = 영상 위치 (A69)
+             */
+            started_at: string | null;
             /** Created At */
             created_at: string | null;
         };
@@ -6469,6 +6499,25 @@ export interface components {
             reason: string;
             /** Created At */
             created_at: string | null;
+        };
+        /** TranscriptEntryResponse */
+        TranscriptEntryResponse: {
+            /** Sequence */
+            sequence: number;
+            /**
+             * Speaker Name
+             * @description 서비스 이름으로 바꾼 화자 (모르면 Meet 표시 이름, A69)
+             */
+            speaker_name: string;
+            /** Text */
+            text: string;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Ended At */
+            ended_at: string | null;
         };
         /**
          * UnavailableInput
@@ -11932,6 +11981,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ArtifactLinkResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    transcript_entries_api_v1_mentoring_sessions__session_id__artifacts__artifact_id__entries_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TranscriptEntryResponse"][];
                 };
             };
             /** @description Validation Error */

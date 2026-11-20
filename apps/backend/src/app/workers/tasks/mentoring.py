@@ -77,6 +77,7 @@ from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseMentoringSessionRepository,
     TortoiseMentoringTeamRepository,
     TortoiseMentorUnavailablePeriodRepository,
+    TortoiseTranscriptEntryRepository,
 )
 from app.core.clock import SystemClock
 from app.core.config import get_settings
@@ -391,6 +392,8 @@ async def build_artifact_service() -> ArtifactService:
         mentors=mentors,
         users=UserQueries(TortoiseUserRepository()),
         clock=SystemClock(),
+        entries=TortoiseTranscriptEntryRepository(),
+        teams=TortoiseMentoringTeamRepository(),
     )
 
 

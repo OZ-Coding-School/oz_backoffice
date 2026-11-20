@@ -830,12 +830,33 @@ Table mentoring_artifacts {
   mime_type varchar(100) [null, note: "MIME 타입 (중계 시 Content-Type)"]
   file_size bigint [null, note: "파일 용량(bytes)"]
   status MentoringArtifactStatus [not null, default: "PENDING"]
+  conference_record varchar(255) [null, note: "Meet 회의 기록 이름 (같은 회의의 영상·전사본 짝짓기, A69)"]
+  started_at timestamptz [null, note: "녹화 시작 시각 (영상만, 전사 문장 시각 − 녹화 시작 = 영상 위치, A69)"]
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
 
   indexes {
     (session_id, drive_file_id) [unique, note: "이벤트 중복 수신/보완 폴링 재실행 시 중복 행 방지"]
     (status) [note: "정리 대기(PENDING) 조회"]
+  }
+}
+Table mentoring_transcript_entries {
+  note: "Meet 전사 문장 (마이그레이션 27, A68·A69). 전사본 파일을 수집할 때 Meet API 전사 항목을 받아 저장하고, 못 받으면 매시 보완 수집에서 다시 시도(세션 종료 7일까지). 화자는 Meet 표시 이름이 멘토 실명·닉네임이나 참여 수강생 이름과 같으면 서비스 이름, 아니면 Meet 이름"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  artifact_id uuid [not null, ref: > mentoring_artifacts.id, note: "전사본(TRANSCRIPT) 파일. 파일이 지워지면 함께 지운다(CASCADE)"]
+  sequence int [not null, note: "문장 순서 (0부터)"]
+  speaker_name varchar(100) [not null, note: "화면에 보일 화자 이름"]
+  meet_name varchar(100) [not null, note: "Meet 표시 이름 (원본)"]
+  text text [not null]
+  started_at timestamptz [not null, note: "문장 시작 (Meet 전사 항목 start_time)"]
+  ended_at timestamptz [null]
+
+  indexes {
+    (artifact_id, sequence) [unique]
+  }
+  checks {
+    `sequence >= 0` [name: "check_transcript_entry_sequence"]
   }
 }
 Table mentoring_session_notes {
