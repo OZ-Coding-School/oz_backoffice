@@ -1,7 +1,7 @@
 # 17. FE-7a 채팅 화면
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #104
 - 관련 결정: `docs/decisions.md` F40·A74 (A57·F36)
 - 이전 기록: [16. FE-6c 내 팀](16_my_team.md)
 - 선행: 백엔드 [73. 채팅 자격을 신청 이력 기준으로 (BE-2h)](../backend/73_chat_request_history.md)
