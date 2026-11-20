@@ -1,6 +1,6 @@
 # 73. 채팅 자격을 신청 이력 기준으로 (BE-2h)
 
-- 상태: PR 진행 중
+- 상태: 완료
 - 관련 PR: #103
 - 관련 결정: `docs/decisions.md` A74, F40 (A57 변경)
 - 이전 기록: [72. 내 팀 응답 보완 (BE-2g)](72_my_team_summary.md)
@@ -38,6 +38,7 @@ API 형태는 바뀌지 않았다(생성 타입 변경 없음).
 - API: 채팅 흐름 테스트를 신청 이력이 있는 상태로 맞춤
 - **로컬 검사 (compose `api`):** ruff, ruff format, mypy, mypy tests, lint-imports 통과. 전체 898 passed.
 - 생성 타입 변경 없음(프론트 `typecheck` 통과)
+- **CI:** 통과. 사용자가 병합을 확인했다(2026-11-20)
 
 ## 남은 작업
 - FE-7a 채팅 화면(새 대화 없음)
