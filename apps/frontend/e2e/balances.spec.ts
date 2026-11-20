@@ -80,6 +80,49 @@ async function mockApi(page: Page) {
     }),
   );
   await page.route("**/api/v1/me/balances", (route) => route.fulfill({ json: ACCOUNTS }));
+  await page.route("**/api/v1/me/mentoring-teams", (route) =>
+    route.fulfill({
+      json: {
+        as_student: [
+          {
+            id: "t3",
+            cohort_id: "c12",
+            team_number: 3,
+            label: "알파",
+            created_at: "2026-11-03T01:00:00Z",
+            mentor: {
+              mentor_id: "m2",
+              display_name: "이멘토",
+              headline: "스타트업 CTO",
+              expertise: "FastAPI",
+              accepting_requests: true,
+            },
+            members: [{ student_id: "st12", name: "가수강", status: "ENROLLED" }],
+            stats: {
+              completed_sessions: 0,
+              completed_minutes: 0,
+              upcoming_sessions: 0,
+              next_session_at: null,
+              pending_requests: 0,
+              pending_requester_name: null,
+            },
+          },
+        ],
+        as_mentor: [],
+      },
+    }),
+  );
+  await page.route("**/api/v1/me/mentoring/sessions**", (route) =>
+    route.fulfill({
+      json: {
+        items: [],
+        total: 0,
+        limit: 3,
+        offset: 0,
+        counts: { SCHEDULED: 0, IN_PROGRESS: 0, COMPLETED: 0, NO_SHOW: 0, CANCELED: 0 },
+      },
+    }),
+  );
   await page.route("**/api/v1/me/balances/a1/transactions**", (route) =>
     route.fulfill({
       json: [
@@ -109,4 +152,19 @@ test("휴대폰: 더보기 → 시간 지급·차감 내역 → 팀 계좌로 �
     .getByRole("link", { name: /3팀 알파 계좌/ })
     .click();
   await expect(ledger.getByText("팀 기본 지급").filter({ visible: true })).toBeVisible();
+});
+
+test("휴대폰: 더보기 → 내 팀 (F39)", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockApi(page);
+  await page.goto("/");
+  await page.getByRole("navigation", { name: "하단 메뉴" }).getByRole("button", { name: "더보기" }).click();
+  await page.getByRole("dialog", { name: "더보기" }).getByRole("link", { name: "내 팀" }).click();
+  const team = page.getByRole("region", { name: "알파" });
+  await expect(team.getByText("5시간")).toBeVisible();
+  await expect(team.getByText("아직 팀 세션이 없어요")).toBeVisible();
+  await expect(page.getByRole("link", { name: "팀 멘토링 신청" })).toHaveAttribute(
+    "href",
+    "/mentoring/apply?kind=team",
+  );
 });
