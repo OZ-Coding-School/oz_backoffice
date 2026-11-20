@@ -61,3 +61,15 @@ class MentoringTeam(AggregateRoot):
         if student_id not in self.member_ids:
             raise BusinessRuleViolation("이 팀의 팀원이 아닙니다.", code="not_team_member")
         self.member_ids.remove(student_id)
+
+
+@dataclass(frozen=True, slots=True)
+class TeamActivity:
+    """수강생이 보는 내 팀 집계 (A73). 진행 시간은 기록(record_duration_minutes) 기준."""
+
+    completed_sessions: int = 0
+    completed_minutes: int = 0
+    upcoming_sessions: int = 0  # 예정·진행 중
+    next_session_at: datetime | None = None
+    pending_requests: int = 0
+    first_requester_id: uuid.UUID | None = None  # 가장 먼저 낸 대기 신청의 신청자

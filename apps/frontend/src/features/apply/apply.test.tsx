@@ -13,6 +13,7 @@ import { slotLabel } from "@/features/requests/labels";
 
 import { useApplyDraft } from "./draft";
 import { kstDateKey } from "./slots";
+import { makeStudentTeam } from "./team-fixture";
 
 const ONE_ON_ONE = { ...MENTORING_SETTINGS, allow_team_mentoring: false };
 const MENTORS = [
@@ -244,17 +245,14 @@ describe("1:1 멘토링 신청 (F30)", () => {
   });
 });
 
-const TEAM = {
-  id: "t1",
-  cohort_id: "c12",
-  team_number: 3,
+const TEAM = makeStudentTeam({
   label: "3팀 알파",
-  mentor: { mentor_id: "m2", display_name: "이멘토" },
+  mentor: { mentor_id: "m2", display_name: "이멘토", headline: null, expertise: null, accepting_requests: true },
   members: [
-    { student_id: "st12", name: "가수강" },
-    { student_id: "st99", name: "나수강" },
+    { student_id: "st12", name: "가수강", status: "ENROLLED" },
+    { student_id: "st99", name: "나수강", status: "ENROLLED" },
   ],
-};
+});
 
 function mockTeam({ team = TEAM as typeof TEAM | null, accepting = true, teamMinutes = 300 } = {}) {
   server.use(

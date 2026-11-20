@@ -133,7 +133,23 @@ async def test_team_lifecycle(client: AsyncClient, settings: Settings) -> None:
 
     mine = (await client.get("/api/v1/me/mentoring-teams", headers=ctx["student_h"])).json()
     (my_team,) = mine["as_student"]
-    assert my_team["mentor"] == {"mentor_id": str(ctx["mentor"].id), "display_name": "멘토K"}
+    assert my_team["mentor"] == {
+        "mentor_id": str(ctx["mentor"].id),
+        "display_name": "멘토K",
+        "headline": None,
+        "expertise": None,
+        "accepting_requests": False,
+    }
+    assert [(m["name"], m["status"]) for m in my_team["members"]] == [("가수강", "ENROLLED")]
+    assert my_team["created_at"] is not None
+    assert my_team["stats"] == {
+        "completed_sessions": 0,
+        "completed_minutes": 0,
+        "upcoming_sessions": 0,
+        "next_session_at": None,
+        "pending_requests": 0,
+        "pending_requester_name": None,
+    }
     assert "name" not in my_team["mentor"]
     assert mine["as_mentor"] == []
     as_mentor = (await client.get("/api/v1/me/mentoring-teams", headers=ctx["mentor_h"])).json()

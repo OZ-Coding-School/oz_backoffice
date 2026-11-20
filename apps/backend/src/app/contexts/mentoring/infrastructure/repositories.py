@@ -6,7 +6,7 @@ from typing import Any, cast
 
 from tortoise.exceptions import IntegrityError
 from tortoise.expressions import Q
-from tortoise.functions import Count
+from tortoise.functions import Count, Min, Sum
 
 from app.contexts.mentoring.domain.artifact import MentoringArtifact
 from app.contexts.mentoring.domain.assignment import CohortMentor
@@ -34,7 +34,7 @@ from app.contexts.mentoring.domain.settings import (
     OperatingHours,
 )
 from app.contexts.mentoring.domain.settlement import MentoringSettlement, SettlementItem
-from app.contexts.mentoring.domain.team import MentoringTeam
+from app.contexts.mentoring.domain.team import MentoringTeam, TeamActivity
 from app.contexts.mentoring.domain.transcript import TranscriptEntry
 from app.contexts.mentoring.infrastructure.models import (
     CohortMentoringBlockTimeModel,
@@ -619,6 +619,25 @@ class TortoiseMentoringRequestRepository:
             return await query.filter(team_id=team_id).count()
         return await query.filter(requester_id=requester_id, team_id__isnull=True).count()
 
+    async def pending_by_teams(
+        self, team_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, tuple[int, uuid.UUID]]:
+        """팀별 승인 대기 신청 수와 가장 먼저 낸 신청의 신청자 (A73)."""
+        if not team_ids:
+            return {}
+        rows = (
+            await MentoringRequestModel.filter(
+                team_id__in=team_ids, status=MentoringRequestStatus.PENDING
+            )
+            .order_by("created_at", "id")
+            .values("team_id", "requester_id")
+        )
+        result: dict[uuid.UUID, tuple[int, uuid.UUID]] = {}
+        for row in rows:
+            count, first = result.get(row["team_id"], (0, row["requester_id"]))
+            result[row["team_id"]] = (count + 1, first)
+        return result
+
     async def count_pending_by_requesters(
         self, requester_ids: list[uuid.UUID]
     ) -> dict[uuid.UUID, int]:
@@ -969,6 +988,42 @@ class TortoiseMentoringSessionRepository:
         for row in rows:
             counts[MentoringSessionStatus(row["status"])] = row["n"]
         return counts
+
+    async def team_activity(self, team_ids: list[uuid.UUID]) -> dict[uuid.UUID, TeamActivity]:
+        """팀별 완료 세션 수·기록 시간 합과 예정(진행 중 포함) 세션 수·가장 이른 시작 (A73)."""
+        if not team_ids:
+            return {}
+        done = (
+            await MentoringSessionModel.filter(
+                request__team_id__in=team_ids, status=MentoringSessionStatus.COMPLETED
+            )
+            .annotate(n=Count("id"), minutes=Sum("record_duration_minutes"))
+            .group_by("request__team_id")
+            .values("request__team_id", "n", "minutes")
+        )
+        upcoming = (
+            await MentoringSessionModel.filter(
+                request__team_id__in=team_ids,
+                status__in=[MentoringSessionStatus.SCHEDULED, MentoringSessionStatus.IN_PROGRESS],
+            )
+            .annotate(n=Count("id"), first=Min("starts_at"))
+            .group_by("request__team_id")
+            .values("request__team_id", "n", "first")
+        )
+        result: dict[uuid.UUID, TeamActivity] = {}
+        for row in done:
+            result[row["request__team_id"]] = TeamActivity(
+                completed_sessions=row["n"], completed_minutes=int(row["minutes"] or 0)
+            )
+        for row in upcoming:
+            base = result.get(row["request__team_id"], TeamActivity())
+            result[row["request__team_id"]] = TeamActivity(
+                completed_sessions=base.completed_sessions,
+                completed_minutes=base.completed_minutes,
+                upcoming_sessions=row["n"],
+                next_session_at=row["first"],
+            )
+        return result
 
     async def count_statuses_for_participants(
         self, *, student_ids: list[uuid.UUID], team_ids: list[uuid.UUID]

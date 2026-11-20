@@ -11,6 +11,7 @@ mentoring.team.manage (기수 범위):
 """
 
 import uuid
+from datetime import datetime
 from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends, Request, Response, status
@@ -28,10 +29,12 @@ from app.contexts.mentoring.application.team_service import (
     MentorOfUser,
     StudentLookup,
 )
-from app.contexts.mentoring.domain.team import NAME_MAX_LENGTH, MentoringTeam
+from app.contexts.mentoring.domain.team import NAME_MAX_LENGTH, MentoringTeam, TeamActivity
 from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseCohortMentoringSettingsRepository,
     TortoiseCohortMentorRepository,
+    TortoiseMentoringRequestRepository,
+    TortoiseMentoringSessionRepository,
     TortoiseMentoringTeamRepository,
 )
 from app.contexts.mentoring.presentation.cleanup import build_cleanup
@@ -116,11 +119,26 @@ class TeamResponse(BaseModel):
 class StudentTeamMentor(BaseModel):
     mentor_id: uuid.UUID
     display_name: str
+    headline: str | None = Field(default=None, description="한 줄 소개 (A73)")
+    expertise: str | None = Field(default=None, description="전문 분야, 쉼표로 구분 (A73)")
+    accepting_requests: bool = Field(default=False, description="신청 받는 중 (A73)")
 
 
 class StudentTeamMember(BaseModel):
     student_id: uuid.UUID
     name: str
+    status: EnrollmentStatus | None = Field(default=None, description="수강 상태 (A73)")
+
+
+class TeamStats(BaseModel):
+    """내 팀 집계 (A73). 진행 시간은 기록 기준."""
+
+    completed_sessions: int
+    completed_minutes: int
+    upcoming_sessions: int = Field(description="예정·진행 중 세션 수")
+    next_session_at: datetime | None = Field(description="가장 이른 예정·진행 중 세션 시작")
+    pending_requests: int = Field(description="승인 대기 팀 신청 수")
+    pending_requester_name: str | None = Field(description="가장 먼저 낸 대기 신청의 신청자")
 
 
 class TeamChangeResponse(TeamResponse):
@@ -130,14 +148,16 @@ class TeamChangeResponse(TeamResponse):
 
 
 class StudentTeamResponse(BaseModel):
-    """수강생이 보는 내 팀 (멘토 실명·팀원 상태 제외)."""
+    """수강생이 보는 내 팀 (멘토 실명·가입 여부 제외)."""
 
     id: uuid.UUID
     cohort_id: uuid.UUID
     team_number: int
     label: str
+    created_at: datetime | None = Field(default=None, description="팀 구성일 (A73)")
     mentor: StudentTeamMentor
     members: list[StudentTeamMember]
+    stats: TeamStats
 
 
 class MyTeamsResponse(BaseModel):
@@ -186,22 +206,53 @@ class Presenter:
         return (await self.teams([team]))[0]
 
     async def student_view(self, teams: list[MentoringTeam]) -> list[StudentTeamResponse]:
-        full = await self.teams(teams)
-        return [
-            StudentTeamResponse(
-                id=t.id,
-                cohort_id=t.cohort_id,
-                team_number=t.team_number,
-                label=t.label,
-                mentor=StudentTeamMentor(
-                    mentor_id=t.mentor.mentor_id, display_name=t.mentor.display_name
-                ),
-                members=[
-                    StudentTeamMember(student_id=m.student_id, name=m.name) for m in t.members
-                ],
+        """수강생의 내 팀 (A73): 멘토 소개·팀원 수강 상태·팀 세션/신청 집계를 붙인다."""
+        mentors = await self._mentors.get_many(list({t.mentor_id for t in teams}))
+        names = await self._mentor_names(teams)
+        students = await self._service.students_of(teams)
+        ids = [t.id for t in teams]
+        activity = await TortoiseMentoringSessionRepository().team_activity(ids)
+        pending = await TortoiseMentoringRequestRepository().pending_by_teams(ids)
+        result = []
+        for t in teams:
+            mentor = mentors.get(t.mentor_id)
+            act = activity.get(t.id, TeamActivity())
+            count, first = pending.get(t.id, (0, None))
+            first_student = students.get(first) if first else None
+            result.append(
+                StudentTeamResponse(
+                    id=t.id,
+                    cohort_id=t.cohort_id,
+                    team_number=t.team_number,
+                    label=t.label,
+                    created_at=t.created_at,
+                    mentor=StudentTeamMentor(
+                        mentor_id=t.mentor_id,
+                        display_name=names[t.mentor_id].display_name
+                        if t.mentor_id in names
+                        else "",
+                        headline=mentor.headline if mentor else None,
+                        expertise=mentor.expertise if mentor else None,
+                        accepting_requests=mentor.accepting_requests if mentor else False,
+                    ),
+                    members=[
+                        StudentTeamMember(
+                            student_id=m, name=students[m].name, status=students[m].status
+                        )
+                        for m in t.member_ids
+                        if m in students
+                    ],
+                    stats=TeamStats(
+                        completed_sessions=act.completed_sessions,
+                        completed_minutes=act.completed_minutes,
+                        upcoming_sessions=act.upcoming_sessions,
+                        next_session_at=act.next_session_at,
+                        pending_requests=count,
+                        pending_requester_name=first_student.name if first_student else None,
+                    ),
+                )
             )
-            for t in full
-        ]
+        return result
 
 
 PresenterDep = Annotated[Presenter, Depends(Presenter)]

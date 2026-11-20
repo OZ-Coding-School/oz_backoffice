@@ -513,3 +513,49 @@ async def test_settlement_repository_and_constraints() -> None:
             "UPDATE mentoring_settlement_items SET pay_unit = 'MONTHLY' WHERE settlement_id = $1",
             [str(other.id)],
         )
+
+
+async def test_team_activity_and_pending_by_teams() -> None:
+    """내 팀 집계: 완료 수·기록 시간, 예정(진행 중 포함) 수·가장 이른 시작, 대기 신청 (A73)."""
+    cohort = await create_cohort()
+    mentor = await create_mentor()
+    first, second = make_student(cohort_id=cohort.id), make_student(cohort_id=cohort.id)
+    for s in (first, second):
+        await TortoiseStudentRepository().add(s)
+    team = MentoringTeam(
+        cohort_id=cohort.id, team_number=1, mentor_id=mentor.id, member_ids=[first.id, second.id]
+    )
+    other = MentoringTeam(cohort_id=cohort.id, team_number=2, mentor_id=mentor.id)
+    for t in (team, other):
+        await TortoiseMentoringTeamRepository().add(t)
+
+    done = _session(await _approved(mentor.id, first.id, team.id), T - timedelta(days=2))
+    done.status, done.record_duration_minutes = MentoringSessionStatus.COMPLETED, 90
+    canceled = _session(await _approved(mentor.id, first.id, team.id), T - timedelta(days=1))
+    canceled.status = MentoringSessionStatus.CANCELED
+    later = _session(await _approved(mentor.id, first.id, team.id), T + timedelta(days=3))
+    live = _session(await _approved(mentor.id, first.id, team.id), T)
+    live.status = MentoringSessionStatus.IN_PROGRESS
+    for item in (done, canceled, later, live):
+        await sessions.add(item)
+
+    activity = await sessions.team_activity([team.id, other.id])
+    assert other.id not in activity
+    got = activity[team.id]
+    assert (got.completed_sessions, got.completed_minutes) == (1, 90)
+    assert (got.upcoming_sessions, got.next_session_at) == (2, T)
+
+    for requester in (second, first):  # 둘째 팀원이 먼저 냈다
+        await requests.add(
+            MentoringRequest(
+                requester_id=requester.id,
+                mentor_id=mentor.id,
+                team_id=team.id,
+                topic="질문",
+                detail="내용",
+                desired_times=[T + timedelta(days=5)],
+                duration=60,
+            )
+        )
+    assert await requests.pending_by_teams([team.id, other.id]) == {team.id: (2, second.id)}
+    assert await sessions.team_activity([]) == {}
