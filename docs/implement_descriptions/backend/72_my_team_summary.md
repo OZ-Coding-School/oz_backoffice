@@ -1,7 +1,7 @@
 # 72. 내 팀 응답 보완 (BE-2g)
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #101
 - 관련 결정: `docs/decisions.md` A73, F39 (A39·F36)
 - 이전 기록: [71. 내 정보 비밀번호 변경 링크 (BE-2f)](71_password_change_link.md)
 
