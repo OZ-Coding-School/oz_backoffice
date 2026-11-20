@@ -1,4 +1,4 @@
-import { CalendarDays, FileText, LayoutGrid, Plus, User, type LucideIcon } from "lucide-react";
+import { CalendarDays, FileText, LayoutGrid, Plus, User, Wallet, type LucideIcon } from "lucide-react";
 
 import type { Me } from "@/features/auth/api";
 
@@ -36,6 +36,13 @@ const SESSIONS: MemberNavItem = {
   icon: CalendarDays,
 };
 
+const BALANCES: MemberNavItem = {
+  to: "/mentoring/balances",
+  label: "시간 지급·차감 내역",
+  shortLabel: "시간 내역",
+  icon: Wallet,
+};
+
 const PROFILE: MemberNavItem = { to: "/my/profile", label: "내 정보", shortLabel: "내 정보", icon: User };
 
 const APPLY: MemberNavItem = { to: "/mentoring/apply", label: "멘토링 신청", shortLabel: "신청", icon: Plus };
@@ -51,7 +58,7 @@ export function memberNav(accountType: Me["account_type"], options: MemberNavOpt
   if (accountType === "MENTOR") return MENTOR_NAV;
   return [
     { items: [HOME] },
-    { title: "멘토링", items: options.apply ? [APPLY, REQUESTS, SESSIONS] : [REQUESTS, SESSIONS] },
+    { title: "멘토링", items: options.apply ? [APPLY, REQUESTS, SESSIONS, BALANCES] : [REQUESTS, SESSIONS, BALANCES] },
     { title: "내 공간", items: [PROFILE] },
   ];
 }
@@ -70,4 +77,29 @@ export function currentNavItem(groups: readonly MemberNavGroup[], pathname: stri
   return navItems(groups)
     .filter((item) => (item.to === "/" ? pathname === "/" : pathname === item.to || pathname.startsWith(`${item.to}/`)))
     .sort((a, b) => b.to.length - a.to.length)[0];
+}
+
+/** 하단 탭에 바로 둘 수 있는 메뉴 수. 넘으면 앞 4개 + 더보기 (F36) */
+export const MAX_BOTTOM_TABS = 5;
+const PINNED_TABS = ["/", "/mentoring/apply", "/mentoring/sessions", "/mentoring/requests"];
+
+export interface BottomTabLayout {
+  tabs: MemberNavItem[];
+  /** 더보기에 들어갈 메뉴 (그룹 이름 유지). 없으면 더보기 탭이 없다 */
+  more: MemberNavGroup[];
+}
+
+/**
+ * 하단 탭 (F36): 메뉴가 5개 이하면 모두, 넘으면 홈·신청·진행 기록·신청 내역(있는 것) 4개 + 더보기.
+ * 고정 메뉴가 4개보다 적으면 사이드바 순서대로 채운다.
+ */
+export function bottomTabLayout(groups: readonly MemberNavGroup[]): BottomTabLayout {
+  const items = navItems(groups);
+  if (items.length <= MAX_BOTTOM_TABS) return { tabs: items, more: [] };
+  const pinned = PINNED_TABS.map((to) => items.find((i) => i.to === to)).filter((i): i is MemberNavItem => !!i);
+  const tabs = [...pinned, ...items.filter((i) => !pinned.includes(i))].slice(0, MAX_BOTTOM_TABS - 1);
+  const more = groups
+    .map((g) => ({ ...g, items: g.items.filter((i) => !tabs.includes(i)) }))
+    .filter((g) => g.items.length > 0);
+  return { tabs, more };
 }
