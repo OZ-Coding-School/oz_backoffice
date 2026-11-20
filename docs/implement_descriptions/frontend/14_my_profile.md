@@ -1,7 +1,7 @@
 # 14. FE-6a 내 정보
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #99
 - 관련 결정: `docs/decisions.md` F37·F36·A72
 - 이전 기록: [13. FE-5b 다시 보기](13_session_replay.md)
 - 선행: 백엔드 [71. 내 정보 비밀번호 변경 링크 (BE-2f)](../backend/71_password_change_link.md)
