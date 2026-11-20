@@ -1,7 +1,7 @@
 # 16. FE-6c 내 팀
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #102
 - 관련 결정: `docs/decisions.md` F39·A73 (F36·F31)
 - 이전 기록: [15. FE-6b 시간 지급·차감 내역](15_balance_history.md)
 - 선행: 백엔드 [72. 내 팀 응답 보완 (BE-2g)](../backend/72_my_team_summary.md)
