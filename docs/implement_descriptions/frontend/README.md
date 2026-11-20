@@ -13,3 +13,4 @@
 | 09 | [FE-3a 1:1 멘토링 신청](09_one_on_one_apply.md) | 완료 (#87) |
 | 10 | [FE-3b 팀 멘토링 신청·종류 선택](10_team_apply.md) | 완료 (#88) |
 | 11 | [FE-4b 신청 변경](11_request_change.md) | 완료 (#90) |
+| 12 | [FE-5a 진행 기록 목록·세션 상세](12_session_history.md) | PR 진행 중 |
