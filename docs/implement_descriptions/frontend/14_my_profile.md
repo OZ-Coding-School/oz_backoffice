@@ -58,7 +58,7 @@ FE-6의 첫 화면이다(F36). 수강생이 계정·수강 정보를 보고, 로
 - 전체 테스트를 돌리면 목록·다시 보기·변경 흐름 테스트가 부하로 5초를 넘기는 일이 생겼다. 이전(#89)처럼 그 테스트들에만 20초 제한을 두었다.
 
 ## 검증
-- `lint`, `format:check`, `typecheck`, `build` 통과. 초기 JS 228kB(gzip 73kB)
+- `lint`, `format:check`, `typecheck`, `build` 통과. 초기 JS 230kB(gzip 73kB), 내 정보 청크 10kB
 - `npm test`: 170 passed (두 번 연속). 내 정보·회원·인증 테스트는 TZ=UTC·America/Los_Angeles·Asia/Seoul 각각 통과
   - 가리기
   - 계정·수강 정보 표시
