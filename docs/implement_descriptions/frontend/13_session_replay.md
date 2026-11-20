@@ -1,7 +1,7 @@
 # 13. FE-5b 다시 보기
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #97
 - 관련 결정: `docs/decisions.md` F35 (F33·A68·A69·A71)
 - 이전 기록: [12. FE-5a 진행 기록 목록·세션 상세](12_session_history.md)
 - 선행: 백엔드 [70. 녹화 끝 시각 (BE-2e)](../backend/70_artifact_recording_end.md)
