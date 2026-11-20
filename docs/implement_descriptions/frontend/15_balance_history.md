@@ -1,7 +1,7 @@
 # 15. FE-6b 시간 지급·차감 내역
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #100
 - 관련 결정: `docs/decisions.md` F38·F36 (A39·A40)
 - 이전 기록: [14. FE-6a 내 정보](14_my_profile.md)
 
