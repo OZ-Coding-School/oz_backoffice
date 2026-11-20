@@ -55,11 +55,13 @@ async function mockApi(page: Page) {
   });
 }
 
-test("휴대폰: 하단 탭 → 내 정보 → 링크 인증 후 비밀번호 변경 (F37·A72)", async ({ page }) => {
+test("휴대폰: 더보기 → 내 정보 → 링크 인증 후 비밀번호 변경 (F37·A72)", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockApi(page);
   await page.goto("/");
-  await page.getByRole("navigation", { name: "하단 메뉴" }).getByRole("link", { name: "내 정보" }).click();
+  // 채팅이 생겨 메뉴가 6개라 내 정보는 더보기 안에 있다 (F36·F40)
+  await page.getByRole("navigation", { name: "하단 메뉴" }).getByRole("button", { name: "더보기" }).click();
+  await page.getByRole("dialog", { name: "더보기" }).getByRole("link", { name: "내 정보" }).click();
   await expect(page.getByRole("heading", { name: "내 정보" })).toBeVisible();
   await expect(page.getByText("010-****-5678")).toBeVisible();
 
