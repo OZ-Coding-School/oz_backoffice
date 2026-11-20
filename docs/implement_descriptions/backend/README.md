@@ -68,3 +68,4 @@
 | 64 | [신청 응답 보완: 단건 조회·확정 세션·취소 주체·차감 상태](64_request_response_supplement.md) | 완료 (#84) |
 | 65 | [신청 목록 상태 여러 개 필터와 상태별 건수](65_request_list_counts.md) | 완료 (#85) |
 | 66 | [세션 응답 보완: 실제 진행 시각·참여자·취소·차감·상태별 건수 (BE-2a)](66_session_response_supplement.md) | 완료 (#91) |
+| 67 | [녹화 서명 링크와 스마트 메모 마크다운 (BE-2b)](67_artifact_link_markdown.md) | 완료 (#92) |

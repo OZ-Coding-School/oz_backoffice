@@ -52,6 +52,9 @@ class DriveArchive(Protocol):
     async def stream(
         self, file_id: str, *, export_pdf: bool, range_header: str | None
     ) -> DriveStream: ...
+    async def export_markdown(self, file_id: str) -> str:
+        """Google 문서를 마크다운으로 내보낸다 (스마트 메모 패널, A68)."""
+        ...
 
 
 class CohortLabelLike(Protocol):
@@ -251,6 +254,31 @@ class ArtifactService:
     ) -> tuple[MentoringArtifact, DriveStream]:
         session = await self._access.get_for_cohort(cohort_id, session_id)
         return await self._open(session, artifact_id, range_header)
+
+    async def viewable_for_user(
+        self, user_id: uuid.UUID, session_id: uuid.UUID, artifact_id: uuid.UUID
+    ) -> MentoringArtifact:
+        """참여자가 볼 수 있는 파일인지 확인한다 (재생 링크 발급 전, A68)."""
+        session = await self._access.get_for_user(user_id, session_id)
+        return await self._artifact_of(session, artifact_id)
+
+    async def markdown_for_user(
+        self, user_id: uuid.UUID, session_id: uuid.UUID, artifact_id: uuid.UUID
+    ) -> tuple[MentoringArtifact, str]:
+        """스마트 메모(SUMMARY)를 마크다운으로 (저장 안 함, A68). 다른 종류는 없는 파일로 본다."""
+        session = await self._access.get_for_user(user_id, session_id)
+        artifact = await self._artifact_of(session, artifact_id)
+        if artifact.artifact_type is not MentoringArtifactType.SUMMARY or self._archive is None:
+            raise _not_found()
+        return artifact, await self._archive.export_markdown(artifact.drive_file_id)
+
+    async def _artifact_of(
+        self, session: MentoringSession, artifact_id: uuid.UUID
+    ) -> MentoringArtifact:
+        artifact = await self._artifacts.get(artifact_id)
+        if artifact is None or artifact.session_id != session.id or not artifact.is_viewable:
+            raise _not_found()
+        return artifact
 
     async def _viewable(self, session: MentoringSession) -> list[MentoringArtifact]:
         return [a for a in await self._artifacts.list_by_session(session.id) if a.is_viewable]

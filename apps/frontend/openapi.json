@@ -8605,6 +8605,205 @@
         }
       }
     },
+    "/api/v1/mentoring/sessions/{session_id}/artifacts/{artifact_id}/link": {
+      "post": {
+        "tags": [
+          "mentoring-artifacts"
+        ],
+        "summary": "Artifact Link",
+        "description": "참여자만. 그 파일·그 사용자에 묶인 3시간짜리 서명 링크 (A68).",
+        "operationId": "artifact_link_api_v1_mentoring_sessions__session_id__artifacts__artifact_id__link_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Artifact Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactLinkResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/mentoring/sessions/{session_id}/artifacts/{artifact_id}/markdown": {
+      "get": {
+        "tags": [
+          "mentoring-artifacts"
+        ],
+        "summary": "Artifact Markdown",
+        "description": "참여자만. 스마트 메모(SUMMARY)를 마크다운으로 (A68). 다른 종류는 404 artifact_not_found.",
+        "operationId": "artifact_markdown_api_v1_mentoring_sessions__session_id__artifacts__artifact_id__markdown_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Artifact Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactMarkdownResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/mentoring/artifacts/{artifact_id}/stream": {
+      "get": {
+        "tags": [
+          "mentoring-artifacts"
+        ],
+        "summary": "Artifact Stream",
+        "description": "서명 링크 중계: 헤더 없이 Range를 받고, 매번 참여자인지 다시 확인한다 (A68).",
+        "operationId": "artifact_stream_api_v1_mentoring_artifacts__artifact_id__stream_get",
+        "parameters": [
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Artifact Id"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "서명 링크의 토큰",
+              "title": "Token"
+            },
+            "description": "서명 링크의 토큰"
+          },
+          {
+            "name": "download",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "참이면 내려받기(attachment)",
+              "default": false,
+              "title": "Download"
+            },
+            "description": "참이면 내려받기(attachment)"
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Range"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/cohorts/{cohort_id}/mentoring/sessions/{session_id}/artifacts": {
       "get": {
         "tags": [
@@ -12028,6 +12227,52 @@
         "type": "object",
         "title": "ApproveStaffRegistrationRequest",
         "description": "승인할 때 조정할 항목. 보내지 않은(null) 항목은 신청한 값을 그대로 쓴다.\n\nassignments를 보내면 담당 목록 전체를 그 값으로 바꾼다(빈 배열이면 담당 없음).\nteam_id는 보내지 않으면 신청값, null을 보내면 팀 없음(부서 직속)이다.\n조정은 자유이고 존재만 검사한다 (A62)."
+      },
+      "ArtifactLinkResponse": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "API 기준 경로 + 서명 토큰. <video src>·내려받기에 그대로 쓴다"
+          },
+          "download_url": {
+            "type": "string",
+            "title": "Download Url",
+            "description": "같은 링크의 내려받기(attachment) 버전"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "download_url",
+          "expires_at"
+        ],
+        "title": "ArtifactLinkResponse"
+      },
+      "ArtifactMarkdownResponse": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Artifact Id"
+          },
+          "markdown": {
+            "type": "string",
+            "title": "Markdown",
+            "description": "스마트 메모를 Drive에서 마크다운으로 내보낸 원문 (저장 안 함)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "markdown"
+        ],
+        "title": "ArtifactMarkdownResponse"
       },
       "ArtifactResponse": {
         "properties": {

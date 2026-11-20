@@ -695,6 +695,9 @@ async def test_artifact_list_and_stream(app: Any, client: AsyncClient, settings:
                 206, {"content-type": "video/mp4", "content-range": "bytes 0-3/10"}, chunks()
             )
 
+        async def export_markdown(self, file_id: str) -> str:
+            return f"## {file_id} 요약"
+
     def service(request: Request) -> ArtifactService:
         state = request.app.state
         return ArtifactService(
@@ -742,7 +745,15 @@ async def test_artifact_list_and_stream(app: Any, client: AsyncClient, settings:
         drive_file_id="p1",
         artifact_type=MentoringArtifactType.SUMMARY,
     )
-    for a in (video, doc, pending):
+    memo = MentoringArtifact(
+        session_id=uuid.UUID(session_id),
+        drive_file_id="s1",
+        artifact_type=MentoringArtifactType.SUMMARY,
+    )
+    memo.archived(
+        file_name="스마트 메모", mime_type="application/vnd.google-apps.document", file_size=None
+    )
+    for a in (video, doc, pending, memo):
         await repo.add_if_absent(a)
 
     base = f"/api/v1/mentoring/sessions/{session_id}/artifacts"
@@ -750,6 +761,7 @@ async def test_artifact_list_and_stream(app: Any, client: AsyncClient, settings:
     assert {(a["artifact_type"], a["file_name"], a["mime_type"]) for a in listed} == {
         ("VIDEO", "녹화.mp4", "video/mp4"),
         ("TRANSCRIPT", "전사본.pdf", "application/pdf"),
+        ("SUMMARY", "스마트 메모.pdf", "application/pdf"),
     }  # 정리 전 파일은 보이지 않는다
     content = await client.get(
         f"{base}/{video.id}/content", headers={**student_h, "Range": "bytes=0-3"}
@@ -767,8 +779,32 @@ async def test_artifact_list_and_stream(app: Any, client: AsyncClient, settings:
     admin_base = (
         f"/api/v1/admin/cohorts/{ctx['cohort'].id}/mentoring/sessions/{session_id}/artifacts"
     )
-    assert len((await client.get(admin_base, headers=admin)).json()) == 2
+    assert len((await client.get(admin_base, headers=admin)).json()) == 3
     assert (await client.get(admin_base, headers=student_h)).status_code == 403
+
+    # 서명 링크: 헤더 없이 Range로 재생, 내려받기는 attachment (A68)
+    link = await client.post(f"{base}/{video.id}/link", headers=student_h)
+    assert link.status_code == 200, link.text
+    played = await client.get(link.json()["url"], headers={"Range": "bytes=0-3"})
+    assert (played.status_code, played.content) == (206, b"part")
+    assert played.headers["content-disposition"].startswith("inline;")
+    saved = await client.get(link.json()["download_url"])
+    assert saved.headers["content-disposition"].startswith("attachment;")
+    assert (await client.post(f"{base}/{video.id}/link", headers=stranger)).status_code == 404
+    token = link.json()["url"].split("token=")[1]
+    other = await client.get(f"/api/v1/mentoring/artifacts/{doc.id}/stream?token={token}")
+    assert (other.status_code, other.json()["error"]["code"]) == (401, "artifact_link_invalid")
+    forged = await client.get(f"/api/v1/mentoring/artifacts/{video.id}/stream?token=x.y.z")
+    assert forged.status_code == 401
+    access_token = student_h["Authorization"].removeprefix("Bearer ")
+    reused = await client.get(f"/api/v1/mentoring/artifacts/{video.id}/stream?token={access_token}")
+    assert reused.status_code == 401  # access 토큰은 서명 링크로 쓸 수 없다
+
+    # 스마트 메모 마크다운 (A68): SUMMARY만
+    md = await client.get(f"{base}/{memo.id}/markdown", headers=student_h)
+    assert md.json() == {"artifact_id": str(memo.id), "markdown": "## s1 요약"}
+    assert (await client.get(f"{base}/{video.id}/markdown", headers=student_h)).status_code == 404
+    assert (await client.get(f"{base}/{memo.id}/markdown", headers=stranger)).status_code == 404
 
 
 async def test_settlement_aggregate_detail_close(

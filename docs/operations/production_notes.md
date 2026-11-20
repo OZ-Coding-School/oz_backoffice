@@ -82,6 +82,8 @@ app.workers.tasks.mentoring       # 배정 만료(매일 00:00 KST), 대기 신�
 ### 2-2. nginx
 - `infra/nginx/prod.conf`(현재 빈 파일, 저장소 밖)에 작성한다: TLS 종료, `/api/` → api:8000 프록시, 1-2의 헤더, 업로드는 S3 presigned POST로 직접 가므로 큰 `client_max_body_size`는 필요 없다.
 - 녹화 스트리밍 중계(P13)는 `Range` 요청을 그대로 넘기고 응답 버퍼링을 끈다(`proxy_buffering off;`).
+- 녹화 서명 링크(A68) `GET /api/v1/mentoring/artifacts/{id}/stream?token=`도 위와 같이 Range를 넘기고 버퍼링을 끈다.
+  - 쿼리에 3시간짜리 서명 토큰이 들어 있다. nginx·로드 밸런서 접근 로그에 쿼리가 남지 않게 이 경로의 로그 형식에서 `$args`를 빼거나(`$uri`만 기록) 마스킹한다.
 - 채팅 실시간 수신(SSE, P15-2) `GET /api/v1/me/mentoring/chat/stream`은 끝나지 않는 응답이다.
   - 응답에 `X-Accel-Buffering: no`를 붙여 nginx가 버퍼링하지 않지만, 이 경로에 `proxy_buffering off;`, `proxy_cache off;`, `proxy_http_version 1.1;`, `proxy_set_header Connection "";`를 함께 둔다.
   - 서버가 15초마다 연결 유지 주석 줄(`: ping`)을 보내므로 `proxy_read_timeout`은 15초보다 길게(기본 60초면 충분) 둔다. 로드 밸런서(ALB 등)의 유휴 타임아웃도 15초보다 길어야 한다.
@@ -162,3 +164,4 @@ app.workers.tasks.mentoring       # 배정 만료(매일 00:00 KST), 대기 신�
 - 2026-11-11: 문서 작성 (P8까지 반영)
 - 2026-11-12: 대기 신청 만료 작업 추가 (P11-1), Meet 공간 생성·보완 작업과 `MEET_DRIVER` 추가 (P12-1), Meet 이벤트 구독·실시간 수신과 `MEET_PUBSUB_*` 추가 (P12-2), 녹화 수집·정리 작업과 `MEET_RECORDINGS_FOLDER_ID` 추가 (P13-2)
 - 2026-11-16: 채팅 실시간 수신(SSE) 프록시·로드 밸런서·Redis 연결 참고사항 추가 (P15-2)
+- 2026-11-20: 녹화 서명 링크 경로의 프록시·접근 로그 참고사항 추가 (A68, BE-2b)

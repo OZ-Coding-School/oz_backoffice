@@ -107,6 +107,9 @@ class FakeArchive:
 
         return DriveStream(200, {}, chunks())
 
+    async def export_markdown(self, file_id: str) -> str:
+        return f"## {file_id}"
+
 
 class Harness:
     def __init__(self) -> None:
@@ -234,6 +237,25 @@ async def test_view_and_stream_permissions(h: Harness) -> None:
     assert h.archive.streamed == [("v1", False, "bytes=0-9"), ("t1", True, None)]
     with pytest.raises(NotFoundError):
         await h.service.open_for_user(student_user, session.id, new_id(), None)
+
+
+async def test_link_check_and_markdown(h: Harness) -> None:
+    """서명 링크 전 확인과 스마트 메모 마크다운 (A68)."""
+    session = await h.session()
+    h.source.files = [MeetFile("VIDEO", "v1"), MeetFile("SUMMARY", "s1")]
+    await h.service.collect(session.id)
+    student_user = h.student.user_id
+    assert student_user is not None
+    items = await h.service.list_for_user(student_user, session.id)
+    video = next(a for a in items if a.artifact_type is MentoringArtifactType.VIDEO)
+    memo = next(a for a in items if a.artifact_type is MentoringArtifactType.SUMMARY)
+    assert (await h.service.viewable_for_user(student_user, session.id, video.id)).id == video.id
+    with pytest.raises(NotFoundError):
+        await h.service.viewable_for_user(new_id(), session.id, video.id)  # 참여자가 아님
+    artifact, markdown = await h.service.markdown_for_user(h.mentor.user_id, session.id, memo.id)
+    assert (artifact.id, markdown) == (memo.id, "## s1")
+    with pytest.raises(NotFoundError):
+        await h.service.markdown_for_user(student_user, session.id, video.id)  # 영상은 없음
 
 
 async def test_disabled_and_canceled(h: Harness) -> None:
