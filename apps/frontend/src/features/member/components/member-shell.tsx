@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { LogOut } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -16,13 +16,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { logout, type Me } from "@/features/auth/api";
+import { type Me } from "@/features/auth/api";
 import { Logo } from "@/features/auth/components/auth-layout";
 import { cn } from "@/lib/utils";
 
 import { activeCohort, cohortLabel, enrollmentsQuery } from "../api";
 import { mentoringSettingsQuery } from "@/features/requests/api";
 
+import { useLogout } from "../logout";
 import { currentNavItem, memberNav, navItems, showBottomTabs, type MemberNavItem } from "../nav";
 
 /**
@@ -147,14 +148,6 @@ function RailLink({ item, active }: { item: MemberNavItem; active: boolean }) {
       <span className="text-caption-strong">{item.shortLabel}</span>
     </Link>
   );
-}
-
-function useLogout() {
-  const navigate = useNavigate();
-  return async () => {
-    await logout();
-    await navigate({ to: "/login", replace: true });
-  };
 }
 
 function LogoutButton() {
