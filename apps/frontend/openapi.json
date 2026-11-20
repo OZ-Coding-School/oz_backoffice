@@ -9628,6 +9628,7 @@
           "mentoring-sessions"
         ],
         "summary": "My Sessions",
+        "description": "본인 1:1·소속 팀 세션. `counts`는 필터와 무관한 상태별 수 (A68).",
         "operationId": "my_sessions_api_v1_me_mentoring_sessions_get",
         "security": [
           {
@@ -9715,7 +9716,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_SessionResponse_"
+                  "$ref": "#/components/schemas/SessionListPage"
                 }
               }
             }
@@ -9826,7 +9827,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_SessionResponse_"
+                  "$ref": "#/components/schemas/SessionListPage"
                 }
               }
             }
@@ -11356,6 +11357,116 @@
             "type": "string",
             "title": "Mentor Display Name"
           },
+          "mentor_headline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mentor Headline",
+            "description": "멘토 한 줄 소개 (A68)"
+          },
+          "participants": {
+            "items": {
+              "$ref": "#/components/schemas/Participant"
+            },
+            "type": "array",
+            "title": "Participants",
+            "description": "1:1은 신청자, 팀은 지금 팀원 (A68)"
+          },
+          "actual_started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Started At",
+            "description": "Meet 실제 시작 (처음 회의, A68)"
+          },
+          "actual_ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Ended At",
+            "description": "Meet 실제 종료 (마지막 회의, A68)"
+          },
+          "cancel_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancel Reason",
+            "description": "취소 사유 (신청의 값, A68)"
+          },
+          "canceled_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MentoringCancelActor"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "취소 주체 (A66·A68)"
+          },
+          "canceled_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canceled At"
+          },
+          "balance": {
+            "$ref": "#/components/schemas/RequestBalanceResponse",
+            "description": "신청의 차감 상태 (A66·A68)"
+          },
+          "approved_rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved Rank",
+            "description": "몇 순위 희망 일시로 승인됐는지 (A68)"
+          },
+          "requested_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested At",
+            "description": "신청 시각 (A68)"
+          },
           "google_meet_url": {
             "anyOf": [
               {
@@ -11421,32 +11532,6 @@
             "type": "string",
             "title": "Mentor Name",
             "description": "멘토 실명 (운영진 응답에만)"
-          },
-          "actual_started_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Actual Started At",
-            "description": "Meet 실제 시작 (처음 회의)"
-          },
-          "actual_ended_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Actual Ended At",
-            "description": "Meet 실제 종료 (마지막 회의)"
           }
         },
         "type": "object",
@@ -11465,14 +11550,22 @@
           "requester_name",
           "mentor_id",
           "mentor_display_name",
+          "mentor_headline",
+          "participants",
+          "actual_started_at",
+          "actual_ended_at",
+          "cancel_reason",
+          "canceled_by",
+          "canceled_at",
+          "balance",
+          "approved_rank",
+          "requested_at",
           "google_meet_url",
           "summary",
           "record_duration_minutes",
           "recorded_at",
           "created_at",
-          "mentor_name",
-          "actual_started_at",
-          "actual_ended_at"
+          "mentor_name"
         ],
         "title": "AdminSessionResponse"
       },
@@ -16472,37 +16565,6 @@
         ],
         "title": "Page[MentorListItem]"
       },
-      "Page_SessionResponse_": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/SessionResponse"
-            },
-            "type": "array",
-            "title": "Items"
-          },
-          "total": {
-            "type": "integer",
-            "title": "Total"
-          },
-          "limit": {
-            "type": "integer",
-            "title": "Limit"
-          },
-          "offset": {
-            "type": "integer",
-            "title": "Offset"
-          }
-        },
-        "type": "object",
-        "required": [
-          "items",
-          "total",
-          "limit",
-          "offset"
-        ],
-        "title": "Page[SessionResponse]"
-      },
       "Page_ThreadResponse_": {
         "properties": {
           "items": {
@@ -16533,6 +16595,26 @@
           "offset"
         ],
         "title": "Page[ThreadResponse]"
+      },
+      "Participant": {
+        "properties": {
+          "student_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Student Id",
+            "description": "수강 등록(students.id)"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "student_id",
+          "name"
+        ],
+        "title": "Participant"
       },
       "PayUnit": {
         "type": "string",
@@ -17860,6 +17942,41 @@
         ],
         "title": "SenderKind"
       },
+      "SessionListPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SessionResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/SessionStatusCounts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset",
+          "counts"
+        ],
+        "title": "SessionListPage"
+      },
       "SessionResponse": {
         "properties": {
           "id": {
@@ -17941,6 +18058,116 @@
             "type": "string",
             "title": "Mentor Display Name"
           },
+          "mentor_headline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mentor Headline",
+            "description": "멘토 한 줄 소개 (A68)"
+          },
+          "participants": {
+            "items": {
+              "$ref": "#/components/schemas/Participant"
+            },
+            "type": "array",
+            "title": "Participants",
+            "description": "1:1은 신청자, 팀은 지금 팀원 (A68)"
+          },
+          "actual_started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Started At",
+            "description": "Meet 실제 시작 (처음 회의, A68)"
+          },
+          "actual_ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Ended At",
+            "description": "Meet 실제 종료 (마지막 회의, A68)"
+          },
+          "cancel_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancel Reason",
+            "description": "취소 사유 (신청의 값, A68)"
+          },
+          "canceled_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MentoringCancelActor"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "취소 주체 (A66·A68)"
+          },
+          "canceled_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canceled At"
+          },
+          "balance": {
+            "$ref": "#/components/schemas/RequestBalanceResponse",
+            "description": "신청의 차감 상태 (A66·A68)"
+          },
+          "approved_rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved Rank",
+            "description": "몇 순위 희망 일시로 승인됐는지 (A68)"
+          },
+          "requested_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested At",
+            "description": "신청 시각 (A68)"
+          },
           "google_meet_url": {
             "anyOf": [
               {
@@ -18019,6 +18246,16 @@
           "requester_name",
           "mentor_id",
           "mentor_display_name",
+          "mentor_headline",
+          "participants",
+          "actual_started_at",
+          "actual_ended_at",
+          "cancel_reason",
+          "canceled_by",
+          "canceled_at",
+          "balance",
+          "approved_rank",
+          "requested_at",
           "google_meet_url",
           "summary",
           "record_duration_minutes",
@@ -18026,6 +18263,40 @@
           "created_at"
         ],
         "title": "SessionResponse"
+      },
+      "SessionStatusCounts": {
+        "properties": {
+          "SCHEDULED": {
+            "type": "integer",
+            "title": "Scheduled"
+          },
+          "IN_PROGRESS": {
+            "type": "integer",
+            "title": "In Progress"
+          },
+          "COMPLETED": {
+            "type": "integer",
+            "title": "Completed"
+          },
+          "NO_SHOW": {
+            "type": "integer",
+            "title": "No Show"
+          },
+          "CANCELED": {
+            "type": "integer",
+            "title": "Canceled"
+          }
+        },
+        "type": "object",
+        "required": [
+          "SCHEDULED",
+          "IN_PROGRESS",
+          "COMPLETED",
+          "NO_SHOW",
+          "CANCELED"
+        ],
+        "title": "SessionStatusCounts",
+        "description": "상태 필터와 무관한 그 목록 대상 전체의 상태별 세션 수 (A68)."
       },
       "SettingsFields": {
         "properties": {

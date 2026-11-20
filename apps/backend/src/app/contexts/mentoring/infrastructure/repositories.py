@@ -958,6 +958,28 @@ class TortoiseMentoringSessionRepository:
     ) -> tuple[list[MentoringSession], int]:
         return await self._page(MentoringSessionModel.filter(mentor_id=mentor_id), query)
 
+    @staticmethod
+    async def _status_counts(query: Any) -> dict[MentoringSessionStatus, int]:
+        counts = dict.fromkeys(MentoringSessionStatus, 0)
+        rows = await query.annotate(n=Count("id")).group_by("status").values("status", "n")
+        for row in rows:
+            counts[MentoringSessionStatus(row["status"])] = row["n"]
+        return counts
+
+    async def count_statuses_for_participants(
+        self, *, student_ids: list[uuid.UUID], team_ids: list[uuid.UUID]
+    ) -> dict[MentoringSessionStatus, int]:
+        if not student_ids and not team_ids:
+            return dict.fromkeys(MentoringSessionStatus, 0)
+        return await self._status_counts(
+            MentoringSessionModel.filter(_participants(student_ids, team_ids))
+        )
+
+    async def count_statuses_for_mentor(
+        self, mentor_id: uuid.UUID
+    ) -> dict[MentoringSessionStatus, int]:
+        return await self._status_counts(MentoringSessionModel.filter(mentor_id=mentor_id))
+
     async def count_by_requesters(
         self, requester_ids: list[uuid.UUID]
     ) -> dict[uuid.UUID, dict[MentoringSessionStatus, int]]:

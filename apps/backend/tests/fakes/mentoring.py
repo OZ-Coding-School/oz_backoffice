@@ -565,6 +565,25 @@ class InMemorySessionRepository:
     ) -> tuple[list[MentoringSession], int]:
         return self._page([s for s in self.items.values() if s.mentor_id == mentor_id], query)
 
+    @staticmethod
+    def _status_counts(found: list[MentoringSession]) -> dict[MentoringSessionStatus, int]:
+        counts = dict.fromkeys(MentoringSessionStatus, 0)
+        for s in found:
+            counts[s.status] += 1
+        return counts
+
+    async def count_statuses_for_participants(
+        self, *, student_ids: list[uuid.UUID], team_ids: list[uuid.UUID]
+    ) -> dict[MentoringSessionStatus, int]:
+        return self._status_counts(
+            [s for s in self.items.values() if self._matches(s, student_ids, team_ids)]
+        )
+
+    async def count_statuses_for_mentor(
+        self, mentor_id: uuid.UUID
+    ) -> dict[MentoringSessionStatus, int]:
+        return self._status_counts([s for s in self.items.values() if s.mentor_id == mentor_id])
+
     async def list_settleable(
         self, cohort_id: uuid.UUID, *, before: datetime
     ) -> list[MentoringSession]:

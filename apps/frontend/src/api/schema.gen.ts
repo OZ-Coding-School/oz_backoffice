@@ -2637,7 +2637,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** My Sessions */
+        /**
+         * My Sessions
+         * @description 본인 1:1·소속 팀 세션. `counts`는 필터와 무관한 상태별 수 (A68).
+         */
         get: operations["my_sessions_api_v1_me_mentoring_sessions_get"];
         put?: never;
         post?: never;
@@ -3117,6 +3120,47 @@ export interface components {
             /** Mentor Display Name */
             mentor_display_name: string;
             /**
+             * Mentor Headline
+             * @description 멘토 한 줄 소개 (A68)
+             */
+            mentor_headline: string | null;
+            /**
+             * Participants
+             * @description 1:1은 신청자, 팀은 지금 팀원 (A68)
+             */
+            participants: components["schemas"]["Participant"][];
+            /**
+             * Actual Started At
+             * @description Meet 실제 시작 (처음 회의, A68)
+             */
+            actual_started_at: string | null;
+            /**
+             * Actual Ended At
+             * @description Meet 실제 종료 (마지막 회의, A68)
+             */
+            actual_ended_at: string | null;
+            /**
+             * Cancel Reason
+             * @description 취소 사유 (신청의 값, A68)
+             */
+            cancel_reason: string | null;
+            /** @description 취소 주체 (A66·A68) */
+            canceled_by: components["schemas"]["MentoringCancelActor"] | null;
+            /** Canceled At */
+            canceled_at: string | null;
+            /** @description 신청의 차감 상태 (A66·A68) */
+            balance: components["schemas"]["RequestBalanceResponse"];
+            /**
+             * Approved Rank
+             * @description 몇 순위 희망 일시로 승인됐는지 (A68)
+             */
+            approved_rank: number | null;
+            /**
+             * Requested At
+             * @description 신청 시각 (A68)
+             */
+            requested_at: string | null;
+            /**
              * Google Meet Url
              * @description Meet 링크. 공간을 만들기 전이거나 취소된 세션은 null (A48)
              */
@@ -3143,16 +3187,6 @@ export interface components {
              * @description 멘토 실명 (운영진 응답에만)
              */
             mentor_name: string;
-            /**
-             * Actual Started At
-             * @description Meet 실제 시작 (처음 회의)
-             */
-            actual_started_at: string | null;
-            /**
-             * Actual Ended At
-             * @description Meet 실제 종료 (마지막 회의)
-             */
-            actual_ended_at: string | null;
         };
         /** AdminStaffRegistrationResponse */
         AdminStaffRegistrationResponse: {
@@ -5101,17 +5135,6 @@ export interface components {
             /** Offset */
             offset: number;
         };
-        /** Page[SessionResponse] */
-        Page_SessionResponse_: {
-            /** Items */
-            items: components["schemas"]["SessionResponse"][];
-            /** Total */
-            total: number;
-            /** Limit */
-            limit: number;
-            /** Offset */
-            offset: number;
-        };
         /** Page[ThreadResponse] */
         Page_ThreadResponse_: {
             /** Items */
@@ -5122,6 +5145,17 @@ export interface components {
             limit: number;
             /** Offset */
             offset: number;
+        };
+        /** Participant */
+        Participant: {
+            /**
+             * Student Id
+             * Format: uuid
+             * @description 수강 등록(students.id)
+             */
+            student_id: string;
+            /** Name */
+            name: string;
         };
         /**
          * PayUnit
@@ -5569,6 +5603,18 @@ export interface components {
          * @enum {string}
          */
         SenderKind: "SYSTEM" | "MENTOR" | "STUDENT";
+        /** SessionListPage */
+        SessionListPage: {
+            /** Items */
+            items: components["schemas"]["SessionResponse"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            counts: components["schemas"]["SessionStatusCounts"];
+        };
         /** SessionResponse */
         SessionResponse: {
             /**
@@ -5624,6 +5670,47 @@ export interface components {
             /** Mentor Display Name */
             mentor_display_name: string;
             /**
+             * Mentor Headline
+             * @description 멘토 한 줄 소개 (A68)
+             */
+            mentor_headline: string | null;
+            /**
+             * Participants
+             * @description 1:1은 신청자, 팀은 지금 팀원 (A68)
+             */
+            participants: components["schemas"]["Participant"][];
+            /**
+             * Actual Started At
+             * @description Meet 실제 시작 (처음 회의, A68)
+             */
+            actual_started_at: string | null;
+            /**
+             * Actual Ended At
+             * @description Meet 실제 종료 (마지막 회의, A68)
+             */
+            actual_ended_at: string | null;
+            /**
+             * Cancel Reason
+             * @description 취소 사유 (신청의 값, A68)
+             */
+            cancel_reason: string | null;
+            /** @description 취소 주체 (A66·A68) */
+            canceled_by: components["schemas"]["MentoringCancelActor"] | null;
+            /** Canceled At */
+            canceled_at: string | null;
+            /** @description 신청의 차감 상태 (A66·A68) */
+            balance: components["schemas"]["RequestBalanceResponse"];
+            /**
+             * Approved Rank
+             * @description 몇 순위 희망 일시로 승인됐는지 (A68)
+             */
+            approved_rank: number | null;
+            /**
+             * Requested At
+             * @description 신청 시각 (A68)
+             */
+            requested_at: string | null;
+            /**
              * Google Meet Url
              * @description Meet 링크. 공간을 만들기 전이거나 취소된 세션은 null (A48)
              */
@@ -5645,6 +5732,22 @@ export interface components {
             recorded_at: string | null;
             /** Created At */
             created_at: string | null;
+        };
+        /**
+         * SessionStatusCounts
+         * @description 상태 필터와 무관한 그 목록 대상 전체의 상태별 세션 수 (A68).
+         */
+        SessionStatusCounts: {
+            /** Scheduled */
+            SCHEDULED: number;
+            /** In Progress */
+            IN_PROGRESS: number;
+            /** Completed */
+            COMPLETED: number;
+            /** No Show */
+            NO_SHOW: number;
+            /** Canceled */
+            CANCELED: number;
         };
         /**
          * SettingsFields
@@ -12295,7 +12398,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Page_SessionResponse_"];
+                    "application/json": components["schemas"]["SessionListPage"];
                 };
             };
             /** @description Validation Error */
@@ -12330,7 +12433,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Page_SessionResponse_"];
+                    "application/json": components["schemas"]["SessionListPage"];
                 };
             };
             /** @description Validation Error */
