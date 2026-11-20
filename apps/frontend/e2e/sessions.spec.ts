@@ -120,6 +120,62 @@ async function mockApi(page: Page) {
   await page.route("**/api/v1/mentoring/sessions/s1", (route) => route.fulfill({ json: SCHEDULED }));
   await page.route("**/api/v1/mentoring/sessions/s2", (route) => route.fulfill({ json: COMPLETED }));
   await page.route("**/api/v1/mentoring/requests/r1", (route) => route.fulfill({ json: REQUEST }));
+  const artifact = { file_name: null, mime_type: "video/mp4", file_size: null, created_at: "2026-11-16T02:10:00Z" };
+  await page.route("**/api/v1/mentoring/sessions/s2/artifacts", (route) =>
+    route.fulfill({
+      json: [
+        {
+          ...artifact,
+          id: "v1",
+          artifact_type: "VIDEO",
+          conference_record: "c1",
+          started_at: "2026-11-16T01:02:00Z",
+          ended_at: "2026-11-16T01:40:00Z",
+        },
+        {
+          ...artifact,
+          id: "t1",
+          artifact_type: "TRANSCRIPT",
+          conference_record: "c1",
+          started_at: null,
+          ended_at: null,
+        },
+        { ...artifact, id: "n1", artifact_type: "SUMMARY", conference_record: "c1", started_at: null, ended_at: null },
+        {
+          ...artifact,
+          id: "v2",
+          artifact_type: "VIDEO",
+          conference_record: "c2",
+          started_at: "2026-11-16T01:41:00Z",
+          ended_at: "2026-11-16T02:01:00Z",
+        },
+      ],
+    }),
+  );
+  await page.route("**/api/v1/mentoring/sessions/s2/artifacts/*/link", (route) => {
+    const id = route.request().url().split("/artifacts/")[1]!.split("/")[0];
+    const path = `/api/v1/mentoring/artifacts/${id}/stream?token=tk`;
+    return route.fulfill({
+      json: { url: path, download_url: `${path}&download=1`, expires_at: "2026-11-16T05:00:00Z" },
+    });
+  });
+  await page.route("**/api/v1/mentoring/artifacts/*/stream**", (route) => route.fulfill({ status: 404, body: "" }));
+  await page.route("**/api/v1/mentoring/sessions/s2/artifacts/t1/entries", (route) =>
+    route.fulfill({
+      json: [
+        {
+          sequence: 0,
+          speaker_name: "멘토K",
+          text: "README부터 봐요",
+          started_at: "2026-11-16T01:04:40Z",
+          ended_at: null,
+        },
+      ],
+    }),
+  );
+  await page.route("**/api/v1/mentoring/sessions/s2/artifacts/n1/markdown", (route) =>
+    route.fulfill({ json: { artifact_id: "n1", markdown: "## 요약\n\n- README 첫 화면 정리" } }),
+  );
 }
 
 test("데스크톱: 진행 기록 → 예정 탭 → 세션 상세의 Meet 입장·신청 보기 (F33·F34)", async ({ page }) => {
@@ -150,4 +206,18 @@ test("휴대폰: 하단 탭 → 완료 세션의 멘토 기록 (F33)", async ({ 
   const record = page.getByRole("region", { name: "멘토 기록" });
   await expect(record.getByRole("heading", { name: "오늘 다룬 것" })).toBeVisible();
   await expect(page.getByText("1시간 차감 · 추가 차감 없음")).toBeVisible();
+});
+
+test("데스크톱: 완료 세션 다시 보기 — 녹화 고르기·전사본·스마트 메모 (F35)", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockApi(page);
+  await page.goto("/mentoring/sessions/s2");
+  const replay = page.getByRole("region", { name: "다시 보기" });
+  await expect(replay.getByRole("group", { name: "녹화 플레이어" })).toBeVisible();
+  await expect(replay.getByRole("radio", { name: "녹화 1 · 10:02 ~ 10:40" })).toHaveAttribute("aria-checked", "true");
+  await expect(replay.getByText("README부터 봐요")).toBeVisible();
+  await replay.getByRole("tab", { name: "스마트 메모" }).click();
+  await expect(replay.getByRole("heading", { name: "요약" })).toBeVisible();
+  await replay.getByRole("radio", { name: "녹화 2 · 10:41 ~ 11:01" }).click();
+  await expect(replay.locator("video")).toHaveAttribute("src", /artifacts\/v2\/stream/);
 });

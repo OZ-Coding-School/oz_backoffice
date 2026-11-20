@@ -3,7 +3,7 @@ import { http, HttpResponse } from "msw";
 import { apiUrl } from "@/mocks/api";
 import { server } from "@/mocks/node";
 
-import type { MentoringSession, SessionCounts } from "./api";
+import type { Artifact, MentoringSession, SessionCounts, TranscriptEntry } from "./api";
 
 /** 수강 등록 st12(가수강, ENROLLMENTS)의 1:1 세션 (예정, 11/20 14:00~15:00 KST) */
 export function makeSession(overrides: Partial<MentoringSession> = {}): MentoringSession {
@@ -88,4 +88,63 @@ export function mockSessionList(items: MentoringSession[], counts: SessionCounts
 
 export function mockSessionDetail(session: MentoringSession) {
   server.use(http.get(apiUrl("/api/v1/mentoring/sessions/{session_id}"), () => HttpResponse.json(session)));
+}
+
+/** 회의 c1·c2의 영상·전사본과 c1 스마트 메모 (완료 세션 s2, 10:02~10:40 / 10:41~11:01 KST) */
+export const ARTIFACTS: Artifact[] = [
+  makeArtifact({
+    id: "v1",
+    artifact_type: "VIDEO",
+    conference_record: "c1",
+    started_at: "2026-11-16T01:02:00Z",
+    ended_at: "2026-11-16T01:40:00Z",
+  }),
+  makeArtifact({ id: "t1", artifact_type: "TRANSCRIPT", conference_record: "c1" }),
+  makeArtifact({ id: "n1", artifact_type: "SUMMARY", conference_record: "c1" }),
+  makeArtifact({
+    id: "v2",
+    artifact_type: "VIDEO",
+    conference_record: "c2",
+    started_at: "2026-11-16T01:41:00Z",
+    ended_at: "2026-11-16T02:01:00Z",
+  }),
+  makeArtifact({ id: "t2", artifact_type: "TRANSCRIPT", conference_record: "c2" }),
+];
+
+export function makeArtifact(overrides: Partial<Artifact> & Pick<Artifact, "id" | "artifact_type">): Artifact {
+  return {
+    file_name: null,
+    mime_type: overrides.artifact_type === "VIDEO" ? "video/mp4" : "application/pdf",
+    file_size: null,
+    conference_record: null,
+    started_at: null,
+    ended_at: null,
+    created_at: "2026-11-16T02:10:00Z",
+    ...overrides,
+  };
+}
+
+/** 녹화 목록·서명 링크·전사 문장·스마트 메모 */
+export function mockArtifacts(
+  artifacts: Artifact[] = ARTIFACTS,
+  entries: Record<string, TranscriptEntry[]> = {},
+  markdown = "## 요약\n\n- README 첫 화면 정리",
+) {
+  const linked: string[] = [];
+  server.use(
+    http.get(apiUrl("/api/v1/mentoring/sessions/{session_id}/artifacts"), () => HttpResponse.json(artifacts)),
+    http.post(apiUrl("/api/v1/mentoring/sessions/{session_id}/artifacts/{artifact_id}/link"), ({ params }) => {
+      const id = String(params.artifact_id);
+      linked.push(id);
+      const path = `/api/v1/mentoring/artifacts/${id}/stream?token=tk`;
+      return HttpResponse.json({ url: path, download_url: `${path}&download=1`, expires_at: "2026-11-16T05:00:00Z" });
+    }),
+    http.get(apiUrl("/api/v1/mentoring/sessions/{session_id}/artifacts/{artifact_id}/entries"), ({ params }) =>
+      HttpResponse.json(entries[String(params.artifact_id)] ?? []),
+    ),
+    http.get(apiUrl("/api/v1/mentoring/sessions/{session_id}/artifacts/{artifact_id}/markdown"), ({ params }) =>
+      HttpResponse.json({ artifact_id: String(params.artifact_id), markdown }),
+    ),
+  );
+  return linked;
 }

@@ -2,6 +2,7 @@ import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
 
 import { api, unwrap } from "@/api/client";
 import type { components } from "@/api/schema.gen";
+import { env } from "@/env";
 
 export type MentoringSession = components["schemas"]["SessionResponse"];
 export type SessionStatus = components["schemas"]["MentoringSessionStatus"];
@@ -62,5 +63,76 @@ export function sessionQuery(id: string) {
   return queryOptions({
     queryKey: sessionKeys.detail(id),
     queryFn: () => unwrap(api.GET("/api/v1/mentoring/sessions/{session_id}", { params: { path: { session_id: id } } })),
+  });
+}
+
+export type Artifact = components["schemas"]["ArtifactResponse"];
+export type TranscriptEntry = components["schemas"]["TranscriptEntryResponse"];
+
+export const artifactKeys = {
+  list: (sessionId: string) => ["sessions", "artifacts", sessionId] as const,
+  link: (artifactId: string) => ["sessions", "artifact-link", artifactId] as const,
+  entries: (artifactId: string) => ["sessions", "artifact-entries", artifactId] as const,
+  markdown: (artifactId: string) => ["sessions", "artifact-markdown", artifactId] as const,
+};
+
+/** 세션의 녹화·전사본·스마트 메모 (참여자만, A54) */
+export function artifactsQuery(sessionId: string) {
+  return queryOptions({
+    queryKey: artifactKeys.list(sessionId),
+    queryFn: () =>
+      unwrap(
+        api.GET("/api/v1/mentoring/sessions/{session_id}/artifacts", { params: { path: { session_id: sessionId } } }),
+      ),
+  });
+}
+
+/** 링크 유효 3시간(A68) — 만료 전에 새로 받도록 2시간 30분 동안만 쓴다 */
+const LINK_STALE_MS = 150 * 60_000;
+
+/**
+ * 서명 링크 (A68): 헤더 없이 `<video src>`·내려받기·PDF 새 창에 쓴다.
+ * 응답은 API 기준 경로라 백엔드 주소를 붙인다.
+ */
+export function artifactLinkQuery(sessionId: string, artifactId: string) {
+  return queryOptions({
+    queryKey: artifactKeys.link(artifactId),
+    queryFn: async () => {
+      const link = await unwrap(
+        api.POST("/api/v1/mentoring/sessions/{session_id}/artifacts/{artifact_id}/link", {
+          params: { path: { session_id: sessionId, artifact_id: artifactId } },
+        }),
+      );
+      return { ...link, url: env.backendUrl + link.url, download_url: env.backendUrl + link.download_url };
+    },
+    staleTime: LINK_STALE_MS,
+    gcTime: LINK_STALE_MS,
+  });
+}
+
+/** 전사 문장 (A69). 아직 못 받았으면 빈 목록 */
+export function transcriptEntriesQuery(sessionId: string, artifactId: string) {
+  return queryOptions({
+    queryKey: artifactKeys.entries(artifactId),
+    queryFn: () =>
+      unwrap(
+        api.GET("/api/v1/mentoring/sessions/{session_id}/artifacts/{artifact_id}/entries", {
+          params: { path: { session_id: sessionId, artifact_id: artifactId } },
+        }),
+      ),
+  });
+}
+
+/** 스마트 메모 마크다운 (A68) */
+export function summaryMarkdownQuery(sessionId: string, artifactId: string) {
+  return queryOptions({
+    queryKey: artifactKeys.markdown(artifactId),
+    queryFn: () =>
+      unwrap(
+        api.GET("/api/v1/mentoring/sessions/{session_id}/artifacts/{artifact_id}/markdown", {
+          params: { path: { session_id: sessionId, artifact_id: artifactId } },
+        }),
+      ),
+    staleTime: 10 * 60_000,
   });
 }
