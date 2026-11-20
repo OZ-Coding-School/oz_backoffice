@@ -1,6 +1,6 @@
 # 72. 내 팀 응답 보완 (BE-2g)
 
-- 상태: PR 진행 중
+- 상태: 완료
 - 관련 PR: #101
 - 관련 결정: `docs/decisions.md` A73, F39 (A39·F36)
 - 이전 기록: [71. 내 정보 비밀번호 변경 링크 (BE-2f)](71_password_change_link.md)
@@ -43,6 +43,7 @@ FE-6c 내 팀 시안에는 팀 집계(진행한 세션·예정 세션·승인 �
   - 세션 팀 필터(소속 팀·모르는 팀)
 - **로컬 검사 (compose `api`):** ruff, ruff format, mypy, mypy tests, lint-imports 통과. 전체 897 passed.
 - **프론트엔드:** 다시 만든 타입으로 `lint`·`typecheck`·`test`(181 passed) 통과
+- **CI:** 통과. 사용자가 병합을 확인했다(2026-11-20)
 
 ## 남은 작업
 - FE-6c 내 팀 화면
