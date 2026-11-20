@@ -1,7 +1,7 @@
 # 67. 녹화 서명 링크와 스마트 메모 마크다운 (BE-2b)
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #92
 - 관련 결정: `docs/decisions.md` A68 (A54·M19)
 - 이전 기록: [66. 세션 응답 보완 (BE-2a)](66_session_response_supplement.md)
 
