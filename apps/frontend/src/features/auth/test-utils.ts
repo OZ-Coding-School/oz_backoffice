@@ -143,6 +143,8 @@ export function resetAuth(): void {
     http.get(apiUrl("/api/v1/me/mentoring/sessions"), () => HttpResponse.json(emptyPage(SESSION_COUNTS))),
     http.get(apiUrl("/api/v1/me/mentoring/requests"), () => HttpResponse.json(emptyPage(REQUEST_COUNTS))),
     http.get(apiUrl("/api/v1/me/balances"), () => HttpResponse.json([])),
+    // 멘토 메뉴의 받은 신청 대기 건수 (F44). 기본은 없음
+    http.get(apiUrl("/api/v1/me/mentor-requests"), () => HttpResponse.json(emptyPage(REQUEST_COUNTS))),
   );
 }
 

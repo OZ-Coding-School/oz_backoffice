@@ -18,6 +18,8 @@ export interface MemberNavItem {
   /** 태블릿 레일·하단 탭에 쓰는 짧은 이름 (F27) */
   shortLabel: string;
   icon: LucideIcon;
+  /** 메뉴 배지 숫자를 화면 읽기 프로그램에 읽어 줄 말 (채팅 '안 읽음' F41, 받은 신청 '대기' F44) */
+  badgeLabel?: string;
 }
 
 export interface MemberNavGroup {
@@ -48,7 +50,13 @@ const SESSIONS: MemberNavItem = {
 
 const TEAM: MemberNavItem = { to: "/mentoring/team", label: "내 팀", shortLabel: "내 팀", icon: Users };
 
-const CHAT: MemberNavItem = { to: "/mentoring/chat", label: "채팅", shortLabel: "채팅", icon: MessageSquare };
+const CHAT: MemberNavItem = {
+  to: "/mentoring/chat",
+  label: "채팅",
+  shortLabel: "채팅",
+  icon: MessageSquare,
+  badgeLabel: "안 읽음",
+};
 
 const BALANCES: MemberNavItem = {
   to: "/mentoring/balances",
@@ -61,7 +69,15 @@ const PROFILE: MemberNavItem = { to: "/my/profile", label: "내 정보", shortLa
 
 const APPLY: MemberNavItem = { to: "/mentoring/apply", label: "멘토링 신청", shortLabel: "신청", icon: Plus };
 
-const MENTOR_NAV: MemberNavGroup[] = [{ items: [HOME] }, { title: "멘토링", items: [CHAT] }];
+const RECEIVED: MemberNavItem = {
+  to: "/mentor/requests",
+  label: "받은 신청",
+  shortLabel: "받은 신청",
+  icon: FileText,
+  badgeLabel: "대기",
+};
+
+const MENTOR_NAV: MemberNavGroup[] = [{ items: [HOME] }, { title: "멘토링", items: [RECEIVED, CHAT] }];
 
 export interface MemberNavOptions {
   /** '멘토링 신청' 메뉴: 1:1이나 팀을 허용하는 기수와 수강이 끝난 수강생(안내)에 (F31) */

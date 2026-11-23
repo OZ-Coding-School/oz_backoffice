@@ -25,6 +25,7 @@ import { activeCohort, cohortLabel, enrollmentsQuery } from "../api";
 import { myTeamsQuery } from "@/features/apply/api";
 import { threadsQuery, unreadTotal } from "@/features/chat/api";
 import { useChatStream } from "@/features/chat/stream";
+import { pendingCountQuery } from "@/features/mentor-requests/api";
 import { mentoringSettingsQuery } from "@/features/requests/api";
 
 import { useLogout } from "../logout";
@@ -62,7 +63,9 @@ export function MemberShell({ me, children }: { me: Me; children: ReactNode }) {
   // 채팅 실시간 수신과 안 읽음 배지 (A58·F41)
   useChatStream(true);
   const threads = useInfiniteQuery(threadsQuery);
-  const badges: Badges = { "/mentoring/chat": unreadTotal(threads.data) };
+  // 받은 신청 승인 대기 건수 (멘토, F44)
+  const pending = useQuery({ ...pendingCountQuery, enabled: me.account_type === "MENTOR" });
+  const badges: Badges = { "/mentoring/chat": unreadTotal(threads.data), "/mentor/requests": pending.data };
   const current = currentNavItem(groups, pathname);
   // 채팅은 여백 없이 화면 높이를 채우고, 휴대폰 대화는 머리·하단 탭 없이 전체 화면이다 (F40)
   const fullBleed = pathname === "/mentoring/chat" || pathname.startsWith("/mentoring/chat/");
@@ -146,8 +149,8 @@ function Mark({ className }: { className?: string }) {
 
 type Badges = Partial<Record<string, number>>;
 
-/** 안 읽음 숫자 (99+). 화면 읽기 프로그램에는 '안 읽음 N'으로 읽힌다 */
-function Count({ value, className }: { value: number | undefined; className?: string }) {
+/** 메뉴 배지 숫자 (99+). 화면 읽기 프로그램에는 '<label> N'(예: 안 읽음 2)으로 읽힌다 */
+function Count({ value, label, className }: { value: number | undefined; label?: string; className?: string }) {
   if (!value) return null;
   return (
     <span
@@ -156,7 +159,7 @@ function Count({ value, className }: { value: number | undefined; className?: st
         className,
       )}
     >
-      <span className="sr-only">안 읽음 </span>
+      <span className="sr-only">{label ?? "새 항목"} </span>
       {value > 99 ? "99+" : value}
     </span>
   );
@@ -177,7 +180,7 @@ function SidebarLink({ item, active, badge }: { item: MemberNavItem; active: boo
     >
       <Icon aria-hidden className="size-4 shrink-0" />
       <span className="flex-1">{item.label}</span>
-      <Count value={badge} />
+      <Count value={badge} label={item.badgeLabel} />
     </Link>
   );
 }
@@ -188,7 +191,7 @@ function RailLink({ item, active, badge }: { item: MemberNavItem; active: boolea
     <Link
       to={item.to}
       aria-current={active ? "page" : undefined}
-      aria-label={badge ? `${item.label} 안 읽음 ${badge}` : item.label}
+      aria-label={badge ? `${item.label} ${item.badgeLabel ?? "새 항목"} ${badge}` : item.label}
       className={cn(
         "relative flex w-14 flex-col items-center gap-0.5 rounded-md px-1 py-1.5",
         active
@@ -198,7 +201,7 @@ function RailLink({ item, active, badge }: { item: MemberNavItem; active: boolea
     >
       <Icon aria-hidden className="size-5" />
       <span className="text-caption-strong">{item.shortLabel}</span>
-      <Count value={badge} className="absolute -top-0.5 right-0.5 min-w-4 px-1" />
+      <Count value={badge} label={item.badgeLabel} className="absolute -top-0.5 right-0.5 min-w-4 px-1" />
     </Link>
   );
 }
@@ -250,7 +253,11 @@ function BottomTabs({
   badges: Badges;
 }) {
   const { tabs, more } = bottomTabLayout(groups);
-  const moreBadge = more.flatMap((g) => g.items).reduce((sum, i) => sum + (badges[i.to] ?? 0), 0);
+  const moreItems = more.flatMap((g) => g.items).filter((i) => (badges[i.to] ?? 0) > 0);
+  const moreBadge = moreItems.reduce((sum, i) => sum + (badges[i.to] ?? 0), 0);
+  // 더보기 안 배지가 한 종류면 그 말로, 섞이면 '새 항목'으로 읽는다
+  const moreLabels = new Set(moreItems.map((i) => i.badgeLabel));
+  const moreLabel = moreLabels.size === 1 ? [...moreLabels][0] : undefined;
   const [open, setOpen] = useState(false);
   const inMore = !!current && more.some((g) => g.items.includes(current));
   const tabClass = (active: boolean) =>
@@ -273,7 +280,7 @@ function BottomTabs({
           <Link key={item.to} to={item.to} aria-current={active ? "page" : undefined} className={tabClass(active)}>
             <Icon aria-hidden className="size-5" />
             {item.shortLabel}
-            <Count value={badges[item.to]} className={TAB_BADGE} />
+            <Count value={badges[item.to]} label={item.badgeLabel} className={TAB_BADGE} />
           </Link>
         );
       })}
@@ -288,7 +295,7 @@ function BottomTabs({
           >
             <Ellipsis aria-hidden className="size-5" />
             더보기
-            <Count value={moreBadge} className={TAB_BADGE} />
+            <Count value={moreBadge} label={moreLabel} className={TAB_BADGE} />
           </button>
           <MoreSheet groups={more} current={current} open={open} onOpenChange={setOpen} badges={badges} />
         </>
@@ -338,7 +345,7 @@ function MoreSheet({
                   >
                     <Icon aria-hidden className="size-4" />
                     <span className="flex-1">{item.label}</span>
-                    <Count value={badges[item.to]} />
+                    <Count value={badges[item.to]} label={item.badgeLabel} />
                   </Link>
                 );
               })}
