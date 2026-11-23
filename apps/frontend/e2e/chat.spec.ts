@@ -56,9 +56,13 @@ async function mockApi(page: Page) {
   await page.route("**/api/v1/me", (route) => route.fulfill({ json: ME }));
   await page.route("**/api/v1/me/enrollments", (route) => route.fulfill({ json: [ENROLLMENT] }));
   await page.route("**/api/v1/me/mentoring/chat/threads**", (route) =>
-    route.fulfill({ json: { items: [THREAD], total: 1, limit: 50, offset: 0 } }),
+    route.fulfill({ json: { items: [{ ...THREAD, unread_count: 2 }], total: 1, limit: 50, offset: 0 } }),
   );
+  await page.route("**/api/v1/mentoring/chat/threads/th1/read", (route) => route.fulfill({ json: THREAD }));
   await page.route("**/api/v1/mentoring/chat/threads/th1", (route) => route.fulfill({ json: THREAD }));
+  await page.route("**/api/v1/me/mentoring/chat/stream", (route) =>
+    route.fulfill({ headers: { "Content-Type": "text/event-stream" }, body: "event: ready\ndata: {}\n\n" }),
+  );
   await page.route("**/api/v1/mentoring/chat/threads/th1/messages**", async (route) => {
     if (route.request().method() === "POST") {
       const { body } = route.request().postDataJSON() as { body: string };
@@ -93,4 +97,12 @@ test("휴대폰: 방 목록 → 전체 화면 대화 → 뒤로 (F40)", async ({
   await page.getByRole("link", { name: "방 목록" }).click();
   await expect(page.getByRole("region", { name: "채팅" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "하단 메뉴" })).toBeVisible();
+});
+
+test("데스크톱: 메뉴의 채팅에 안 읽음 수를 보여 준다 (F41)", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockApi(page);
+  await page.goto("/");
+  const menu = page.getByRole("navigation", { name: "메뉴", exact: true }).first();
+  await expect(menu.getByRole("link", { name: /채팅/ })).toContainText("안 읽음 2");
 });
