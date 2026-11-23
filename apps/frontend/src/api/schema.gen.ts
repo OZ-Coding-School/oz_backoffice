@@ -3332,6 +3332,21 @@ export interface components {
             /** Created At */
             created_at: string | null;
             /**
+             * Cohort Id
+             * @description 신청자의 기수 (A77)
+             */
+            cohort_id: string | null;
+            /**
+             * Bootcamp Name
+             * @description 신청자 기수의 과정명 (A77)
+             */
+            bootcamp_name: string | null;
+            /**
+             * Cohort Number
+             * @description 신청자 기수 번호 (A77)
+             */
+            cohort_number: number | null;
+            /**
              * Mentor Name
              * @description 멘토 실명 (운영진 응답에만)
              */
@@ -5000,6 +5015,19 @@ export interface components {
             /** Created At */
             created_at: string | null;
         };
+        /** MentorSessionListPage */
+        MentorSessionListPage: {
+            /** Items */
+            items: components["schemas"]["SessionResponse"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            counts: components["schemas"]["SessionStatusCounts"];
+            view_counts: components["schemas"]["SessionViewCounts"];
+        };
         /** MentorSummary */
         MentorSummary: {
             /**
@@ -5974,6 +6002,21 @@ export interface components {
             recorded_at: string | null;
             /** Created At */
             created_at: string | null;
+            /**
+             * Cohort Id
+             * @description 신청자의 기수 (A77)
+             */
+            cohort_id: string | null;
+            /**
+             * Bootcamp Name
+             * @description 신청자 기수의 과정명 (A77)
+             */
+            bootcamp_name: string | null;
+            /**
+             * Cohort Number
+             * @description 신청자 기수 번호 (A77)
+             */
+            cohort_number: number | null;
         };
         /**
          * SessionStatusCounts
@@ -5990,6 +6033,26 @@ export interface components {
             NO_SHOW: number;
             /** Canceled */
             CANCELED: number;
+        };
+        /**
+         * SessionView
+         * @description 멘토 세션 목록 탭 (A77).
+         * @enum {string}
+         */
+        SessionView: "upcoming" | "record_missing" | "past";
+        /**
+         * SessionViewCounts
+         * @description 멘토 세션 탭별 수 (A77). 탭·상태 필터와 무관하고 기수 필터는 따른다.
+         */
+        SessionViewCounts: {
+            /** Upcoming */
+            upcoming: number;
+            /** Record Missing */
+            record_missing: number;
+            /** Past */
+            past: number;
+            /** All */
+            all: number;
         };
         /**
          * SettingsFields
@@ -12973,6 +13036,10 @@ export interface operations {
     mentor_sessions_api_v1_me_mentor_sessions_get: {
         parameters: {
             query?: {
+                /** @description 탭: upcoming·record_missing·past (A77). status와 함께 쓸 수 있다 */
+                view?: components["schemas"]["SessionView"] | null;
+                /** @description 신청자 기수로 거른다. 건수도 따른다 (A77) */
+                cohort_id?: string | null;
                 /** @description 여러 개 가능 (예: status=SCHEDULED&status=IN_PROGRESS, A70) */
                 status?: components["schemas"]["MentoringSessionStatus"][] | null;
                 from?: string | null;
@@ -12994,7 +13061,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SessionListPage"];
+                    "application/json": components["schemas"]["MentorSessionListPage"];
                 };
             };
             /** @description Validation Error */

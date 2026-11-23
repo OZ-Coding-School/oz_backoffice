@@ -8,6 +8,7 @@
 """
 
 import uuid
+from datetime import datetime
 from typing import Protocol
 
 from app.contexts.academy.domain.entities import Student
@@ -83,11 +84,25 @@ class MentoringSessionQueries:
             student_ids=student_ids, team_ids=team_ids
         )
 
-    async def counts_for_mentor(self, user_id: uuid.UUID) -> dict[MentoringSessionStatus, int]:
+    async def counts_for_mentor(
+        self, user_id: uuid.UUID, *, cohort_id: uuid.UUID | None = None
+    ) -> dict[MentoringSessionStatus, int]:
+        """상태별 수. 상태·탭 필터와 무관하고 기수 필터는 따른다 (A77)."""
+        mentor = await self._mentor(user_id)
+        return await self._sessions.count_statuses_for_mentor(mentor.id, cohort_id=cohort_id)
+
+    async def views_for_mentor(
+        self, user_id: uuid.UUID, *, now: datetime, cohort_id: uuid.UUID | None = None
+    ) -> dict[str, int]:
+        """탭별 수: upcoming·record_missing·past·all (A77)."""
+        mentor = await self._mentor(user_id)
+        return await self._sessions.count_views_for_mentor(mentor.id, now=now, cohort_id=cohort_id)
+
+    async def _mentor(self, user_id: uuid.UUID) -> Mentor:
         mentor = await self._mentors.get_by_user(user_id)
         if mentor is None:
             raise NotFoundError("멘토 프로필이 없습니다.", code="mentor_profile_not_found")
-        return await self._sessions.count_statuses_for_mentor(mentor.id)
+        return mentor
 
     async def list_by_cohort(
         self,

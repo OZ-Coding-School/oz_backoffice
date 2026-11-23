@@ -10192,6 +10192,43 @@
         ],
         "parameters": [
           {
+            "name": "view",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/SessionView"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "탭: upcoming·record_missing·past (A77). status와 함께 쓸 수 있다",
+              "title": "View"
+            },
+            "description": "탭: upcoming·record_missing·past (A77). status와 함께 쓸 수 있다"
+          },
+          {
+            "name": "cohort_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "신청자 기수로 거른다. 건수도 따른다 (A77)",
+              "title": "Cohort Id"
+            },
+            "description": "신청자 기수로 거른다. 건수도 따른다 (A77)"
+          },
+          {
             "name": "status",
             "in": "query",
             "required": false,
@@ -10292,7 +10329,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SessionListPage"
+                  "$ref": "#/components/schemas/MentorSessionListPage"
                 }
               }
             }
@@ -12045,6 +12082,43 @@
             ],
             "title": "Created At"
           },
+          "cohort_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cohort Id",
+            "description": "신청자의 기수 (A77)"
+          },
+          "bootcamp_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bootcamp Name",
+            "description": "신청자 기수의 과정명 (A77)"
+          },
+          "cohort_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cohort Number",
+            "description": "신청자 기수 번호 (A77)"
+          },
           "mentor_name": {
             "type": "string",
             "title": "Mentor Name",
@@ -12082,6 +12156,9 @@
           "record_duration_minutes",
           "recorded_at",
           "created_at",
+          "cohort_id",
+          "bootcamp_name",
+          "cohort_number",
           "mentor_name"
         ],
         "title": "AdminSessionResponse"
@@ -16410,6 +16487,45 @@
         ],
         "title": "MentorListItem"
       },
+      "MentorSessionListPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SessionResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/SessionStatusCounts"
+          },
+          "view_counts": {
+            "$ref": "#/components/schemas/SessionViewCounts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset",
+          "counts",
+          "view_counts"
+        ],
+        "title": "MentorSessionListPage"
+      },
       "MentorSummary": {
         "properties": {
           "mentor_id": {
@@ -18956,6 +19072,43 @@
               }
             ],
             "title": "Created At"
+          },
+          "cohort_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cohort Id",
+            "description": "신청자의 기수 (A77)"
+          },
+          "bootcamp_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bootcamp Name",
+            "description": "신청자 기수의 과정명 (A77)"
+          },
+          "cohort_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cohort Number",
+            "description": "신청자 기수 번호 (A77)"
           }
         },
         "type": "object",
@@ -18988,7 +19141,10 @@
           "summary",
           "record_duration_minutes",
           "recorded_at",
-          "created_at"
+          "created_at",
+          "cohort_id",
+          "bootcamp_name",
+          "cohort_number"
         ],
         "title": "SessionResponse"
       },
@@ -19025,6 +19181,45 @@
         ],
         "title": "SessionStatusCounts",
         "description": "상태 필터와 무관한 그 목록 대상 전체의 상태별 세션 수 (A68)."
+      },
+      "SessionView": {
+        "type": "string",
+        "enum": [
+          "upcoming",
+          "record_missing",
+          "past"
+        ],
+        "title": "SessionView",
+        "description": "멘토 세션 목록 탭 (A77)."
+      },
+      "SessionViewCounts": {
+        "properties": {
+          "upcoming": {
+            "type": "integer",
+            "title": "Upcoming"
+          },
+          "record_missing": {
+            "type": "integer",
+            "title": "Record Missing"
+          },
+          "past": {
+            "type": "integer",
+            "title": "Past"
+          },
+          "all": {
+            "type": "integer",
+            "title": "All"
+          }
+        },
+        "type": "object",
+        "required": [
+          "upcoming",
+          "record_missing",
+          "past",
+          "all"
+        ],
+        "title": "SessionViewCounts",
+        "description": "멘토 세션 탭별 수 (A77). 탭·상태 필터와 무관하고 기수 필터는 따른다."
       },
       "SettingsFields": {
         "properties": {

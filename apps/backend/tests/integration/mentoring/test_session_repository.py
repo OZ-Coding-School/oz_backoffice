@@ -11,7 +11,7 @@ from tortoise.exceptions import IntegrityError
 from app.contexts.academy.infrastructure.repositories import TortoiseStudentRepository
 from app.contexts.mentoring.domain.enums import MentoringRequestStatus, MentoringSessionStatus
 from app.contexts.mentoring.domain.request import MentoringRequest
-from app.contexts.mentoring.domain.session import MentoringSession, SessionQuery
+from app.contexts.mentoring.domain.session import MentoringSession, SessionQuery, SessionView
 from app.contexts.mentoring.domain.team import MentoringTeam
 from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseMentoringRequestRepository,
@@ -595,3 +595,56 @@ async def test_chat_pairs_from_request_history() -> None:
     pairs = await requests.chat_pairs(student_ids=[student.id], team_ids=[team.id])
     assert pairs == {(mentor.id, student.id), (other_mentor.id, team.id)}
     assert await requests.chat_pairs(student_ids=[], team_ids=[]) == set()
+
+
+async def test_mentor_views_and_cohort_filter() -> None:
+    """멘토 세션 탭(upcoming·record_missing·past)과 기수 필터·탭별 수 (A77)."""
+    cohort, other_cohort = await create_cohort(), await create_cohort()
+    student = make_student(cohort_id=cohort.id)
+    elsewhere = make_student(cohort_id=other_cohort.id)
+    for s in (student, elsewhere):
+        await TortoiseStudentRepository().add(s)
+    mentor = await create_mentor()
+    now = T + timedelta(minutes=30)
+    started = _session(await _approved(mentor.id, student.id))  # T~T+1h, 진행 중이고 기록 없음
+    later = _session(await _approved(mentor.id, student.id), T + timedelta(hours=2))
+    ended = _session(await _approved(mentor.id, student.id), T - timedelta(hours=3))
+    other = _session(await _approved(mentor.id, elsewhere.id), T + timedelta(hours=4))
+    for session in (started, later, ended, other):
+        await sessions.add(session)
+    await connections.get("default").execute_query(
+        "UPDATE mentoring_sessions SET status = 'CANCELED' WHERE id = $1", [str(ended.id)]
+    )
+
+    def ids(found: list[MentoringSession]) -> set[Any]:
+        return {s.id for s in found}
+
+    upcoming, _ = await sessions.list_for_mentor(
+        mentor.id, SessionQuery(view=SessionView.UPCOMING, now=now)
+    )
+    assert ids(upcoming) == {started.id, later.id, other.id}
+    missing, _ = await sessions.list_for_mentor(
+        mentor.id, SessionQuery(view=SessionView.RECORD_MISSING, now=now)
+    )
+    assert ids(missing) == {started.id}
+    past, _ = await sessions.list_for_mentor(mentor.id, SessionQuery(view=SessionView.PAST))
+    assert ids(past) == {ended.id}
+    in_cohort, total = await sessions.list_for_mentor(
+        mentor.id, SessionQuery(view=SessionView.UPCOMING, now=now, cohort_id=cohort.id)
+    )
+    assert (ids(in_cohort), total) == ({started.id, later.id}, 2)
+
+    assert await sessions.count_views_for_mentor(mentor.id, now=now) == {
+        "all": 4,
+        "upcoming": 3,
+        "record_missing": 1,
+        "past": 1,
+    }
+    assert await sessions.count_views_for_mentor(mentor.id, now=now, cohort_id=cohort.id) == {
+        "all": 3,
+        "upcoming": 2,
+        "record_missing": 1,
+        "past": 1,
+    }
+    by_status = await sessions.count_statuses_for_mentor(mentor.id, cohort_id=other_cohort.id)
+    assert by_status[MentoringSessionStatus.SCHEDULED] == 1
