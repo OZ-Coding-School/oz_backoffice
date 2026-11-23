@@ -1,7 +1,7 @@
 # 23. FE-10b 멘토 세션 상세·기록·내부 메모
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #114
 - 관련 결정: `docs/decisions.md` F48·A78 (A53·F46·F47)
 - 이전 기록: [22. FE-10a 멘토 세션 목록](22_mentor_sessions_list.md)
 - 선행: 백엔드 [77. 기록 제출 시 잔여 부족 처리 (BE-2l)](../backend/77_record_overtime_shortfall.md)
