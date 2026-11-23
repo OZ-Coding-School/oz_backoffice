@@ -550,6 +550,10 @@ async def test_unavailable_conflicts_reject_and_cancel(
         ("REQUEST", pending),
         ("SESSION", session["id"]),
     }
+    # 주제·신청자 (A79)
+    assert {(c["topic"], c["requester_label"]) for c in preview.json()["conflicts"]} == {
+        (_body(ctx)["topic"], "가수강")
+    }
     done = await client.post(path, params={"confirm": "true"}, json=body, headers=mentor_h)
     assert done.json()["applied"] is True
 
