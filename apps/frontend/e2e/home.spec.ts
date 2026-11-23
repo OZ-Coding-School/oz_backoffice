@@ -66,53 +66,65 @@ const SESSION = {
 };
 const COUNTS = { SCHEDULED: 1, IN_PROGRESS: 0, COMPLETED: 0, NO_SHOW: 0, CANCELED: 0 };
 
-test("휴대폰: 수강생 홈 요약과 오늘 세션의 Meet 입장, 요약에서 진행 기록 예정 탭으로 (F42)", async ({ page }) => {
-  await page.clock.setFixedTime(new Date("2026-11-20T03:00:00Z")); // 11/20 12:00 KST
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.route("**/api/v1/auth/refresh", (route) =>
-    route.fulfill({ json: { access_token: "t", expires_at: new Date(Date.now() + 900_000).toISOString() } }),
-  );
-  await page.route("**/api/v1/me", (route) => route.fulfill({ json: ME }));
-  await page.route("**/api/v1/me/enrollments", (route) => route.fulfill({ json: [ENROLLMENT] }));
-  await page.route("**/api/v1/me/mentoring/settings**", (route) =>
-    route.fulfill({
-      json: {
-        cohort_id: "c12",
-        allow_1_on_1: true,
-        allow_team_mentoring: false,
-        allowed_duration: 30,
-        min_lead_hours: 24,
-        max_pending_requests: 3,
-      },
-    }),
-  );
-  await page.route("**/api/v1/me/balances", (route) => route.fulfill({ json: [] }));
-  await page.route("**/api/v1/me/mentoring/chat/threads**", (route) =>
-    route.fulfill({ json: { items: [], total: 0, limit: 50, offset: 0 } }),
-  );
-  await page.route("**/api/v1/me/mentoring/chat/stream", (route) =>
-    route.fulfill({ headers: { "Content-Type": "text/event-stream" }, body: "event: ready\ndata: {}\n\n" }),
-  );
-  await page.route("**/api/v1/me/mentoring/requests**", (route) =>
-    route.fulfill({
-      json: { items: [], total: 0, limit: 2, offset: 0, counts: { PENDING: 0, APPROVED: 1, REJECTED: 0, CANCELED: 0 } },
-    }),
-  );
-  await page.route("**/api/v1/me/mentoring/sessions**", (route) =>
-    route.fulfill({ json: { items: [SESSION], total: 1, limit: 20, offset: 0, counts: COUNTS } }),
-  );
+test.describe("수강생 홈", () => {
+  // page.clock의 가짜 Date에서는 TZDate가 브라우저 시간대로 표시해, 브라우저를 KST로 맞춘다.
+  // 시간대별 표시는 단위 테스트가 UTC·LA·서울에서 확인한다
+  test.use({ timezoneId: "Asia/Seoul" });
 
-  await page.goto("/");
-  const summary = page.getByRole("list", { name: "할 일 요약" });
-  await expect(summary.getByRole("link", { name: /오늘 멘토링\s*1회/ })).toBeVisible();
-  await expect(summary.getByRole("link", { name: /승인 대기 신청\s*0건/ })).toBeVisible();
-  const card = page.getByRole("region", { name: "멘토링" });
-  await expect(card.getByRole("link", { name: /포트폴리오 리뷰/ })).toContainText("오늘 14:00~15:00");
-  await expect(card.getByRole("link", { name: "Meet 입장" })).toHaveAttribute(
-    "href",
-    "https://meet.google.com/abc-defg-hij",
-  );
+  test("휴대폰: 수강생 홈 요약과 오늘 세션의 Meet 입장, 요약에서 진행 기록 예정 탭으로 (F42)", async ({ page }) => {
+    await page.clock.setFixedTime(new Date("2026-11-20T03:00:00Z")); // 11/20 12:00 KST
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.route("**/api/v1/auth/refresh", (route) =>
+      route.fulfill({ json: { access_token: "t", expires_at: new Date(Date.now() + 900_000).toISOString() } }),
+    );
+    await page.route("**/api/v1/me", (route) => route.fulfill({ json: ME }));
+    await page.route("**/api/v1/me/enrollments", (route) => route.fulfill({ json: [ENROLLMENT] }));
+    await page.route("**/api/v1/me/mentoring/settings**", (route) =>
+      route.fulfill({
+        json: {
+          cohort_id: "c12",
+          allow_1_on_1: true,
+          allow_team_mentoring: false,
+          allowed_duration: 30,
+          min_lead_hours: 24,
+          max_pending_requests: 3,
+        },
+      }),
+    );
+    await page.route("**/api/v1/me/balances", (route) => route.fulfill({ json: [] }));
+    await page.route("**/api/v1/me/mentoring/chat/threads**", (route) =>
+      route.fulfill({ json: { items: [], total: 0, limit: 50, offset: 0 } }),
+    );
+    await page.route("**/api/v1/me/mentoring/chat/stream", (route) =>
+      route.fulfill({ headers: { "Content-Type": "text/event-stream" }, body: "event: ready\ndata: {}\n\n" }),
+    );
+    await page.route("**/api/v1/me/mentoring/requests**", (route) =>
+      route.fulfill({
+        json: {
+          items: [],
+          total: 0,
+          limit: 2,
+          offset: 0,
+          counts: { PENDING: 0, APPROVED: 1, REJECTED: 0, CANCELED: 0 },
+        },
+      }),
+    );
+    await page.route("**/api/v1/me/mentoring/sessions**", (route) =>
+      route.fulfill({ json: { items: [SESSION], total: 1, limit: 20, offset: 0, counts: COUNTS } }),
+    );
 
-  await summary.getByRole("link", { name: /오늘 멘토링/ }).click();
-  await expect(page).toHaveURL(/\/mentoring\/sessions\?tab=scheduled$/);
+    await page.goto("/");
+    const summary = page.getByRole("list", { name: "할 일 요약" });
+    await expect(summary.getByRole("link", { name: /오늘 멘토링\s*1회/ })).toBeVisible();
+    await expect(summary.getByRole("link", { name: /승인 대기 신청\s*0건/ })).toBeVisible();
+    const card = page.getByRole("region", { name: "멘토링" });
+    await expect(card.getByRole("link", { name: /포트폴리오 리뷰/ })).toContainText("오늘 14:00~15:00");
+    await expect(card.getByRole("link", { name: "Meet 입장" })).toHaveAttribute(
+      "href",
+      "https://meet.google.com/abc-defg-hij",
+    );
+
+    await summary.getByRole("link", { name: /오늘 멘토링/ }).click();
+    await expect(page).toHaveURL(/\/mentoring\/sessions\?tab=scheduled$/);
+  });
 });
