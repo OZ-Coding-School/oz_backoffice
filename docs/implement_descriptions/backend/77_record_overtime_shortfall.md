@@ -1,6 +1,6 @@
 # 77. 기록 제출 시 잔여 부족 처리 (BE-2l)
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-23 병합)
 - 관련 PR: #113
 - 관련 결정: `docs/decisions.md` A78 (A53 변경, A55·A56)
 - 이전 기록: [76. 멘토 세션 목록 탭·기수 필터 (BE-2k)](76_mentor_session_views.md)
@@ -36,6 +36,9 @@ FE-10b 기록 작성 화면을 정하다가 정책을 바꿨다. A53은 실제 �
 - 마이그레이션: 개발 DB에서 `aerich upgrade` → `aerich migrate`(No changes detected) → `aerich downgrade -v 29` → `aerich upgrade`
 - DBML 파서(`@dbml/core` 11.x) 통과
 - 프론트엔드: `typecheck`, `vitest` 225 passed
+
+- GitHub Actions (PR #113): 백엔드·프론트엔드 검사·E2E 3개 통과
+- 사용자가 병합을 확인했다(2026-11-23)
 
 ## 남은 작업
 - FE-10b 세션 상세·기록 작성(초과·단축 안내)·수정·내부 메모
