@@ -14,11 +14,11 @@ beforeEach(() => {
 });
 
 describe("회원 공통 틀 (F27)", () => {
-  it("수강생은 홈 메뉴·인사말과 빈 상태를 보고, 상단 막대에는 기수를 표시하지 않는다", async () => {
+  it("수강생은 홈 메뉴·인사말과 할 일 요약을 보고, 상단 막대에는 기수를 표시하지 않는다", async () => {
     mockSignedIn(makeMe());
     await renderRoute("/");
     expect(await screen.findByRole("heading", { name: "안녕하세요, 가수강님" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "할 일 요약이 곧 여기에 모여요" })).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "할 일 요약" })).toBeInTheDocument();
     expect((await screen.findAllByText("수강생 · 초격차 백엔드 12기")).length).toBeGreaterThan(0);
     expect(within(screen.getByRole("banner")).queryByText(/초격차 백엔드/)).not.toBeInTheDocument();
     const menus = screen.getAllByRole("navigation", { name: "메뉴" });
