@@ -138,6 +138,10 @@ async def test_session_round_trip_overlap_and_lists() -> None:
     assert nothing == []
     by_mentor, mentor_total = await sessions.list_for_mentor(mentor.id, SessionQuery(limit=1))
     assert (mentor_total, [s.id for s in by_mentor]) == (2, [team_session.id])
+    newest_first, _ = await sessions.list_for_mentor(mentor.id, SessionQuery())
+    earliest_first, _ = await sessions.list_for_mentor(mentor.id, SessionQuery(ascending=True))
+    assert [s.id for s in earliest_first] == [s.id for s in reversed(newest_first)]  # A75
+    assert earliest_first[0].starts_at < earliest_first[1].starts_at
     _, cohort_total = await sessions.list_by_cohort(
         cohort.id, mentor_id=other_mentor.id, query=SessionQuery()
     )

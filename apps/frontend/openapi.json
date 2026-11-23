@@ -10096,6 +10096,22 @@
             }
           },
           {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string",
+              "description": "시작 시각 정렬. desc(기본) 최신순, asc 이른 순 (A75)",
+              "default": "desc",
+              "title": "Order"
+            },
+            "description": "시작 시각 정렬. desc(기본) 최신순, asc 이른 순 (A75)"
+          },
+          {
             "name": "limit",
             "in": "query",
             "required": false,
@@ -10210,6 +10226,22 @@
               ],
               "title": "To"
             }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string",
+              "description": "시작 시각 정렬. desc(기본) 최신순, asc 이른 순 (A75)",
+              "default": "desc",
+              "title": "Order"
+            },
+            "description": "시작 시각 정렬. desc(기본) 최신순, asc 이른 순 (A75)"
           },
           {
             "name": "limit",

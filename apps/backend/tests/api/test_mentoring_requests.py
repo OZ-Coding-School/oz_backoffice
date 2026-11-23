@@ -342,6 +342,11 @@ async def test_approve_reject_and_sessions(client: AsyncClient, settings: Settin
     )
     assert mentor_list.json()["total"] == 1
     assert mentor_list.json()["counts"]["SCHEDULED"] == 1
+    for order, code in (("asc", 200), ("desc", 200), ("oldest", 422)):  # 정렬 (A75)
+        ordered = await client.get(
+            "/api/v1/me/mentoring/sessions", params={"order": order}, headers=student_h
+        )
+        assert ordered.status_code == code
     window = await client.get(
         "/api/v1/me/mentoring/sessions",
         params={"from": ctx["at"].isoformat(), "to": second.isoformat()},

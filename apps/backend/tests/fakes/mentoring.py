@@ -564,7 +564,7 @@ class InMemorySessionRepository:
             and (q.starts_from is None or s.starts_at >= q.starts_from)
             and (q.starts_before is None or s.starts_at < q.starts_before)
         ]
-        found.sort(key=lambda s: (s.starts_at, s.id), reverse=True)
+        found.sort(key=lambda s: (s.starts_at, s.id), reverse=not q.ascending)
         return found[q.offset : q.offset + q.limit], len(found)
 
     async def list_for_participants(

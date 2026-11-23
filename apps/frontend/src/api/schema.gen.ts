@@ -12903,6 +12903,8 @@ export interface operations {
                 status?: components["schemas"]["MentoringSessionStatus"][] | null;
                 from?: string | null;
                 to?: string | null;
+                /** @description 시작 시각 정렬. desc(기본) 최신순, asc 이른 순 (A75) */
+                order?: "asc" | "desc";
                 limit?: number;
                 offset?: number;
             };
@@ -12939,6 +12941,8 @@ export interface operations {
                 status?: components["schemas"]["MentoringSessionStatus"][] | null;
                 from?: string | null;
                 to?: string | null;
+                /** @description 시작 시각 정렬. desc(기본) 최신순, asc 이른 순 (A75) */
+                order?: "asc" | "desc";
                 limit?: number;
                 offset?: number;
             };

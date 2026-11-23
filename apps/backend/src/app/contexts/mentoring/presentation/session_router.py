@@ -11,7 +11,7 @@
 
 import uuid
 from datetime import datetime
-from typing import Annotated, cast
+from typing import Annotated, Literal, cast
 
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import AwareDatetime, BaseModel, Field
@@ -88,6 +88,10 @@ def member_session_query(
     ] = None,
     starts_from: Annotated[AwareDatetime | None, Query(alias="from")] = None,
     starts_before: Annotated[AwareDatetime | None, Query(alias="to")] = None,
+    order: Annotated[
+        Literal["asc", "desc"],
+        Query(description="시작 시각 정렬. desc(기본) 최신순, asc 이른 순 (A75)"),
+    ] = "desc",
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> SessionQuery:
@@ -96,6 +100,7 @@ def member_session_query(
         statuses=tuple(status or ()),
         starts_from=starts_from,
         starts_before=starts_before,
+        ascending=order == "asc",
         limit=limit,
         offset=offset,
     )

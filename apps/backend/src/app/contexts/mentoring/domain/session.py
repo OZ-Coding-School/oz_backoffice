@@ -27,12 +27,13 @@ RECORD_EDIT_DAYS = 7
 
 @dataclass(frozen=True, slots=True)
 class SessionQuery:
-    """세션 목록 조건 (시작 시각 최신순)."""
+    """세션 목록 조건 (기본은 시작 시각 최신순, `ascending`이면 이른 순, A75)."""
 
     status: MentoringSessionStatus | None = None
     statuses: tuple[MentoringSessionStatus, ...] = ()  # 여러 개 (수강생·멘토 목록, A70)
     starts_from: datetime | None = None  # 포함
     starts_before: datetime | None = None  # 미포함
+    ascending: bool = False  # 시작 시각 이른 순 (수강생·멘토 목록, A75)
     limit: int = 20
     offset: int = 0
 
