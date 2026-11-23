@@ -348,14 +348,16 @@ class MentoringRequestService:
         statuses: list[MentoringRequestStatus] | None,
         limit: int,
         offset: int,
+        cohort_id: uuid.UUID | None = None,
     ) -> RequestList:
         mentor = await self._mentors.get_by_user(user_id)
         if mentor is None:
             raise NotFoundError("멘토 프로필이 없습니다.", code="mentor_profile_not_found")
         items, total = await self._requests.list_for_mentor(
-            mentor.id, statuses=statuses, limit=limit, offset=offset
+            mentor.id, statuses=statuses, limit=limit, offset=offset, cohort_id=cohort_id
         )
-        counts = await self._requests.count_statuses_for_mentor(mentor.id)
+        # 건수는 상태 필터와 무관하지만 기수 필터는 따른다 (A67·A76)
+        counts = await self._requests.count_statuses_for_mentor(mentor.id, cohort_id=cohort_id)
         return RequestList(items=items, total=total, counts=counts)
 
     async def list_by_cohort(

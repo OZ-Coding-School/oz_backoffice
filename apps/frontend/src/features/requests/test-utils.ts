@@ -30,6 +30,10 @@ export function makeRequest(overrides: Partial<MentoringRequest> = {}): Mentorin
     balance: { state: "HELD", minutes: 60 },
     replaced_request_id: null,
     created_at: "2026-11-16T01:02:00Z",
+    cohort_id: "c12",
+    bootcamp_name: "초격차 백엔드",
+    cohort_number: 12,
+    requester_status: "ENROLLED",
     ...overrides,
   };
 }

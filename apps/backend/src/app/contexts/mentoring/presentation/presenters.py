@@ -10,6 +10,8 @@ from typing import cast
 from fastapi import Request
 from pydantic import BaseModel, Field
 
+from app.contexts.academy.application.catalog import AcademyCatalog
+from app.contexts.academy.domain.enums import EnrollmentStatus
 from app.contexts.identity.application.auth_service import UserQueries
 from app.contexts.mentoring.application.assignment_service import MentorDirectory
 from app.contexts.mentoring.application.request_service import StudentLookup
@@ -45,6 +47,8 @@ class Names:
     mentor_display_name: str
     mentor_name: str
     mentor_headline: str | None
+    requester_cohort_id: uuid.UUID | None = None
+    requester_status: EnrollmentStatus | None = None
 
 
 class NameBook:
@@ -53,6 +57,7 @@ class NameBook:
         self._students = cast("StudentLookup", state.student_queries)
         self._mentors = cast("MentorDirectory", state.mentor_queries)
         self._users = cast("UserQueries", state.user_queries)
+        self._catalog = cast("AcademyCatalog", state.academy_catalog)
         self._teams = TortoiseMentoringTeamRepository()
 
     async def of(self, items: list[MentoringRequest]) -> dict[uuid.UUID, Names]:
@@ -75,8 +80,15 @@ class NameBook:
                 mentor_display_name=mentor.display_name(real) if mentor else "",
                 mentor_name=real,
                 mentor_headline=mentor.headline if mentor else None,
+                requester_cohort_id=student.cohort_id if student else None,
+                requester_status=student.status if student else None,
             )
         return result
+
+    async def cohort_labels(self, cohort_ids: list[uuid.UUID]) -> dict[uuid.UUID, tuple[str, int]]:
+        """기수 id → (과정명, 기수 번호) (A76). IN 쿼리 한 번."""
+        labels = await self._catalog.cohort_labels(cohort_ids)
+        return {k: (v.bootcamp_name, v.cohort_number) for k, v in labels.items()}
 
     async def participants(
         self, items: list[MentoringRequest]
