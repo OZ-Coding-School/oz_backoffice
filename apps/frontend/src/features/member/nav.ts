@@ -6,6 +6,7 @@ import {
   Plus,
   User,
   Users,
+  Video,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
@@ -77,7 +78,9 @@ const RECEIVED: MemberNavItem = {
   badgeLabel: "대기",
 };
 
-const MENTOR_NAV: MemberNavGroup[] = [{ items: [HOME] }, { title: "멘토링", items: [RECEIVED, CHAT] }];
+const MENTOR_SESSIONS: MemberNavItem = { to: "/mentor/sessions", label: "세션", shortLabel: "세션", icon: Video };
+
+const MENTOR_NAV: MemberNavGroup[] = [{ items: [HOME] }, { title: "멘토링", items: [RECEIVED, MENTOR_SESSIONS, CHAT] }];
 
 export interface MemberNavOptions {
   /** '멘토링 신청' 메뉴: 1:1이나 팀을 허용하는 기수와 수강이 끝난 수강생(안내)에 (F31) */
