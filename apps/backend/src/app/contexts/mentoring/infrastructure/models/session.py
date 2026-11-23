@@ -28,6 +28,7 @@ class MentoringSessionModel(models.Model):
     topic = fields.CharField(max_length=100)
     body = fields.TextField(null=True)
     record_duration_minutes = fields.SmallIntField(null=True)
+    uncharged_overtime_minutes = fields.SmallIntField(null=True)
     recorded_at = fields.DatetimeField(null=True)
     google_space_name = fields.CharField(max_length=255, null=True, unique=True)
     google_meet_url = fields.CharField(max_length=255, null=True)

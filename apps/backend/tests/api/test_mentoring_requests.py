@@ -402,6 +402,8 @@ async def test_approve_reject_and_sessions(client: AsyncClient, settings: Settin
         assert filtered.json()["total"] == total
     one = await client.get(f"{admin_path}/{session['id']}", headers=admin)
     assert one.json()["id"] == session["id"]
+    assert one.json()["uncharged_overtime_minutes"] is None  # 운영진만 본다 (A78)
+    assert "uncharged_overtime_minutes" not in detail.json()
     elsewhere = await create_cohort()
     wrong = await client.get(
         f"/api/v1/admin/cohorts/{elsewhere.id}/mentoring/sessions/{session['id']}", headers=admin
@@ -987,12 +989,13 @@ async def test_settlement_csv_and_mentor_view(
         "요약,쉼표",
     )
     assert record["정산 상태"] == "집계 중"
+    assert record["미차감 초과(분)"] == ""  # 신청과 같은 시간이라 없다 (A78)
     bad = await client.get(
         f"{base}/export.csv", params={"month": month, "columns": "x"}, headers=admin
     )
     assert bad.json()["error"]["code"] == "invalid_export_columns"
     single = await client.get(f"{base}/{summary['id']}/export.csv", headers=admin)
-    assert len(next(iter(csv.reader(io.StringIO(single.content.decode("utf-8-sig")))))) == 14
+    assert len(next(iter(csv.reader(io.StringIO(single.content.decode("utf-8-sig")))))) == 15
     assert (
         await client.get(f"{base}/export.csv", params={"month": month}, headers=student_h)
     ).status_code == 403

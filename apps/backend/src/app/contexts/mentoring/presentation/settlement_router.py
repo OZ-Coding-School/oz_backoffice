@@ -175,6 +175,9 @@ class SettlementItemResponse(BaseModel):
     pay_unit: PayUnit
     pay_rate: int
     amount: int
+    uncharged_overtime_minutes: int | None = Field(
+        description="잔여가 모자라 차감하지 못한 초과 진행 시간(분), 정산 참고 (A78)"
+    )
 
 
 class SettlementDetail(SettlementSummary):
@@ -254,6 +257,9 @@ class Presenter:
                     pay_unit=i.pay_unit,
                     pay_rate=i.pay_rate,
                     amount=i.amount,
+                    uncharged_overtime_minutes=sessions[i.session_id].uncharged_overtime_minutes
+                    if i.session_id in sessions
+                    else None,
                 )
                 for i in sorted(
                     s.items,

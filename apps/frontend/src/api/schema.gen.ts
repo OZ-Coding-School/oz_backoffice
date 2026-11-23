@@ -3351,6 +3351,11 @@ export interface components {
              * @description 멘토 실명 (운영진 응답에만)
              */
             mentor_name: string;
+            /**
+             * Uncharged Overtime Minutes
+             * @description 잔여가 모자라 차감하지 못한 초과 진행 시간(분). 운영진 정산 참고 (A78)
+             */
+            uncharged_overtime_minutes: number | null;
         };
         /** AdminStaffRegistrationResponse */
         AdminStaffRegistrationResponse: {
@@ -6213,6 +6218,11 @@ export interface components {
             pay_rate: number;
             /** Amount */
             amount: number;
+            /**
+             * Uncharged Overtime Minutes
+             * @description 잔여가 모자라 차감하지 못한 초과 진행 시간(분), 정산 참고 (A78)
+             */
+            uncharged_overtime_minutes: number | null;
         };
         /**
          * SettlementItemType

@@ -2,7 +2,8 @@
 
 기록 (담당 멘토만, 예정 시작 이후):
 - COMPLETED: 실제 진행 시간(30분 단위, 신청보다 길어도 됨)·주제·요약. 계좌는 실제 진행 시간 기준으로
-  맞춘다 — 짧으면 차이를 REFUND, 길면 초과분을 OVERTIME(잔여가 모자라면 거부).
+  맞춘다 — 짧으면 차이를 REFUND, 길면 초과분을 OVERTIME. 잔여가 모자라도 제출은 받고, 잔여만큼만
+  차감한 뒤 모자란 분은 세션의 미차감 초과 시간으로 남긴다(A78).
 - NO_SHOW: 사유 선택, 신청 시간 전액 REFUND(M28).
 - 진행 시간·완료/노쇼는 처음 제출로 고정. 주제·요약만 제출 후 7일까지 수정.
 내부 메모: 세션당 하나, 담당 멘토만 쓰고 담당 멘토·운영진(기수 범위)만 본다. 작성·수정은 감사 로그.
@@ -131,9 +132,13 @@ class SessionRecordService:
                         account.refund(-diff, request_id=request.id, reason=REFUND_SHORT_REASON)
                     )
                 elif diff > 0:
-                    entries.append(
-                        account.overtime(diff, request_id=request.id, reason=OVERTIME_REASON)
-                    )
+                    charged = min(diff, account.remaining_minutes)
+                    if charged > 0:
+                        entries.append(
+                            account.overtime(charged, request_id=request.id, reason=OVERTIME_REASON)
+                        )
+                    if diff > charged:
+                        locked.note_uncharged_overtime(diff - charged)
             await self._sessions.save(locked)
             if entries:
                 await self._accounts.save(account)

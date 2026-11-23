@@ -796,6 +796,7 @@ Table mentoring_sessions {
   topic varchar(100) [not null, note: "진행 주제"]
   body text [null, note: "진행 내용 기록(공유 요약). 기록 전에는 null"]
   record_duration_minutes smallint [null, note: "실제 진행 시간"]
+  uncharged_overtime_minutes smallint [null, note: "잔여가 모자라 차감하지 못한 초과 진행 시간(분). 완료 기록만, 운영진 정산 참고 (A78). CHECK: null 또는 (> 0 이고 status = COMPLETED)"]
   recorded_at timestamptz [null, note: "기록 제출 시각"]
   // Google Meet연동
   google_space_name varchar(255) [null, unique, note: "Google Meet Space 이름 (spaces/xxx)"]

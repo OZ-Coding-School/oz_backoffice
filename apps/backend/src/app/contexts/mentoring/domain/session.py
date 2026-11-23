@@ -6,6 +6,7 @@
 - 멘토 일정 겹침은 DB EXCLUDE가, 신청자 일정 겹침은 서비스가 막는다.
 - Meet 공간은 승인 후 만들고(링크 = `google_meet_url`), 취소되면 막고 링크를 지운다(A48).
 - 기록(A53): 담당 멘토가 예정 시작 시각 이후 COMPLETED(실제 진행 시간 30분 단위·주제·요약 필수)
+  — 초과분은 잔여만큼만 차감하고 모자란 분은 `uncharged_overtime_minutes`로 남긴다(A78) —
   또는 NO_SHOW(사유 선택)를 제출한다. 진행 시간·완료/노쇼는 처음 제출로 고정, 주제·요약은 제출 후
   7일까지 수정.
 """
@@ -86,6 +87,8 @@ class MentoringSession(AggregateRoot):
     status: MentoringSessionStatus = MentoringSessionStatus.SCHEDULED
     body: str | None = None
     record_duration_minutes: int | None = None
+    # 잔여가 모자라 차감하지 못한 초과 진행 시간 (완료 기록만, 운영진 정산 참고, A78)
+    uncharged_overtime_minutes: int | None = None
     recorded_at: datetime | None = None
     google_space_name: str | None = None
     google_meet_url: str | None = None
@@ -197,6 +200,15 @@ class MentoringSession(AggregateRoot):
         self.topic = topic_text
         self.body = summary_text
         self.recorded_at = now
+
+    def note_uncharged_overtime(self, minutes: int) -> None:
+        """초과 진행분 중 잔여가 모자라 차감하지 못한 시간을 남긴다 (A78)."""
+        _rule(
+            self.status is MentoringSessionStatus.COMPLETED and minutes > 0,
+            "미차감 초과 시간이 올바르지 않습니다.",
+            "invalid_uncharged_overtime",
+        )
+        self.uncharged_overtime_minutes = minutes
 
     def submit_no_show(self, *, reason: str | None, now: datetime) -> None:
         text = (reason or "").strip()

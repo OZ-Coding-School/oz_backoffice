@@ -40,6 +40,7 @@ BASE_COLUMNS: list[tuple[str, str]] = [
     ("pay_rate", "단가(원)"),
     ("amount", "금액(원)"),
     ("session_id", "세션 ID"),
+    ("uncharged_overtime", "미차감 초과(분)"),
 ]
 OPTIONAL_COLUMNS: dict[str, str] = {
     "topic": "주제",
@@ -169,6 +170,7 @@ class SettlementExporter:
                 str(item.pay_rate),
                 str(item.amount),
                 str(item.session_id),
+                str(session.uncharged_overtime_minutes or "") if session else "",
             ]
             optional = {
                 "topic": session.topic if session else "",

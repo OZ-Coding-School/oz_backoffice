@@ -806,6 +806,7 @@ _SESSION_FIELDS = (
     "topic",
     "body",
     "record_duration_minutes",
+    "uncharged_overtime_minutes",
     "recorded_at",
     "google_space_name",
     "google_meet_url",

@@ -135,14 +135,30 @@ async def test_shorter_session_refunds_difference(h: Harness) -> None:
 
 async def test_longer_session_charges_overtime(h: Harness) -> None:
     session = await h.session(minutes=60, balance=120)
-    with pytest.raises(BusinessRuleViolation) as short:  # 잔여 60분, 초과 90분
-        await h.submit(session, duration=150)
-    assert short.value.code == "insufficient_balance"
-    assert h.sessions.items[session.id].status is MentoringSessionStatus.SCHEDULED
     done = await h.submit(session, duration=120, topic="실제 주제")
     assert (done.record_duration_minutes, done.topic) == (120, "실제 주제")
     assert (h.account().used_minutes, h.account().remaining_minutes) == (120, 0)
     assert h.ledger.entries[-1].type is MentoringBalanceTransactionType.OVERTIME
+    assert done.uncharged_overtime_minutes is None
+
+
+async def test_overtime_beyond_balance_is_recorded_not_rejected(h: Harness) -> None:
+    """잔여가 모자라도 제출은 받고 잔여만큼만 차감, 나머지는 미차감 초과로 남긴다 (A78)."""
+    session = await h.session(minutes=60, balance=120)  # 보류 60분, 잔여 60분
+    done = await h.submit(session, duration=150)  # 초과 90분
+    assert done.status is MentoringSessionStatus.COMPLETED
+    assert done.uncharged_overtime_minutes == 30
+    assert (h.account().used_minutes, h.account().remaining_minutes) == (120, 0)
+    overtime = h.ledger.entries[-1]
+    assert (overtime.type, abs(overtime.amount)) == (MentoringBalanceTransactionType.OVERTIME, 60)
+
+
+async def test_overtime_with_no_balance_left_charges_nothing(h: Harness) -> None:
+    session = await h.session(minutes=60, balance=60)  # 보류 60분, 잔여 0분
+    before = len(h.ledger.entries)
+    done = await h.submit(session, duration=90)
+    assert done.uncharged_overtime_minutes == 30
+    assert len(h.ledger.entries) == before  # 차감할 잔여가 없어 원장은 그대로
 
 
 async def test_exact_duration_no_ledger_and_no_show_refund(h: Harness) -> None:
