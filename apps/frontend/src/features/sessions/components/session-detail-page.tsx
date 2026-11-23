@@ -1,6 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft, CalendarDays, FileSearch, Timer, User, Users, Video } from "lucide-react";
+import { ArrowLeft, MessageSquare, CalendarDays, FileSearch, Timer, User, Users, Video } from "lucide-react";
 import { useMemo } from "react";
 
 import { ApiError } from "@/api/errors";
@@ -11,6 +11,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { findThread, threadsQuery } from "@/features/chat/api";
 import { enrollmentsQuery } from "@/features/member/api";
 import { formatKst } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
@@ -94,24 +95,21 @@ function Detail({ session }: { session: MentoringSession }) {
               </div>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2 lg:flex lg:justify-end">
+          <div className="flex flex-wrap gap-2 lg:justify-end">
             {upcoming && session.google_meet_url ? (
-              <Button asChild>
+              <Button asChild className="flex-1 lg:flex-none">
                 <a href={session.google_meet_url} target="_blank" rel="noopener noreferrer">
                   <Video aria-hidden />
                   Meet 입장
                 </a>
               </Button>
             ) : null}
-            <Button
-              asChild
-              variant="outline"
-              className={cn(!(upcoming && session.google_meet_url) && "col-span-2 lg:col-span-1")}
-            >
+            <Button asChild variant="outline" className="flex-1 lg:flex-none">
               <Link to="/mentoring/requests/$requestId" params={{ requestId: session.request_id }}>
                 신청 보기
               </Link>
             </Button>
+            <ChatButton session={session} />
           </div>
         </header>
         <dl
@@ -206,5 +204,24 @@ function MentorRecord({ session, recordedAt }: { session: MentoringSession; reco
         ) : null}
       </div>
     </section>
+  );
+}
+
+/** 그 세션의 방으로 (F41): 1:1은 신청 수강 등록-멘토, 팀은 팀-멘토. 방이 없으면 숨긴다 */
+function ChatButton({ session }: { session: MentoringSession }) {
+  const threads = useInfiniteQuery(threadsQuery);
+  const thread = findThread(threads.data, {
+    mentorId: session.mentor_id,
+    teamId: session.team_id,
+    studentId: session.requester_id,
+  });
+  if (!thread) return null;
+  return (
+    <Button asChild variant="outline" className="flex-1 lg:flex-none">
+      <Link to="/mentoring/chat/$threadId" params={{ threadId: thread.id }}>
+        <MessageSquare aria-hidden />
+        채팅
+      </Link>
+    </Button>
   );
 }

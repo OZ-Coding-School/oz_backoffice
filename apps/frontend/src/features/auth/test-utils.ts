@@ -82,6 +82,44 @@ export const MENTORING_SETTINGS = {
   max_pending_requests: 3,
 };
 
+/** 열어 둔 채 프레임만 보내는 SSE 응답 (테스트용). 끝나지 않으므로 연결은 화면이 닫을 때 끊긴다 */
+export function sseResponse(frames: string[]): HttpResponse<ReadableStream> {
+  const encoder = new TextEncoder();
+  const body = new ReadableStream({
+    start(controller) {
+      for (const frame of frames) controller.enqueue(encoder.encode(frame));
+    },
+  });
+  return new HttpResponse(body, { headers: { "Content-Type": "text/event-stream" } });
+}
+
+/** 테스트가 원하는 때 프레임을 보내는 SSE 연결 (연결마다 새 응답) */
+export function pushableSse(): { respond: () => HttpResponse<ReadableStream>; push: (frame: string) => void } {
+  const encoder = new TextEncoder();
+  const controllers: ReadableStreamDefaultController<Uint8Array>[] = [];
+  return {
+    respond: () =>
+      new HttpResponse(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            controllers.push(controller);
+            controller.enqueue(encoder.encode("event: ready\ndata: {}\n\n"));
+          },
+        }),
+        { headers: { "Content-Type": "text/event-stream" } },
+      ),
+    push: (frame) => {
+      for (const c of controllers) {
+        try {
+          c.enqueue(encoder.encode(frame));
+        } catch {
+          // 이미 닫힌 연결
+        }
+      }
+    },
+  };
+}
+
 /** 세션·복원 상태를 비우고, 기본으로 refresh 쿠키가 없는 상태를 모킹한다. */
 export function resetAuth(): void {
   resetSessionForTest();
@@ -96,6 +134,11 @@ export function resetAuth(): void {
     http.get(apiUrl("/api/v1/me/mentoring/settings"), () => HttpResponse.json(MENTORING_SETTINGS)),
     // 공통 틀이 '내 팀' 메뉴를 정하려고 부른다 (F39). 기본은 팀 없음
     http.get(apiUrl("/api/v1/me/mentoring-teams"), () => HttpResponse.json({ as_student: [], as_mentor: [] })),
+    // 공통 틀의 채팅 안 읽음 배지·실시간 수신 (F41). 기본은 방 없음, 연결은 열어 두기만 한다
+    http.get(apiUrl("/api/v1/me/mentoring/chat/threads"), () =>
+      HttpResponse.json({ items: [], total: 0, limit: 50, offset: 0 }),
+    ),
+    http.get(apiUrl("/api/v1/me/mentoring/chat/stream"), () => sseResponse(["event: ready\ndata: {}\n\n"])),
   );
 }
 

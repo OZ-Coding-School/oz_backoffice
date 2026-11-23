@@ -1,6 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { CalendarDays, ChevronRight, CircleCheck, Hourglass, Plus, Users, Wallet } from "lucide-react";
+import { CalendarDays, ChevronRight, CircleCheck, Hourglass, MessageSquare, Plus, Users, Wallet } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { EmptyState } from "@/components/empty-state";
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { expertiseChips, myTeamsQuery, type StudentTeam } from "@/features/apply/api";
 import { Chips } from "@/features/apply/components/mentor-step";
+import { findThread, threadsQuery } from "@/features/chat/api";
 import { MentorDialog } from "@/features/apply/components/mentor-dialog";
 import { activeCohort, cohortLabel, ENROLLMENT_STATUS_LABELS, enrollmentsQuery } from "@/features/member/api";
 import { balancesQuery } from "@/features/requests/api";
@@ -39,6 +40,7 @@ export function TeamPage() {
             <p className="text-caption text-muted-foreground">팀 멘토링을 함께 받는 팀이에요</p>
           </div>
         </div>
+        {team ? <TeamChatButton team={team} /> : null}
         {team && cohort && !cohort.readOnly ? (
           <Button asChild size="sm" className="h-10 md:h-8">
             <Link to="/mentoring/apply" search={{ kind: "team" }}>
@@ -234,5 +236,19 @@ function RecentSessions({ teamId }: { teamId: string }) {
         </ul>
       )}
     </div>
+  );
+}
+
+/** 팀-담당 멘토 방으로 (F41). 방이 없으면(담당 멘토에게 팀 신청이 없으면) 숨긴다 */
+function TeamChatButton({ team }: { team: StudentTeam }) {
+  const threads = useInfiniteQuery(threadsQuery);
+  const thread = findThread(threads.data, { mentorId: team.mentor.mentor_id, teamId: team.id });
+  if (!thread) return null;
+  return (
+    <Button asChild variant="outline" size="sm" className="h-10 md:h-8">
+      <Link to="/mentoring/chat/$threadId" params={{ threadId: thread.id }}>
+        <MessageSquare aria-hidden />팀 채팅
+      </Link>
+    </Button>
   );
 }

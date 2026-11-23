@@ -194,3 +194,53 @@ describe("세션 상세 (F33·F34)", () => {
     expect(await screen.findByRole("heading", { name: "세션을 찾을 수 없어요" })).toBeInTheDocument();
   });
 });
+
+describe("세션 상세 [채팅] (F41)", () => {
+  it("그 세션의 방이 있으면 바로 그 방으로, 없으면 버튼이 없다", async () => {
+    mockSessionDetail(makeSession());
+    server.use(
+      http.get(apiUrl("/api/v1/me/mentoring/chat/threads"), () =>
+        HttpResponse.json({
+          items: [
+            { ...THREAD_BASE, id: "th-other", mentor_id: "m9" },
+            { ...THREAD_BASE, id: "th-mine" },
+          ],
+          total: 2,
+          limit: 50,
+          offset: 0,
+        }),
+      ),
+    );
+    await renderRoute("/mentoring/sessions/s1");
+    await waitFor(() => expect(chatLinks()).toHaveLength(1));
+    expect(chatLinks()[0]).toHaveAttribute("href", "/mentoring/chat/th-mine");
+  });
+
+  it("방이 없으면 [채팅]을 숨긴다", async () => {
+    mockSessionDetail(makeSession());
+    await renderRoute("/mentoring/sessions/s1");
+    expect(await screen.findByRole("link", { name: "신청 보기" })).toBeInTheDocument();
+    expect(chatLinks()).toEqual([]);
+  });
+});
+
+const THREAD_BASE = {
+  kind: "DIRECT" as const,
+  cohort_id: "c12",
+  student_id: "st12",
+  student_name: "가수강",
+  team_id: null,
+  team_label: null,
+  mentor_id: "m1",
+  mentor_display_name: "멘토K",
+  last_message_at: null,
+  last_message: null,
+  unread_count: 0,
+};
+
+/** 메뉴의 '채팅'(/mentoring/chat)을 빼고 방으로 가는 [채팅]만 */
+function chatLinks(): HTMLElement[] {
+  return screen
+    .queryAllByRole("link", { name: "채팅" })
+    .filter((a) => a.getAttribute("href")?.startsWith("/mentoring/chat/"));
+}
