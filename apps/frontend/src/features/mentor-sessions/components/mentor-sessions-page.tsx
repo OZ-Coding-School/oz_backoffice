@@ -1,6 +1,6 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { CalendarDays, Video } from "lucide-react";
+import { CalendarDays, Pencil, Video } from "lucide-react";
 import { useState } from "react";
 
 import { EmptyState } from "@/components/empty-state";
@@ -124,9 +124,30 @@ function RecordCell({ session, now, prefix }: { session: MentoringSession; now: 
   );
 }
 
+/** 행·카드 동작: 오늘·진행 중이면 Meet 입장, 기록 미제출이면 기록 작성 (F47·F48) */
+function Action({ session, now, className }: { session: MentoringSession; now: number; className?: string }) {
+  if (canEnterMeet(session, now)) return <MeetButton session={session} className={className} />;
+  if (recordState(session, now).kind !== "missing") return null;
+  return (
+    <Button asChild size="sm" variant="outline" className={cn("relative", className)}>
+      <Link to="/mentor/sessions/$sessionId" params={{ sessionId: session.id }}>
+        <Pencil aria-hidden />
+        기록 작성
+      </Link>
+    </Button>
+  );
+}
+
+function hasAction(session: MentoringSession, now: number): boolean {
+  return canEnterMeet(session, now) || recordState(session, now).kind === "missing";
+}
+
+/** 제목 링크의 누름 영역을 행·카드 전체로 넓힌다 (동작 버튼은 relative로 위에 둔다) */
+const STRETCHED = "outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:underline hover:underline";
+
 function MeetButton({ session, className }: { session: MentoringSession; className?: string }) {
   return (
-    <Button asChild size="sm" className={className}>
+    <Button asChild size="sm" className={cn("relative", className)}>
       <a href={session.google_meet_url ?? undefined} target="_blank" rel="noopener noreferrer">
         <Video aria-hidden />
         Meet 입장
@@ -163,7 +184,7 @@ function SessionTable({ items, now }: { items: MentoringSession[]; now: number }
         </thead>
         <tbody>
           {items.map((s) => (
-            <tr key={s.id} className="border-t border-border">
+            <tr key={s.id} className="relative border-t border-border hover:bg-muted">
               <td className="px-4 py-3">
                 <span className="flex flex-col gap-0.5">
                   <span className="text-body text-foreground">{whenLabel(s)}</span>
@@ -172,7 +193,13 @@ function SessionTable({ items, now }: { items: MentoringSession[]; now: number }
               </td>
               <td className="px-4 py-3">
                 <span className="flex flex-col gap-0.5">
-                  <span className="text-body-strong text-foreground">{s.title}</span>
+                  <Link
+                    to="/mentor/sessions/$sessionId"
+                    params={{ sessionId: s.id }}
+                    className={cn("w-fit text-body-strong text-foreground", STRETCHED)}
+                  >
+                    {s.title}
+                  </Link>
                   <span className="text-caption text-muted-foreground">{s.topic}</span>
                 </span>
               </td>
@@ -183,7 +210,9 @@ function SessionTable({ items, now }: { items: MentoringSession[]; now: number }
               <td className="px-4 py-3 text-body text-foreground">
                 <RecordCell session={s} now={now} />
               </td>
-              <td className="px-4 py-3 text-right">{canEnterMeet(s, now) ? <MeetButton session={s} /> : null}</td>
+              <td className="px-4 py-3 text-right">
+                <Action session={s} now={now} />
+              </td>
             </tr>
           ))}
         </tbody>
@@ -193,14 +222,18 @@ function SessionTable({ items, now }: { items: MentoringSession[]; now: number }
 }
 
 function SessionCard({ session, now }: { session: MentoringSession; now: number }) {
-  const meet = canEnterMeet(session, now);
+  const action = hasAction(session, now);
   return (
     <article
       aria-label={session.title}
-      className="flex flex-col gap-1.5 rounded-xl border border-border bg-card px-4 py-3.5"
+      className="relative flex flex-col gap-1.5 rounded-xl border border-border bg-card px-4 py-3.5 hover:bg-muted"
     >
       <div className="flex items-center gap-2">
-        <h2 className="min-w-0 flex-1 text-body-strong text-foreground">{session.title}</h2>
+        <h2 className="min-w-0 flex-1 text-body-strong text-foreground">
+          <Link to="/mentor/sessions/$sessionId" params={{ sessionId: session.id }} className={STRETCHED}>
+            {session.title}
+          </Link>
+        </h2>
         <StatusBadge session={session} now={now} />
       </div>
       <p className="text-caption text-muted-foreground">
@@ -213,9 +246,9 @@ function SessionCard({ session, now }: { session: MentoringSession; now: number 
         <span className="text-caption text-muted-foreground">
           <RecordCell session={session} now={now} prefix="기록 " />
         </span>
-        {meet ? <MeetButton session={session} className="max-md:hidden" /> : null}
+        {action ? <Action session={session} now={now} className="max-md:hidden" /> : null}
       </div>
-      {meet ? <MeetButton session={session} className="mt-1 h-10 md:hidden" /> : null}
+      {action ? <Action session={session} now={now} className="mt-1 h-10 md:hidden" /> : null}
     </article>
   );
 }
