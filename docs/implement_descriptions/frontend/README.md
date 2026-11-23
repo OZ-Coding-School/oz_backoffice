@@ -22,4 +22,4 @@
 | 18 | [FE-7b 채팅 실시간 수신·안 읽음](18_chat_realtime.md) | 완료 (#105) |
 | 19 | [FE-8 수강생 홈](19_student_home.md) | 완료 (#107) |
 | 20 | [FE-9a 멘토 받은 신청 목록](20_mentor_requests_list.md) | 완료 (#109) |
-| 21 | [FE-9b 멘토 받은 신청 상세·승인·반려](21_mentor_request_detail.md) | PR 진행 중 (#110) |
+| 21 | [FE-9b 멘토 받은 신청 상세·승인·반려](21_mentor_request_detail.md) | 완료 (#110) |
