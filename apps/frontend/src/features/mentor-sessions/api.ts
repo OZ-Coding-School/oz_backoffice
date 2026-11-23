@@ -1,7 +1,8 @@
-import { infiniteQueryOptions } from "@tanstack/react-query";
+import { infiniteQueryOptions, queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { api, unwrap } from "@/api/client";
 import type { components } from "@/api/schema.gen";
+import { sessionKeys, type MentoringSession } from "@/features/sessions/api";
 
 export type SessionViewCounts = components["schemas"]["SessionViewCounts"];
 
@@ -48,5 +49,70 @@ export function mentorSessionsQuery(tab: MentorSessionTab, cohortId: string | un
         }),
       ),
     getNextPageParam: (last) => (last.offset + last.items.length < last.total ? last.offset + last.limit : undefined),
+  });
+}
+
+export type RecordBody = components["schemas"]["RecordBody"];
+export type SessionNote = components["schemas"]["NoteResponse"];
+
+/** 기록 제출·수정 뒤: 응답으로 상세 캐시를 고치고 세션 목록(멘토·수강생)을 다시 부른다 */
+function useApplySession(id: string) {
+  const queryClient = useQueryClient();
+  return (session: MentoringSession) => {
+    queryClient.setQueryData(sessionKeys.detail(id), session);
+    // 목록(멘토·수강생·팀·홈)만 다시 부른다. 상세·메모·녹화는 그대로
+    void queryClient.invalidateQueries({
+      queryKey: ["sessions"],
+      predicate: (q) => ["mine", "mentor", "team"].includes(String(q.queryKey[1])),
+    });
+  };
+}
+
+/** 기록 제출 (A53·A78): 완료(진행 시간·주제·요약) 또는 노쇼(사유 선택). 결과·진행 시간은 처음 제출로 고정 */
+export function useSubmitRecord(id: string) {
+  const apply = useApplySession(id);
+  return useMutation({
+    mutationFn: (body: RecordBody) =>
+      unwrap(
+        api.POST("/api/v1/mentoring/sessions/{session_id}/record", { params: { path: { session_id: id } }, body }),
+      ),
+    onSuccess: apply,
+  });
+}
+
+/** 기록 수정: 주제·요약만, 제출 후 7일까지 (A53) */
+export function useEditRecord(id: string) {
+  const apply = useApplySession(id);
+  return useMutation({
+    mutationFn: (body: { topic: string; summary: string }) =>
+      unwrap(
+        api.PATCH("/api/v1/mentoring/sessions/{session_id}/record", { params: { path: { session_id: id } }, body }),
+      ),
+    onSuccess: apply,
+  });
+}
+
+export const noteKeys = { detail: (id: string) => ["sessions", "note", id] as const };
+
+/** 내부 메모 (담당 멘토 작성, 운영진도 본다. 수강생은 못 본다) */
+export function noteQuery(id: string) {
+  return queryOptions({
+    queryKey: noteKeys.detail(id),
+    queryFn: () =>
+      unwrap(api.GET("/api/v1/mentoring/sessions/{session_id}/note", { params: { path: { session_id: id } } })),
+  });
+}
+
+export function useSaveNote(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: string) =>
+      unwrap(
+        api.PUT("/api/v1/mentoring/sessions/{session_id}/note", {
+          params: { path: { session_id: id } },
+          body: { body },
+        }),
+      ),
+    onSuccess: (note) => queryClient.setQueryData(noteKeys.detail(id), note),
   });
 }

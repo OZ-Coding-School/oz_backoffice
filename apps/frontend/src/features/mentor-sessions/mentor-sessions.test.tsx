@@ -154,6 +154,11 @@ describe("멘토 세션 목록 (F46·A77)", () => {
     const row = await screen.findByRole("row", { name: /멘토K 멘토링 1회차/ });
     expect(within(row).getByText("진행됨")).toBeInTheDocument();
     expect(within(row).getByText("미제출")).toBeInTheDocument();
+    expect(within(row).getByRole("link", { name: "기록 작성" })).toHaveAttribute("href", "/mentor/sessions/s3");
+    expect(within(row).getByRole("link", { name: "멘토K 멘토링 1회차" })).toHaveAttribute(
+      "href",
+      "/mentor/sessions/s3",
+    );
     expect(seen[0]?.get("order")).toBeNull();
 
     await userEvent.setup().click(screen.getByRole("link", { name: "지난 세션 1" }));
