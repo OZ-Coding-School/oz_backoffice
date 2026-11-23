@@ -1,7 +1,7 @@
 # 24. FE-10c 멘토 다시 보기 · Figma 크기별 배치
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #115
 - 관련 결정: `docs/decisions.md` F50·F49 (F35·F46·F21)
 - 이전 기록: [23. FE-10b 멘토 세션 상세·기록·내부 메모](23_mentor_session_detail.md)
 
