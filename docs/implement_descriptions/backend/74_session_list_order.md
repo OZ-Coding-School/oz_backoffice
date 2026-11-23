@@ -1,7 +1,7 @@
 # 74. 세션 목록 정렬 (BE-2i)
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #106
 - 관련 결정: `docs/decisions.md` A75, F42
 - 이전 기록: [73. 채팅 자격을 신청 이력 기준으로 (BE-2h)](73_chat_request_history.md)
 
