@@ -1,7 +1,7 @@
 # 19. FE-8 수강생 홈
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #107
 - 관련 결정: `docs/decisions.md` F42·A75 (F15·F31·F41)
 - 이전 기록: [18. FE-7b 채팅 실시간 수신·안 읽음 배지·[채팅] 버튼](18_chat_realtime.md)
 - 선행: 백엔드 [74. 세션 목록 정렬 (BE-2i)](../backend/74_session_list_order.md)
