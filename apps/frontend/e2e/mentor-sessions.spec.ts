@@ -98,4 +98,66 @@ test.describe("멘토 세션", () => {
       "https://meet.google.com/abc-defg-hij",
     );
   });
+
+  test("휴대폰: 기록 미제출 → [기록 작성] → 상세에서 기록 제출 (F48)", async ({ page }) => {
+    await page.clock.setFixedTime(new Date("2026-11-20T08:00:00Z"));
+    await page.setViewportSize({ width: 390, height: 844 });
+    let current: Record<string, unknown> = { ...SESSION };
+    await page.route("**/api/v1/auth/refresh", (route) =>
+      route.fulfill({ json: { access_token: "t", expires_at: new Date(Date.now() + 900_000).toISOString() } }),
+    );
+    await page.route("**/api/v1/me", (route) => route.fulfill({ json: MENTOR }));
+    await page.route("**/api/v1/me/mentoring/chat/threads**", (route) =>
+      route.fulfill({ json: { items: [], total: 0, limit: 50, offset: 0 } }),
+    );
+    await page.route("**/api/v1/me/mentoring/chat/stream", (route) =>
+      route.fulfill({ headers: { "Content-Type": "text/event-stream" }, body: "event: ready\ndata: {}\n\n" }),
+    );
+    await page.route("**/api/v1/me/mentor-assignments**", (route) => route.fulfill({ json: [] }));
+    await page.route("**/api/v1/me/mentor-requests**", (route) =>
+      route.fulfill({
+        json: {
+          items: [],
+          total: 0,
+          limit: 1,
+          offset: 0,
+          counts: { PENDING: 0, APPROVED: 0, REJECTED: 0, CANCELED: 0 },
+        },
+      }),
+    );
+    await page.route("**/api/v1/me/mentor-sessions**", (route) =>
+      route.fulfill({
+        json: {
+          items: [current],
+          total: 1,
+          limit: 20,
+          offset: 0,
+          counts: { SCHEDULED: 1, IN_PROGRESS: 0, COMPLETED: 0, NO_SHOW: 0, CANCELED: 0 },
+          view_counts: { upcoming: 0, record_missing: 1, past: 0, all: 1 },
+        },
+      }),
+    );
+    await page.route("**/api/v1/mentoring/sessions/s1/note", (route) =>
+      route.fulfill({ json: { session_id: "s1", body: null, updated_at: null } }),
+    );
+    await page.route("**/api/v1/mentoring/sessions/s1/record", async (route) => {
+      const body = route.request().postDataJSON() as { duration: number; topic: string; summary: string };
+      current = {
+        ...current,
+        status: "COMPLETED",
+        record_duration_minutes: body.duration,
+        summary: body.summary,
+        recorded_at: "2026-11-20T08:00:00Z",
+      };
+      return route.fulfill({ json: current });
+    });
+    await page.route("**/api/v1/mentoring/sessions/s1", (route) => route.fulfill({ json: current }));
+
+    await page.goto("/mentor/sessions?tab=record_missing");
+    await page.getByRole("link", { name: "기록 작성" }).click();
+    await expect(page.getByRole("heading", { name: "멘토K 멘토링 3회차", level: 1 })).toBeVisible();
+    await page.getByRole("textbox", { name: "요약 (수강생도 봐요)" }).fill("README 구성 정리");
+    await page.getByRole("button", { name: "기록 제출" }).click();
+    await expect(page.getByText("진행함 · 60분 (고정)")).toBeVisible();
+  });
 });
