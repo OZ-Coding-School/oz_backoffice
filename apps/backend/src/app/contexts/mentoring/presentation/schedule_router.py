@@ -40,6 +40,7 @@ from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseMentorUnavailablePeriodRepository,
 )
 from app.contexts.mentoring.presentation.cleanup import build_cleanup
+from app.contexts.mentoring.presentation.presenters import NameBook
 from app.core.clock import Clock
 from app.core.dependencies import get_clock
 from app.core.uow import UnitOfWork
@@ -192,6 +193,8 @@ class ConflictResponse(BaseModel):
     target_id: uuid.UUID
     starts_at: datetime
     ends_at: datetime
+    topic: str = Field(description="신청·세션 주제 (A79)")
+    requester_label: str = Field(description="팀이면 팀 이름, 1:1이면 수강생 이름 (A79)")
 
 
 class ChangeResponse(BaseModel):
@@ -200,17 +203,56 @@ class ChangeResponse(BaseModel):
     conflicts: list[ConflictResponse] = Field(description="불가 시간에 걸리는 신청·세션")
 
     @classmethod
-    def of(cls, change: ScheduleChange) -> "ChangeResponse":
+    def of(cls, change: ScheduleChange, details: dict[uuid.UUID, tuple[str, str]]) -> Self:
         return cls(
             applied=change.applied,
             unavailable_period=UnavailableResponse.of(change.period),
             conflicts=[
                 ConflictResponse(
-                    kind=c.kind, target_id=c.target_id, starts_at=c.starts_at, ends_at=c.ends_at
+                    kind=c.kind,
+                    target_id=c.target_id,
+                    starts_at=c.starts_at,
+                    ends_at=c.ends_at,
+                    topic=details.get(c.target_id, ("", ""))[0],
+                    requester_label=details.get(c.target_id, ("", ""))[1],
                 )
                 for c in change.conflicts
             ],
         )
+
+
+class ConflictDetails:
+    """충돌 대상 id → (주제, 신청자). 신청·세션을 묶어서 한 번씩 읽는다 (A79)."""
+
+    def __init__(self, request: Request) -> None:
+        self._names = NameBook(request)
+        self._requests = TortoiseMentoringRequestRepository()
+        self._sessions = TortoiseMentoringSessionRepository()
+
+    async def of(self, change: ScheduleChange) -> dict[uuid.UUID, tuple[str, str]]:
+        if not change.conflicts:
+            return {}
+        sessions = await self._sessions.get_many(
+            [c.target_id for c in change.conflicts if c.kind == "SESSION"]
+        )
+        request_ids = [c.target_id for c in change.conflicts if c.kind == "REQUEST"]
+        requests = await self._requests.get_many(
+            request_ids + [s.request_id for s in sessions.values()]
+        )
+        names = await self._names.of(list(requests.values()))
+        result: dict[uuid.UUID, tuple[str, str]] = {}
+        for c in change.conflicts:
+            session = sessions.get(c.target_id) if c.kind == "SESSION" else None
+            req = requests.get(session.request_id if session else c.target_id)
+            if req is None:
+                continue
+            n = names[req.id]
+            label = n.team_label if req.team_id and n.team_label else n.requester_name
+            result[c.target_id] = (session.topic if session else req.topic, label)
+        return result
+
+
+DetailsDep = Annotated[ConflictDetails, Depends(ConflictDetails)]
 
 
 # ---------------------------------------------------------------- 공통 동작
@@ -234,10 +276,11 @@ async def _create(
     confirm: bool,
     actor: uuid.UUID,
     response: Response,
+    details: ConflictDetails,
 ) -> ChangeResponse:
     change = await service.create(body.to_entity(mentor_id), confirm=confirm, actor_id=actor)
     response.status_code = status.HTTP_201_CREATED if change.applied else status.HTTP_200_OK
-    return ChangeResponse.of(change)
+    return ChangeResponse.of(change, await details.of(change))
 
 
 async def _update(
@@ -247,11 +290,12 @@ async def _update(
     body: UnavailableInput,
     confirm: bool,
     actor: uuid.UUID,
+    details: ConflictDetails,
 ) -> ChangeResponse:
     change = await service.update(
         mentor_id, period_id, body.to_entity(mentor_id), confirm=confirm, actor_id=actor
     )
-    return ChangeResponse.of(change)
+    return ChangeResponse.of(change, await details.of(change))
 
 
 # ---------------------------------------------------------------- 멘토 본인
@@ -275,12 +319,13 @@ async def create_my_unavailable(
     body: UnavailableInput,
     user: ApprovedUser,
     service: ServiceDep,
+    details: DetailsDep,
     response: Response,
     confirm: Confirm = False,
 ) -> ChangeResponse:
     """저장하면 201, 충돌 미리보기면 200 (applied=false)."""
     mentor_id = await service.mentor_of_user(user.id)
-    return await _create(service, mentor_id, body, confirm, user.id, response)
+    return await _create(service, mentor_id, body, confirm, user.id, response, details)
 
 
 @me_router.put("/unavailable-periods/{period_id}", response_model=ChangeResponse)
@@ -289,10 +334,11 @@ async def update_my_unavailable(
     body: UnavailableInput,
     user: ApprovedUser,
     service: ServiceDep,
+    details: DetailsDep,
     confirm: Confirm = False,
 ) -> ChangeResponse:
     mentor_id = await service.mentor_of_user(user.id)
-    return await _update(service, mentor_id, period_id, body, confirm, user.id)
+    return await _update(service, mentor_id, period_id, body, confirm, user.id, details)
 
 
 @me_router.delete("/unavailable-periods/{period_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -324,11 +370,12 @@ async def create_mentor_unavailable(
     body: UnavailableInput,
     user: MentorManager,
     service: ServiceDep,
+    details: DetailsDep,
     response: Response,
     confirm: Confirm = False,
 ) -> ChangeResponse:
     """저장하면 201, 충돌 미리보기면 200 (applied=false)."""
-    return await _create(service, mentor_id, body, confirm, user.id, response)
+    return await _create(service, mentor_id, body, confirm, user.id, response, details)
 
 
 @admin_router.put("/unavailable-periods/{period_id}", response_model=ChangeResponse)
@@ -338,9 +385,10 @@ async def update_mentor_unavailable(
     body: UnavailableInput,
     user: MentorManager,
     service: ServiceDep,
+    details: DetailsDep,
     confirm: Confirm = False,
 ) -> ChangeResponse:
-    return await _update(service, mentor_id, period_id, body, confirm, user.id)
+    return await _update(service, mentor_id, period_id, body, confirm, user.id, details)
 
 
 @admin_router.delete("/unavailable-periods/{period_id}", status_code=status.HTTP_204_NO_CONTENT)

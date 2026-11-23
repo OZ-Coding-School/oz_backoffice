@@ -79,3 +79,4 @@
 | 75 | [멘토 받은 신청 보완 (BE-2j)](75_mentor_request_cohort.md) | 완료 (#108) |
 | 76 | [멘토 세션 목록 탭·기수 필터 (BE-2k)](76_mentor_session_views.md) | 완료 (#111) |
 | 77 | [기록 제출 시 잔여 부족 처리 (BE-2l)](77_record_overtime_shortfall.md) | 완료 (#113) |
+| 78 | [불가 시간 충돌 응답에 주제·신청자 (BE-2m)](78_schedule_conflict_detail.md) | 완료 (#116) |

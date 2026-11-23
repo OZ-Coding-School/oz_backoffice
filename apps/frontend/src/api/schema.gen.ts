@@ -4198,6 +4198,16 @@ export interface components {
              * Format: date-time
              */
             ends_at: string;
+            /**
+             * Topic
+             * @description 신청·세션 주제 (A79)
+             */
+            topic: string;
+            /**
+             * Requester Label
+             * @description 팀이면 팀 이름, 1:1이면 수강생 이름 (A79)
+             */
+            requester_label: string;
         };
         /** ContractFields */
         ContractFields: {
