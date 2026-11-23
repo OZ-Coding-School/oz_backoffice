@@ -11,7 +11,13 @@ from app.contexts.mentoring.domain.balance import BalanceAccount, BalanceTransac
 from app.contexts.mentoring.domain.enums import MentoringRequestStatus, MentoringSessionStatus
 from app.contexts.mentoring.domain.request import MentoringRequest
 from app.contexts.mentoring.domain.schedule import MentorUnavailablePeriod
-from app.contexts.mentoring.domain.session import MentoringSession, SessionQuery
+from app.contexts.mentoring.domain.session import (
+    CLOSED_STATUSES,
+    OPEN_STATUSES,
+    MentoringSession,
+    SessionQuery,
+    SessionView,
+)
 from app.contexts.mentoring.domain.settings import CohortMentoringSettings, MentoringBlockTime
 from app.contexts.mentoring.domain.team import MentoringTeam
 from app.contexts.mentoring.domain.transcript import TranscriptEntry
@@ -565,6 +571,7 @@ class InMemorySessionRepository:
             and (not q.statuses or s.status in q.statuses)
             and (q.starts_from is None or s.starts_at >= q.starts_from)
             and (q.starts_before is None or s.starts_at < q.starts_before)
+            and (q.view is None or _in_view(s, q.view, q.now))
         ]
         found.sort(key=lambda s: (s.starts_at, s.id), reverse=not q.ascending)
         return found[q.offset : q.offset + q.limit], len(found)
@@ -595,9 +602,19 @@ class InMemorySessionRepository:
         )
 
     async def count_statuses_for_mentor(
-        self, mentor_id: uuid.UUID
+        self, mentor_id: uuid.UUID, *, cohort_id: uuid.UUID | None = None
     ) -> dict[MentoringSessionStatus, int]:
+        # 기수는 보지 않는다 (인메모리 세션은 기수를 모른다)
         return self._status_counts([s for s in self.items.values() if s.mentor_id == mentor_id])
+
+    async def count_views_for_mentor(
+        self, mentor_id: uuid.UUID, *, now: datetime, cohort_id: uuid.UUID | None = None
+    ) -> dict[str, int]:
+        mine = [s for s in self.items.values() if s.mentor_id == mentor_id]
+        result = {"all": len(mine)}
+        for view in SessionView:
+            result[view.value] = sum(1 for s in mine if _in_view(s, view, now))
+        return result
 
     async def list_settleable(
         self, cohort_id: uuid.UUID, *, before: datetime
@@ -897,3 +914,15 @@ class InMemorySettlementRepository:
             for i in s.items
             if i.session_id in session_ids
         }
+
+
+def _in_view(session: MentoringSession, view: SessionView, now: datetime | None) -> bool:
+    """`TortoiseMentoringSessionRepository._view`와 같은 탭 조건 (A77)."""
+    if view is SessionView.PAST:
+        return session.status in CLOSED_STATUSES
+    assert now is not None
+    if session.status not in OPEN_STATUSES:
+        return False
+    if view is SessionView.UPCOMING:
+        return session.ends_at > now
+    return session.starts_at <= now

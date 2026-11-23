@@ -316,9 +316,15 @@ class MentoringSessionRepository(Protocol):
         ...
 
     async def count_statuses_for_mentor(
-        self, mentor_id: uuid.UUID
+        self, mentor_id: uuid.UUID, *, cohort_id: uuid.UUID | None = None
     ) -> dict[MentoringSessionStatus, int]:
-        """멘토 세션의 상태별 수 (모든 상태, 없으면 0, A68)."""
+        """멘토 세션의 상태별 수 (모든 상태, 없으면 0, A68). 기수 필터는 따른다 (A77)."""
+        ...
+
+    async def count_views_for_mentor(
+        self, mentor_id: uuid.UUID, *, now: datetime, cohort_id: uuid.UUID | None = None
+    ) -> dict[str, int]:
+        """멘토 세션의 탭별 수: upcoming·record_missing·past·all (A77)."""
         ...
 
     async def list_by_cohort(

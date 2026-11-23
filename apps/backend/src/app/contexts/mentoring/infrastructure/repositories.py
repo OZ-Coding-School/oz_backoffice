@@ -26,7 +26,13 @@ from app.contexts.mentoring.domain.schedule import (
     mask_to_weekdays,
     weekdays_to_mask,
 )
-from app.contexts.mentoring.domain.session import MentoringSession, SessionQuery
+from app.contexts.mentoring.domain.session import (
+    CLOSED_STATUSES,
+    OPEN_STATUSES,
+    MentoringSession,
+    SessionQuery,
+    SessionView,
+)
 from app.contexts.mentoring.domain.settings import (
     CohortMentoringSettings,
     MentoringBlockTime,
@@ -975,7 +981,23 @@ class TortoiseMentoringSessionRepository:
             .exists()
         )
 
+    @staticmethod
+    def _view(query: Any, view: SessionView, now: datetime | None) -> Any:
+        """탭 조건 (A77)."""
+        if view is SessionView.PAST:
+            return query.filter(status__in=list(CLOSED_STATUSES))
+        if now is None:
+            raise ValueError("view에는 now가 필요합니다.")
+        query = query.filter(status__in=list(OPEN_STATUSES))
+        if view is SessionView.UPCOMING:
+            return query.filter(ends_at__gt=now)
+        return query.filter(starts_at__lte=now)
+
     async def _page(self, query: Any, q: SessionQuery) -> tuple[list[MentoringSession], int]:
+        if q.view is not None:
+            query = self._view(query, q.view, q.now)
+        if q.cohort_id is not None:
+            query = query.filter(request__requester__cohort_id=q.cohort_id)
         if q.status is not None:
             query = query.filter(status=q.status)
         if q.statuses:
@@ -1056,10 +1078,26 @@ class TortoiseMentoringSessionRepository:
             MentoringSessionModel.filter(_participants(student_ids, team_ids))
         )
 
+    @staticmethod
+    def _mentor_sessions(mentor_id: uuid.UUID, cohort_id: uuid.UUID | None) -> Any:
+        query = MentoringSessionModel.filter(mentor_id=mentor_id)
+        if cohort_id is not None:
+            query = query.filter(request__requester__cohort_id=cohort_id)
+        return query
+
     async def count_statuses_for_mentor(
-        self, mentor_id: uuid.UUID
+        self, mentor_id: uuid.UUID, *, cohort_id: uuid.UUID | None = None
     ) -> dict[MentoringSessionStatus, int]:
-        return await self._status_counts(MentoringSessionModel.filter(mentor_id=mentor_id))
+        return await self._status_counts(self._mentor_sessions(mentor_id, cohort_id))
+
+    async def count_views_for_mentor(
+        self, mentor_id: uuid.UUID, *, now: datetime, cohort_id: uuid.UUID | None = None
+    ) -> dict[str, int]:
+        result = {"all": await self._mentor_sessions(mentor_id, cohort_id).count()}
+        for view in SessionView:
+            base = self._mentor_sessions(mentor_id, cohort_id)
+            result[view.value] = await self._view(base, view, now).count()
+        return result
 
     async def count_by_requesters(
         self, requester_ids: list[uuid.UUID]

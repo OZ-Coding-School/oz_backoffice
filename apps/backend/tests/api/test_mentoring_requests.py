@@ -359,6 +359,21 @@ async def test_approve_reject_and_sessions(client: AsyncClient, settings: Settin
     )
     assert mentor_list.json()["total"] == 1
     assert mentor_list.json()["counts"]["SCHEDULED"] == 1
+    # 탭별 수·기수 (A77)
+    assert mentor_list.json()["view_counts"]["all"] == 1
+    assert mentor_list.json()["items"][0]["cohort_number"] == ctx["cohort"].cohort_number
+    past_view = await client.get(
+        "/api/v1/me/mentor-sessions", params={"view": "past"}, headers=mentor_h
+    )
+    assert (past_view.json()["total"], past_view.json()["view_counts"]["past"]) == (0, 0)
+    other_cohort = await client.get(
+        "/api/v1/me/mentor-sessions", params={"cohort_id": str(new_id())}, headers=mentor_h
+    )
+    assert (other_cohort.json()["total"], other_cohort.json()["view_counts"]["all"]) == (0, 0)
+    bad_view = await client.get(
+        "/api/v1/me/mentor-sessions", params={"view": "later"}, headers=mentor_h
+    )
+    assert bad_view.status_code == 422
     for order, code in (("asc", 200), ("desc", 200), ("oldest", 422)):  # 정렬 (A75)
         ordered = await client.get(
             "/api/v1/me/mentoring/sessions", params={"order": order}, headers=student_h

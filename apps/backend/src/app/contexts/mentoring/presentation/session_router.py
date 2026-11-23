@@ -10,6 +10,7 @@
 """
 
 import uuid
+from dataclasses import replace
 from datetime import datetime
 from typing import Annotated, Literal, cast
 
@@ -22,7 +23,7 @@ from app.contexts.mentoring.application.assignment_service import MentorDirector
 from app.contexts.mentoring.application.request_service import StudentLookup
 from app.contexts.mentoring.application.session_service import MentoringSessionQueries
 from app.contexts.mentoring.domain.enums import MentoringCancelActor, MentoringSessionStatus
-from app.contexts.mentoring.domain.session import MentoringSession, SessionQuery
+from app.contexts.mentoring.domain.session import MentoringSession, SessionQuery, SessionView
 from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseBalanceTransactionRepository,
     TortoiseMentoringRequestRepository,
@@ -35,6 +36,8 @@ from app.contexts.mentoring.presentation.presenters import (
     RequestBalanceResponse,
     balance_response,
 )
+from app.core.clock import Clock
+from app.core.dependencies import get_clock
 from app.core.pagination import Page
 
 router = APIRouter(prefix="/mentoring/sessions", tags=["mentoring-sessions"])
@@ -141,6 +144,9 @@ class SessionResponse(BaseModel):
     record_duration_minutes: int | None = Field(description="실제 진행 시간(분), 완료만")
     recorded_at: datetime | None = Field(description="기록 제출 시각")
     created_at: datetime | None
+    cohort_id: uuid.UUID | None = Field(description="신청자의 기수 (A77)")
+    bootcamp_name: str | None = Field(description="신청자 기수의 과정명 (A77)")
+    cohort_number: int | None = Field(description="신청자 기수 번호 (A77)")
 
 
 class AdminSessionResponse(SessionResponse):
@@ -161,6 +167,19 @@ class SessionListPage(Page[SessionResponse]):
     counts: SessionStatusCounts
 
 
+class SessionViewCounts(BaseModel):
+    """멘토 세션 탭별 수 (A77). 탭·상태 필터와 무관하고 기수 필터는 따른다."""
+
+    upcoming: int
+    record_missing: int
+    past: int
+    all: int
+
+
+class MentorSessionListPage(SessionListPage):
+    view_counts: SessionViewCounts
+
+
 class SessionPresenter:
     def __init__(self, request: Request) -> None:
         self._names = NameBook(request)
@@ -170,6 +189,9 @@ class SessionPresenter:
     async def admin(self, items: list[MentoringSession]) -> list[AdminSessionResponse]:
         requests = await self._requests.get_many(list({s.request_id for s in items}))
         names = await self._names.of(list(requests.values()))
+        labels = await self._names.cohort_labels(
+            list({n.requester_cohort_id for n in names.values() if n.requester_cohort_id})
+        )
         people = await self._names.participants(list(requests.values()))
         amounts = await self._ledger.amounts_by_requests(list(requests))
         result = []
@@ -210,6 +232,13 @@ class SessionPresenter:
                     actual_started_at=s.actual_started_at,
                     actual_ended_at=s.actual_ended_at,
                     created_at=s.created_at,
+                    cohort_id=n.requester_cohort_id,
+                    bootcamp_name=labels[n.requester_cohort_id][0]
+                    if n.requester_cohort_id in labels
+                    else None,
+                    cohort_number=labels[n.requester_cohort_id][1]
+                    if n.requester_cohort_id in labels
+                    else None,
                 )
             )
         return result
@@ -255,17 +284,34 @@ async def my_sessions(
     )
 
 
-@me_router.get("/mentor-sessions", response_model=SessionListPage)
+@me_router.get("/mentor-sessions", response_model=MentorSessionListPage)
 async def mentor_sessions(
-    user: ApprovedUser, queries: QueriesDep, presenter: PresenterDep, query: MemberQueryDep
-) -> SessionListPage:
-    items, total = await queries.list_for_mentor(user.id, query)
-    return SessionListPage(
+    user: ApprovedUser,
+    queries: QueriesDep,
+    presenter: PresenterDep,
+    query: MemberQueryDep,
+    clock: Annotated[Clock, Depends(get_clock)],
+    view: Annotated[
+        SessionView | None,
+        Query(description="탭: upcoming·record_missing·past (A77). status와 함께 쓸 수 있다"),
+    ] = None,
+    cohort_id: Annotated[
+        uuid.UUID | None, Query(description="신청자 기수로 거른다. 건수도 따른다 (A77)")
+    ] = None,
+) -> MentorSessionListPage:
+    now = clock.now()
+    items, total = await queries.list_for_mentor(
+        user.id, replace(query, view=view, now=now, cohort_id=cohort_id)
+    )
+    return MentorSessionListPage(
         items=await presenter.public(items),
         total=total,
         limit=query.limit,
         offset=query.offset,
-        counts=_counts(await queries.counts_for_mentor(user.id)),
+        counts=_counts(await queries.counts_for_mentor(user.id, cohort_id=cohort_id)),
+        view_counts=SessionViewCounts(
+            **await queries.views_for_mentor(user.id, now=now, cohort_id=cohort_id)
+        ),
     )
 
 

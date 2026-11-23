@@ -13,6 +13,7 @@
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from enum import StrEnum
 
 from app.contexts.mentoring.domain.enums import MentoringSessionStatus, RecordingStatus
 from app.shared.domain import AggregateRoot
@@ -25,6 +26,22 @@ RECORD_UNIT_MINUTES = 30
 RECORD_EDIT_DAYS = 7
 
 
+class SessionView(StrEnum):
+    """멘토 세션 목록 탭 (A77)."""
+
+    UPCOMING = "upcoming"  # 아직 끝나지 않은 예정·진행 중
+    RECORD_MISSING = "record_missing"  # 예정 시작이 지났는데 기록이 없는 예정·진행 중
+    PAST = "past"  # 완료·노쇼·취소
+
+
+OPEN_STATUSES = (MentoringSessionStatus.SCHEDULED, MentoringSessionStatus.IN_PROGRESS)
+CLOSED_STATUSES = (
+    MentoringSessionStatus.COMPLETED,
+    MentoringSessionStatus.NO_SHOW,
+    MentoringSessionStatus.CANCELED,
+)
+
+
 @dataclass(frozen=True, slots=True)
 class SessionQuery:
     """세션 목록 조건 (기본은 시작 시각 최신순, `ascending`이면 이른 순, A75)."""
@@ -34,6 +51,9 @@ class SessionQuery:
     starts_from: datetime | None = None  # 포함
     starts_before: datetime | None = None  # 미포함
     ascending: bool = False  # 시작 시각 이른 순 (수강생·멘토 목록, A75)
+    view: SessionView | None = None  # 탭 (멘토 목록, A77). `now`가 필요하다
+    now: datetime | None = None
+    cohort_id: uuid.UUID | None = None  # 신청자 기수 (멘토 목록, A77)
     limit: int = 20
     offset: int = 0
 
