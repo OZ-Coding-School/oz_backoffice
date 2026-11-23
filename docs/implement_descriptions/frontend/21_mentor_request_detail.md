@@ -1,7 +1,7 @@
 # 21. FE-9b 멘토 받은 신청 상세·승인·반려
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #110
 - 관련 결정: `docs/decisions.md` F45 (F43·A42·A43·A76·F41)
 - 이전 기록: [20. FE-9a 멘토 받은 신청 목록](20_mentor_requests_list.md)
 
