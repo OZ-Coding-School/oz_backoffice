@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { sessionQuery, type MentoringSession } from "@/features/sessions/api";
+import { ReplaySection } from "@/features/sessions/components/replay-section";
 import { plannedMinutes, scheduleLabel } from "@/features/sessions/labels";
 import { formatKstDayTime } from "@/lib/datetime";
 
@@ -84,6 +85,8 @@ function Detail({ session }: { session: MentoringSession }) {
           </Button>
         ) : null}
       </header>
+      {/* 완료 세션은 머리 아래 전체 폭으로 다시 보기 (F50, 수강생 FE-5b와 같은 블록) */}
+      {session.status === "COMPLETED" ? <ReplaySection session={session} /> : null}
       {/* 데스크톱은 2단, 그 밖은 기록 → 신청 정보 → 내부 메모 (F48) */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_22.5rem] lg:items-start lg:gap-6">
         <RecordCard session={session} now={now} />
