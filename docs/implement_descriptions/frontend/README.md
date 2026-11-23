@@ -19,3 +19,4 @@
 | 15 | [FE-6b 시간 지급·차감 내역](15_balance_history.md) | 완료 (#100) |
 | 16 | [FE-6c 내 팀](16_my_team.md) | 완료 (#102) |
 | 17 | [FE-7a 채팅 화면](17_chat_screens.md) | 완료 (#104) |
+| 18 | [FE-7b 채팅 실시간 수신·안 읽음](18_chat_realtime.md) | 완료 (#105) |

@@ -92,8 +92,47 @@ export function useApplyMessage() {
     queryClient.setQueryData<MessagesData>(chatKeys.messages(message.thread_id), (data) =>
       upsertMessage(data, message),
     );
+    // 안 읽음 수가 바뀌므로 목록과 그 방을 다시 본다
     void queryClient.invalidateQueries({ queryKey: chatKeys.threads });
+    void queryClient.invalidateQueries({ queryKey: chatKeys.thread(message.thread_id) });
   };
+}
+
+/** 방 상태(안 읽음 등)를 방 단건·목록 캐시에 반영한다 (읽음, 실시간 `read`) */
+export function useApplyThread() {
+  const queryClient = useQueryClient();
+  return (thread: ChatThread) => {
+    queryClient.setQueryData(chatKeys.thread(thread.id), thread);
+    queryClient.setQueryData<InfiniteData<ThreadPage, number>>(chatKeys.threads, (data) =>
+      data
+        ? {
+            ...data,
+            pages: data.pages.map((p) => ({ ...p, items: p.items.map((t) => (t.id === thread.id ? thread : t)) })),
+          }
+        : data,
+    );
+  };
+}
+
+/** 안 읽음 합 (메뉴 배지, F41) */
+export function unreadTotal(data: InfiniteData<ThreadPage> | undefined): number {
+  return (data?.pages ?? []).reduce((sum, p) => sum + p.items.reduce((s, t) => s + t.unread_count, 0), 0);
+}
+
+/** 상대와의 방 찾기 (F41): 세션·내 팀의 [채팅]. 팀이면 팀-멘토, 아니면 수강 등록-멘토 1:1 */
+export function findThread(
+  data: InfiniteData<ThreadPage> | undefined,
+  target: { mentorId: string; teamId?: string | null; studentId?: string | null },
+): ChatThread | undefined {
+  return (data?.pages ?? [])
+    .flatMap((p) => p.items)
+    .find((t) =>
+      t.mentor_id !== target.mentorId
+        ? false
+        : target.teamId
+          ? t.kind === "TEAM" && t.team_id === target.teamId
+          : t.kind === "DIRECT" && t.student_id === target.studentId,
+    );
 }
 
 export function useSendMessage(threadId: string) {
@@ -125,7 +164,7 @@ export function useDeleteMessage(threadId: string) {
 
 /** 본 마지막 메시지까지 읽음 (앞으로만 옮긴다, A57) */
 export function useMarkRead(threadId: string) {
-  const queryClient = useQueryClient();
+  const applyThread = useApplyThread();
   return useMutation({
     mutationFn: (messageId: string) =>
       unwrap(
@@ -134,16 +173,6 @@ export function useMarkRead(threadId: string) {
           body: { message_id: messageId },
         }),
       ),
-    onSuccess: (thread) => {
-      queryClient.setQueryData(chatKeys.thread(threadId), thread);
-      queryClient.setQueryData<InfiniteData<ThreadPage, number>>(chatKeys.threads, (data) =>
-        data
-          ? {
-              ...data,
-              pages: data.pages.map((p) => ({ ...p, items: p.items.map((t) => (t.id === thread.id ? thread : t)) })),
-            }
-          : data,
-      );
-    },
+    onSuccess: applyThread,
   });
 }

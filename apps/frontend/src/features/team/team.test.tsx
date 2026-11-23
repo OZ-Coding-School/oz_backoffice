@@ -108,6 +108,7 @@ describe("내 팀 (F39·A73)", () => {
     expect(within(team).getByRole("link", { name: "알파 2회차 · 완료" })).toBeInTheDocument();
     expect(seen).toContain("t3");
 
+    expect(screen.queryByRole("link", { name: "팀 채팅" })).not.toBeInTheDocument(); // 방이 없다 (F41)
     expect(screen.getByRole("link", { name: "팀 멘토링 신청" })).toHaveAttribute("href", "/mentoring/apply?kind=team");
     await user.click(within(team).getByRole("button", { name: "상세 소개 보기" }));
     expect(await screen.findByRole("dialog", { name: "이멘토" })).toBeInTheDocument();
@@ -133,5 +134,38 @@ describe("내 팀 (F39·A73)", () => {
     const menu = (await screen.findAllByRole("navigation", { name: "메뉴" }))[0]!;
     await waitFor(() => expect(within(menu).getAllByRole("link")).toHaveLength(7));
     expect(within(menu).queryByRole("link", { name: "내 팀" })).not.toBeInTheDocument();
+  });
+});
+
+describe("내 팀 [팀 채팅] (F41)", () => {
+  it("팀-담당 멘토 방이 있으면 바로 그 방으로 간다", async () => {
+    mockTeamPage();
+    server.use(
+      http.get(apiUrl("/api/v1/me/mentoring/chat/threads"), () =>
+        HttpResponse.json({
+          items: [
+            {
+              id: "th-team",
+              kind: "TEAM",
+              cohort_id: "c12",
+              student_id: null,
+              student_name: null,
+              team_id: "t3",
+              team_label: "알파",
+              mentor_id: "m2",
+              mentor_display_name: "이멘토",
+              last_message_at: null,
+              last_message: null,
+              unread_count: 0,
+            },
+          ],
+          total: 1,
+          limit: 50,
+          offset: 0,
+        }),
+      ),
+    );
+    await renderRoute("/mentoring/team");
+    expect(await screen.findByRole("link", { name: "팀 채팅" })).toHaveAttribute("href", "/mentoring/chat/th-team");
   });
 });

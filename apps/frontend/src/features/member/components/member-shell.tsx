@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Ellipsis, LogOut } from "lucide-react";
 import { useState, type ReactNode } from "react";
@@ -23,6 +23,8 @@ import { cn } from "@/lib/utils";
 
 import { activeCohort, cohortLabel, enrollmentsQuery } from "../api";
 import { myTeamsQuery } from "@/features/apply/api";
+import { threadsQuery, unreadTotal } from "@/features/chat/api";
+import { useChatStream } from "@/features/chat/stream";
 import { mentoringSettingsQuery } from "@/features/requests/api";
 
 import { useLogout } from "../logout";
@@ -57,6 +59,10 @@ export function MemberShell({ me, children }: { me: Me; children: ReactNode }) {
   const teams = useQuery({ ...myTeamsQuery, enabled: !!settings.data?.allow_team_mentoring });
   const team = !!settings.data?.allow_team_mentoring && (teams.data?.as_student.length ?? 0) > 0;
   const groups = memberNav(me.account_type, { apply, team });
+  // 채팅 실시간 수신과 안 읽음 배지 (A58·F41)
+  useChatStream(true);
+  const threads = useInfiniteQuery(threadsQuery);
+  const badges: Badges = { "/mentoring/chat": unreadTotal(threads.data) };
   const current = currentNavItem(groups, pathname);
   // 채팅은 여백 없이 화면 높이를 채우고, 휴대폰 대화는 머리·하단 탭 없이 전체 화면이다 (F40)
   const fullBleed = pathname === "/mentoring/chat" || pathname.startsWith("/mentoring/chat/");
@@ -72,7 +78,7 @@ export function MemberShell({ me, children }: { me: Me; children: ReactNode }) {
             <div key={group.title ?? index} className="flex flex-col gap-0.5">
               {group.title ? <p className="px-2 py-1.5 text-caption text-muted-foreground">{group.title}</p> : null}
               {group.items.map((item) => (
-                <SidebarLink key={item.to} item={item} active={item === current} />
+                <SidebarLink key={item.to} item={item} active={item === current} badge={badges[item.to]} />
               ))}
             </div>
           ))}
@@ -95,7 +101,7 @@ export function MemberShell({ me, children }: { me: Me; children: ReactNode }) {
       >
         <Mark className="size-10" />
         {navItems(groups).map((item) => (
-          <RailLink key={item.to} item={item} active={item === current} />
+          <RailLink key={item.to} item={item} active={item === current} badge={badges[item.to]} />
         ))}
       </nav>
 
@@ -121,7 +127,9 @@ export function MemberShell({ me, children }: { me: Me; children: ReactNode }) {
             <div className="mx-auto w-full max-w-270">{children}</div>
           </main>
         )}
-        {showBottomTabs(groups) ? <BottomTabs groups={groups} current={current} hidden={immersive} /> : null}
+        {showBottomTabs(groups) ? (
+          <BottomTabs groups={groups} current={current} hidden={immersive} badges={badges} />
+        ) : null}
       </div>
     </div>
   );
@@ -136,7 +144,25 @@ function Mark({ className }: { className?: string }) {
   );
 }
 
-function SidebarLink({ item, active }: { item: MemberNavItem; active: boolean }) {
+type Badges = Partial<Record<string, number>>;
+
+/** 안 읽음 숫자 (99+). 화면 읽기 프로그램에는 '안 읽음 N'으로 읽힌다 */
+function Count({ value, className }: { value: number | undefined; className?: string }) {
+  if (!value) return null;
+  return (
+    <span
+      className={cn(
+        "inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-caption-strong text-primary-foreground",
+        className,
+      )}
+    >
+      <span className="sr-only">안 읽음 </span>
+      {value > 99 ? "99+" : value}
+    </span>
+  );
+}
+
+function SidebarLink({ item, active, badge }: { item: MemberNavItem; active: boolean; badge?: number | undefined }) {
   const Icon = item.icon;
   return (
     <Link
@@ -150,20 +176,21 @@ function SidebarLink({ item, active }: { item: MemberNavItem; active: boolean })
       )}
     >
       <Icon aria-hidden className="size-4 shrink-0" />
-      {item.label}
+      <span className="flex-1">{item.label}</span>
+      <Count value={badge} />
     </Link>
   );
 }
 
-function RailLink({ item, active }: { item: MemberNavItem; active: boolean }) {
+function RailLink({ item, active, badge }: { item: MemberNavItem; active: boolean; badge?: number | undefined }) {
   const Icon = item.icon;
   return (
     <Link
       to={item.to}
       aria-current={active ? "page" : undefined}
-      aria-label={item.label}
+      aria-label={badge ? `${item.label} 안 읽음 ${badge}` : item.label}
       className={cn(
-        "flex w-14 flex-col items-center gap-0.5 rounded-md px-1 py-1.5",
+        "relative flex w-14 flex-col items-center gap-0.5 rounded-md px-1 py-1.5",
         active
           ? "bg-sidebar-accent text-sidebar-accent-foreground"
           : "text-sidebar-foreground hover:bg-sidebar-accent/60",
@@ -171,6 +198,7 @@ function RailLink({ item, active }: { item: MemberNavItem; active: boolean }) {
     >
       <Icon aria-hidden className="size-5" />
       <span className="text-caption-strong">{item.shortLabel}</span>
+      <Count value={badge} className="absolute -top-0.5 right-0.5 min-w-4 px-1" />
     </Link>
   );
 }
@@ -213,18 +241,21 @@ function BottomTabs({
   groups,
   current,
   hidden,
+  badges,
 }: {
   groups: MemberNavGroup[];
   current: MemberNavItem | undefined;
   /** 휴대폰 채팅 대화처럼 전체 화면일 때 숨긴다 (F40) */
   hidden: boolean;
+  badges: Badges;
 }) {
   const { tabs, more } = bottomTabLayout(groups);
+  const moreBadge = more.flatMap((g) => g.items).reduce((sum, i) => sum + (badges[i.to] ?? 0), 0);
   const [open, setOpen] = useState(false);
   const inMore = !!current && more.some((g) => g.items.includes(current));
   const tabClass = (active: boolean) =>
     cn(
-      "flex flex-1 flex-col items-center gap-0.5 py-2 text-caption",
+      "relative flex flex-1 flex-col items-center gap-0.5 py-2 text-caption",
       active ? "text-primary-text" : "text-muted-foreground",
     );
   return (
@@ -242,6 +273,7 @@ function BottomTabs({
           <Link key={item.to} to={item.to} aria-current={active ? "page" : undefined} className={tabClass(active)}>
             <Icon aria-hidden className="size-5" />
             {item.shortLabel}
+            <Count value={badges[item.to]} className={TAB_BADGE} />
           </Link>
         );
       })}
@@ -256,8 +288,9 @@ function BottomTabs({
           >
             <Ellipsis aria-hidden className="size-5" />
             더보기
+            <Count value={moreBadge} className={TAB_BADGE} />
           </button>
-          <MoreSheet groups={more} current={current} open={open} onOpenChange={setOpen} />
+          <MoreSheet groups={more} current={current} open={open} onOpenChange={setOpen} badges={badges} />
         </>
       ) : null}
     </nav>
@@ -265,12 +298,16 @@ function BottomTabs({
 }
 
 /** 더보기 (F36): 하단 탭에 없는 메뉴를 그룹 이름과 함께 아래에서 올린다 */
+const TAB_BADGE = "absolute top-1 left-1/2 ml-1.5 min-w-4 px-1";
+
 function MoreSheet({
   groups,
   current,
   open,
   onOpenChange,
+  badges,
 }: {
+  badges: Badges;
   groups: MemberNavGroup[];
   current: MemberNavItem | undefined;
   open: boolean;
@@ -300,7 +337,8 @@ function MoreSheet({
                     )}
                   >
                     <Icon aria-hidden className="size-4" />
-                    {item.label}
+                    <span className="flex-1">{item.label}</span>
+                    <Count value={badges[item.to]} />
                   </Link>
                 );
               })}
