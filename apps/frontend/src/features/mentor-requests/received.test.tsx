@@ -111,7 +111,10 @@ describe("멘토 받은 신청 목록 (F43)", () => {
     expect(within(row).getByText("대기")).toBeInTheDocument();
     expect(within(table).getByRole("row", { name: /팀 배포 구성 점검/ })).toHaveTextContent("3팀 알파 · 팀");
     // 휴대폰·태블릿 카드
-    expect(screen.getByRole("article", { name: "Django ORM 질문" })).toHaveTextContent("희망 11/24(화) 19:00 외 2");
+    const card = screen.getByRole("link", { name: "Django ORM 질문 · 대기" });
+    expect(card).toHaveTextContent("희망 11/24(화) 19:00 외 2");
+    expect(card).toHaveAttribute("href", "/mentor/requests/r1");
+    expect(within(row).getByRole("link", { name: "Django ORM 질문" })).toHaveAttribute("href", "/mentor/requests/r1");
   });
 
   it("기수를 고르면 그 기수로 거르고 탭 건수도 따른다 (A76)", async () => {

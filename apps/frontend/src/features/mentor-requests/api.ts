@@ -1,8 +1,8 @@
-import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
+import { infiniteQueryOptions, queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { api, unwrap } from "@/api/client";
 import type { components } from "@/api/schema.gen";
-import type { RequestCounts, RequestStatus } from "@/features/requests/api";
+import { requestKeys, type RequestCounts, type RequestStatus } from "@/features/requests/api";
 
 export type MyAssignment = components["schemas"]["MyAssignmentResponse"];
 
@@ -85,4 +85,41 @@ export function cohortOptions(assignments: readonly MyAssignment[]): { id: strin
     if (!byCohort.has(a.cohort_id)) byCohort.set(a.cohort_id, a);
   }
   return [...byCohort.values()].map((a) => ({ id: a.cohort_id, label: `${a.bootcamp_name} ${a.cohort_number}기` }));
+}
+
+/** 승인 (A43): 희망 일시 하나로 세션을 만든다. 응답의 신청으로 상세 캐시를 고치고 목록·배지·세션을 새로 부른다 */
+export function useApproveRequest(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (startsAt: string) =>
+      unwrap(
+        api.POST("/api/v1/mentoring/requests/{request_id}/approve", {
+          params: { path: { request_id: id } },
+          body: { starts_at: startsAt },
+        }),
+      ),
+    onSuccess: ({ request }) => {
+      queryClient.setQueryData(requestKeys.detail(id), request);
+      void queryClient.invalidateQueries({ queryKey: receivedKeys.all });
+      void queryClient.invalidateQueries({ queryKey: ["sessions"] });
+    },
+  });
+}
+
+/** 반려 (A42): 사유 필수 300자. 신청자의 차감 예정 시간이 돌아간다 */
+export function useRejectRequest(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (reason: string) =>
+      unwrap(
+        api.POST("/api/v1/mentoring/requests/{request_id}/reject", {
+          params: { path: { request_id: id } },
+          body: { reason },
+        }),
+      ),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(requestKeys.detail(id), updated);
+      void queryClient.invalidateQueries({ queryKey: receivedKeys.all });
+    },
+  });
 }

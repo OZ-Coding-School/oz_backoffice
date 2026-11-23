@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { FileText } from "lucide-react";
+import { ChevronRight, FileText } from "lucide-react";
 
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
@@ -160,15 +160,24 @@ function RequestTable({ items }: { items: MentoringRequest[] }) {
             <th scope="col" className="w-20 px-4 py-2.5 font-normal">
               상태
             </th>
+            <th scope="col" className="w-10">
+              <span className="sr-only">상세</span>
+            </th>
           </tr>
         </thead>
         <tbody>
           {items.map((r) => (
-            <tr key={r.id} className="border-t border-border">
+            <tr key={r.id} className="relative border-t border-border hover:bg-muted">
               <td className="px-4 py-3 text-body text-foreground">{requestedAt(r)}</td>
               <td className="px-4 py-3">
                 <span className="flex flex-col gap-0.5">
-                  <span className="text-body-strong text-foreground">{r.topic}</span>
+                  <Link
+                    to="/mentor/requests/$requestId"
+                    params={{ requestId: r.id }}
+                    className="w-fit text-body-strong text-foreground outline-none after:absolute after:inset-0 hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {r.topic}
+                  </Link>
                   <span className="text-caption text-muted-foreground">{metaLabel(r)}</span>
                 </span>
               </td>
@@ -176,6 +185,9 @@ function RequestTable({ items }: { items: MentoringRequest[] }) {
               <td className="px-4 py-3 text-body text-foreground">{desiredLabel(r)}</td>
               <td className="px-4 py-3">
                 <StatusBadge request={r} />
+              </td>
+              <td className="pr-4 text-muted-foreground">
+                <ChevronRight aria-hidden className="size-4" />
               </td>
             </tr>
           ))}
@@ -187,12 +199,14 @@ function RequestTable({ items }: { items: MentoringRequest[] }) {
 
 function RequestCard({ request }: { request: MentoringRequest }) {
   return (
-    <article
-      aria-label={request.topic}
-      className="flex flex-col gap-1.5 rounded-xl border border-border bg-card px-4 py-3.5"
+    <Link
+      to="/mentor/requests/$requestId"
+      params={{ requestId: request.id }}
+      aria-label={`${request.topic} · ${RECEIVED_STATUS[request.status].label}`}
+      className="flex flex-col gap-1.5 rounded-xl border border-border bg-card px-4 py-3.5 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
     >
       <div className="flex items-center gap-2">
-        <h2 className="min-w-0 flex-1 text-body-strong text-foreground">{request.topic}</h2>
+        <span className="min-w-0 flex-1 text-body-strong text-foreground">{request.topic}</span>
         <StatusBadge request={request} />
       </div>
       <p className="text-caption text-muted-foreground">
@@ -205,6 +219,6 @@ function RequestCard({ request }: { request: MentoringRequest }) {
         </span>
         <span className="text-caption text-muted-foreground">신청 {requestedAt(request)}</span>
       </div>
-    </article>
+    </Link>
   );
 }
