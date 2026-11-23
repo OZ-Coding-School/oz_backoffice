@@ -1,7 +1,7 @@
 # 76. 멘토 세션 목록 탭·기수 필터, 세션 기수 (BE-2k)
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #111
 - 관련 결정: `docs/decisions.md` A77, F46 (A68·A76)
 - 이전 기록: [75. 멘토 받은 신청 보완 (BE-2j)](75_mentor_request_cohort.md)
 
