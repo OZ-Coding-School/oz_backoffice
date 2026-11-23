@@ -139,7 +139,18 @@ export function resetAuth(): void {
       HttpResponse.json({ items: [], total: 0, limit: 50, offset: 0 }),
     ),
     http.get(apiUrl("/api/v1/me/mentoring/chat/stream"), () => sseResponse(["event: ready\ndata: {}\n\n"])),
+    // 수강생 홈의 요약·멘토링 카드 (F42). 기본은 세션·신청·계좌 없음
+    http.get(apiUrl("/api/v1/me/mentoring/sessions"), () => HttpResponse.json(emptyPage(SESSION_COUNTS))),
+    http.get(apiUrl("/api/v1/me/mentoring/requests"), () => HttpResponse.json(emptyPage(REQUEST_COUNTS))),
+    http.get(apiUrl("/api/v1/me/balances"), () => HttpResponse.json([])),
   );
+}
+
+const SESSION_COUNTS = { SCHEDULED: 0, IN_PROGRESS: 0, COMPLETED: 0, NO_SHOW: 0, CANCELED: 0 };
+const REQUEST_COUNTS = { PENDING: 0, APPROVED: 0, REJECTED: 0, CANCELED: 0 };
+
+function emptyPage<C>(counts: C) {
+  return { items: [], total: 0, limit: 20, offset: 0, counts };
 }
 
 /** refresh 쿠키가 살아 있고 /me가 이 사용자인 상태 (앱을 새로 열었을 때). */
