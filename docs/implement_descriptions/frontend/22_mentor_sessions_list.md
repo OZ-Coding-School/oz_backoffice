@@ -1,7 +1,7 @@
 # 22. FE-10a 멘토 세션 목록
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #112
 - 관련 결정: `docs/decisions.md` F46·F47·A77
 - 이전 기록: [21. FE-9b 멘토 받은 신청 상세·승인·반려](21_mentor_request_detail.md)
 - 선행: 백엔드 [76. 멘토 세션 목록 탭·기수 필터 (BE-2k)](../backend/76_mentor_session_views.md)
