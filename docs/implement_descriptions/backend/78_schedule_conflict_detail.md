@@ -1,7 +1,7 @@
 # 78. 불가 시간 충돌 응답에 주제·신청자 (BE-2m)
 
-- 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 상태: 완료 (2026-11-23 병합)
+- 관련 PR: #116
 - 관련 결정: `docs/decisions.md` A79, F51 (A37·A45)
 - 이전 기록: [77. 기록 제출 시 잔여 부족 처리 (BE-2l)](77_record_overtime_shortfall.md)
 
@@ -26,6 +26,9 @@ FE-11 멘토 일정 시안의 충돌 확인 창은 겹치는 대기 신청·승�
 - `ruff check`, `ruff format --check`, `mypy`, `mypy tests`, `lint-imports` 통과
 - `pytest` 902 passed (통합 테스트 포함). API: 미리보기 충돌의 주제·신청자
 - 프론트엔드: `typecheck`, `vitest` 236 passed
+
+- GitHub Actions (PR #116): 백엔드·프론트엔드 검사·E2E 3개 통과
+- 사용자가 다음 작업 전까지의 PR 병합을 맡겼다(2026-11-23)
 
 ## 남은 작업
 - FE-11a 멘토 일정 보기, FE-11b 불가 시간 추가·수정·삭제·충돌 확인
