@@ -1,7 +1,7 @@
 # 20. FE-9a 멘토 받은 신청 목록
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #109
 - 관련 결정: `docs/decisions.md` F43·F44·A76 (F27·F41)
 - 이전 기록: [19. FE-8 수강생 홈](19_student_home.md)
 - 선행: 백엔드 [75. 멘토 받은 신청 보완 (BE-2j)](../backend/75_mentor_request_cohort.md)
