@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ChevronRight, FileText } from "lucide-react";
 
@@ -6,22 +6,13 @@ import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
 import { LoadMore } from "@/components/load-more";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import type { MentoringRequest } from "@/features/requests/api";
 import { cn } from "@/lib/utils";
 
-import {
-  cohortOptions,
-  myAssignmentsQuery,
-  RECEIVED_TABS,
-  receivedRequestsQuery,
-  receivedTabCount,
-  type ReceivedTab,
-} from "../api";
+import { RECEIVED_TABS, receivedRequestsQuery, receivedTabCount, type ReceivedTab } from "../api";
+import { CohortSelect } from "./cohort-select";
 import { desiredLabel, metaLabel, RECEIVED_STATUS, requestedAt, requesterLabel } from "../labels";
-
-const ALL_COHORTS = "all";
 
 /** 멘토 받은 신청 목록 (Figma `Column / 받은 신청 · 목록 (FE-9a)`, F43·A76). 데스크톱은 표, 그 밖은 카드 */
 export function ReceivedRequestsPage({ tab, cohortId }: { tab: ReceivedTab; cohortId: string | undefined }) {
@@ -104,33 +95,19 @@ export function ReceivedRequestsPage({ tab, cohortId }: { tab: ReceivedTab; coho
   );
 }
 
-/** 기수 필터: 내 배정 기수 전체(비활성 포함), 맨 위는 전체 기수 (F43) */
+/** 기수를 고르면 탭은 그대로 두고 주소의 cohort만 바꾼다 (F43) */
 function CohortFilter({ tab, cohortId }: { tab: ReceivedTab; cohortId: string | undefined }) {
   const navigate = useNavigate();
-  const assignments = useQuery(myAssignmentsQuery);
-  const options = cohortOptions(assignments.data ?? []);
   return (
-    <Select
-      value={cohortId ?? ALL_COHORTS}
-      onValueChange={(value) =>
+    <CohortSelect
+      value={cohortId}
+      onChange={(cohort) =>
         void navigate({
           to: "/mentor/requests",
-          search: { ...(tab === "pending" ? {} : { tab }), ...(value === ALL_COHORTS ? {} : { cohort: value }) },
+          search: { ...(tab === "pending" ? {} : { tab }), ...(cohort ? { cohort } : {}) },
         })
       }
-    >
-      <SelectTrigger aria-label="기수" className="lg:w-45">
-        <SelectValue placeholder="전체 기수" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value={ALL_COHORTS}>전체 기수</SelectItem>
-        {options.map((o) => (
-          <SelectItem key={o.id} value={o.id}>
-            {o.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    />
   );
 }
 
