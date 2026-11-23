@@ -76,4 +76,4 @@
 | 72 | [내 팀 응답 보완 (BE-2g)](72_my_team_summary.md) | 완료 (#101) |
 | 73 | [채팅 자격을 신청 이력 기준으로 (BE-2h)](73_chat_request_history.md) | 완료 (#103) |
 | 74 | [세션 목록 정렬 (BE-2i)](74_session_list_order.md) | 완료 (#106) |
-| 75 | [멘토 받은 신청 보완 (BE-2j)](75_mentor_request_cohort.md) | PR 진행 중 |
+| 75 | [멘토 받은 신청 보완 (BE-2j)](75_mentor_request_cohort.md) | PR 진행 중 (#108) |
