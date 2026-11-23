@@ -1,7 +1,7 @@
 # 77. 기록 제출 시 잔여 부족 처리 (BE-2l)
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #113
 - 관련 결정: `docs/decisions.md` A78 (A53 변경, A55·A56)
 - 이전 기록: [76. 멘토 세션 목록 탭·기수 필터 (BE-2k)](76_mentor_session_views.md)
 
