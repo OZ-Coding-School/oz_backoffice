@@ -977,7 +977,8 @@ class TortoiseMentoringSessionRepository:
         if q.starts_before is not None:
             query = query.filter(starts_at__lt=q.starts_before)
         total = await query.count()
-        rows = await query.order_by("-starts_at", "-id").offset(q.offset).limit(q.limit)
+        order = ("starts_at", "id") if q.ascending else ("-starts_at", "-id")
+        rows = await query.order_by(*order).offset(q.offset).limit(q.limit)
         return [self._entity(row) for row in rows], total
 
     async def list_for_participants(
