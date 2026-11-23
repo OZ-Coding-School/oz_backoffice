@@ -24,3 +24,4 @@
 | 20 | [FE-9a 멘토 받은 신청 목록](20_mentor_requests_list.md) | 완료 (#109) |
 | 21 | [FE-9b 멘토 받은 신청 상세·승인·반려](21_mentor_request_detail.md) | 완료 (#110) |
 | 22 | [FE-10a 멘토 세션 목록](22_mentor_sessions_list.md) | 완료 (#112) |
+| 23 | [FE-10b 멘토 세션 상세·기록·내부 메모](23_mentor_session_detail.md) | PR 진행 중 |
