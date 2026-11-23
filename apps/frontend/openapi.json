@@ -12123,6 +12123,18 @@
             "type": "string",
             "title": "Mentor Name",
             "description": "멘토 실명 (운영진 응답에만)"
+          },
+          "uncharged_overtime_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uncharged Overtime Minutes",
+            "description": "잔여가 모자라 차감하지 못한 초과 진행 시간(분). 운영진 정산 참고 (A78)"
           }
         },
         "type": "object",
@@ -12159,7 +12171,8 @@
           "cohort_id",
           "bootcamp_name",
           "cohort_number",
-          "mentor_name"
+          "mentor_name",
+          "uncharged_overtime_minutes"
         ],
         "title": "AdminSessionResponse"
       },
@@ -19516,6 +19529,18 @@
           "amount": {
             "type": "integer",
             "title": "Amount"
+          },
+          "uncharged_overtime_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uncharged Overtime Minutes",
+            "description": "잔여가 모자라 차감하지 못한 초과 진행 시간(분), 정산 참고 (A78)"
           }
         },
         "type": "object",
@@ -19527,7 +19552,8 @@
           "billable_minutes",
           "pay_unit",
           "pay_rate",
-          "amount"
+          "amount",
+          "uncharged_overtime_minutes"
         ],
         "title": "SettlementItemResponse"
       },

@@ -151,6 +151,9 @@ class SessionResponse(BaseModel):
 
 class AdminSessionResponse(SessionResponse):
     mentor_name: str = Field(description="멘토 실명 (운영진 응답에만)")
+    uncharged_overtime_minutes: int | None = Field(
+        description="잔여가 모자라 차감하지 못한 초과 진행 시간(분). 운영진 정산 참고 (A78)"
+    )
 
 
 class SessionStatusCounts(BaseModel):
@@ -215,6 +218,7 @@ class SessionPresenter:
                     mentor_id=s.mentor_id,
                     mentor_display_name=n.mentor_display_name,
                     mentor_name=n.mentor_name,
+                    uncharged_overtime_minutes=s.uncharged_overtime_minutes,
                     mentor_headline=n.mentor_headline,
                     participants=people.get(r.id, []),
                     cancel_reason=r.cancel_reason,
@@ -246,7 +250,7 @@ class SessionPresenter:
     async def public(self, items: list[MentoringSession]) -> list[SessionResponse]:
         """수강생·멘토용 (멘토 실명 제외)."""
         return [
-            SessionResponse(**s.model_dump(exclude={"mentor_name"}))
+            SessionResponse(**s.model_dump(exclude={"mentor_name", "uncharged_overtime_minutes"}))
             for s in await self.admin(items)
         ]
 

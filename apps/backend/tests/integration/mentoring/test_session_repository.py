@@ -648,3 +648,27 @@ async def test_mentor_views_and_cohort_filter() -> None:
     }
     by_status = await sessions.count_statuses_for_mentor(mentor.id, cohort_id=other_cohort.id)
     assert by_status[MentoringSessionStatus.SCHEDULED] == 1
+
+
+async def test_uncharged_overtime_round_trip_and_check() -> None:
+    """미차감 초과 시간은 완료 기록에만, 0보다 커야 한다 (A78)."""
+    cohort = await create_cohort()
+    student = make_student(cohort_id=cohort.id)
+    await TortoiseStudentRepository().add(student)
+    mentor = await create_mentor()
+    session = _session(await _approved(mentor.id, student.id))
+    await sessions.add(session)
+    session.submit_completed(duration=120, topic="주제", summary="요약", now=T + timedelta(hours=1))
+    session.note_uncharged_overtime(30)
+    await sessions.save(session)
+    stored = await sessions.get(session.id)
+    assert stored is not None
+    assert stored.uncharged_overtime_minutes == 30
+
+    db = connections.get("default")
+    for sql in (
+        "UPDATE mentoring_sessions SET uncharged_overtime_minutes = 0 WHERE id = $1",
+        "UPDATE mentoring_sessions SET status = 'SCHEDULED' WHERE id = $1",
+    ):
+        with pytest.raises(IntegrityError):
+            await db.execute_query(sql, [str(session.id)])
