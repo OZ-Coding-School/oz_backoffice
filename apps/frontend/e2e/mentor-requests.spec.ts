@@ -94,4 +94,51 @@ test.describe("멘토 받은 신청", () => {
     await expect(page).toHaveURL(/tab=approved/);
     await expect(table.getByRole("row", { name: /포트폴리오 리뷰/ })).toContainText("11/20(금) 14:00");
   });
+
+  test("휴대폰: 카드 → 상세 → 일시 골라 승인 → 처리 결과 (F45)", async ({ page }) => {
+    await page.clock.setFixedTime(new Date("2026-11-20T03:00:00Z"));
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.route("**/api/v1/auth/refresh", (route) =>
+      route.fulfill({ json: { access_token: "t", expires_at: new Date(Date.now() + 900_000).toISOString() } }),
+    );
+    await page.route("**/api/v1/me", (route) => route.fulfill({ json: MENTOR }));
+    await page.route("**/api/v1/me/mentoring/chat/threads**", (route) =>
+      route.fulfill({ json: { items: [], total: 0, limit: 50, offset: 0 } }),
+    );
+    await page.route("**/api/v1/me/mentoring/chat/stream", (route) =>
+      route.fulfill({ headers: { "Content-Type": "text/event-stream" }, body: "event: ready\ndata: {}\n\n" }),
+    );
+    await page.route("**/api/v1/me/mentor-assignments**", (route) => route.fulfill({ json: [] }));
+    let current = REQUESTS[0]!;
+    await page.route("**/api/v1/me/mentor-requests**", (route) =>
+      route.fulfill({
+        json: {
+          items: current.status === "PENDING" ? [current] : [],
+          total: 1,
+          limit: 20,
+          offset: 0,
+          counts: { PENDING: 1, APPROVED: 0, REJECTED: 0, CANCELED: 0 },
+        },
+      }),
+    );
+    await page.route("**/api/v1/mentoring/requests/r1", (route) => route.fulfill({ json: current }));
+    await page.route("**/api/v1/mentoring/requests/r1/approve", async (route) => {
+      const { starts_at } = route.request().postDataJSON() as { starts_at: string };
+      current = {
+        ...current,
+        status: "APPROVED",
+        session: { id: "s1", starts_at, ends_at: "2026-11-25T11:00:00Z" },
+        balance: { state: "USED", minutes: 60 },
+      };
+      return route.fulfill({ json: { request: current, session: {} } });
+    });
+
+    await page.goto("/mentor/requests");
+    await page.getByRole("link", { name: "Django ORM 질문 · 대기" }).click();
+    await expect(page.getByRole("heading", { name: "Django ORM 질문", level: 1 })).toBeVisible();
+    await page.getByRole("radio", { name: /^2순위/ }).click();
+    await page.getByRole("button", { name: "이 일시로 승인" }).click();
+    await expect(page.getByRole("heading", { name: "승인한 신청이에요" })).toBeVisible();
+    await expect(page.getByText(/11\/25\(수\) 19:00 ~ 20:00 · 2순위/)).toBeVisible();
+  });
 });
