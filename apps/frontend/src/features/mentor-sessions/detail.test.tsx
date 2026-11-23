@@ -4,7 +4,7 @@ import { http, HttpResponse } from "msw";
 
 import { makeMe, mockSignedIn, resetAuth } from "@/features/auth/test-utils";
 import type { MentoringSession } from "@/features/sessions/api";
-import { makeSession } from "@/features/sessions/test-utils";
+import { makeSession, mockArtifacts } from "@/features/sessions/test-utils";
 import { apiUrl, errorBody } from "@/mocks/api";
 import { server } from "@/mocks/node";
 import { renderRoute } from "@/test/render";
@@ -221,5 +221,27 @@ describe("멘토 세션 상세·기록 (F48·A78)", () => {
     await user.type(await screen.findByRole("textbox", { name: "요약 (수강생도 봐요)" }), "요약");
     await user.click(screen.getByRole("button", { name: "기록 제출" }));
     expect(await screen.findByText("세션이 시작된 뒤에 기록할 수 있어요.")).toBeInTheDocument();
+  });
+});
+
+describe("멘토 다시 보기 (F50)", () => {
+  it("완료 세션은 머리 아래에 녹화·전사본 다시 보기를 보여 준다", async () => {
+    mockSession(
+      makeSession({ ...MISSING, status: "COMPLETED", record_duration_minutes: 60, recorded_at: NOW.toISOString() }),
+    );
+    mockArtifacts();
+    await renderRoute("/mentor/sessions/s1");
+    const replay = await screen.findByRole("region", { name: "다시 보기" });
+    expect(await within(replay).findByRole("link", { name: "내려받기" })).toBeInTheDocument();
+    // 다시 보기가 기록 카드보다 앞에 온다
+    const record = screen.getByRole("region", { name: "세션 기록" });
+    expect(replay.compareDocumentPosition(record) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("기록 전 세션에는 다시 보기가 없다", async () => {
+    mockSession(MISSING);
+    await renderRoute("/mentor/sessions/s1");
+    await screen.findByRole("button", { name: "기록 제출" });
+    expect(screen.queryByRole("region", { name: "다시 보기" })).not.toBeInTheDocument();
   });
 });
