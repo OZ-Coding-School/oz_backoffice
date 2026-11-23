@@ -9,7 +9,7 @@
 수강생·멘토:
   GET  /mentoring/requests/{id}               단건: 신청자·소속 팀원·담당 멘토만, 그 밖은 404 (A66)
 멘토:
-  GET  /me/mentor-requests?status=            받은 신청 (status 여러 개, 상태별 건수, A67)
+  GET  /me/mentor-requests?status=&cohort_id= 받은 신청 (상태 여러 개·건수 A67, 기수 필터 A76)
   POST /mentoring/requests/{id}/approve       희망 일시 하나를 골라 승인 → 세션 생성 (A43)
   POST /mentoring/requests/{id}/reject        반려 (사유 필수)
 운영진 (기수 범위):
@@ -20,11 +20,12 @@
 
 import uuid
 from datetime import datetime
-from typing import Annotated, cast
+from typing import Annotated, Any, cast
 
 from fastapi import APIRouter, Depends, Query, Request, status
 from pydantic import AwareDatetime, BaseModel, Field
 
+from app.contexts.academy.domain.enums import EnrollmentStatus
 from app.contexts.access.presentation.dependencies import ApprovedUser, require_permission
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.identity.application.auth_service import UserQueries
@@ -64,6 +65,7 @@ from app.contexts.mentoring.presentation.availability_router import get_availabl
 from app.contexts.mentoring.presentation.notices import build_notices
 from app.contexts.mentoring.presentation.presenters import (
     NameBook,
+    Names,
     RequestBalanceResponse,
     balance_response,
 )
@@ -205,6 +207,10 @@ class RequestResponse(BaseModel):
     balance: RequestBalanceResponse
     replaced_request_id: uuid.UUID | None
     created_at: datetime | None
+    cohort_id: uuid.UUID | None = Field(description="신청자의 기수 (A76)")
+    bootcamp_name: str | None = Field(description="신청자 기수의 과정명 (A76)")
+    cohort_number: int | None = Field(description="신청자 기수 번호 (A76)")
+    requester_status: EnrollmentStatus | None = Field(description="신청자의 수강 상태 (A76)")
 
 
 class AdminRequestResponse(RequestResponse):
@@ -255,6 +261,9 @@ class Presenter:
 
     async def admin(self, items: list[MentoringRequest]) -> list[AdminRequestResponse]:
         names = await self._names.of(items)
+        labels = await self._names.cohort_labels(
+            list({n.requester_cohort_id for n in names.values() if n.requester_cohort_id})
+        )
         ids = [r.id for r in items]
         sessions = await self._sessions.map_by_requests(
             [r.id for r in items if r.status is MentoringRequestStatus.APPROVED]
@@ -285,6 +294,7 @@ class Presenter:
                 balance=balance_response(amounts.get(r.id, [])),
                 replaced_request_id=r.replaced_request_id,
                 created_at=r.created_at,
+                **_cohort(names[r.id], labels),
             )
             for r in items
         ]
@@ -295,6 +305,17 @@ class Presenter:
             RequestResponse(**r.model_dump(exclude={"mentor_name"}))
             for r in await self.admin(items)
         ]
+
+
+def _cohort(names: Names, labels: dict[uuid.UUID, tuple[str, int]]) -> dict[str, Any]:
+    cohort_id = names.requester_cohort_id
+    label = labels.get(cohort_id) if cohort_id else None
+    return {
+        "cohort_id": cohort_id,
+        "bootcamp_name": label[0] if label else None,
+        "cohort_number": label[1] if label else None,
+        "requester_status": names.requester_status,
+    }
 
 
 def _session_brief(session: MentoringSession | None) -> RequestSessionBrief | None:
@@ -392,10 +413,15 @@ async def mentor_requests(
     service: ServiceDep,
     presenter: PresenterDep,
     status_: StatusFilter = None,
+    cohort_id: Annotated[
+        uuid.UUID | None, Query(description="신청자 기수로 거른다. counts도 따른다 (A76)")
+    ] = None,
     limit: Limit = 20,
     offset: Offset = 0,
 ) -> RequestListPage:
-    found = await service.list_for_mentor(user.id, statuses=status_, limit=limit, offset=offset)
+    found = await service.list_for_mentor(
+        user.id, statuses=status_, limit=limit, offset=offset, cohort_id=cohort_id
+    )
     return _list_page(found, await presenter.public(found.items), limit, offset)
 
 

@@ -712,10 +712,17 @@ class TortoiseMentoringRequestRepository:
             return dict.fromkeys(MentoringRequestStatus, 0)
         return await self._status_counts(self._participants(student_ids, team_ids))
 
+    @staticmethod
+    def _mentor_requests(mentor_id: uuid.UUID, cohort_id: uuid.UUID | None) -> Any:
+        query = MentoringRequestModel.filter(mentor_id=mentor_id)
+        if cohort_id is not None:
+            query = query.filter(requester__cohort_id=cohort_id)
+        return query
+
     async def count_statuses_for_mentor(
-        self, mentor_id: uuid.UUID
+        self, mentor_id: uuid.UUID, *, cohort_id: uuid.UUID | None = None
     ) -> dict[MentoringRequestStatus, int]:
-        return await self._status_counts(MentoringRequestModel.filter(mentor_id=mentor_id))
+        return await self._status_counts(self._mentor_requests(mentor_id, cohort_id))
 
     async def list_for_mentor(
         self,
@@ -724,8 +731,9 @@ class TortoiseMentoringRequestRepository:
         statuses: list[MentoringRequestStatus] | None,
         limit: int,
         offset: int,
+        cohort_id: uuid.UUID | None = None,
     ) -> tuple[list[MentoringRequest], int]:
-        query = MentoringRequestModel.filter(mentor_id=mentor_id)
+        query = self._mentor_requests(mentor_id, cohort_id)
         if statuses:
             query = query.filter(status__in=statuses)
         return await self._page(query, limit, offset)

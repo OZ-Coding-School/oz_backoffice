@@ -126,6 +126,23 @@ async def test_create_cancel_and_lists(client: AsyncClient, settings: Settings) 
         )
     ).json()
     assert received["total"] == 1
+    # 신청자 기수·수강 상태 (A76)
+    item = received["items"][0]
+    assert item["cohort_id"] == str(ctx["cohort"].id)
+    assert (item["cohort_number"], item["requester_status"]) == (
+        ctx["cohort"].cohort_number,
+        "ENROLLED",
+    )
+    assert item["bootcamp_name"]
+    for cohort_id, total in ((ctx["cohort"].id, 1), (new_id(), 0)):  # 기수 필터·건수 (A76)
+        filtered = (
+            await client.get(
+                "/api/v1/me/mentor-requests",
+                params={"cohort_id": str(cohort_id)},
+                headers=ctx["mentor_h"],
+            )
+        ).json()
+        assert (filtered["total"], filtered["counts"]["PENDING"]) == (total, total)
     staff = (await client.get(ctx["admin_path"], headers=ctx["admin"])).json()
     assert staff["items"][0]["mentor_name"] == "김멘토"
     for params, total in (  # 신청자 1:1만 / 팀만 (A59)

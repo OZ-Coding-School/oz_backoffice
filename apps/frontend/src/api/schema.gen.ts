@@ -3192,6 +3192,23 @@ export interface components {
             /** Created At */
             created_at: string | null;
             /**
+             * Cohort Id
+             * @description 신청자의 기수 (A76)
+             */
+            cohort_id: string | null;
+            /**
+             * Bootcamp Name
+             * @description 신청자 기수의 과정명 (A76)
+             */
+            bootcamp_name: string | null;
+            /**
+             * Cohort Number
+             * @description 신청자 기수 번호 (A76)
+             */
+            cohort_number: number | null;
+            /** @description 신청자의 수강 상태 (A76) */
+            requester_status: components["schemas"]["EnrollmentStatus"] | null;
+            /**
              * Mentor Name
              * @description 멘토 실명 (운영진 응답에만)
              */
@@ -5625,6 +5642,23 @@ export interface components {
             replaced_request_id: string | null;
             /** Created At */
             created_at: string | null;
+            /**
+             * Cohort Id
+             * @description 신청자의 기수 (A76)
+             */
+            cohort_id: string | null;
+            /**
+             * Bootcamp Name
+             * @description 신청자 기수의 과정명 (A76)
+             */
+            bootcamp_name: string | null;
+            /**
+             * Cohort Number
+             * @description 신청자 기수 번호 (A76)
+             */
+            cohort_number: number | null;
+            /** @description 신청자의 수강 상태 (A76) */
+            requester_status: components["schemas"]["EnrollmentStatus"] | null;
         };
         /** RequestSessionBrief */
         RequestSessionBrief: {
@@ -12035,6 +12069,8 @@ export interface operations {
             query?: {
                 /** @description 여러 개 가능 (예: status=REJECTED&status=CANCELED, A67) */
                 status?: components["schemas"]["MentoringRequestStatus"][] | null;
+                /** @description 신청자 기수로 거른다. counts도 따른다 (A76) */
+                cohort_id?: string | null;
                 limit?: number;
                 offset?: number;
             };

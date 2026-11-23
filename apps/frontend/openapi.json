@@ -8346,6 +8346,25 @@
             "description": "여러 개 가능 (예: status=REJECTED&status=CANCELED, A67)"
           },
           {
+            "name": "cohort_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "신청자 기수로 거른다. counts도 따른다 (A76)",
+              "title": "Cohort Id"
+            },
+            "description": "신청자 기수로 거른다. counts도 따른다 (A76)"
+          },
+          {
             "name": "limit",
             "in": "query",
             "required": false,
@@ -11688,6 +11707,54 @@
             ],
             "title": "Created At"
           },
+          "cohort_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cohort Id",
+            "description": "신청자의 기수 (A76)"
+          },
+          "bootcamp_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bootcamp Name",
+            "description": "신청자 기수의 과정명 (A76)"
+          },
+          "cohort_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cohort Number",
+            "description": "신청자 기수 번호 (A76)"
+          },
+          "requester_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EnrollmentStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "신청자의 수강 상태 (A76)"
+          },
           "mentor_name": {
             "type": "string",
             "title": "Mentor Name",
@@ -11718,6 +11785,10 @@
           "balance",
           "replaced_request_id",
           "created_at",
+          "cohort_id",
+          "bootcamp_name",
+          "cohort_number",
+          "requester_status",
           "mentor_name"
         ],
         "title": "AdminRequestResponse"
@@ -17988,6 +18059,54 @@
               }
             ],
             "title": "Created At"
+          },
+          "cohort_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cohort Id",
+            "description": "신청자의 기수 (A76)"
+          },
+          "bootcamp_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bootcamp Name",
+            "description": "신청자 기수의 과정명 (A76)"
+          },
+          "cohort_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cohort Number",
+            "description": "신청자 기수 번호 (A76)"
+          },
+          "requester_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EnrollmentStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "신청자의 수강 상태 (A76)"
           }
         },
         "type": "object",
@@ -18013,7 +18132,11 @@
           "session",
           "balance",
           "replaced_request_id",
-          "created_at"
+          "created_at",
+          "cohort_id",
+          "bootcamp_name",
+          "cohort_number",
+          "requester_status"
         ],
         "title": "RequestResponse"
       },

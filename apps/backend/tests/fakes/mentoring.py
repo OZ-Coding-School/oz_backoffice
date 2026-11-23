@@ -374,8 +374,9 @@ class InMemoryRequestRepository:
         return self._counts(self._of_participants(student_ids, team_ids))
 
     async def count_statuses_for_mentor(
-        self, mentor_id: uuid.UUID
+        self, mentor_id: uuid.UUID, *, cohort_id: uuid.UUID | None = None
     ) -> dict[MentoringRequestStatus, int]:
+        # 기수는 보지 않는다 (인메모리 신청은 기수를 모른다)
         return self._counts([r for r in self.items.values() if r.mentor_id == mentor_id])
 
     async def list_for_mentor(
@@ -385,6 +386,7 @@ class InMemoryRequestRepository:
         statuses: list[MentoringRequestStatus] | None,
         limit: int,
         offset: int,
+        cohort_id: uuid.UUID | None = None,
     ) -> tuple[list[MentoringRequest], int]:
         found = [
             r

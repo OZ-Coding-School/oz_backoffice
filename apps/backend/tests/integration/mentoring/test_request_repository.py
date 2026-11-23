@@ -121,6 +121,16 @@ async def test_request_round_trip_queries_and_constraints() -> None:
         **zero,
         MentoringRequestStatus.PENDING: 3,
     }
+    # 신청자 기수로 거르고, 건수도 기수를 따른다 (A76)
+    in_cohort, in_cohort_total = await repo.list_for_mentor(
+        mentor.id, statuses=None, limit=10, offset=0, cohort_id=cohort.id
+    )
+    assert ({r.id for r in in_cohort}, in_cohort_total) == ({solo.id, team_request.id}, 2)
+    assert await repo.count_statuses_for_mentor(mentor.id, cohort_id=cohort.id) == {
+        **zero,
+        MentoringRequestStatus.PENDING: 2,
+    }
+    assert await repo.count_statuses_for_mentor(mentor.id, cohort_id=new_id()) == zero
 
     assert {r.id for r in await repo.list_stale(T + timedelta(hours=4))} == {team_request.id}
     assert len(await repo.list_stale(T + timedelta(days=2))) == 3
