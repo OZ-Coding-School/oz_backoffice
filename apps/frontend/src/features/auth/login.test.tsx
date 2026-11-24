@@ -43,7 +43,7 @@ describe("라우트 가드", () => {
       }),
     );
     const { router } = await renderRoute("/");
-    expect(await screen.findByText("최고 관리자")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "안녕하세요, 김오즈님" })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/admin");
   });
 

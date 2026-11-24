@@ -145,6 +145,8 @@ export function resetAuth(): void {
     http.get(apiUrl("/api/v1/me/balances"), () => HttpResponse.json([])),
     // 멘토 메뉴의 받은 신청 대기 건수 (F44). 기본은 없음
     http.get(apiUrl("/api/v1/me/mentor-requests"), () => HttpResponse.json(emptyPage(REQUEST_COUNTS))),
+    // 운영진 틀의 메뉴·역할 이름 (A81). 기본은 권한 없음
+    http.get(apiUrl("/api/v1/me/staff-access"), () => HttpResponse.json({ permissions: [], cohorts: [] })),
     // 멘토 홈의 세션·신청 받기 (F57). 기본은 세션 없음, 신청 받는 중
     http.get(apiUrl("/api/v1/me/mentor-sessions"), () =>
       HttpResponse.json({

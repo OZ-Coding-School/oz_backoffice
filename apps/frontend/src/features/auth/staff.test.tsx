@@ -257,7 +257,7 @@ describe("운영진 최초 정보 입력", () => {
     );
     await user.click(screen.getByRole("button", { name: "새로고침" }));
     await waitFor(() => expect(router.state.location.pathname).toBe("/admin"));
-    expect(await screen.findByText("운영 매니저")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /^안녕하세요, .+님$/ })).toBeInTheDocument();
   });
 
   it("반려되면 사유를 보여 주고 이전 입력을 채운 폼으로 다시 신청한다", async () => {
