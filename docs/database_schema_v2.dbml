@@ -147,7 +147,12 @@ Table roles {
   code varchar(50) [not null, unique]
   name varchar(50) [not null]
   description text [null]
+  scope_kind varchar(20) [null, note: "새 역할의 허용 범위 GLOBAL(전체)·SCOPED(과정·기수). 기본 역할은 null(코드 정의를 따름) (A84)"]
   created_at timestamptz [not null, default: `now()`]
+
+  checks {
+    `scope_kind IS NULL OR scope_kind IN ('GLOBAL', 'SCOPED')` [name: 'check_role_scope_kind']
+  }
 }
 
 Table permissions {
@@ -159,7 +164,7 @@ Table permissions {
 }
 
 Table role_permissions {
-  note: "역할-권한 매핑. 역할은 계층이 아닌 권한 집합"
+  note: "역할-권한 매핑. 역할은 계층이 아닌 권한 집합. 권한 판정의 출처(A84, 최고 관리자는 항상 전체)"
 
   role_id uuid [not null, ref: > roles.id]
   permission_id uuid [not null, ref: > permissions.id]

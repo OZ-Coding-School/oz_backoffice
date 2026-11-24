@@ -1,7 +1,7 @@
-"""권한 판정 (plan §2.3, decisions D4·M31).
+"""권한 판정 (plan §2.3, decisions D4·M31·A84).
 
-- 역할 → 권한 매핑은 코드 정의(access/domain/catalog.py)를 따른다. DB의 role_permissions는 시드로
-  같은 내용을 유지하는 사본이라 판정에는 쓰지 않는다(요청마다 조인하지 않기 위해).
+- 역할 → 권한 매핑은 DB `role_permissions`를 따른다(A84). 사용자 역할을 읽을 때 함께 읽는다.
+  최고 관리자는 항상 모든 권한이다.
 - 범위: GLOBAL은 전체, BOOTCAMP는 그 과정과 소속 기수 전부, COHORT는 그 기수만.
 - 사용자 역할은 요청당 한 번만 읽는다 (PermissionChecker 인스턴스가 요청 단위로 캐시한다).
 """
@@ -12,7 +12,7 @@ from enum import StrEnum
 from typing import Protocol
 
 from app.contexts.access.application.roles import RoleQueries
-from app.contexts.access.domain.catalog import PERMISSIONS, ROLES_BY_CODE
+from app.contexts.access.domain.catalog import PERMISSIONS
 from app.contexts.access.domain.entities import RoleGrant
 from app.contexts.access.domain.enums import RoleScopeType
 from app.shared.errors import PermissionDeniedError
@@ -79,11 +79,7 @@ class PermissionChecker:
 
     async def has(self, user_id: uuid.UUID, code: str, target: PermissionTarget) -> bool:
         ensure_known_permission(code)
-        grants = [
-            g
-            for g in await self._grants_of(user_id)
-            if code in ROLES_BY_CODE[g.role_code].permissions
-        ]
+        grants = [g for g in await self._grants_of(user_id) if code in g.permissions]
         if not grants:
             return False
         if target.kind is TargetKind.ANY or any(
@@ -107,11 +103,7 @@ class PermissionChecker:
     async def scope_of(self, user_id: uuid.UUID, code: str) -> PermissionScope:
         """목록을 담당 범위로 거를 때 쓴다 (예: 승인 대기 목록)."""
         ensure_known_permission(code)
-        grants = [
-            g
-            for g in await self._grants_of(user_id)
-            if code in ROLES_BY_CODE[g.role_code].permissions
-        ]
+        grants = [g for g in await self._grants_of(user_id) if code in g.permissions]
         if any(g.scope_type is RoleScopeType.GLOBAL for g in grants):
             return PermissionScope(is_global=True)
         return PermissionScope(

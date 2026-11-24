@@ -7,11 +7,38 @@ from typing import Protocol
 
 from app.contexts.access.domain.catalog import RoleDefinition
 from app.contexts.access.domain.entities import RoleGrant, UserRole
+from app.contexts.access.domain.roles import Role
 
 
 class RoleCatalogRepository(Protocol):
     async def sync(self, roles: Sequence[RoleDefinition], permissions: dict[str, str]) -> None:
-        """역할·권한·역할-권한 매핑을 정의와 같게 맞춘다 (멱등)."""
+        """없는 권한·역할만 만든다 (멱등, A84).
+
+        권한 설명은 정의대로 고친다. 역할을 새로 만들 때만 초기 권한 묶음을 넣고, 이미 있는
+        역할의 이름·설명·매핑은 덮지 않는다. 최고 관리자에게는 빠진 권한을 더한다.
+        """
+        ...
+
+
+class RoleRepository(Protocol):
+    async def list_all(self) -> list[Role]:
+        """기본 역할(정의 순서) → 새 역할(만든 순서)."""
+        ...
+
+    async def get(self, code: str) -> Role | None: ...
+    async def lock(self, code: str) -> Role | None:
+        """행을 잠가 읽는다 (UoW 안에서)."""
+        ...
+
+    async def name_taken(self, name: str, *, exclude_code: str | None = None) -> bool: ...
+    async def add(self, role: Role) -> None: ...
+    async def save(self, role: Role) -> None:
+        """이름·설명·권한 묶음을 저장한다."""
+        ...
+
+    async def delete(self, code: str) -> None: ...
+    async def holder_counts(self) -> dict[str, int]:
+        """역할별 부여받은 회원 수 (만료된 부여 포함)."""
         ...
 
 

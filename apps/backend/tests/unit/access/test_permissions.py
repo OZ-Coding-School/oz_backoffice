@@ -226,3 +226,22 @@ async def test_scope_of_permission(h: Harness) -> None:
     await h.grant(SUPER_ADMIN, RoleScopeType.GLOBAL)
     fresh = PermissionChecker(RoleQueries(h.user_roles, FixedClock(NOW)), h.cohorts)
     assert (await fresh.scope_of(h.user_id, "user.approve")).is_global
+
+
+async def test_role_permissions_come_from_stored_mapping(h: Harness) -> None:
+    """역할별 권한은 저장된 매핑을 따른다 (A84). 최고 관리자는 항상 전체."""
+    h.user_roles.role_permissions[COHORT_ASSISTANT] = frozenset({"contract.manage"})
+    h.user_roles.role_permissions["AUDITOR"] = frozenset({"mentoring.request.read"})
+    await h.grant(COHORT_ASSISTANT, RoleScopeType.COHORT, COHORT)
+    await h.grant("AUDITOR", RoleScopeType.BOOTCAMP, BOOTCAMP)
+
+    assert await h.checker.has(h.user_id, "contract.manage", ANY)
+    assert not await h.checker.has(h.user_id, "user.approve", ANY)  # 기본 묶음에서 빠짐
+    assert await h.checker.has(h.user_id, "mentoring.request.read", PermissionTarget.cohort(COHORT))
+    assert not await h.checker.has(
+        h.user_id, "mentoring.request.read", PermissionTarget.cohort(OTHER_COHORT)
+    )
+
+    admin = Harness()
+    await admin.grant(SUPER_ADMIN, RoleScopeType.GLOBAL)
+    assert await admin.checker.has(admin.user_id, "role.assign", G)

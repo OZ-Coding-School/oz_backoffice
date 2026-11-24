@@ -55,7 +55,7 @@ def test_permission_table_matches_plan() -> None:
         (COHORT_MANAGER, RoleScopeType.COHORT, False, False),
         (COHORT_MANAGER, RoleScopeType.GLOBAL, False, False),
         (STUDENT, RoleScopeType.BOOTCAMP, True, False),
-        ("UNKNOWN", RoleScopeType.GLOBAL, False, False),
+        ("CUSTOM_ROLE", RoleScopeType.GLOBAL, False, True),  # 새 역할 범위는 서비스가 검사 (A84)
     ],
 )
 def test_user_role_scope_rules(role: str, scope: RoleScopeType, with_id: bool, valid: bool) -> None:

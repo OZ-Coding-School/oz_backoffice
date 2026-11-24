@@ -9,11 +9,10 @@ from app.contexts.access.domain.catalog import (
     PERMISSIONS,
     ROLES,
     SUPER_ADMIN,
-    RoleDefinition,
 )
 from app.contexts.access.domain.entities import UserRole
 from app.contexts.access.domain.enums import RoleScopeType
-from app.contexts.access.infrastructure.models import RoleModel
+from app.contexts.access.infrastructure.models import PermissionModel, RoleModel
 from app.contexts.access.infrastructure.repositories import (
     TortoiseRoleCatalogRepository,
     TortoiseUserRoleRepository,
@@ -33,7 +32,7 @@ async def _permission_codes(role_code: str) -> set[str]:
     return {p.code for p in await role.permissions.all()}
 
 
-async def test_catalog_sync_is_idempotent_and_prunes_mappings() -> None:
+async def test_catalog_sync_is_idempotent_and_keeps_edited_mappings() -> None:
     catalog = TortoiseRoleCatalogRepository()
     await catalog.sync(ROLES, PERMISSIONS)
     await catalog.sync(ROLES, PERMISSIONS)
@@ -42,14 +41,20 @@ async def test_catalog_sync_is_idempotent_and_prunes_mappings() -> None:
     assert await _permission_codes(SUPER_ADMIN) == set(PERMISSIONS)
     assert "contract.manage" not in await _permission_codes(COHORT_ASSISTANT)
 
-    narrowed = [
-        RoleDefinition(r.code, r.name, r.description, frozenset({"org.manage"}), r.scopes)
-        if r.code == SUPER_ADMIN
-        else r
-        for r in ROLES
-    ]
-    await catalog.sync(narrowed, PERMISSIONS)
-    assert await _permission_codes(SUPER_ADMIN) == {"org.manage"}
+    # 화면에서 고친 매핑·이름은 다시 시드해도 덮지 않는다 (A84)
+    assistant = await RoleModel.get(code=COHORT_ASSISTANT)
+    await assistant.permissions.add(await PermissionModel.get(code="contract.manage"))
+    assistant.name = "보조 매니저"
+    await assistant.save()
+    await catalog.sync(ROLES, PERMISSIONS)
+    assert "contract.manage" in await _permission_codes(COHORT_ASSISTANT)
+    assert (await RoleModel.get(code=COHORT_ASSISTANT)).name == "보조 매니저"
+
+    # 최고 관리자에게는 빠진 권한을 다시 채운다
+    admin = await RoleModel.get(code=SUPER_ADMIN)
+    await admin.permissions.remove(await PermissionModel.get(code="org.manage"))
+    await catalog.sync(ROLES, PERMISSIONS)
+    assert await _permission_codes(SUPER_ADMIN) == set(PERMISSIONS)
 
 
 async def test_user_role_grant_lookup_and_expiry() -> None:

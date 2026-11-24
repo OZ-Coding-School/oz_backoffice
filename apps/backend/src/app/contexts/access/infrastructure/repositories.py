@@ -6,18 +6,25 @@ from datetime import datetime
 
 from tortoise.expressions import Q
 
-from app.contexts.access.domain.catalog import RoleDefinition
+from app.contexts.access.domain.catalog import (
+    BUILTIN_ROLE_CODES,
+    PERMISSIONS,
+    ROLES,
+    SUPER_ADMIN,
+    RoleDefinition,
+)
 from app.contexts.access.domain.entities import RoleGrant, UserRole
-from app.contexts.access.domain.enums import RoleScopeType
+from app.contexts.access.domain.enums import RoleScopeKind, RoleScopeType
+from app.contexts.access.domain.roles import Role, builtin_scope_kind
 from app.contexts.access.infrastructure.models import PermissionModel, RoleModel, UserRoleModel
 from app.shared.errors import ConflictError
 
 
 class TortoiseRoleCatalogRepository:
     async def sync(self, roles: Sequence[RoleDefinition], permissions: dict[str, str]) -> None:
-        """정의에 있는 역할·권한을 만들거나 고치고, 역할-권한 매핑을 정의와 같게 맞춘다.
+        """없는 권한·역할만 만들고, 새 역할에만 초기 권한 묶음을 넣는다 (A84).
 
-        정의에서 빠진 역할·권한 행은 지우지 않는다 (부여 이력 보존). 매핑만 정리한다.
+        정의에서 빠진 역할·권한 행은 지우지 않는다 (부여 이력 보존).
         """
         by_code: dict[str, PermissionModel] = {}
         for code, description in permissions.items():
@@ -27,17 +34,98 @@ class TortoiseRoleCatalogRepository:
             by_code[code] = permission
 
         for definition in roles:
-            role, _ = await RoleModel.update_or_create(
+            role, created = await RoleModel.get_or_create(
                 code=definition.code,
                 defaults={"name": definition.name, "description": definition.description},
             )
-            current = {p.code: p for p in await role.permissions.all()}
-            missing = [by_code[c] for c in sorted(definition.permissions - current.keys())]
-            extra = [p for c, p in current.items() if c not in definition.permissions]
+            if definition.code == SUPER_ADMIN:
+                wanted = set(by_code)  # 최고 관리자는 항상 모든 권한
+            elif created:
+                wanted = set(definition.permissions)
+            else:
+                continue
+            current = {p.code for p in await role.permissions.all()}
+            missing = [by_code[c] for c in sorted(wanted - current)]
             if missing:
                 await role.permissions.add(*missing)
-            if extra:
-                await role.permissions.remove(*extra)
+
+
+def _to_role(row: RoleModel) -> Role:
+    return Role(
+        id=row.id,
+        code=row.code,
+        name=row.name,
+        description=row.description,
+        scope_kind=(
+            builtin_scope_kind(row.code)
+            if row.code in BUILTIN_ROLE_CODES
+            else RoleScopeKind(row.scope_kind or RoleScopeKind.SCOPED)
+        ),
+        permissions=frozenset(p.code for p in row.permissions),
+    )
+
+
+_BUILTIN_ORDER = {role.code: i for i, role in enumerate(ROLES)}
+
+
+class TortoiseRoleRepository:
+    async def list_all(self) -> list[Role]:
+        rows = await RoleModel.all().prefetch_related("permissions").order_by("created_at", "id")
+        roles = [_to_role(row) for row in rows]
+        return sorted(roles, key=lambda r: _BUILTIN_ORDER.get(r.code, len(_BUILTIN_ORDER)))
+
+    async def get(self, code: str) -> Role | None:
+        row = await RoleModel.get_or_none(code=code).prefetch_related("permissions")
+        return _to_role(row) if row else None
+
+    async def lock(self, code: str) -> Role | None:
+        row = await RoleModel.filter(code=code).select_for_update().first()
+        if row is None:
+            return None
+        await row.fetch_related("permissions")
+        return _to_role(row)
+
+    async def name_taken(self, name: str, *, exclude_code: str | None = None) -> bool:
+        query = RoleModel.filter(name=name)
+        if exclude_code is not None:
+            query = query.exclude(code=exclude_code)
+        return await query.exists()
+
+    async def add(self, role: Role) -> None:
+        if await RoleModel.filter(code=role.code).exists():
+            raise ConflictError("이미 있는 역할 코드입니다.", code="role_code_taken")
+        await RoleModel.create(
+            id=role.id,
+            code=role.code,
+            name=role.name,
+            description=role.description,
+            scope_kind=role.scope_kind,
+        )
+
+    async def save(self, role: Role) -> None:
+        row = await RoleModel.get(code=role.code)
+        row.name = role.name
+        row.description = role.description  # type: ignore[assignment]  # null=True 필드 타입
+        await row.save(update_fields=["name", "description"])
+        current = {p.code: p for p in await row.permissions.all()}
+        extra = [p for code, p in current.items() if code not in role.permissions]
+        if extra:
+            await row.permissions.remove(*extra)
+        missing = sorted(role.permissions - current.keys())
+        if missing:
+            await row.permissions.add(*await PermissionModel.filter(code__in=missing))
+
+    async def delete(self, code: str) -> None:
+        row = await RoleModel.get(code=code)
+        await row.permissions.clear()
+        await row.delete()
+
+    async def holder_counts(self) -> dict[str, int]:
+        rows = await UserRoleModel.all().values("role__code", "user_id")
+        holders: dict[str, set[object]] = {}
+        for row in rows:
+            holders.setdefault(row["role__code"], set()).add(row["user_id"])
+        return {code: len(users) for code, users in holders.items()}
 
 
 def _to_user_role(row: UserRoleModel) -> UserRole:
@@ -131,6 +219,7 @@ class TortoiseUserRoleRepository:
                 Q(expires_at__isnull=True) | Q(expires_at__gt=now), user_id=user_id
             )
             .select_related("role")
+            .prefetch_related("role__permissions")
             .order_by("created_at", "id")
         )
         return [
@@ -139,6 +228,11 @@ class TortoiseUserRoleRepository:
                 scope_type=RoleScopeType(row.scope_type),
                 scope_id=row.scope_id,
                 expires_at=row.expires_at,
+                permissions=(
+                    frozenset(PERMISSIONS)
+                    if row.role.code == SUPER_ADMIN
+                    else frozenset(p.code for p in row.role.permissions)
+                ),
             )
             for row in rows
         ]
