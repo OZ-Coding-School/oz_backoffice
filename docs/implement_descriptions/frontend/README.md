@@ -31,3 +31,4 @@
 | 27 | [FE-12a 멘토 정산 목록·명세](27_mentor_settlements.md) | 완료 (#120) |
 | 28 | [FE-12b 멘토 내 프로필](28_mentor_profile.md) | 완료 (#122) |
 | 29 | [FE-13 멘토 홈](29_mentor_home.md) | 완료 (#124) |
+| 30 | [FE-14a 운영진 틀](30_staff_shell.md) | 완료 (#126) |
