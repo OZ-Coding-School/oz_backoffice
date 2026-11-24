@@ -1,7 +1,7 @@
 # 88. 담당 역할 칸 제거·직원 수정에서 담당 지정 (BE-3h)
 
-- 상태: PR 진행 중
-- 관련 PR: (작성 중)
+- 상태: 완료 (2026-11-24 병합)
+- 관련 PR: #136
 - 관련 결정: `docs/decisions.md` A88·A89 (A63·A83 변경)
 - 이전 기록: [87. 직위 = 역할, 최고 관리자 필드, 데이터 범위 (BE-3g)](87_positions_as_roles.md)
 
@@ -32,6 +32,9 @@
 - `pytest` 891 passed (통합 포함). 새 테스트: 담당 지정 규칙(단위), 직원 수정의 담당(과정 여러 개·기수 하나·직위 변경과 함께 교체·다른 직원의 기수·해제), 항목별 권한(API)
 - 마이그레이션: `aerich upgrade` → `migrate`(No changes) → `downgrade -v 32` → `upgrade`, DBML 파서 검증
 - 프론트엔드: `lint`, `format:check`, `typecheck`, `vitest` 304 passed(UTC·Asia/Seoul), `build`, Playwright E2E 39 passed
+
+- GitHub Actions (PR #136): 첫 실행은 프론트 포맷 검사 실패(지운 상수 뒤 빈 줄) → 고친 뒤 백엔드·프론트엔드 검사·E2E 통과
+- 백엔드 PR은 CI 통과 후 바로 병합한다는 사용자 지시에 따라 병합했다(2026-11-24)
 
 ## 남은 작업
 - FE-15d 조직 설정 모듈 + 권한 화면, 이후 직원 화면에서 직위·최고 관리자·담당 지정(F64)
