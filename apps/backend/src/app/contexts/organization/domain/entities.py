@@ -9,7 +9,12 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 
-from app.contexts.organization.domain.enums import AssignmentScope, EmploymentType, StaffRole
+from app.contexts.organization.domain.enums import (
+    AssignmentScope,
+    DataScope,
+    EmploymentType,
+    StaffRole,
+)
 from app.shared.domain import AggregateRoot
 from app.shared.errors import BusinessRuleViolation
 
@@ -84,23 +89,37 @@ class EmployeePosition(AggregateRoot):
     """직위. priority가 작을수록 높은 직급이다.
 
     assignment_scope는 운영진 정보 입력에서 담당을 고르는 방식이다 (A62).
+    직위가 곧 역할이다(A87): 권한 묶음은 따로 저장하고, data_scope가 기수 데이터의 범위를 정한다.
     """
 
     name: str
     priority: int
     assignment_scope: AssignmentScope | None = None
+    data_scope: DataScope = DataScope.ASSIGNED
 
     def __post_init__(self) -> None:
         self.name = self.name.strip()
         _require(0 < len(self.name) <= 20, "직위명은 1~20자여야 합니다.", "invalid_position")
         _require(self.priority >= 0, "직급 우선순위는 0 이상이어야 합니다.", "invalid_position")
 
-    def update(self, *, name: str, priority: int, assignment_scope: AssignmentScope | None) -> None:
+    def update(
+        self,
+        *,
+        name: str,
+        priority: int,
+        assignment_scope: AssignmentScope | None,
+        data_scope: DataScope | None = None,
+    ) -> None:
         changed = EmployeePosition(
-            id=self.id, name=name, priority=priority, assignment_scope=assignment_scope
+            id=self.id,
+            name=name,
+            priority=priority,
+            assignment_scope=assignment_scope,
+            data_scope=data_scope or self.data_scope,
         )
         self.name, self.priority = changed.name, changed.priority
         self.assignment_scope = changed.assignment_scope
+        self.data_scope = changed.data_scope
 
 
 @dataclass(kw_only=True, eq=False)

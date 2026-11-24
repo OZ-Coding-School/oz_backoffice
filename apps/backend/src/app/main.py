@@ -17,8 +17,7 @@ from app.contexts.academy.infrastructure.repositories import (
     TortoiseCohortRepository,
     TortoiseStudentRepository,
 )
-from app.contexts.access.application.roles import RoleAssignmentService, RoleQueries
-from app.contexts.access.infrastructure.repositories import TortoiseUserRoleRepository
+from app.contexts.access.application.grant_source import StaffGrantSource
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.audit.infrastructure.repositories import TortoiseAuditLogRepository
 from app.contexts.educator.application.mentor_onboarding import MentorOnboarding
@@ -33,7 +32,12 @@ from app.contexts.identity.application.user_admin import UserAdministration
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
 from app.contexts.mentoring.infrastructure.chat_events import RedisChatEvents
 from app.contexts.organization.application.employee_queries import EmployeeQueries
-from app.contexts.organization.infrastructure.repositories import TortoiseEmployeeRepository
+from app.contexts.organization.infrastructure.repositories import (
+    TortoiseBootcampStaffRepository,
+    TortoiseCohortStaffRepository,
+    TortoiseEmployeePositionRepository,
+    TortoiseEmployeeRepository,
+)
 from app.core.clock import SystemClock
 from app.core.config import Settings, get_settings
 from app.core.database import build_tortoise_config
@@ -82,15 +86,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # 컨텍스트 간 공개 서비스 연결 (composition root). 다른 컨텍스트의 presentation 의존성이
     # 이 서비스를 쓰되 identity.infrastructure를 직접 import하지 않게 한다.
     app.state.user_queries = UserQueries(TortoiseUserRepository())
-    app.state.role_queries = RoleQueries(TortoiseUserRoleRepository(), clock)
-    app.state.role_assignments = RoleAssignmentService(TortoiseUserRoleRepository())
     app.state.user_admin = UserAdministration(TortoiseUserRepository(), clock)
     app.state.audit_recorder = AuditRecorder(TortoiseAuditLogRepository(), clock)
     app.state.roster_sync_dispatcher = TaskiqRosterSyncDispatcher()
-    app.state.employee_queries = EmployeeQueries(TortoiseEmployeeRepository())
+    app.state.employee_queries = EmployeeQueries(
+        TortoiseEmployeeRepository(),
+        positions=TortoiseEmployeePositionRepository(),
+        bootcamp_staffs=TortoiseBootcampStaffRepository(),
+        cohort_staffs=TortoiseCohortStaffRepository(),
+    )
+    # 권한 출처 (A87): 최고 관리자 필드 + 직위 권한·데이터 범위 + 담당 배정
+    app.state.grant_source = StaffGrantSource(app.state.user_queries, app.state.employee_queries)
     app.state.mail_dispatcher = TaskiqMailDispatcher()
     app.state.meet_scheduler = TaskiqMeetScheduler()
-    # 가입 자동 매칭(A31)·승인(A33): academy·educator·access 공개 서비스를 가입 트랜잭션 안에서 쓴다
+    # 가입 자동 매칭(A31)·승인(A33): academy·educator 공개 서비스를 가입 트랜잭션 안에서 쓴다
     app.state.student_claims = StudentClaims(TortoiseStudentRepository())
     app.state.mentor_onboarding = MentorOnboarding(
         contracts=TortoiseEducatorContractRepository(), mentors=TortoiseMentorRepository()
@@ -98,7 +107,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.signup_matcher = SignupMatcher(
         students=app.state.student_claims,
         mentors=app.state.mentor_onboarding,
-        roles=app.state.role_assignments,
     )
     app.state.academy_catalog = AcademyCatalog(
         TortoiseBootcampRepository(), TortoiseCohortRepository()

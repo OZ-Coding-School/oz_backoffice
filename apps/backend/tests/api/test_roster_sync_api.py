@@ -16,15 +16,12 @@ from app.contexts.academy.infrastructure.repositories import (
     TortoiseRosterSyncRunRepository,
     TortoiseStudentRepository,
 )
-from app.contexts.access.application.roles import RoleAssignmentService
-from app.contexts.access.domain.catalog import COHORT_ASSISTANT
-from app.contexts.access.domain.enums import RoleScopeType
-from app.contexts.access.infrastructure.repositories import TortoiseUserRoleRepository
 from app.contexts.identity.domain.entities import User
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
 from app.core.config import Settings
 from app.core.security import JWTService
 from tests.factories.academy import create_cohort, make_student
+from tests.factories.access import ASSISTANT, give_role
 from tests.factories.staff_review import create_applicant
 
 pytestmark = pytest.mark.api
@@ -83,9 +80,7 @@ async def _assistant(settings: Settings, cohort: Cohort) -> dict[str, str]:
     user = await create_applicant()
     user.approve(now=datetime.now(UTC))
     await TortoiseUserRepository().save(user)
-    await RoleAssignmentService(TortoiseUserRoleRepository()).grant(
-        user.id, COHORT_ASSISTANT, RoleScopeType.COHORT, cohort.id
-    )
+    await give_role(user.id, ASSISTANT, cohort_id=cohort.id)
     return bearer(settings, user)
 
 

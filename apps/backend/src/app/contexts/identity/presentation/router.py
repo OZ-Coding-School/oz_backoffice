@@ -12,8 +12,7 @@ from urllib.parse import urlencode
 from fastapi import APIRouter, Cookie, Depends, Response, status
 from fastapi.responses import RedirectResponse
 
-from app.contexts.access.application.roles import RoleQueries
-from app.contexts.access.presentation.dependencies import CurrentUser, get_role_queries
+from app.contexts.access.presentation.dependencies import CurrentUser
 from app.contexts.identity.application.auth_service import SessionService, StaffGoogleLoginService
 from app.contexts.identity.application.tokens import IssuedAccess, IssuedTokens
 from app.contexts.identity.presentation.dependencies import (
@@ -24,7 +23,6 @@ from app.contexts.identity.presentation.dependencies import (
 from app.contexts.identity.presentation.schemas import (
     AccessTokenResponse,
     MeResponse,
-    RoleGrantResponse,
 )
 from app.core.config import Settings
 from app.shared.errors import AppError, AuthenticationError
@@ -171,11 +169,8 @@ async def logout(
 
 
 @me_router.get("/me", response_model=MeResponse)
-async def me(
-    user: CurrentUser, role_queries: Annotated[RoleQueries, Depends(get_role_queries)]
-) -> MeResponse:
-    """승인 전에도 호출할 수 있다 (승인 상태 확인용, plan §2.2). 만료되지 않은 역할을 함께 준다."""
-    grants = await role_queries.list_for_user(user.id)
+async def me(user: CurrentUser) -> MeResponse:
+    """승인 전에도 호출할 수 있다 (승인 상태 확인용, plan §2.2)."""
     return MeResponse(
         id=user.id,
         email=user.email,
@@ -184,13 +179,5 @@ async def me(
         phone_number=user.phone_number,
         approval_status=user.approval_status,
         approved_at=user.approved_at,
-        roles=[
-            RoleGrantResponse(
-                role=g.role_code,
-                scope_type=g.scope_type,
-                scope_id=g.scope_id,
-                expires_at=g.expires_at,
-            )
-            for g in grants
-        ],
+        is_super_admin=user.is_super_admin,
     )

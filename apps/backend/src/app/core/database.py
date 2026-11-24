@@ -15,7 +15,6 @@ MODEL_APP = "models"
 # 컨텍스트별 모델 모듈 (Tortoise가 모델을 찾는 위치)
 MODEL_MODULES: list[str] = [
     "app.contexts.identity.infrastructure.models",
-    "app.contexts.access.infrastructure.models",
     "app.contexts.organization.infrastructure.models",
     "app.contexts.academy.infrastructure.models",
     "app.contexts.educator.infrastructure.models",

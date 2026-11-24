@@ -15,10 +15,12 @@ const ADMIN = makeMe({
   name: "김운영",
   email: "staff@nextrunners.co.kr",
   account_type: "STAFF",
-  roles: [{ role: "SUPER_ADMIN", scope_type: "GLOBAL", scope_id: null, expires_at: null }],
+  is_super_admin: true,
 });
 
 const ACCESS: StaffAccess = {
+  is_super_admin: false,
+  position: null,
   permissions: [
     { code: "member.approval.read", is_global: true, bootcamp_ids: [], cohort_ids: [] },
     { code: "member.approval.manage", is_global: true, bootcamp_ids: [], cohort_ids: [] },

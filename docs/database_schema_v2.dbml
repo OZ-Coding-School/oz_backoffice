@@ -51,8 +51,25 @@ Table employee_positions {
   name varchar(20) [not null, unique]
   priority smallint [not null, note: "직급 우선순위"]
   assignment_scope AssignmentScope [null, note: "담당 방식 (A62). COURSE: 소속 팀의 과정 여러 개(운영 매니저), COHORT: 소속 팀 과정의 기수 하나(조교), null: 담당 없음. 신청할 때만 검사"]
+  data_scope varchar(20) [not null, default: 'ASSIGNED', note: "데이터 범위 (A87). ASSIGNED: 담당 과정·기수만, ALL: 모든 과정·기수. 기수에 속한 엔터티 권한에만 적용"]
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
+
+  checks {
+    `data_scope IN ('ASSIGNED', 'ALL')` [name: 'check_employee_position_data_scope']
+  }
+}
+
+Table position_permissions {
+  note: "직위의 권한 묶음 (직위 = 역할, A87). 권한 코드는 access/domain/catalog.py가 정의한다"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  position_id uuid [not null, ref: > employee_positions.id, note: "ON DELETE CASCADE"]
+  permission_code varchar(100) [not null]
+
+  indexes {
+    (position_id, permission_code) [unique]
+  }
 }
 
 // ----------------------------------------------
@@ -75,6 +92,7 @@ Table users {
   is_active bool [not null, default: false, note: "계정 활성화 여부 (비활성화·정지 시 false)"]
   last_login_at timestamptz [null]
   deleted_at timestamptz [null, note: "탈퇴(soft delete)"]
+  is_super_admin bool [not null, default: false, note: "최고 관리자 (모든 권한·모든 데이터, A87). 운영진 계정만, 마지막 1명은 끌 수 없음"]
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
 
@@ -135,64 +153,11 @@ Table member_signups {
 
 
 // ----------------------------------------------
-// 권한 (RBAC + 범위)  — *_staffs 담당자 테이블과 병행
-//  - 권한 판정: user_roles
-//  - 담당자 목록 표시: bootcamp_staffs, cohort_staffs, cohort_mentors
-//  - 담당자 배정 시 대응하는 user_roles를 같은 트랜잭션에서 생성/회수 (앱 레벨 동기화)
+// 권한 (A87): 직위 = 역할
+//  - 권한 묶음: position_permissions (직위별), 최고 관리자: users.is_super_admin
+//  - 데이터 범위: employee_positions.data_scope + bootcamp_staffs·cohort_staffs(담당 배정)
+//  - 예전 roles·permissions·role_permissions·user_roles는 마이그레이션 31에서 지웠다
 // ----------------------------------------------
-Table roles {
-  note: "역할 정의 (SUPER_ADMIN, ADMIN, COHORT_MANAGER, COHORT_ASSISTANT, MENTOR, INSTRUCTOR, STUDENT ...)"
-
-  id uuid [pk, note: "default=uuid7 사용"]
-  code varchar(50) [not null, unique]
-  name varchar(50) [not null]
-  description text [null]
-  scope_kind varchar(20) [null, note: "새 역할의 허용 범위 GLOBAL(전체)·SCOPED(과정·기수). 기본 역할은 null(코드 정의를 따름) (A84)"]
-  created_at timestamptz [not null, default: `now()`]
-
-  checks {
-    `scope_kind IS NULL OR scope_kind IN ('GLOBAL', 'SCOPED')` [name: 'check_role_scope_kind']
-  }
-}
-
-Table permissions {
-  note: "권한 정의 (mentoring.request.approve, mentoring.settlement.close ...)"
-
-  id uuid [pk, note: "default=uuid7 사용"]
-  code varchar(100) [not null, unique]
-  description text [null]
-}
-
-Table role_permissions {
-  note: "역할-권한 매핑. 역할은 계층이 아닌 권한 집합. 권한 판정의 출처(A84, 최고 관리자는 항상 전체)"
-
-  role_id uuid [not null, ref: > roles.id]
-  permission_id uuid [not null, ref: > permissions.id]
-
-  indexes {
-    (role_id, permission_id) [pk]
-  }
-}
-
-Table user_roles {
-  note: "사용자 역할 부여 + 적용 범위"
-
-  id uuid [pk, note: "default=uuid7 사용"]
-  role_id uuid [not null, ref: > roles.id]
-  user_id uuid [not null, ref: > users.id]
-  scope_type RoleScopeType [not null]
-  scope_id uuid [null, note: "GLOBAL이면 null, BOOTCAMP=bootcamps.id, COHORT=cohorts.id"]
-  expires_at timestamptz [null, note: "미리보기(대리 로그인) 등 임시 권한"]
-  created_at timestamptz [not null, default: `now()`]
-
-  indexes {
-    (user_id, role_id, scope_type, scope_id) [unique, note: "NULLS NOT DISTINCT"]
-    (scope_type, scope_id)
-  }
-  checks {
-    `(scope_type = 'GLOBAL') = (scope_id IS NULL)` [name: "check_user_role_scope"]
-  }
-}
 
 
 // ----------------------------------------------
@@ -1084,12 +1049,6 @@ Enum SocialLoginProvider {
   KAKAO
   GOOGLE
   NAVER
-}
-
-Enum RoleScopeType {
-  GLOBAL
-  BOOTCAMP
-  COHORT
 }
 
 Enum StaffRole {

@@ -2,17 +2,22 @@ from datetime import UTC, datetime
 
 import pytest
 
-from app.contexts.access.domain.catalog import COHORT_ASSISTANT, COHORT_MANAGER
-from app.contexts.access.infrastructure.repositories import TortoiseUserRoleRepository
 from app.contexts.audit.infrastructure.models import AuditLogModel
 from app.contexts.identity.domain.entities import User
+from app.contexts.organization.application.employee_queries import EmployeeQueries
 from app.contexts.organization.application.staff_service import StaffTarget
 from app.contexts.organization.domain.enums import StaffRole
+from app.contexts.organization.infrastructure.repositories import (
+    TortoiseBootcampStaffRepository,
+    TortoiseCohortStaffRepository,
+    TortoiseEmployeePositionRepository,
+    TortoiseEmployeeRepository,
+)
 from app.shared.errors import BusinessRuleViolation, ConflictError, NotFoundError
 from app.shared.ids import new_id
 from tests.factories.academy import create_cohort
 from tests.factories.organization import create_employee
-from tests.factories.staff_review import build_staff_service, create_applicant, seed_roles
+from tests.factories.staff_review import build_staff_service, create_applicant
 
 pytestmark = pytest.mark.integration
 
@@ -21,16 +26,25 @@ NOW = datetime.now(UTC)
 
 @pytest.fixture
 async def actor() -> User:
-    await seed_roles()
     return await create_applicant()
 
 
-async def _roles(user_id: object) -> set[tuple[str, str, object]]:
-    grants = await TortoiseUserRoleRepository().list_grants(user_id, now=NOW)  # type: ignore[arg-type]
-    return {(g.role_code, g.scope_type.value, g.scope_id) for g in grants}
+async def _scope(user_id: object) -> set[tuple[str, object]]:
+    """담당 배정 = 데이터 범위 (A87)."""
+    access = await EmployeeQueries(
+        TortoiseEmployeeRepository(),
+        positions=TortoiseEmployeePositionRepository(),
+        bootcamp_staffs=TortoiseBootcampStaffRepository(),
+        cohort_staffs=TortoiseCohortStaffRepository(),
+    ).access_of(user_id)  # type: ignore[arg-type]
+    if access is None:
+        return set()
+    return {("BOOTCAMP", b) for b in access.bootcamp_ids} | {
+        ("COHORT", c) for c in access.cohort_ids
+    }
 
 
-async def test_assign_and_unassign_cohort_staff_syncs_role(actor: User) -> None:
+async def test_assign_and_unassign_cohort_staff_changes_scope(actor: User) -> None:
     cohort = await create_cohort()
     employee = await create_employee()
     service = build_staff_service()
@@ -45,12 +59,12 @@ async def test_assign_and_unassign_cohort_staff_syncs_role(actor: User) -> None:
 
     assert (member.user_id, member.role) == (employee.user_id, StaffRole.ASSISTANT)
     assert [m.id for m in await service.list_members(StaffTarget.COHORT, cohort.id)] == [member.id]
-    assert await _roles(employee.user_id) == {(COHORT_ASSISTANT, "COHORT", cohort.id)}
+    assert await _scope(employee.user_id) == {("COHORT", cohort.id)}
 
     await service.unassign(StaffTarget.COHORT, cohort.id, member.id, actor_id=actor.id)
 
     assert await service.list_members(StaffTarget.COHORT, cohort.id) == []
-    assert await _roles(employee.user_id) == set()
+    assert await _scope(employee.user_id) == set()
     logs = await AuditLogModel.filter(target_id=cohort.id).order_by("created_at")
     assert [log.action for log in logs] == [
         "organization.staff.assign",
@@ -58,7 +72,7 @@ async def test_assign_and_unassign_cohort_staff_syncs_role(actor: User) -> None:
     ]
 
 
-async def test_bootcamp_staff_and_independent_roles(actor: User) -> None:
+async def test_bootcamp_staff_and_independent_scope(actor: User) -> None:
     cohort = await create_cohort()
     employee = await create_employee()
     service = build_staff_service()
@@ -77,9 +91,9 @@ async def test_bootcamp_staff_and_independent_roles(actor: User) -> None:
         actor_id=actor.id,
     )
 
-    # 기수 담당을 해제해도 과정 담당 역할은 남는다
+    # 기수 담당을 해제해도 과정 담당은 남는다
     await service.unassign(StaffTarget.COHORT, cohort.id, cohort_member.id, actor_id=actor.id)
-    assert await _roles(employee.user_id) == {(COHORT_MANAGER, "BOOTCAMP", cohort.bootcamp_id)}
+    assert await _scope(employee.user_id) == {("BOOTCAMP", cohort.bootcamp_id)}
 
 
 async def test_assign_errors(actor: User) -> None:

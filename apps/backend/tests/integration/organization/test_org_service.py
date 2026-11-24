@@ -182,7 +182,7 @@ async def test_positions(actor: User) -> None:
     other = await create_position("조교")
     with pytest.raises(ConflictError):
         await svc.update_position(position.id, PositionChanges(name="조교"), actor_id=actor.id)
-    assert [p.id for p in await svc.list_positions()] == [position.id, other.id]
+    assert [v.position.id for v in await svc.list_positions()] == [position.id, other.id]
 
     employee = await create_employee()
     with pytest.raises(ConflictError) as in_use:

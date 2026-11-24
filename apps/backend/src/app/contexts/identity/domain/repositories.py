@@ -28,6 +28,10 @@ class UserRepository(Protocol):
         self, provider: SocialLoginProvider, provider_user_id: str
     ) -> User | None: ...
 
+    async def lock_super_admin_ids(self) -> list[uuid.UUID]:
+        """최고 관리자 행을 잠가 읽는다 (UoW 안에서)."""
+        ...
+
 
 @dataclass(frozen=True, slots=True)
 class SignupVisibility:

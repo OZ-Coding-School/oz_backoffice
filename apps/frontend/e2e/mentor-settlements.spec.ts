@@ -8,7 +8,7 @@ const MENTOR = {
   phone_number: "01012345678",
   approval_status: "APPROVED",
   approved_at: "2026-11-01T01:00:00Z",
-  roles: [{ role: "MENTOR", scope_type: "GLOBAL", scope_id: null, expires_at: null }],
+  is_super_admin: false,
 };
 const SUMMARY = {
   id: "st1",

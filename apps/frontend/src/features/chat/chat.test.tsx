@@ -132,7 +132,7 @@ describe("채팅 (F40·A74)", () => {
   });
 
   it("멘토는 수강생·팀 이름과 1:1/팀으로 방을 본다", async () => {
-    mockSignedIn(makeMe({ account_type: "MENTOR", name: "김멘토", roles: [] }));
+    mockSignedIn(makeMe({ account_type: "MENTOR", name: "김멘토", is_super_admin: false }));
     mockChat([makeThread(), TEAM]);
     await renderRoute("/mentoring/chat");
     const list = await screen.findByRole("region", { name: "채팅" });

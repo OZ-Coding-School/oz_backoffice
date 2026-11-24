@@ -8,11 +8,6 @@ from httpx import AsyncClient
 
 from app.cli import create_super_admin
 from app.contexts.academy.infrastructure.repositories import TortoiseStudentRepository
-from app.contexts.access.application.roles import RoleAssignmentService
-from app.contexts.access.domain.catalog import COHORT_ASSISTANT
-from app.contexts.access.domain.enums import RoleScopeType
-from app.contexts.access.infrastructure.models import UserRoleModel
-from app.contexts.access.infrastructure.repositories import TortoiseUserRoleRepository
 from app.contexts.educator.infrastructure.repositories import TortoiseMentorRepository
 from app.contexts.identity.domain.entities import User
 from app.contexts.identity.domain.enums import AccountType, MemberSignupType
@@ -21,8 +16,9 @@ from app.contexts.identity.infrastructure.repositories import TortoiseUserReposi
 from app.core.config import Settings
 from app.core.security import JWTService
 from tests.factories.academy import create_cohort, make_student
+from tests.factories.access import ASSISTANT, give_role
 from tests.factories.educator import create_applicant_signup
-from tests.factories.staff_review import create_applicant, seed_roles
+from tests.factories.staff_review import create_applicant
 
 pytestmark = pytest.mark.api
 
@@ -41,16 +37,10 @@ async def admin(settings: Settings) -> dict[str, str]:
 
 
 async def _assistant(settings: Settings, cohort_id: object) -> dict[str, str]:
-    await seed_roles()
     user = await create_applicant()
     user.approve(now=datetime.now(UTC))
     await TortoiseUserRepository().save(user)
-    await RoleAssignmentService(TortoiseUserRoleRepository()).grant(
-        user.id,
-        COHORT_ASSISTANT,
-        RoleScopeType.COHORT,
-        cohort_id,  # type: ignore[arg-type]
-    )
+    await give_role(user.id, ASSISTANT, cohort_id=cohort_id)  # type: ignore[arg-type]
     return bearer(settings, user)
 
 
@@ -75,8 +65,6 @@ async def test_admin_approves_student_with_roster_from_other_cohort(
     claimed = await TortoiseStudentRepository().get(student.id)
     assert claimed is not None
     assert claimed.user_id == user.id
-    roles = await UserRoleModel.filter(user_id=user.id).prefetch_related("role")
-    assert [(r.role.code, str(r.scope_id)) for r in roles] == [("STUDENT", str(actual.id))]
     assert app.state.mail_dispatcher.dispatched[-1].subject.endswith("가입이 승인되었습니다")
     assert (await client.get(API, headers=admin)).json()["total"] == 0
 

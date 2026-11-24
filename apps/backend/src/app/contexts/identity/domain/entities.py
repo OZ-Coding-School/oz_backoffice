@@ -32,6 +32,7 @@ class User(AggregateRoot):
     is_active: bool = False
     last_login_at: datetime | None = None
     deleted_at: datetime | None = None
+    is_super_admin: bool = False  # 모든 권한·모든 데이터 (A87)
 
     def __post_init__(self) -> None:
         try:
@@ -94,6 +95,16 @@ class User(AggregateRoot):
         if self.is_approved or self.account_type not in members or account_type not in members:
             raise BusinessRuleViolation("계정 종류를 바꿀 수 없습니다.", code="account_type_locked")
         self.account_type = account_type
+
+    def set_super_admin(self, enabled: bool) -> None:
+        """최고 관리자를 켜고 끈다 (A87). 승인된 활성 운영진 계정만 켤 수 있다."""
+        if enabled and (
+            self.account_type is not AccountType.STAFF or not self.is_approved or not self.can_login
+        ):
+            raise BusinessRuleViolation(
+                "승인된 활성 운영진 계정만 최고 관리자로 지정할 수 있습니다.", code="staff_only"
+            )
+        self.is_super_admin = enabled
 
     def verify_email(self, *, now: datetime) -> None:
         self.email_verified_at = now

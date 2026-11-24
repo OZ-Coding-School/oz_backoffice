@@ -8,18 +8,15 @@ import pytest
 from httpx import AsyncClient
 
 from app.cli import create_super_admin
-from app.contexts.access.application.roles import RoleAssignmentService
-from app.contexts.access.domain.catalog import COHORT_ASSISTANT, COHORT_MANAGER
-from app.contexts.access.domain.enums import RoleScopeType
-from app.contexts.access.infrastructure.repositories import TortoiseUserRoleRepository
 from app.contexts.identity.domain.entities import User
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
 from app.core.config import Settings
 from app.core.security import JWTService
 from tests.factories.academy import create_cohort
+from tests.factories.access import ASSISTANT, MANAGER, give_role
 from tests.factories.educator import create_instructor, create_mentor
 from tests.factories.organization import create_employee
-from tests.factories.staff_review import create_applicant, seed_roles
+from tests.factories.staff_review import create_applicant
 
 pytestmark = pytest.mark.api
 
@@ -39,13 +36,10 @@ async def admin(settings: Settings, s3_bucket: str) -> dict[str, str]:
 
 
 async def _staff(settings: Settings, role: str) -> dict[str, str]:
-    await seed_roles()
     user = await create_applicant()
     user.approve(now=datetime.now(UTC))
     await TortoiseUserRepository().save(user)
-    await RoleAssignmentService(TortoiseUserRoleRepository()).grant(
-        user.id, role, RoleScopeType.COHORT, (await create_cohort()).id
-    )
+    await give_role(user.id, role, cohort_id=(await create_cohort()).id)
     return bearer(settings, user)
 
 
@@ -153,10 +147,10 @@ async def test_draft_delete_and_list(client: AsyncClient, admin: dict[str, str])
 
 async def test_permissions(client: AsyncClient, settings: Settings, s3_bucket: str) -> None:
     assert (await client.get(f"{API}/contracts")).status_code == 401
-    assistant = await _staff(settings, COHORT_ASSISTANT)
+    assistant = await _staff(settings, ASSISTANT)
     assert (await client.get(f"{API}/contracts", headers=assistant)).status_code == 403
     # 계약은 기수 범위가 없어 매니저 역할이 하나라도 있으면 허용한다 (A16)
-    manager = await _staff(settings, COHORT_MANAGER)
+    manager = await _staff(settings, MANAGER)
     assert (await client.get(f"{API}/contracts", headers=manager)).status_code == 200
 
 

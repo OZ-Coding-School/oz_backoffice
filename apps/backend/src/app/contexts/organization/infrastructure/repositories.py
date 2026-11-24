@@ -26,6 +26,7 @@ from app.contexts.organization.infrastructure.models import (
     EmployeePositionModel,
     EmployeeRegistrationAssignmentModel,
     EmployeeRegistrationModel,
+    PositionPermissionModel,
     TeamBootcampModel,
     TeamModel,
 )
@@ -105,7 +106,7 @@ class TortoiseEmployeePositionRepository(
 ):
     model = EmployeePositionModel
     entity = EmployeePosition
-    fields = ("name", "priority", "assignment_scope")
+    fields = ("name", "priority", "assignment_scope", "data_scope")
 
     async def get_by_name(self, name: str) -> EmployeePosition | None:
         row = await EmployeePositionModel.get_or_none(name=name.strip())
@@ -114,6 +115,36 @@ class TortoiseEmployeePositionRepository(
     async def list_all(self) -> list[EmployeePosition]:
         rows = await EmployeePositionModel.all().order_by("priority", "name")
         return [self.to_entity(row) for row in rows]
+
+    async def permissions_of(self, position_id: uuid.UUID) -> frozenset[str]:
+        codes = await PositionPermissionModel.filter(position_id=position_id).values_list(
+            "permission_code", flat=True
+        )
+        return frozenset(str(c) for c in codes)
+
+    async def permissions_by_position(self) -> dict[uuid.UUID, frozenset[str]]:
+        result: dict[uuid.UUID, set[str]] = {}
+        for position_id, code in await PositionPermissionModel.all().values_list(
+            "position_id", "permission_code"
+        ):
+            result.setdefault(uuid.UUID(str(position_id)), set()).add(str(code))
+        return {k: frozenset(v) for k, v in result.items()}
+
+    async def replace_permissions(self, position_id: uuid.UUID, codes: frozenset[str]) -> None:
+        current = await self.permissions_of(position_id)
+        removed = current - codes
+        if removed:
+            await PositionPermissionModel.filter(
+                position_id=position_id, permission_code__in=sorted(removed)
+            ).delete()
+        added = codes - current
+        if added:
+            await PositionPermissionModel.bulk_create(
+                [
+                    PositionPermissionModel(position_id=position_id, permission_code=code)
+                    for code in sorted(added)
+                ]
+            )
 
 
 class TortoiseEmployeeRepository(TortoiseRepository[Employee, EmployeeModel]):
@@ -150,6 +181,18 @@ class TortoiseEmployeeRepository(TortoiseRepository[Employee, EmployeeModel]):
         if not employee_ids:
             return []
         return [self.to_entity(row) for row in await EmployeeModel.filter(id__in=employee_ids)]
+
+    async def list_by_users(self, user_ids: list[uuid.UUID]) -> list[Employee]:
+        if not user_ids:
+            return []
+        return [self.to_entity(row) for row in await EmployeeModel.filter(user_id__in=user_ids)]
+
+    async def count_by_position(self) -> dict[uuid.UUID, int]:
+        counts: dict[uuid.UUID, int] = {}
+        for position_id in await EmployeeModel.all().values_list("position_id", flat=True):
+            key = uuid.UUID(str(position_id))
+            counts[key] = counts.get(key, 0) + 1
+        return counts
 
 
 class TortoiseBootcampStaffRepository(TortoiseRepository[BootcampStaff, BootcampStaffModel]):

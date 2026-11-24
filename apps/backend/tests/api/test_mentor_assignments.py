@@ -7,10 +7,6 @@ import pytest
 from httpx import AsyncClient
 
 from app.cli import create_super_admin
-from app.contexts.access.application.roles import RoleAssignmentService
-from app.contexts.access.domain.catalog import COHORT_ASSISTANT, COHORT_MANAGER
-from app.contexts.access.domain.enums import RoleScopeType
-from app.contexts.access.infrastructure.repositories import TortoiseUserRoleRepository
 from app.contexts.educator.domain.enums import DisplayNamePreference
 from app.contexts.educator.domain.profiles import Mentor
 from app.contexts.identity.domain.entities import User
@@ -18,8 +14,9 @@ from app.contexts.identity.infrastructure.repositories import TortoiseUserReposi
 from app.core.config import Settings
 from app.core.security import JWTService
 from tests.factories.academy import create_cohort
+from tests.factories.access import ASSISTANT, MANAGER, give_role
 from tests.factories.educator import create_mentor, create_user
-from tests.factories.staff_review import create_applicant, seed_roles
+from tests.factories.staff_review import create_applicant
 
 pytestmark = pytest.mark.api
 
@@ -44,14 +41,8 @@ async def _approved(user: User) -> User:
 
 
 async def _staff(settings: Settings, role: str, cohort_id: object) -> dict[str, str]:
-    await seed_roles()
     user = await _approved(await create_applicant())
-    await RoleAssignmentService(TortoiseUserRoleRepository()).grant(
-        user.id,
-        role,
-        RoleScopeType.COHORT,
-        cohort_id,  # type: ignore[arg-type]
-    )
+    await give_role(user.id, role, cohort_id=cohort_id)  # type: ignore[arg-type]
     return bearer(settings, user)
 
 
@@ -120,8 +111,8 @@ async def test_assignment_permissions(
     cohort, other = await create_cohort(), await create_cohort()
     mentor = await _mentor()
     path = f"{API}/cohorts/{cohort.id}/mentor-assignments"
-    manager = await _staff(settings, COHORT_MANAGER, cohort.id)
-    assistant = await _staff(settings, COHORT_ASSISTANT, cohort.id)
+    manager = await _staff(settings, MANAGER, cohort.id)
+    assistant = await _staff(settings, ASSISTANT, cohort.id)
 
     assert (await client.get(path)).status_code == 401
     assert (await client.post(path, json=_body(mentor), headers=manager)).status_code == 201

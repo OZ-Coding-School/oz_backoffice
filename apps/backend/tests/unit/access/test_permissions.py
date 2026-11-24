@@ -1,247 +1,122 @@
-from datetime import UTC, datetime, timedelta
+"""권한 판정 (decisions A86·A87): 직위 권한 + 데이터 범위(전체 / 담당 과정·기수)."""
 
 import pytest
 
-from app.contexts.access.application.permissions import PermissionChecker, PermissionTarget
-from app.contexts.access.application.roles import RoleQueries
-from app.contexts.access.domain.catalog import (
-    COHORT_ASSISTANT,
-    COHORT_MANAGER,
-    STUDENT,
-    SUPER_ADMIN,
+from app.contexts.access.application.permissions import (
+    PermissionChecker,
+    PermissionScope,
+    PermissionTarget,
+    StaffGrant,
 )
-from app.contexts.access.domain.entities import UserRole
-from app.contexts.access.domain.enums import RoleScopeType
-from app.core.clock import FixedClock
 from app.shared.errors import PermissionDeniedError
 from app.shared.ids import new_id
-from tests.fakes.access import CountingUserRoleRepository, FakeCohortDirectory
+from tests.fakes.access import FakeCohortDirectory, FakeGrantSource
 
 pytestmark = pytest.mark.unit
 
-NOW = datetime(2026, 11, 6, 9, 0, tzinfo=UTC)
 BOOTCAMP = new_id()
 COHORT = new_id()  # BOOTCAMP 소속
 OTHER_BOOTCAMP = new_id()
 OTHER_COHORT = new_id()  # OTHER_BOOTCAMP 소속
+G = PermissionTarget.global_()
+ANY = PermissionTarget.any_scope()
+IN_BOOTCAMP = PermissionTarget.bootcamp(BOOTCAMP)
+IN_COHORT = PermissionTarget.cohort(COHORT)
+IN_OTHER = PermissionTarget.cohort(OTHER_COHORT)
 
 
 class Harness:
-    def __init__(self) -> None:
-        self.user_roles = CountingUserRoleRepository()
+    def __init__(self, grant: StaffGrant) -> None:
+        self.source = FakeGrantSource()
         self.cohorts = FakeCohortDirectory({COHORT: BOOTCAMP, OTHER_COHORT: OTHER_BOOTCAMP})
-        self.checker = PermissionChecker(
-            RoleQueries(self.user_roles, FixedClock(NOW)), self.cohorts
-        )
         self.user_id = new_id()
+        self.source.grants[self.user_id] = grant
+        self.checker = PermissionChecker(self.source, self.cohorts)
 
-    async def grant(
-        self, role: str, scope: RoleScopeType, scope_id: object = None, **kw: object
-    ) -> None:
-        await self.user_roles.add(
-            UserRole(
-                user_id=self.user_id,
-                role_code=role,
-                scope_type=scope,
-                scope_id=scope_id,  # type: ignore[arg-type]
-                **kw,  # type: ignore[arg-type]
-            )
-        )
+    async def has(self, code: str, target: PermissionTarget) -> bool:
+        return await self.checker.has(self.user_id, code, target)
 
 
-@pytest.fixture
-def h() -> Harness:
-    return Harness()
+READ = "mentoring.request.read"  # 기수에 속한 엔터티
+ORG = "org.department.manage"  # 기수와 무관한 엔터티
 
 
-G = PermissionTarget.global_()
-ANY = PermissionTarget.any_scope()
+async def test_without_permission_nothing_is_allowed() -> None:
+    h = Harness(StaffGrant(permissions=frozenset({ORG}), all_data=True))
+    assert not await h.has(READ, IN_COHORT)
+    assert not await h.has(READ, ANY)
+    assert (await h.checker.scope_of(h.user_id, READ)).is_empty
+
+
+async def test_entities_outside_cohorts_ignore_data_scope() -> None:
+    """조직·과정·계약 같은 엔터티는 권한만 있으면 된다 (A87)."""
+    h = Harness(StaffGrant(permissions=frozenset({ORG})))  # 담당만, 담당 없음
+    assert await h.has(ORG, G)
+    assert await h.has(ORG, ANY)
+    assert (await h.checker.scope_of(h.user_id, ORG)).is_global
+
+
+async def test_all_data_scope_reaches_every_cohort() -> None:
+    h = Harness(StaffGrant(permissions=frozenset({READ}), all_data=True))
+    for target in (G, ANY, IN_BOOTCAMP, IN_COHORT, IN_OTHER):
+        assert await h.has(READ, target)
+    assert (await h.checker.scope_of(h.user_id, READ)).is_global
 
 
 @pytest.mark.parametrize(
-    ("role", "scope", "scope_id", "code", "target", "allowed"),
+    ("bootcamps", "cohorts", "target", "allowed"),
     [
-        # SUPER_ADMIN(GLOBAL)은 모든 권한·범위
-        (SUPER_ADMIN, RoleScopeType.GLOBAL, None, "org.department.manage", G, True),
-        (
-            SUPER_ADMIN,
-            RoleScopeType.GLOBAL,
-            None,
-            "academy.roster.sync",
-            PermissionTarget.cohort(OTHER_COHORT),
-            True,
-        ),
-        # 과정 매니저: 그 과정과 소속 기수만
-        (
-            COHORT_MANAGER,
-            RoleScopeType.BOOTCAMP,
-            BOOTCAMP,
-            "mentoring.settings.manage",
-            PermissionTarget.cohort(COHORT),
-            True,
-        ),
-        (
-            COHORT_MANAGER,
-            RoleScopeType.BOOTCAMP,
-            BOOTCAMP,
-            "mentoring.settings.manage",
-            PermissionTarget.bootcamp(BOOTCAMP),
-            True,
-        ),
-        (
-            COHORT_MANAGER,
-            RoleScopeType.BOOTCAMP,
-            BOOTCAMP,
-            "mentoring.settings.manage",
-            PermissionTarget.cohort(OTHER_COHORT),
-            False,
-        ),
-        (
-            COHORT_MANAGER,
-            RoleScopeType.BOOTCAMP,
-            BOOTCAMP,
-            "mentoring.settings.manage",
-            PermissionTarget.bootcamp(OTHER_BOOTCAMP),
-            False,
-        ),
-        (COHORT_MANAGER, RoleScopeType.BOOTCAMP, BOOTCAMP, "mentoring.settings.manage", G, False),
-        # 매니저에게 없는 권한
-        (
-            COHORT_MANAGER,
-            RoleScopeType.BOOTCAMP,
-            BOOTCAMP,
-            "org.department.manage",
-            PermissionTarget.cohort(COHORT),
-            False,
-        ),
-        # 계약 관리는 범위가 없어 매니저 역할이 하나라도 있으면 된다(ANY)
-        (COHORT_MANAGER, RoleScopeType.COHORT, COHORT, "educator.contract.manage", ANY, True),
-        (COHORT_ASSISTANT, RoleScopeType.COHORT, COHORT, "educator.contract.manage", ANY, False),
-        # 기수 조교: 그 기수만, 과정 단위 대상에는 권한 없음
-        (
-            COHORT_ASSISTANT,
-            RoleScopeType.COHORT,
-            COHORT,
-            "mentoring.team.manage",
-            PermissionTarget.cohort(COHORT),
-            True,
-        ),
-        (
-            COHORT_ASSISTANT,
-            RoleScopeType.COHORT,
-            COHORT,
-            "mentoring.team.manage",
-            PermissionTarget.cohort(OTHER_COHORT),
-            False,
-        ),
-        (
-            COHORT_ASSISTANT,
-            RoleScopeType.COHORT,
-            COHORT,
-            "mentoring.team.manage",
-            PermissionTarget.bootcamp(BOOTCAMP),
-            False,
-        ),
-        (
-            COHORT_ASSISTANT,
-            RoleScopeType.COHORT,
-            COHORT,
-            "mentoring.settlement.close",
-            PermissionTarget.cohort(COHORT),
-            False,
-        ),
-        # 수강생 역할에는 권한 코드가 없다 (소유 관계로 검사)
-        (
-            STUDENT,
-            RoleScopeType.COHORT,
-            COHORT,
-            "mentoring.request.read",
-            PermissionTarget.cohort(COHORT),
-            False,
-        ),
+        ((BOOTCAMP,), (), IN_BOOTCAMP, True),
+        ((BOOTCAMP,), (), IN_COHORT, True),  # 과정 담당은 소속 기수 전부
+        ((BOOTCAMP,), (), IN_OTHER, False),
+        ((), (COHORT,), IN_COHORT, True),
+        ((), (COHORT,), IN_BOOTCAMP, False),  # 기수 담당은 과정 전체가 아니다
+        ((), (COHORT,), IN_OTHER, False),
+        ((BOOTCAMP,), (COHORT,), G, False),  # 전체가 필요한 대상
+        ((), (), ANY, True),  # 어느 범위든: 권한만 있으면
+        ((), (), IN_COHORT, False),
     ],
 )
-async def test_permission_matrix(
-    h: Harness,
-    role: str,
-    scope: RoleScopeType,
-    scope_id: object,
-    code: str,
+async def test_assigned_scope_follows_assignments(
+    bootcamps: tuple[object, ...],
+    cohorts: tuple[object, ...],
     target: PermissionTarget,
     allowed: bool,
 ) -> None:
-    await h.grant(role, scope, scope_id)
-    assert await h.checker.has(h.user_id, code, target) is allowed
-
-
-async def test_no_roles_means_no_permission(h: Harness) -> None:
-    assert not await h.checker.has(h.user_id, "mentoring.request.read", ANY)
-    with pytest.raises(PermissionDeniedError) as exc:
-        await h.checker.require(h.user_id, "mentoring.request.read", ANY)
-    assert exc.value.code == "permission_denied"
-
-
-async def test_expired_role_is_ignored(h: Harness) -> None:
-    await h.grant(SUPER_ADMIN, RoleScopeType.GLOBAL, expires_at=NOW - timedelta(seconds=1))
-    assert not await h.checker.has(h.user_id, "org.department.manage", G)
-
-
-async def test_unknown_cohort_is_denied_for_scoped_roles(h: Harness) -> None:
-    await h.grant(COHORT_MANAGER, RoleScopeType.BOOTCAMP, BOOTCAMP)
-    assert not await h.checker.has(
-        h.user_id, "mentoring.request.read", PermissionTarget.cohort(new_id())
+    h = Harness(
+        StaffGrant(
+            permissions=frozenset({READ}),
+            bootcamp_ids=frozenset(bootcamps),  # type: ignore[arg-type]
+            cohort_ids=frozenset(cohorts),  # type: ignore[arg-type]
+        )
     )
+    assert await h.has(READ, target) is allowed
 
 
-async def test_roles_are_loaded_once_per_checker(h: Harness) -> None:
-    await h.grant(COHORT_ASSISTANT, RoleScopeType.COHORT, COHORT)
-    for _ in range(3):
-        await h.checker.has(h.user_id, "mentoring.team.manage", PermissionTarget.cohort(COHORT))
-    assert h.user_roles.list_calls == 1
-    # 기수 권한으로 판정되면 과정 조회를 하지 않는다
-    assert h.cohorts.lookups == 0
-
-
-async def test_unknown_permission_code_is_a_programming_error(h: Harness) -> None:
-    with pytest.raises(ValueError, match="정의되지 않은 권한"):
-        await h.checker.has(h.user_id, "mentoring.unknown", G)
-
-
-async def test_scope_of_permission(h: Harness) -> None:
-    from app.contexts.access.application.permissions import PermissionScope
-
-    assert (await h.checker.scope_of(h.user_id, "member.approval.manage")).is_empty
-
-    await h.grant(COHORT_ASSISTANT, RoleScopeType.COHORT, COHORT)
-    await h.grant(COHORT_MANAGER, RoleScopeType.BOOTCAMP, OTHER_BOOTCAMP)
-    checker = PermissionChecker(RoleQueries(h.user_roles, FixedClock(NOW)), h.cohorts)
-    assert await checker.scope_of(h.user_id, "member.approval.manage") == PermissionScope(
+async def test_scope_of_assigned_lists_assignments() -> None:
+    h = Harness(
+        StaffGrant(
+            permissions=frozenset({READ}),
+            bootcamp_ids=frozenset({OTHER_BOOTCAMP}),
+            cohort_ids=frozenset({COHORT}),
+        )
+    )
+    assert await h.checker.scope_of(h.user_id, READ) == PermissionScope(
         bootcamp_ids=frozenset({OTHER_BOOTCAMP}), cohort_ids=frozenset({COHORT})
     )
-    # 조교에게 없는 권한은 매니저 역할 범위만
-    assert await checker.scope_of(h.user_id, "educator.contract.manage") == PermissionScope(
-        bootcamp_ids=frozenset({OTHER_BOOTCAMP})
-    )
-
-    await h.grant(SUPER_ADMIN, RoleScopeType.GLOBAL)
-    fresh = PermissionChecker(RoleQueries(h.user_roles, FixedClock(NOW)), h.cohorts)
-    assert (await fresh.scope_of(h.user_id, "member.approval.manage")).is_global
 
 
-async def test_role_permissions_come_from_stored_mapping(h: Harness) -> None:
-    """역할별 권한은 저장된 매핑을 따른다 (A84). 최고 관리자는 항상 전체."""
-    h.user_roles.role_permissions[COHORT_ASSISTANT] = frozenset({"educator.contract.manage"})
-    h.user_roles.role_permissions["AUDITOR"] = frozenset({"mentoring.request.read"})
-    await h.grant(COHORT_ASSISTANT, RoleScopeType.COHORT, COHORT)
-    await h.grant("AUDITOR", RoleScopeType.BOOTCAMP, BOOTCAMP)
+async def test_grant_is_loaded_once_per_checker() -> None:
+    h = Harness(StaffGrant(permissions=frozenset({READ}), cohort_ids=frozenset({COHORT})))
+    await h.has(READ, IN_COHORT)
+    await h.has(READ, IN_OTHER)
+    await h.checker.scope_of(h.user_id, READ)
+    assert h.source.calls == 1
 
-    assert await h.checker.has(h.user_id, "educator.contract.manage", ANY)
-    assert not await h.checker.has(h.user_id, "member.approval.manage", ANY)  # 기본 묶음에서 빠짐
-    assert await h.checker.has(h.user_id, "mentoring.request.read", PermissionTarget.cohort(COHORT))
-    assert not await h.checker.has(
-        h.user_id, "mentoring.request.read", PermissionTarget.cohort(OTHER_COHORT)
-    )
 
-    admin = Harness()
-    await admin.grant(SUPER_ADMIN, RoleScopeType.GLOBAL)
-    assert await admin.checker.has(admin.user_id, "access.role.manage", G)
+async def test_require_and_unknown_code() -> None:
+    h = Harness(StaffGrant())
+    with pytest.raises(PermissionDeniedError):
+        await h.checker.require(h.user_id, READ, IN_COHORT)
+    with pytest.raises(ValueError, match="정의되지 않은 권한"):
+        await h.has("no.such.permission", G)

@@ -16,6 +16,9 @@ class InMemoryUserRepository:
         self.users: dict[uuid.UUID, User] = {}
         self.oauth_accounts: list[OAuthAccount] = []
 
+    async def lock_super_admin_ids(self) -> list[uuid.UUID]:
+        return [u.id for u in self.users.values() if u.is_super_admin and u.deleted_at is None]
+
     async def add(self, user: User) -> None:
         self.users[user.id] = replace(user)
 

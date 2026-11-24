@@ -1,9 +1,7 @@
 """과정·기수 담당자 배정·해제 (decisions D4).
 
-담당자 행(bootcamp_staffs·cohort_staffs)은 화면 표시용이고 권한은 user_roles로 판정한다.
-배정·해제할 때 같은 트랜잭션에서 대응하는 역할을 부여·회수해 둘을 맞춘다.
-- 과정 담당: 매니저 → COHORT_MANAGER(BOOTCAMP), 조교 → COHORT_ASSISTANT(BOOTCAMP)
-- 기수 담당: 매니저 → COHORT_MANAGER(COHORT), 조교 → COHORT_ASSISTANT(COHORT)
+담당자 행(bootcamp_staffs·cohort_staffs)은 직원의 데이터 범위다(A87): 직위의 데이터 범위가
+'담당만'이면 기수에 속한 엔터티 권한이 배정된 과정·기수에만 미친다. 권한 묶음은 직위가 정한다.
 """
 
 import uuid
@@ -12,10 +10,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 
-from app.contexts.access.domain.enums import RoleScopeType
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.organization.application.registration_service import StaffTargetCatalog
-from app.contexts.organization.application.staff_roles import StaffRoleSync, role_scope
 from app.contexts.organization.domain.entities import BootcampStaff, CohortStaff
 from app.contexts.organization.domain.enums import StaffRole
 from app.contexts.organization.domain.repositories import (
@@ -56,7 +52,6 @@ class StaffAssignmentService:
         bootcamp_staffs: BootcampStaffRepository,
         cohort_staffs: CohortStaffRepository,
         catalog: StaffTargetCatalog,
-        roles: StaffRoleSync,
         audit: AuditRecorder,
         uow: UnitOfWork,
     ) -> None:
@@ -64,7 +59,6 @@ class StaffAssignmentService:
         self._bootcamp_staffs = bootcamp_staffs
         self._cohort_staffs = cohort_staffs
         self._catalog = catalog
-        self._roles = roles
         self._audit = audit
         self._uow = uow
 
@@ -114,7 +108,6 @@ class StaffAssignmentService:
             else:
                 staff = CohortStaff(employee_id=employee_id, cohort_id=target_id, role=role)
                 await self._cohort_staffs.add(staff)
-            await self._roles.grant(employee.user_id, *_role_scope(target, target_id, role))
             await self._audit.record(
                 actor_user_id=actor_id,
                 action="organization.staff.assign",
@@ -137,11 +130,6 @@ class StaffAssignmentService:
                 await self._bootcamp_staffs.remove(staff_id)
             else:
                 await self._cohort_staffs.remove(staff_id)
-            employee = await self._employees.get(staff.employee_id)
-            if employee is not None:
-                await self._roles.revoke(
-                    employee.user_id, *_role_scope(target, target_id, staff.role)
-                )
             await self._audit.record(
                 actor_user_id=actor_id,
                 action="organization.staff.unassign",
@@ -154,14 +142,6 @@ class StaffAssignmentService:
         if target is StaffTarget.BOOTCAMP:
             return list(await self._bootcamp_staffs.list_by_bootcamp(target_id))
         return list(await self._cohort_staffs.list_by_cohort(target_id))
-
-
-def _role_scope(
-    target: StaffTarget, target_id: uuid.UUID, role: StaffRole
-) -> tuple[str, RoleScopeType, uuid.UUID]:
-    if target is StaffTarget.BOOTCAMP:
-        return role_scope(role, bootcamp_id=target_id)
-    return role_scope(role, cohort_id=target_id)
 
 
 def _member(

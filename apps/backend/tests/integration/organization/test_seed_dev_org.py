@@ -3,7 +3,8 @@
 import pytest
 
 from app.cli import seed_dev_org
-from app.contexts.organization.domain.enums import AssignmentScope
+from app.contexts.access.domain.catalog import DEV_POSITION_PERMISSIONS
+from app.contexts.organization.domain.enums import AssignmentScope, DataScope
 from app.contexts.organization.infrastructure.repositories import (
     TortoiseBootcampTeamRepository,
     TortoiseDepartmentRepository,
@@ -31,21 +32,26 @@ async def test_seed_dev_org_is_idempotent(settings: Settings) -> None:
     assert department is not None
     team = await TortoiseTeamRepository().find_by_department_and_name(department.id, "교육 1팀")
     assert team is not None
+    repo = TortoiseEmployeePositionRepository()
     positions = {
-        p.name: (p.priority, p.assignment_scope)
-        for p in await TortoiseEmployeePositionRepository().list_all()
+        p.name: (p.priority, p.assignment_scope, p.data_scope) for p in await repo.list_all()
     }
     assert positions == {
-        "팀리드": (1, AssignmentScope.COURSE),
-        "운영 매니저": (2, AssignmentScope.COURSE),
-        "조교": (3, AssignmentScope.COHORT),
-        "러닝 코치": (4, AssignmentScope.COURSE),
+        "팀리드": (1, AssignmentScope.COURSE, DataScope.ALL),
+        "운영 매니저": (2, AssignmentScope.COURSE, DataScope.ASSIGNED),
+        "조교": (3, AssignmentScope.COHORT, DataScope.ASSIGNED),
+        "러닝 코치": (4, AssignmentScope.COURSE, DataScope.ASSIGNED),
     }
+    # 권한은 비어 있을 때만 기본 묶음을 넣는다 (A87)
+    by_name = {p.name: p.id for p in await repo.list_all()}
+    assert await repo.permissions_of(by_name["조교"]) == DEV_POSITION_PERMISSIONS["조교"]
+    await repo.replace_permissions(by_name["조교"], frozenset({"mentoring.request.read"}))
     links = TortoiseBootcampTeamRepository()
     assert await links.list_bootcamp_ids(team.id) == {free.bootcamp_id}
     assert await links.list_bootcamp_ids(other_team.id) == {linked.bootcamp_id}  # 그대로
 
     assert await seed_dev_org(settings) == ["바꿀 것이 없습니다 (이미 반영됨)."]
+    assert await repo.permissions_of(by_name["조교"]) == {"mentoring.request.read"}  # 덮지 않음
 
 
 async def test_seed_dev_org_refuses_production(settings: Settings) -> None:

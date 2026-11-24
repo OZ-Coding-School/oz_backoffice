@@ -5,11 +5,6 @@ from app.contexts.academy.infrastructure.repositories import (
     TortoiseBootcampRepository,
     TortoiseCohortRepository,
 )
-from app.contexts.access.application.roles import RoleAssignmentService, RoleCatalogSeeder
-from app.contexts.access.infrastructure.repositories import (
-    TortoiseRoleCatalogRepository,
-    TortoiseUserRoleRepository,
-)
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.audit.infrastructure.repositories import TortoiseAuditLogRepository
 from app.contexts.identity.application.user_admin import UserAdministration
@@ -57,15 +52,10 @@ def build_review_service() -> StaffRegistrationReviewService:
             catalog=AcademyCatalog(TortoiseBootcampRepository(), TortoiseCohortRepository()),
         ),
         users=UserAdministration(TortoiseUserRepository(), clock),
-        roles=RoleAssignmentService(TortoiseUserRoleRepository()),
         audit=AuditRecorder(TortoiseAuditLogRepository(), clock),
         uow=UnitOfWork(),
         clock=clock,
     )
-
-
-async def seed_roles() -> None:
-    await RoleCatalogSeeder(TortoiseRoleCatalogRepository()).seed()
 
 
 async def create_applicant(**overrides: object) -> User:
@@ -95,7 +85,6 @@ def build_staff_service() -> StaffAssignmentService:
         bootcamp_staffs=TortoiseBootcampStaffRepository(),
         cohort_staffs=TortoiseCohortStaffRepository(),
         catalog=AcademyCatalog(TortoiseBootcampRepository(), TortoiseCohortRepository()),
-        roles=RoleAssignmentService(TortoiseUserRoleRepository()),
         audit=AuditRecorder(TortoiseAuditLogRepository(), clock),
         uow=UnitOfWork(),
     )

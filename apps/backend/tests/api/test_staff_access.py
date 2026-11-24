@@ -2,6 +2,7 @@
 
 import uuid
 from collections.abc import Collection
+from dataclasses import dataclass
 from datetime import UTC, date, datetime
 
 import pytest
@@ -10,23 +11,15 @@ from httpx import AsyncClient
 
 from app.contexts.academy.application.catalog import CohortSummary
 from app.contexts.academy.domain.enums import CohortStatus
-from app.contexts.access.application.roles import RoleQueries
-from app.contexts.access.domain.catalog import (
-    COHORT_ASSISTANT,
-    COHORT_MANAGER,
-    PERMISSIONS,
-    SUPER_ADMIN,
-)
-from app.contexts.access.domain.entities import UserRole
-from app.contexts.access.domain.enums import RoleScopeType
+from app.contexts.access.application.permissions import StaffGrant
+from app.contexts.access.domain.catalog import DEV_POSITION_PERMISSIONS, PERMISSIONS
 from app.contexts.identity.application.auth_service import UserQueries
 from app.contexts.identity.domain.enums import AccountType
-from app.core.clock import FixedClock
 from app.core.config import Settings
 from app.core.security import JWTService
 from app.shared.ids import new_id
 from tests.factories.identity import make_user
-from tests.fakes.access import InMemoryUserRoleRepository
+from tests.fakes.access import FakeGrantSource
 from tests.fakes.identity import InMemoryUserRepository
 
 pytestmark = pytest.mark.api
@@ -76,26 +69,46 @@ class FakeCatalog:
         ]
 
 
+@dataclass(frozen=True)
+class Position:
+    position_id: uuid.UUID
+    position_name: str
+    all_data: bool
+
+
 class World:
     def __init__(self, app: FastAPI, settings: Settings) -> None:
         self.users = InMemoryUserRepository()
-        self.roles = InMemoryUserRoleRepository()
+        self.grants = FakeGrantSource()
+        self.positions: dict[uuid.UUID, Position] = {}
         self.settings = settings
         app.state.user_queries = UserQueries(self.users)
-        app.state.role_queries = RoleQueries(self.roles, FixedClock(NOW))
+        app.state.grant_source = self.grants
+        app.state.employee_queries = self
         app.state.academy_catalog = FakeCatalog([C12, C9, C8])
+
+    async def access_of(self, user_id: uuid.UUID) -> "Position | None":
+        return self.positions.get(user_id)
 
     async def login(
         self,
-        *roles: tuple[str, RoleScopeType, uuid.UUID | None],
+        grant: StaffGrant | None = None,
+        *,
+        super_admin: bool = False,
+        position: str | None = None,
         account_type: AccountType = AccountType.STAFF,
     ) -> dict[str, str]:
         user = make_user(account_type=account_type)
         user.approve(now=NOW)
+        if super_admin:
+            user.set_super_admin(True)
+            grant = StaffGrant(permissions=frozenset(PERMISSIONS), all_data=True)
         await self.users.add(user)
-        for code, scope, scope_id in roles:
-            await self.roles.add(
-                UserRole(user_id=user.id, role_code=code, scope_type=scope, scope_id=scope_id)
+        if grant:
+            self.grants.grants[user.id] = grant
+        if position:
+            self.positions[user.id] = Position(
+                new_id(), position, grant.all_data if grant else False
             )
         token, _ = JWTService(self.settings).encode(str(user.id), "access", now=NOW)
         return {"Authorization": f"Bearer {token}"}
@@ -109,10 +122,11 @@ def world(app: FastAPI, settings: Settings) -> World:
 async def test_super_admin_has_every_permission_globally_and_all_cohorts(
     world: World, client: AsyncClient
 ) -> None:
-    headers = await world.login((SUPER_ADMIN, RoleScopeType.GLOBAL, None))
+    headers = await world.login(super_admin=True)
     res = await client.get(URL, headers=headers)
     assert res.status_code == 200, res.text
     body = res.json()
+    assert (body["is_super_admin"], body["position"]) == (True, None)
     assert [p["code"] for p in body["permissions"]] == list(PERMISSIONS)
     assert all(p["is_global"] for p in body["permissions"])
     assert [c["id"] for c in body["cohorts"]] == [str(C12.id), str(C9.id), str(C8.id)]
@@ -127,12 +141,19 @@ async def test_super_admin_has_every_permission_globally_and_all_cohorts(
     }
 
 
-async def test_scoped_roles_union_their_cohorts(world: World, client: AsyncClient) -> None:
+async def test_assigned_scope_unions_bootcamp_and_cohort(world: World, client: AsyncClient) -> None:
+    """데이터 범위 '담당만' 직위 (A87): 기수 엔터티는 담당 과정·기수, 그 밖은 전체."""
     headers = await world.login(
-        (COHORT_ASSISTANT, RoleScopeType.COHORT, C12.id),
-        (COHORT_MANAGER, RoleScopeType.BOOTCAMP, OTHER_BOOTCAMP),
+        StaffGrant(
+            permissions=DEV_POSITION_PERMISSIONS["운영 매니저"],
+            bootcamp_ids=frozenset({OTHER_BOOTCAMP}),
+            cohort_ids=frozenset({C12.id}),
+        ),
+        position="운영 매니저",
     )
     body = (await client.get(URL, headers=headers)).json()
+    assert body["position"]["name"] == "운영 매니저"
+    assert body["position"]["all_data"] is False
     perms = {p["code"]: p for p in body["permissions"]}
     assert perms["member.approval.manage"] == {
         "code": "member.approval.manage",
@@ -140,17 +161,16 @@ async def test_scoped_roles_union_their_cohorts(world: World, client: AsyncClien
         "bootcamp_ids": [str(OTHER_BOOTCAMP)],
         "cohort_ids": [str(C12.id)],
     }
-    # 매니저(과정)만 가진 권한
-    assert perms["educator.contract.manage"]["cohort_ids"] == []
-    assert perms["educator.contract.manage"]["bootcamp_ids"] == [str(OTHER_BOOTCAMP)]
-    assert "org.department.manage" not in perms  # 최고 관리자만
-    assert "staff.assignment.manage" not in perms  # 팀리드만
+    # 기수와 무관한 엔터티는 전체
+    assert perms["educator.contract.manage"]["is_global"] is True
+    assert "org.department.manage" not in perms  # 직위에 없는 권한
+    assert "staff.assignment.manage" not in perms
     assert {c["id"] for c in body["cohorts"]} == {str(C12.id), str(C9.id), str(C8.id)}
 
 
 async def test_staff_without_roles_sees_nothing(world: World, client: AsyncClient) -> None:
     body = (await client.get(URL, headers=await world.login())).json()
-    assert body == {"permissions": [], "cohorts": []}
+    assert body == {"is_super_admin": False, "position": None, "permissions": [], "cohorts": []}
 
 
 async def test_only_staff(world: World, client: AsyncClient) -> None:

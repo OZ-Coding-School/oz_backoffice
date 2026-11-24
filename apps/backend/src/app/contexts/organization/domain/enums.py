@@ -17,6 +17,13 @@ class AssignmentScope(StrEnum):
     COHORT = "COHORT"  # 소속 팀 과정의 기수 하나 (조교)
 
 
+class DataScope(StrEnum):
+    """직위의 데이터 범위 (A87): 기수에 속한 엔터티에 미치는 범위."""
+
+    ASSIGNED = "ASSIGNED"  # 담당자로 배정된 과정·기수만
+    ALL = "ALL"  # 모든 과정·기수
+
+
 class StaffRole(StrEnum):
     MANAGER = "MANAGER"  # 운영 매니저
     ASSISTANT = "ASSISTANT"  # 조교

@@ -59,7 +59,7 @@ export function StaffShell({ me, children }: { me: Me; children: ReactNode }) {
           <ModuleLink key={m.key} module={m} active={m.key === module?.key} />
         ))}
         <div className="mt-auto">
-          <UserMenu me={me} lines={roleLines(me.roles, access.data?.cohorts ?? [])} />
+          <UserMenu me={me} lines={roleLines(access.data)} />
         </div>
       </nav>
       {module ? (

@@ -6,7 +6,7 @@ from app.contexts.identity.domain.entities import User
 from app.contexts.identity.domain.enums import AccountType, UserApprovalStatus
 from app.contexts.identity.domain.repositories import UserRepository
 from app.core.clock import Clock
-from app.shared.errors import BusinessRuleViolation, NotFoundError
+from app.shared.errors import BusinessRuleViolation, ConflictError, NotFoundError
 
 
 class UserAdministration:
@@ -55,6 +55,20 @@ class UserAdministration:
         if user.approval_status is UserApprovalStatus.PENDING:
             user.reject()
             await self._users.save(user)
+        return user
+
+    async def set_super_admin(self, user_id: uuid.UUID, enabled: bool) -> User:
+        """최고 관리자를 켜고 끈다 (A87). 마지막 1명은 끌 수 없다.
+
+        호출하는 쪽이 UnitOfWork를 연다.
+        """
+        user = await self._get(user_id)
+        if user.is_super_admin == enabled:
+            return user
+        if not enabled and set(await self._users.lock_super_admin_ids()) == {user_id}:
+            raise ConflictError("마지막 최고 관리자는 끌 수 없습니다.", code="last_super_admin")
+        user.set_super_admin(enabled)
+        await self._users.save(user)
         return user
 
     async def _get(self, user_id: uuid.UUID) -> User:

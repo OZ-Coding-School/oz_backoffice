@@ -39,7 +39,7 @@ describe("라우트 가드", () => {
       makeMe({
         name: "김오즈",
         account_type: "STAFF",
-        roles: [{ role: "SUPER_ADMIN", scope_type: "GLOBAL", scope_id: null, expires_at: null }],
+        is_super_admin: true,
       }),
     );
     const { router } = await renderRoute("/");
@@ -121,7 +121,7 @@ describe("로그인", () => {
 
 describe("가입 상태 모달", () => {
   it("승인 대기면 신청 내용을 보여 주고 확인하면 로그아웃한다", async () => {
-    mockLogin(makeMe({ approval_status: "PENDING", approved_at: null, roles: [] }));
+    mockLogin(makeMe({ approval_status: "PENDING", approved_at: null, is_super_admin: false }));
     server.use(http.get(apiUrl("/api/v1/me/member-signup"), () => HttpResponse.json(makeSignup())));
     await renderRoute("/login");
     const user = await fillAndSubmit();
@@ -133,7 +133,7 @@ describe("가입 상태 모달", () => {
   });
 
   it("반려되면 사유를 보여 주고 멘토로 다시 신청해 바로 승인되면 홈으로 간다", async () => {
-    mockLogin(makeMe({ approval_status: "REJECTED", approved_at: null, roles: [] }));
+    mockLogin(makeMe({ approval_status: "REJECTED", approved_at: null, is_super_admin: false }));
     server.use(
       http.get(apiUrl("/api/v1/me/member-signup"), () =>
         HttpResponse.json(makeSignup({ status: "REJECTED", reject_reason: "명단에 없어요." })),
@@ -143,13 +143,7 @@ describe("가입 상태 모달", () => {
     server.use(
       http.post(apiUrl("/api/v1/me/member-signup"), async ({ request }) => {
         bodies.push(await request.json());
-        server.use(
-          http.get(apiUrl("/api/v1/me"), () =>
-            HttpResponse.json(
-              makeMe({ roles: [{ role: "MENTOR", scope_type: "GLOBAL", scope_id: null, expires_at: null }] }),
-            ),
-          ),
-        );
+        server.use(http.get(apiUrl("/api/v1/me"), () => HttpResponse.json(makeMe({ is_super_admin: false }))));
         return HttpResponse.json({
           user_id: "u1",
           name: "가수강",
@@ -174,7 +168,7 @@ describe("가입 상태 모달", () => {
   });
 
   it("수강생 재신청은 기수를 골라야 한다", async () => {
-    mockLogin(makeMe({ approval_status: "REJECTED", approved_at: null, roles: [] }));
+    mockLogin(makeMe({ approval_status: "REJECTED", approved_at: null, is_super_admin: false }));
     server.use(
       http.get(apiUrl("/api/v1/me/member-signup"), () =>
         HttpResponse.json(makeSignup({ status: "REJECTED", requested_cohort_id: null, reject_reason: "기수 확인" })),

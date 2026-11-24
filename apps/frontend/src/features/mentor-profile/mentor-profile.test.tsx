@@ -25,7 +25,7 @@ const MENTOR = makeMe({
   email: "mentor@example.com",
   phone_number: "01012345678",
   account_type: "MENTOR",
-  roles: [{ role: "MENTOR", scope_type: "GLOBAL", scope_id: null, expires_at: null }],
+  is_super_admin: false,
 });
 
 const PROFILE: MentorProfile = {

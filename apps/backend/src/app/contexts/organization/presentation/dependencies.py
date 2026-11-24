@@ -19,7 +19,6 @@ from app.contexts.organization.application.review_service import (
     StaffRegistrationReviewService,
     StaffUserApprover,
 )
-from app.contexts.organization.application.staff_roles import StaffRoleGranter, StaffRoleSync
 from app.contexts.organization.application.staff_service import StaffAssignmentService
 from app.contexts.organization.infrastructure.repositories import (
     TortoiseBootcampStaffRepository,
@@ -85,7 +84,6 @@ def get_staff_registration_review_service(
             catalog=catalog,
         ),
         users=cast("StaffUserApprover", state.user_admin),
-        roles=cast("StaffRoleGranter", state.role_assignments),
         audit=cast("AuditRecorder", state.audit_recorder),
         uow=UnitOfWork(),
         clock=clock,
@@ -102,7 +100,6 @@ def get_staff_assignment_service(
         bootcamp_staffs=TortoiseBootcampStaffRepository(),
         cohort_staffs=TortoiseCohortStaffRepository(),
         catalog=catalog,
-        roles=cast("StaffRoleSync", state.role_assignments),
         audit=cast("AuditRecorder", state.audit_recorder),
         uow=UnitOfWork(),
     )

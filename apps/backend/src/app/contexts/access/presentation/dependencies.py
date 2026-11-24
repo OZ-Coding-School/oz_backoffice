@@ -5,7 +5,8 @@
 
 회원 조회 서비스(UserQueries)는 composition root(app.main)가 app.state.user_queries에 연결한다.
 다른 컨텍스트의 infrastructure를 import하지 않기 위해서다 (import-linter 계약).
-역할 조회 서비스(RoleQueries)도 같은 방식으로 app.state.role_queries에 연결한다.
+권한 출처(StaffGrantSource: 최고 관리자 필드 + 직위 권한·데이터 범위 + 담당 배정, A87)는
+app.state.grant_source에 연결한다.
 - require_permission(code, ...): 승인된 회원 + 권한 코드 + 범위(경로의 과정·기수 ID) 검사
 
 """
@@ -19,11 +20,11 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.contexts.access.application.permissions import (
     CohortDirectory,
+    GrantSource,
     PermissionChecker,
     PermissionTarget,
     ensure_known_permission,
 )
-from app.contexts.access.application.roles import RoleQueries
 from app.contexts.identity.application.auth_service import UserQueries
 from app.contexts.identity.application.tokens import read_access_token
 from app.contexts.identity.domain.entities import User
@@ -38,8 +39,8 @@ def get_user_queries(request: Request) -> UserQueries:
     return cast("UserQueries", request.app.state.user_queries)
 
 
-def get_role_queries(request: Request) -> RoleQueries:
-    return cast("RoleQueries", request.app.state.role_queries)
+def get_grant_source(request: Request) -> GrantSource:
+    return cast("GrantSource", request.app.state.grant_source)
 
 
 async def get_current_user(
@@ -63,16 +64,26 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 ApprovedUser = Annotated[User, Depends(require_approved_user)]
 
 
+async def require_super_admin(user: Annotated[User, Depends(require_approved_user)]) -> User:
+    """최고 관리자만 (회원 필드, A87)."""
+    if not user.is_super_admin:
+        raise PermissionDeniedError("최고 관리자만 할 수 있습니다.", code="super_admin_only")
+    return user
+
+
+SuperAdmin = Annotated[User, Depends(require_super_admin)]
+
+
 def get_cohort_directory(request: Request) -> CohortDirectory:
     return cast("CohortDirectory", request.app.state.academy_catalog)
 
 
 def get_permission_checker(
-    roles: Annotated[RoleQueries, Depends(get_role_queries)],
+    grants: Annotated[GrantSource, Depends(get_grant_source)],
     cohorts: Annotated[CohortDirectory, Depends(get_cohort_directory)],
 ) -> PermissionChecker:
-    """요청 단위로 하나 만든다(FastAPI 의존성 캐시). 사용자 역할은 요청당 한 번만 읽는다."""
-    return PermissionChecker(roles, cohorts)
+    """요청 단위로 하나 만든다(FastAPI 의존성 캐시). 권한은 요청당 한 번만 읽는다."""
+    return PermissionChecker(grants, cohorts)
 
 
 PermissionCheckerDep = Annotated[PermissionChecker, Depends(get_permission_checker)]

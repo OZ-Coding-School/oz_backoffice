@@ -18,7 +18,7 @@ const MENTOR = makeMe({
   id: "u9",
   name: "김멘토",
   account_type: "MENTOR",
-  roles: [{ role: "MENTOR", scope_type: "GLOBAL", scope_id: null, expires_at: null }],
+  is_super_admin: false,
 });
 
 const NOW = new Date("2026-11-20T03:00:00Z"); // 11/20(금) 12:00 KST

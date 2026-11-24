@@ -8,9 +8,11 @@ const ADMIN = {
   phone_number: null,
   approval_status: "APPROVED",
   approved_at: "2026-11-01T01:00:00Z",
-  roles: [{ role: "SUPER_ADMIN", scope_type: "GLOBAL", scope_id: null, expires_at: null }],
+  is_super_admin: true,
 };
 const ACCESS = {
+  is_super_admin: false,
+  position: null,
   permissions: [
     { code: "staff.assignment.read", is_global: true, bootcamp_ids: [], cohort_ids: [] },
     { code: "staff.assignment.manage", is_global: true, bootcamp_ids: [], cohort_ids: [] },

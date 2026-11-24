@@ -6,10 +6,6 @@ import pytest
 from httpx import AsyncClient
 
 from app.cli import create_super_admin
-from app.contexts.access.application.roles import RoleAssignmentService
-from app.contexts.access.domain.catalog import COHORT_ASSISTANT
-from app.contexts.access.domain.enums import RoleScopeType
-from app.contexts.access.infrastructure.repositories import TortoiseUserRoleRepository
 from app.contexts.educator.domain.profiles import Mentor
 from app.contexts.identity.domain.entities import User
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
@@ -17,8 +13,9 @@ from app.core.config import Settings
 from app.core.security import JWTService
 from app.shared.time import KST
 from tests.factories.academy import create_cohort
+from tests.factories.access import ASSISTANT, give_role
 from tests.factories.educator import create_mentor, create_user
-from tests.factories.staff_review import create_applicant, seed_roles
+from tests.factories.staff_review import create_applicant
 
 pytestmark = pytest.mark.api
 
@@ -171,12 +168,8 @@ async def test_admin_proxy_and_permissions(
     )
     assert accepting.json()["accepting_requests"] is True
     assert len((await client.get(base, headers=admin)).json()["unavailable_periods"]) == 1
-
-    await seed_roles()
     assistant_user = await _approved(await create_applicant())
-    await RoleAssignmentService(TortoiseUserRoleRepository()).grant(
-        assistant_user.id, COHORT_ASSISTANT, RoleScopeType.COHORT, (await create_cohort()).id
-    )
+    await give_role(assistant_user.id, ASSISTANT, cohort_id=(await create_cohort()).id)
     assert (await client.get(base, headers=bearer(settings, assistant_user))).status_code == 403
     assert (await client.get(base)).status_code == 401
     stranger = bearer(settings, await _approved(await create_user()))

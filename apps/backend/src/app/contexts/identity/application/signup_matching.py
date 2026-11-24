@@ -12,8 +12,6 @@ import uuid
 from typing import Protocol
 
 from app.contexts.academy.application.student_claims import ClaimOutcome
-from app.contexts.access.domain.catalog import STUDENT
-from app.contexts.access.domain.enums import RoleScopeType
 from app.contexts.educator.application.mentor_onboarding import MentorMatch
 from app.contexts.educator.domain.enums import DisplayNamePreference
 from app.contexts.identity.domain.entities import User
@@ -43,25 +41,10 @@ class MentorLinker(Protocol):
     ) -> MentorMatch: ...
 
 
-class RoleGranter(Protocol):
-    """access `RoleAssignmentService`."""
-
-    async def grant(
-        self,
-        user_id: uuid.UUID,
-        role_code: str,
-        scope_type: RoleScopeType,
-        scope_id: uuid.UUID | None = None,
-    ) -> bool: ...
-
-
 class SignupMatcher:
-    def __init__(
-        self, *, students: StudentClaimer, mentors: MentorLinker, roles: RoleGranter
-    ) -> None:
+    def __init__(self, *, students: StudentClaimer, mentors: MentorLinker) -> None:
         self._students = students
         self._mentors = mentors
-        self._roles = roles
 
     async def match(self, user: User, signup: MemberSignup) -> SignupMatchResult:
         if user.phone_number is None:  # 가입은 SMS 인증을 거치므로 항상 있다
@@ -84,7 +67,6 @@ class SignupMatcher:
                 if outcome.candidate_count > 1
                 else SignupMatchResult.NO_MATCH
             )
-        await self._roles.grant(user.id, STUDENT, RoleScopeType.COHORT, signup.requested_cohort_id)
         return SignupMatchResult.MATCHED
 
     async def _match_mentor(

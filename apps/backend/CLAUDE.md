@@ -79,8 +79,7 @@ docker compose exec api aerich migrate --name <설명>    # 모델 변경 → mi
 docker compose exec api aerich upgrade                 # 적용
 
 docker compose exec api python -m app.cli create-super-admin <email> [--name 이름]  # 최고 관리자 등록 (멱등)
-docker compose exec api python -m app.cli seed-roles   # 역할·권한 정의(access/domain/catalog.py) 중 없는 것만 DB에 추가 (멱등, 고친 매핑은 덮지 않음 A84)
-docker compose exec api python -m app.cli seed-dev-org # 개발용 부서·팀·직위·과정 담당 팀 (멱등, local·test 전용, A62)
+docker compose exec api python -m app.cli seed-dev-org # 개발용 부서·팀·직위(권한·데이터 범위)·과정 담당 팀 (멱등, local·test 전용, A62·A87)
 docker compose exec api python -m app.cli send-test-mail <받는주소>  # 현재 MAIL_DRIVER로 확인 메일 발송 (Gmail 설정 확인)
 ```
 
@@ -122,12 +121,12 @@ src/app/
 
 - 의존 방향: `presentation → (application | infrastructure) → domain`. 도메인은 `fastapi`, `tortoise`, `redis`, `httpx`, `app.core`를 import하지 않는다.
 - 다른 컨텍스트는 `application`(공개 서비스)으로만 호출한다. 다른 컨텍스트의 `infrastructure`/`presentation` import 금지. 예외로 `access.presentation`의 권한 의존성은 공개한다.
-- 다른 컨텍스트의 공개 서비스에 리포지토리 구현을 넣어야 하면, composition root `app.main`이 만들어 `app.state`에 연결하고 presentation 의존성이 `request.app.state`에서 꺼낸다 (decisions B10, 예: `app.state.user_queries`). 인증 의존성은 `access.presentation.dependencies`의 `CurrentUser`(로그인) / `ApprovedUser`(승인된 회원)를 쓴다. 운영진 API는 `Depends(require_permission("<권한 코드>", cohort_param="cohort_id" | bootcamp_param=... | any_scope=True))`로 권한과 범위를 검사한다(기본은 GLOBAL, decisions A16). 역할별 권한은 DB `role_permissions`가 출처다(A84, 최고 관리자는 항상 전체). 리소스 소유(본인 신청 등)는 서비스에서 검사한다.
+- 다른 컨텍스트의 공개 서비스에 리포지토리 구현을 넣어야 하면, composition root `app.main`이 만들어 `app.state`에 연결하고 presentation 의존성이 `request.app.state`에서 꺼낸다 (decisions B10, 예: `app.state.user_queries`). 인증 의존성은 `access.presentation.dependencies`의 `CurrentUser`(로그인) / `ApprovedUser`(승인된 회원)를 쓴다. 운영진 API는 `Depends(require_permission("<권한 코드>", cohort_param="cohort_id" | bootcamp_param=... | any_scope=True))`로 권한과 범위를 검사한다(기본은 GLOBAL, decisions A16). 권한은 직위의 권한 묶음(`position_permissions`)이고 최고 관리자(`users.is_super_admin`)는 모든 권한이다. 기수에 속한 엔터티는 직위의 데이터 범위와 담당 배정으로 범위를 거른다(A87). 리소스 소유(본인 신청 등)는 서비스에서 검사한다.
 - 앱 공통 의존성(설정·시계·JWT·외부 HTTP 클라이언트)은 `app.core.dependencies`에서 가져온다. 시각은 `get_clock`(테스트는 `app.state.clock`을 `FixedClock`으로 교체)을 쓴다.
 - 트랜잭션은 서비스에서 `UnitOfWork`로 연다. 외부 API 호출은 `uow.on_commit(...)`으로 커밋 후에 실행한다.
 - 도메인은 시각을 직접 읽지 않고 `now`를 인자로 받는다. 서비스가 `Clock`에서 꺼내 넘긴다.
 - 예외는 `app.shared.errors`의 `AppError` 하위 클래스로 던진다. HTTP 매핑은 `app.core.errors`가 한다 (`{"error": {"code", "message"}}`).
-- Tortoise 모델은 7개 컨텍스트 모듈을 **단일 app `models`** 에 등록한다 (`app.core.database.MODEL_MODULES`, decisions B9). 모델 클래스 이름은 `<이름>Model`, 테이블 이름은 `Meta.table`로 DBML과 같게 지정한다. FK는 `"models.UserModel"`처럼 참조한다.
+- Tortoise 모델은 컨텍스트별 모델 모듈(access는 A87 이후 모델 없음)을 **단일 app `models`** 에 등록한다 (`app.core.database.MODEL_MODULES`, decisions B9). 모델 클래스 이름은 `<이름>Model`, 테이블 이름은 `Meta.table`로 DBML과 같게 지정한다. FK는 `"models.UserModel"`처럼 참조한다.
 - enum은 `CharEnumField`(varchar)로 저장하고, 허용 값은 마이그레이션에 CHECK로 건다. DB 기본값(`now()`, `false` 등)과 DBML check 제약도 마이그레이션 raw SQL로 추가한다. aerich 생성 파일(`migrations/`)은 ruff 대상에서 제외한다.
 - aerich 생성물에서 직접 고쳐야 하는 것 (aerich 0.10 한계):
   - **downgrade의 테이블 삭제 순서가 FK 의존을 고려하지 않는다.** 참조하는 쪽부터 지우도록 고친다.

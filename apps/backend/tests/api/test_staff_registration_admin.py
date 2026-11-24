@@ -6,18 +6,16 @@ import pytest
 from httpx import AsyncClient
 
 from app.cli import create_super_admin
-from app.contexts.access.application.roles import RoleAssignmentService
-from app.contexts.access.domain.catalog import COHORT_ASSISTANT
-from app.contexts.access.domain.enums import RoleScopeType
-from app.contexts.access.infrastructure.repositories import TortoiseUserRoleRepository
 from app.contexts.identity.domain.entities import User
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
 from app.contexts.organization.domain.enums import StaffRole
 from app.contexts.organization.domain.registration import RequestedAssignment
+from app.contexts.organization.infrastructure.repositories import TortoiseCohortStaffRepository
 from app.core.config import Settings
 from app.core.security import JWTService
 from app.shared.ids import new_id
 from tests.factories.academy import create_cohort
+from tests.factories.access import ASSISTANT, give_role
 from tests.factories.organization import create_department, create_team
 from tests.factories.staff_review import create_applicant, create_registration
 
@@ -81,14 +79,9 @@ async def test_approve_with_adjustment_then_applicant_has_roles(
     assert body["applicant"]["approval_status"] == "APPROVED"
     me = (await client.get("/api/v1/me", headers=bearer(settings, applicant))).json()
     assert me["approval_status"] == "APPROVED"
-    assert me["roles"] == [
-        {
-            "role": "COHORT_ASSISTANT",
-            "scope_type": "COHORT",
-            "scope_id": str(cohort.id),
-            "expires_at": None,
-        }
-    ]
+    # 권한은 직위가, 데이터 범위는 담당이 정한다 (A87): 조정한 기수 담당이 생긴다
+    staffs = await TortoiseCohortStaffRepository().list_by_cohort(cohort.id)
+    assert [s.role for s in staffs] == [StaffRole.ASSISTANT]
 
 
 async def test_approve_without_body_uses_requested_values(
@@ -149,9 +142,7 @@ async def test_only_super_admin_can_review(client: AsyncClient, settings: Settin
     assert approved is not None
     approved.approve(now=datetime.now(UTC))
     await users.save(approved)
-    await RoleAssignmentService(TortoiseUserRoleRepository()).grant(
-        assistant.id, COHORT_ASSISTANT, RoleScopeType.COHORT, cohort.id
-    )
+    await give_role(assistant.id, ASSISTANT, cohort_id=cohort.id)
     pending = await create_applicant()
 
     forbidden = await client.get(URL, headers=bearer(settings, approved))

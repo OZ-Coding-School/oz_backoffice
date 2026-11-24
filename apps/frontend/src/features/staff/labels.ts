@@ -1,26 +1,16 @@
-import type { Me } from "@/features/auth/api";
-import { ROLE_LABELS } from "@/features/auth/messages";
-
-import type { StaffCohort } from "./api";
+import type { StaffAccess, StaffCohort } from "./api";
 
 /**
- * 사용자 메뉴의 역할 줄 (F58): 전체 범위는 역할 이름만, 과정·기수 범위는 그 이름을 앞에 붙인다.
- * 이름은 담당 기수 목록(A81)에서 찾고, 못 찾으면 역할 이름만 쓴다
+ * 사용자 메뉴의 역할 줄 (F58·A87): 최고 관리자면 '최고 관리자', 그다음 직위(= 역할)와 데이터 범위
  */
-export function roleLines(roles: Me["roles"], cohorts: readonly StaffCohort[]): string[] {
-  const cohortNames = new Map(cohorts.map((c) => [c.id, `${c.bootcamp_name} ${c.cohort_number}기`]));
-  const bootcampNames = new Map(cohorts.map((c) => [c.bootcamp_id, c.bootcamp_name]));
-  const lines = roles.map((r) => {
-    const role = ROLE_LABELS[r.role] ?? r.role;
-    const scope =
-      r.scope_type === "COHORT"
-        ? cohortNames.get(r.scope_id ?? "")
-        : r.scope_type === "BOOTCAMP"
-          ? bootcampNames.get(r.scope_id ?? "")
-          : undefined;
-    return scope ? `${scope} ${role}` : role;
-  });
-  return [...new Set(lines)];
+export function roleLines(access: Pick<StaffAccess, "is_super_admin" | "position"> | undefined): string[] {
+  if (!access) return [];
+  const lines: string[] = [];
+  if (access.is_super_admin) lines.push("최고 관리자");
+  if (access.position) {
+    lines.push(`${access.position.name} · ${access.position.all_data ? "모든 과정·기수" : "담당 과정·기수"}`);
+  }
+  return lines;
 }
 
 export function staffCohortLabel(c: Pick<StaffCohort, "bootcamp_name" | "cohort_number">): string {
