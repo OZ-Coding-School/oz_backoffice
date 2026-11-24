@@ -50,7 +50,10 @@ admin_router = APIRouter(
     prefix="/admin/mentors/{mentor_id}/schedule", tags=["admin-mentor-schedule"]
 )
 
-MentorManager = Annotated[User, Depends(require_permission("mentor.manage", any_scope=True))]
+MentorManager = Annotated[
+    User, Depends(require_permission("educator.mentor.manage", any_scope=True))
+]
+MentorReader = Annotated[User, Depends(require_permission("educator.mentor.read", any_scope=True))]
 Confirm = Annotated[
     bool,
     Query(description="충돌하는 신청·세션이 있어도 저장한다 (대기 신청 반려, 세션 취소·전액 환불)"),
@@ -352,7 +355,7 @@ async def delete_my_unavailable(
 # ---------------------------------------------------------------- 운영진 대리
 @admin_router.get("", response_model=ScheduleResponse)
 async def get_mentor_schedule(
-    mentor_id: uuid.UUID, _: MentorManager, service: ServiceDep, include_past: IncludePast = False
+    mentor_id: uuid.UUID, _: MentorReader, service: ServiceDep, include_past: IncludePast = False
 ) -> ScheduleResponse:
     return ScheduleResponse.of(await service.view(mentor_id, include_past=include_past))
 

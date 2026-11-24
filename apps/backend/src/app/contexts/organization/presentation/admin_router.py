@@ -35,7 +35,8 @@ from app.core.pagination import Page
 
 router = APIRouter(prefix="/admin/staff-registrations", tags=["admin-staff-registrations"])
 
-Reviewer = Annotated[User, Depends(require_permission("role.assign"))]
+Reviewer = Annotated[User, Depends(require_permission("staff.registration.manage"))]
+ReviewerReader = Annotated[User, Depends(require_permission("staff.registration.read"))]
 ServiceDep = Annotated[
     StaffRegistrationReviewService, Depends(get_staff_registration_review_service)
 ]
@@ -67,7 +68,7 @@ async def _responses(
 
 @router.get("", response_model=Page[AdminStaffRegistrationResponse])
 async def list_staff_registrations(
-    _: Reviewer,
+    _: ReviewerReader,
     service: ServiceDep,
     users: UsersDep,
     status: EmployeeRegistrationStatus = EmployeeRegistrationStatus.PENDING,
@@ -83,7 +84,7 @@ async def list_staff_registrations(
 
 @router.get("/{registration_id}", response_model=AdminStaffRegistrationResponse)
 async def get_staff_registration(
-    registration_id: uuid.UUID, _: Reviewer, service: ServiceDep, users: UsersDep
+    registration_id: uuid.UUID, _: ReviewerReader, service: ServiceDep, users: UsersDep
 ) -> AdminStaffRegistrationResponse:
     return (await _responses([await service.get(registration_id)], users))[0]
 

@@ -29,7 +29,8 @@ from app.contexts.organization.presentation.schemas import (
 
 router = APIRouter(prefix="/admin", tags=["admin-staffs"])
 
-Admin = Annotated[User, Depends(require_permission("staff.assign"))]
+Admin = Annotated[User, Depends(require_permission("staff.assignment.manage"))]
+AdminReader = Annotated[User, Depends(require_permission("staff.assignment.read"))]
 ServiceDep = Annotated[StaffAssignmentService, Depends(get_staff_assignment_service)]
 UsersDep = Annotated[UserQueries, Depends(get_user_queries)]
 
@@ -72,7 +73,7 @@ async def _assign(
 # ---------------------------------------------------------------- 과정 담당자
 @router.get("/bootcamps/{bootcamp_id}/staffs", response_model=list[StaffMemberResponse])
 async def list_bootcamp_staffs(
-    bootcamp_id: uuid.UUID, _: Admin, service: ServiceDep, users: UsersDep
+    bootcamp_id: uuid.UUID, _: AdminReader, service: ServiceDep, users: UsersDep
 ) -> list[StaffMemberResponse]:
     return await _responses(await service.list_members(StaffTarget.BOOTCAMP, bootcamp_id), users)
 
@@ -105,7 +106,7 @@ async def unassign_bootcamp_staff(
 # ---------------------------------------------------------------- 기수 담당자
 @router.get("/cohorts/{cohort_id}/staffs", response_model=list[StaffMemberResponse])
 async def list_cohort_staffs(
-    cohort_id: uuid.UUID, _: Admin, service: ServiceDep, users: UsersDep
+    cohort_id: uuid.UUID, _: AdminReader, service: ServiceDep, users: UsersDep
 ) -> list[StaffMemberResponse]:
     return await _responses(await service.list_members(StaffTarget.COHORT, cohort_id), users)
 

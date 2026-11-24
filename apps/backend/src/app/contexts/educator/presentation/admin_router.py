@@ -39,7 +39,8 @@ from app.shared.errors import BusinessRuleViolation
 
 router = APIRouter(prefix="/admin", tags=["admin-contracts"])
 
-Manager = Annotated[User, Depends(require_permission("contract.manage", any_scope=True))]
+Manager = Annotated[User, Depends(require_permission("educator.contract.manage", any_scope=True))]
+Reader = Annotated[User, Depends(require_permission("educator.contract.read", any_scope=True))]
 
 
 def get_contract_service(
@@ -226,7 +227,7 @@ async def confirm_contract_upload(
 # ---------------------------------------------------------------- 계약
 @router.get("/contracts", response_model=Page[ContractResponse])
 async def list_contracts(
-    _: Manager,
+    _: Reader,
     contracts: ContractsDep,
     status_: Annotated[list[ContractStatus] | None, Query(alias="status")] = None,
     educator_type: EducatorType | None = None,
@@ -254,7 +255,7 @@ async def create_contract(
 
 @router.get("/contracts/{contract_id}", response_model=ContractResponse)
 async def get_contract(
-    contract_id: uuid.UUID, _: Manager, contracts: ContractsDep
+    contract_id: uuid.UUID, _: Reader, contracts: ContractsDep
 ) -> ContractResponse:
     return ContractResponse.of(await contracts.get(contract_id))
 
@@ -317,7 +318,7 @@ async def unlink_contract(
 
 @router.get("/contracts/{contract_id}/file-url", response_model=FileUrlResponse)
 async def contract_file_url(
-    contract_id: uuid.UUID, _: Manager, contracts: ContractsDep
+    contract_id: uuid.UUID, _: Reader, contracts: ContractsDep
 ) -> FileUrlResponse:
     """계약서 다운로드 presigned GET URL (만료 10분, 원본 파일 이름으로 저장)."""
     url, file = await contracts.file_url(contract_id)

@@ -71,20 +71,22 @@ def test_name_and_description_are_trimmed_and_limited() -> None:
 
 def test_scoped_role_cannot_take_global_only_permissions() -> None:
     role = custom(RoleScopeKind.SCOPED)
-    role.replace_permissions(["user.approve", "mentoring.request.read"])
-    assert role.permissions == {"user.approve", "mentoring.request.read"}
+    role.replace_permissions(["member.approval.read", "mentoring.request.read"])
+    assert role.permissions == {"member.approval.read", "mentoring.request.read"}
 
     with pytest.raises(BusinessRuleViolation) as error:
-        role.replace_permissions(["user.approve", "staff.assign"])
+        role.replace_permissions(["member.approval.read", "staff.assignment.read"])
     assert error.value.code == "global_only_permission"
-    assert role.permissions == {"user.approve", "mentoring.request.read"}  # 그대로
+    assert role.permissions == {"member.approval.read", "mentoring.request.read"}  # 그대로
 
     manager = builtin(COHORT_MANAGER)
     with pytest.raises(BusinessRuleViolation):
-        manager.replace_permissions(["org.manage"])
+        manager.replace_permissions(["org.department.read"])
 
     global_role = custom(RoleScopeKind.GLOBAL)
-    global_role.replace_permissions(["org.manage", "role.assign", "staff.assign"])
+    global_role.replace_permissions(
+        ["org.department.read", "org.department.manage", "access.role.read"]
+    )
     assert global_role.scopes == {RoleScopeType.GLOBAL}
 
 
@@ -109,5 +111,22 @@ def test_super_admin_always_has_every_permission() -> None:
     team_lead = builtin(TEAM_LEAD)
     assert team_lead.scope_kind is RoleScopeKind.GLOBAL
     assert not team_lead.permissions_locked
-    team_lead.replace_permissions(["org.manage"])
-    assert team_lead.effective_permissions == {"org.manage"}
+    team_lead.replace_permissions(["org.department.read"])
+    assert team_lead.effective_permissions == {"org.department.read"}
+
+
+@pytest.mark.parametrize(
+    "codes",
+    [
+        ["org.department.manage"],
+        ["academy.roster.sync"],
+        ["mentoring.request.cancel"],
+        ["mentoring.settlement.close"],
+    ],
+)
+def test_manage_and_actions_need_read(codes: list[str]) -> None:
+    """관리·동기화·취소·마감은 조회를 포함한다 (A86)."""
+    role = custom(RoleScopeKind.GLOBAL)
+    with pytest.raises(BusinessRuleViolation) as error:
+        role.replace_permissions(codes)
+    assert error.value.code == "permission_requires_read"

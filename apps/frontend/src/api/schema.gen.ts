@@ -737,7 +737,8 @@ export interface paths {
         /**
          * Replace Role Permissions
          * @description 권한 묶음 교체. 최고 관리자는 422 role_permissions_locked,
-         *     과정·기수 범위 역할에 전체 전용 권한은 422 global_only_permission.
+         *     과정·기수 범위 역할에 전체 전용 권한은 422 global_only_permission,
+         *     조회 없이 관리·동기화·취소·마감만 있으면 422 permission_requires_read (A86).
          */
         put: operations["replace_role_permissions_api_v1_admin_roles__code__permissions_put"];
         post?: never;
@@ -5630,6 +5631,21 @@ export interface components {
         PermissionDefinitionResponse: {
             /** Code */
             code: string;
+            /**
+             * Area
+             * @description 화면 묶음: 조직·학사·회원·권한·강사·멘토·멘토링
+             */
+            area: string;
+            /**
+             * Entity
+             * @description 엔터티 이름 (같은 엔터티의 권한은 한 행)
+             */
+            entity: string;
+            /**
+             * Action
+             * @description 동작: 조회·관리·동기화·취소·마감
+             */
+            action: string;
             /** Description */
             description: string;
             /**
@@ -5637,6 +5653,11 @@ export interface components {
              * @description 전체 범위 역할에만 켤 수 있음
              */
             global_only: boolean;
+            /**
+             * Requires
+             * @description 함께 켜야 하는 조회 권한 (A86)
+             */
+            requires: string | null;
         };
         /** PermissionScopeResponse */
         PermissionScopeResponse: {

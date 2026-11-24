@@ -2078,7 +2078,7 @@
           "admin-roles"
         ],
         "summary": "Replace Role Permissions",
-        "description": "권한 묶음 교체. 최고 관리자는 422 role_permissions_locked,\n과정·기수 범위 역할에 전체 전용 권한은 422 global_only_permission.",
+        "description": "권한 묶음 교체. 최고 관리자는 422 role_permissions_locked,\n과정·기수 범위 역할에 전체 전용 권한은 422 global_only_permission,\n조회 없이 관리·동기화·취소·마감만 있으면 422 permission_requires_read (A86).",
         "operationId": "replace_role_permissions_api_v1_admin_roles__code__permissions_put",
         "security": [
           {
@@ -18034,6 +18034,21 @@
             "type": "string",
             "title": "Code"
           },
+          "area": {
+            "type": "string",
+            "title": "Area",
+            "description": "화면 묶음: 조직·학사·회원·권한·강사·멘토·멘토링"
+          },
+          "entity": {
+            "type": "string",
+            "title": "Entity",
+            "description": "엔터티 이름 (같은 엔터티의 권한은 한 행)"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action",
+            "description": "동작: 조회·관리·동기화·취소·마감"
+          },
           "description": {
             "type": "string",
             "title": "Description"
@@ -18042,13 +18057,29 @@
             "type": "boolean",
             "title": "Global Only",
             "description": "전체 범위 역할에만 켤 수 있음"
+          },
+          "requires": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requires",
+            "description": "함께 켜야 하는 조회 권한 (A86)"
           }
         },
         "type": "object",
         "required": [
           "code",
+          "area",
+          "entity",
+          "action",
           "description",
-          "global_only"
+          "global_only",
+          "requires"
         ],
         "title": "PermissionDefinitionResponse"
       },

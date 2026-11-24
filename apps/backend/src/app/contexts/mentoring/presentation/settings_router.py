@@ -37,9 +37,12 @@ from app.core.uow import UnitOfWork
 
 router = APIRouter(prefix="/admin", tags=["admin-mentoring-settings"])
 
-PERMISSION = "mentoring.settings.manage"
-CohortManager = Annotated[User, Depends(require_permission(PERMISSION, cohort_param="cohort_id"))]
-AnyManager = Annotated[User, Depends(require_permission(PERMISSION, any_scope=True))]
+READ = "mentoring.settings.read"
+MANAGE = "mentoring.settings.manage"
+CohortManager = Annotated[User, Depends(require_permission(MANAGE, cohort_param="cohort_id"))]
+CohortReader = Annotated[User, Depends(require_permission(READ, cohort_param="cohort_id"))]
+AnyManager = Annotated[User, Depends(require_permission(MANAGE, any_scope=True))]
+AnyReader = Annotated[User, Depends(require_permission(READ, any_scope=True))]
 
 
 def get_settings_service(request: Request) -> MentoringSettingsService:
@@ -177,7 +180,7 @@ class HolidayResponse(BaseModel):
 # ---------------------------------------------------------------- 설정
 @router.get("/cohorts/{cohort_id}/mentoring-settings", response_model=SettingsResponse)
 async def get_settings(
-    cohort_id: uuid.UUID, _: CohortManager, service: ServiceDep
+    cohort_id: uuid.UUID, _: CohortReader, service: ServiceDep
 ) -> SettingsResponse:
     """설정이 없으면 404 `mentoring_settings_not_configured` (설정 페이지로 안내)."""
     return SettingsResponse.of(await service.get_settings(cohort_id))
@@ -195,7 +198,7 @@ async def save_settings(
 # ---------------------------------------------------------------- 금지 시간대
 @router.get("/cohorts/{cohort_id}/mentoring-block-times", response_model=list[BlockTimeResponse])
 async def list_block_times(
-    cohort_id: uuid.UUID, _: CohortManager, service: ServiceDep
+    cohort_id: uuid.UUID, _: CohortReader, service: ServiceDep
 ) -> list[BlockTimeResponse]:
     return [BlockTimeResponse.of(b) for b in await service.list_blocks(cohort_id)]
 
@@ -242,7 +245,7 @@ async def delete_block_time(
 # ---------------------------------------------------------------- 휴일
 @router.get("/mentoring-holidays", response_model=list[HolidayResponse])
 async def list_holidays(
-    _: AnyManager,
+    _: AnyReader,
     year: Annotated[int, Query(ge=2000, le=2100)],
 ) -> list[HolidayResponse]:
     """그해 법정공휴일(holidays 패키지)과 추가 휴일."""

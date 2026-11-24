@@ -11,10 +11,7 @@ from typing import Annotated, Any, Protocol, cast
 from fastapi import APIRouter, Depends, Query, Request, Response, status
 from pydantic import BaseModel, Field
 
-from app.contexts.access.application.permissions import PermissionTarget
 from app.contexts.access.presentation.dependencies import (
-    ApprovedUser,
-    PermissionCheckerDep,
     require_permission,
 )
 from app.contexts.identity.application.auth_service import UserQueries
@@ -43,11 +40,15 @@ from app.contexts.organization.presentation.dependencies import (
 )
 from app.contexts.organization.presentation.schemas import StaffUserSummary
 from app.core.pagination import Page
-from app.shared.errors import PermissionDeniedError
 
 router = APIRouter(prefix="/admin", tags=["admin-organization"])
 
-Admin = Annotated[User, Depends(require_permission("org.manage"))]
+DepartmentReader = Annotated[User, Depends(require_permission("org.department.read"))]
+DepartmentManager = Annotated[User, Depends(require_permission("org.department.manage"))]
+PositionReader = Annotated[User, Depends(require_permission("org.position.read"))]
+PositionManager = Annotated[User, Depends(require_permission("org.position.manage"))]
+EmployeeReader = Annotated[User, Depends(require_permission("org.employee.read"))]
+EmployeeManager = Annotated[User, Depends(require_permission("org.employee.manage"))]
 ServiceDep = Annotated[OrganizationAdminService, Depends(get_organization_admin_service)]
 UsersDep = Annotated[UserQueries, Depends(get_user_queries)]
 
@@ -244,27 +245,16 @@ async def _employees(
     return responses
 
 
-async def require_employee_viewer(user: ApprovedUser, checker: PermissionCheckerDep) -> User:
-    """직원 조회: org.manage 또는 staff.assign(전체 범위) — 팀리드가 담당자를 고를 때 (A83)."""
-    for code in ("org.manage", "staff.assign"):
-        if await checker.has(user.id, code, PermissionTarget.global_()):
-            return user
-    raise PermissionDeniedError("이 작업을 할 권한이 없습니다.", code="permission_denied")
-
-
-EmployeeViewer = Annotated[User, Depends(require_employee_viewer)]
-
-
 # ---------------------------------------------------------------- 부서
 @router.get("/departments", response_model=list[DepartmentResponse])
-async def list_departments(_: Admin, service: ServiceDep) -> list[DepartmentResponse]:
+async def list_departments(_: DepartmentReader, service: ServiceDep) -> list[DepartmentResponse]:
     """전체 부서 (이름순)."""
     return [DepartmentResponse.of(d) for d in await service.list_departments()]
 
 
 @router.post("/departments", response_model=DepartmentResponse, status_code=status.HTTP_201_CREATED)
 async def create_department(
-    body: DepartmentCreateRequest, admin: Admin, service: ServiceDep
+    body: DepartmentCreateRequest, admin: DepartmentManager, service: ServiceDep
 ) -> DepartmentResponse:
     department = await service.create_department(
         name=body.name,
@@ -277,7 +267,10 @@ async def create_department(
 
 @router.patch("/departments/{department_id}", response_model=DepartmentResponse)
 async def update_department(
-    department_id: uuid.UUID, body: DepartmentUpdateRequest, admin: Admin, service: ServiceDep
+    department_id: uuid.UUID,
+    body: DepartmentUpdateRequest,
+    admin: DepartmentManager,
+    service: ServiceDep,
 ) -> DepartmentResponse:
     department = await service.update_department(
         department_id, DepartmentChanges(**_sent(body, ("rules",))), actor_id=admin.id
@@ -287,7 +280,7 @@ async def update_department(
 
 @router.delete("/departments/{department_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_department(
-    department_id: uuid.UUID, admin: Admin, service: ServiceDep
+    department_id: uuid.UUID, admin: DepartmentManager, service: ServiceDep
 ) -> Response:
     """팀·직원·가입 신청이 참조 중이면 409 in_use."""
     await service.delete_department(department_id, actor_id=admin.id)
@@ -296,13 +289,15 @@ async def delete_department(
 
 # ---------------------------------------------------------------- 팀
 @router.get("/teams", response_model=list[TeamResponse])
-async def list_teams(_: Admin, service: ServiceDep) -> list[TeamResponse]:
+async def list_teams(_: DepartmentReader, service: ServiceDep) -> list[TeamResponse]:
     """전체 팀과 담당 과정 (이름순)."""
     return [TeamResponse.of(t, ids) for t, ids in await service.list_teams()]
 
 
 @router.post("/teams", response_model=TeamResponse, status_code=status.HTTP_201_CREATED)
-async def create_team(body: TeamCreateRequest, admin: Admin, service: ServiceDep) -> TeamResponse:
+async def create_team(
+    body: TeamCreateRequest, admin: DepartmentManager, service: ServiceDep
+) -> TeamResponse:
     team = await service.create_team(
         department_id=body.department_id,
         name=body.name,
@@ -314,7 +309,7 @@ async def create_team(body: TeamCreateRequest, admin: Admin, service: ServiceDep
 
 @router.patch("/teams/{team_id}", response_model=TeamResponse)
 async def update_team(
-    team_id: uuid.UUID, body: TeamUpdateRequest, admin: Admin, service: ServiceDep
+    team_id: uuid.UUID, body: TeamUpdateRequest, admin: DepartmentManager, service: ServiceDep
 ) -> TeamResponse:
     """부서를 바꾸면 팀이 다른 부서로 옮겨 간다 (담당 과정은 그대로)."""
     team = await service.update_team(
@@ -327,7 +322,7 @@ async def update_team(
 @router.delete("/teams/{team_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_team(
     team_id: uuid.UUID,
-    admin: Admin,
+    admin: DepartmentManager,
     service: ServiceDep,
     move_to_team_id: Annotated[
         uuid.UUID | None,
@@ -344,7 +339,7 @@ async def delete_team(
 
 @router.put("/bootcamps/{bootcamp_id}/team", response_model=BootcampTeamResponse)
 async def set_bootcamp_team(
-    bootcamp_id: uuid.UUID, body: BootcampTeamRequest, admin: Admin, service: ServiceDep
+    bootcamp_id: uuid.UUID, body: BootcampTeamRequest, admin: DepartmentManager, service: ServiceDep
 ) -> BootcampTeamResponse:
     """과정의 담당 팀을 정한다 (과정당 한 팀, A62)."""
     team_id = await service.set_bootcamp_team(bootcamp_id, body.team_id, actor_id=admin.id)
@@ -353,14 +348,14 @@ async def set_bootcamp_team(
 
 # ---------------------------------------------------------------- 직위
 @router.get("/positions", response_model=list[PositionResponse])
-async def list_positions(_: Admin, service: ServiceDep) -> list[PositionResponse]:
+async def list_positions(_: PositionReader, service: ServiceDep) -> list[PositionResponse]:
     """직위 목록 (우선순위가 높은 직급부터)."""
     return [PositionResponse.of(p) for p in await service.list_positions()]
 
 
 @router.post("/positions", response_model=PositionResponse, status_code=status.HTTP_201_CREATED)
 async def create_position(
-    body: PositionCreateRequest, admin: Admin, service: ServiceDep
+    body: PositionCreateRequest, admin: PositionManager, service: ServiceDep
 ) -> PositionResponse:
     position = await service.create_position(
         name=body.name,
@@ -373,7 +368,7 @@ async def create_position(
 
 @router.patch("/positions/{position_id}", response_model=PositionResponse)
 async def update_position(
-    position_id: uuid.UUID, body: PositionUpdateRequest, admin: Admin, service: ServiceDep
+    position_id: uuid.UUID, body: PositionUpdateRequest, admin: PositionManager, service: ServiceDep
 ) -> PositionResponse:
     position = await service.update_position(
         position_id, PositionChanges(**_sent(body, ("assignment_scope",))), actor_id=admin.id
@@ -382,7 +377,9 @@ async def update_position(
 
 
 @router.delete("/positions/{position_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_position(position_id: uuid.UUID, admin: Admin, service: ServiceDep) -> Response:
+async def delete_position(
+    position_id: uuid.UUID, admin: PositionManager, service: ServiceDep
+) -> Response:
     """직원·가입 신청이 쓰는 직위면 409 in_use."""
     await service.delete_position(position_id, actor_id=admin.id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -391,7 +388,7 @@ async def delete_position(position_id: uuid.UUID, admin: Admin, service: Service
 # ---------------------------------------------------------------- 직원
 @router.get("/employees", response_model=Page[EmployeeResponse])
 async def list_employees(
-    _: EmployeeViewer,
+    _: EmployeeReader,
     service: ServiceDep,
     users: UsersDep,
     academy: AcademyDep,
@@ -413,7 +410,7 @@ async def list_employees(
 @router.get("/employees/{employee_id}", response_model=EmployeeResponse)
 async def get_employee(
     employee_id: uuid.UUID,
-    _: EmployeeViewer,
+    _: EmployeeReader,
     service: ServiceDep,
     users: UsersDep,
     academy: AcademyDep,
@@ -425,7 +422,7 @@ async def get_employee(
 async def update_employee(
     employee_id: uuid.UUID,
     body: EmployeeUpdateRequest,
-    admin: Admin,
+    admin: EmployeeManager,
     service: ServiceDep,
     users: UsersDep,
     academy: AcademyDep,

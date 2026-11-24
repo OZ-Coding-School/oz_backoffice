@@ -134,17 +134,17 @@ async def test_scoped_roles_union_their_cohorts(world: World, client: AsyncClien
     )
     body = (await client.get(URL, headers=headers)).json()
     perms = {p["code"]: p for p in body["permissions"]}
-    assert perms["user.approve"] == {
-        "code": "user.approve",
+    assert perms["member.approval.manage"] == {
+        "code": "member.approval.manage",
         "is_global": False,
         "bootcamp_ids": [str(OTHER_BOOTCAMP)],
         "cohort_ids": [str(C12.id)],
     }
     # 매니저(과정)만 가진 권한
-    assert perms["contract.manage"]["cohort_ids"] == []
-    assert perms["contract.manage"]["bootcamp_ids"] == [str(OTHER_BOOTCAMP)]
-    assert "org.manage" not in perms  # 최고 관리자만
-    assert "staff.assign" not in perms  # 팀리드만
+    assert perms["educator.contract.manage"]["cohort_ids"] == []
+    assert perms["educator.contract.manage"]["bootcamp_ids"] == [str(OTHER_BOOTCAMP)]
+    assert "org.department.manage" not in perms  # 최고 관리자만
+    assert "staff.assignment.manage" not in perms  # 팀리드만
     assert {c["id"] for c in body["cohorts"]} == {str(C12.id), str(C9.id), str(C8.id)}
 
 

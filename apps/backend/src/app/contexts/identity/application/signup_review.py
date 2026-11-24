@@ -49,8 +49,10 @@ from app.core.clock import Clock
 from app.core.uow import UnitOfWork
 from app.shared.errors import BusinessRuleViolation, NotFoundError, PermissionDeniedError
 
-APPROVE = "user.approve"
-CONTRACT_MANAGE = "contract.manage"
+APPROVAL_READ = "member.approval.read"  # 목록·후보 (A86)
+APPROVE = "member.approval.manage"  # 승인·반려
+CONTRACT_READ = "educator.contract.read"  # 멘토 신청 보기·계약 후보
+CONTRACT_MANAGE = "educator.contract.manage"  # 멘토 승인·반려 (계약 연결)
 
 
 class PermissionGate(Protocol):
@@ -188,13 +190,13 @@ class SignupReviewService:
         limit: int,
         offset: int,
     ) -> tuple[list[SignupView], int]:
-        scope = await self._permissions.scope_of(actor_id, APPROVE)
+        scope = await self._permissions.scope_of(actor_id, APPROVAL_READ)
         visibility = SignupVisibility(
             all_students=scope.is_global,
             student_cohort_ids=scope.cohort_ids,
             student_bootcamp_ids=scope.bootcamp_ids,
             mentors=await self._permissions.has(
-                actor_id, CONTRACT_MANAGE, PermissionTarget.any_scope()
+                actor_id, CONTRACT_READ, PermissionTarget.any_scope()
             ),
         )
         signups, total = await self._signups.list_pending(
@@ -221,8 +223,8 @@ class SignupReviewService:
         query = (query or "").strip() or None
         phone = _digits(user.phone_number)
         if signup.signup_type is MemberSignupType.STUDENT:
-            await self._require_student_scope(actor_id, signup)
-            scope = await self._permissions.scope_of(actor_id, APPROVE)
+            await self._require_student_scope(actor_id, signup, APPROVAL_READ)
+            scope = await self._permissions.scope_of(actor_id, APPROVAL_READ)
             cohort_ids: set[uuid.UUID] | None = None
             if not scope.is_global:
                 cohort_ids = set(scope.cohort_ids) | {
@@ -251,7 +253,7 @@ class SignupReviewService:
                 key=lambda s: (-(s.name_match + s.phone_match), not s.same_cohort, s.candidate.name)
             )
             return SignupCandidates(signup.signup_type, students, [])
-        await self._require_contract_manage(actor_id)
+        await self._require_contract(actor_id, CONTRACT_READ)
         contracts = [
             MentorContractCandidate(
                 candidate=c,
@@ -270,9 +272,9 @@ class SignupReviewService:
     ) -> SignupView:
         async with self._uow:
             user, signup = await self._pending(user_id, MemberSignupType.STUDENT)
-            await self._require_student_scope(actor_id, signup)
+            await self._require_student_scope(actor_id, signup, APPROVE)
             cohort_id = await self._students.cohort_of_claimable(student_id)
-            await self._require_cohort(actor_id, cohort_id)
+            await self._require_cohort(actor_id, cohort_id, APPROVE)
             await self._students.claim_selected(student_id, user_id=user.id)
             await self._roles.grant(user.id, STUDENT, RoleScopeType.COHORT, cohort_id)
             await self._approve(
@@ -288,7 +290,7 @@ class SignupReviewService:
     ) -> SignupView:
         async with self._uow:
             user, signup = await self._pending(user_id, MemberSignupType.MENTOR)
-            await self._require_contract_manage(actor_id)
+            await self._require_contract(actor_id, CONTRACT_MANAGE)
             match = await self._mentors.approve(
                 user_id=user.id,
                 nickname=signup.nickname,
@@ -311,9 +313,9 @@ class SignupReviewService:
         async with self._uow:
             user, signup = await self._pending(user_id, None)
             if signup.signup_type is MemberSignupType.STUDENT:
-                await self._require_student_scope(actor_id, signup)
+                await self._require_student_scope(actor_id, signup, APPROVE)
             else:
-                await self._require_contract_manage(actor_id)
+                await self._require_contract(actor_id, CONTRACT_MANAGE)
             signup.reject(reason, now=self._clock.now())
             user.reject()
             await self._signups.save(signup)
@@ -350,17 +352,19 @@ class SignupReviewService:
             )
         return user, signup
 
-    async def _require_student_scope(self, actor_id: uuid.UUID, signup: MemberSignup) -> None:
+    async def _require_student_scope(
+        self, actor_id: uuid.UUID, signup: MemberSignup, code: str
+    ) -> None:
         if signup.requested_cohort_id is None:
             raise _denied()
-        await self._require_cohort(actor_id, signup.requested_cohort_id)
+        await self._require_cohort(actor_id, signup.requested_cohort_id, code)
 
-    async def _require_cohort(self, actor_id: uuid.UUID, cohort_id: uuid.UUID) -> None:
-        if not await self._permissions.has(actor_id, APPROVE, PermissionTarget.cohort(cohort_id)):
+    async def _require_cohort(self, actor_id: uuid.UUID, cohort_id: uuid.UUID, code: str) -> None:
+        if not await self._permissions.has(actor_id, code, PermissionTarget.cohort(cohort_id)):
             raise _denied()
 
-    async def _require_contract_manage(self, actor_id: uuid.UUID) -> None:
-        if not await self._permissions.has(actor_id, CONTRACT_MANAGE, PermissionTarget.any_scope()):
+    async def _require_contract(self, actor_id: uuid.UUID, code: str) -> None:
+        if not await self._permissions.has(actor_id, code, PermissionTarget.any_scope()):
             raise _denied()
 
     async def _approve(

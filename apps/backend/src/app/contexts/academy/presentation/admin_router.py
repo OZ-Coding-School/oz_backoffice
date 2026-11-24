@@ -42,7 +42,22 @@ def get_academy_admin_service(request: Request) -> AcademyAdminService:
     )
 
 
-Admin = Annotated[User, Depends(require_permission("org.manage"))]
+HrdReader = Annotated[User, Depends(require_permission("academy.hrd.read"))]
+HrdManager = Annotated[User, Depends(require_permission("academy.hrd.manage"))]
+BootcampReader = Annotated[User, Depends(require_permission("academy.bootcamp.read"))]
+BootcampManager = Annotated[User, Depends(require_permission("academy.bootcamp.manage"))]
+BootcampCohortReader = Annotated[
+    User, Depends(require_permission("academy.cohort.read", bootcamp_param="bootcamp_id"))
+]
+BootcampCohortManager = Annotated[
+    User, Depends(require_permission("academy.cohort.manage", bootcamp_param="bootcamp_id"))
+]
+CohortReader = Annotated[
+    User, Depends(require_permission("academy.cohort.read", cohort_param="cohort_id"))
+]
+CohortManager = Annotated[
+    User, Depends(require_permission("academy.cohort.manage", cohort_param="cohort_id"))
+]
 ServiceDep = Annotated[AcademyAdminService, Depends(get_academy_admin_service)]
 NonNegative = Annotated[int, Field(ge=0)]
 SmallPositive = Annotated[int, Field(ge=1, le=32767)]
@@ -170,7 +185,7 @@ def _not_null(changes: dict[str, Any], *fields: str) -> dict[str, Any]:
 
 # ---------------------------------------------------------------- HRD 과정
 @router.get("/hrd-bootcamps", response_model=list[HrdBootcampResponse])
-async def list_hrd_bootcamps(_: Admin, service: ServiceDep) -> list[HrdBootcampResponse]:
+async def list_hrd_bootcamps(_: HrdReader, service: ServiceDep) -> list[HrdBootcampResponse]:
     return [HrdBootcampResponse.model_validate(b) for b in await service.list_hrd_bootcamps()]
 
 
@@ -178,7 +193,7 @@ async def list_hrd_bootcamps(_: Admin, service: ServiceDep) -> list[HrdBootcampR
     "/hrd-bootcamps", response_model=HrdBootcampResponse, status_code=status.HTTP_201_CREATED
 )
 async def create_hrd_bootcamp(
-    body: HrdBootcampFields, admin: Admin, service: ServiceDep
+    body: HrdBootcampFields, admin: HrdManager, service: ServiceDep
 ) -> HrdBootcampResponse:
     created = await service.create_hrd_bootcamp(body.model_dump(), actor_id=admin.id)
     return HrdBootcampResponse.model_validate(created)
@@ -186,14 +201,14 @@ async def create_hrd_bootcamp(
 
 @router.get("/hrd-bootcamps/{hrd_bootcamp_id}", response_model=HrdBootcampResponse)
 async def get_hrd_bootcamp(
-    hrd_bootcamp_id: uuid.UUID, _: Admin, service: ServiceDep
+    hrd_bootcamp_id: uuid.UUID, _: HrdReader, service: ServiceDep
 ) -> HrdBootcampResponse:
     return HrdBootcampResponse.model_validate(await service.get_hrd_bootcamp(hrd_bootcamp_id))
 
 
 @router.patch("/hrd-bootcamps/{hrd_bootcamp_id}", response_model=HrdBootcampResponse)
 async def update_hrd_bootcamp(
-    hrd_bootcamp_id: uuid.UUID, body: HrdBootcampUpdate, admin: Admin, service: ServiceDep
+    hrd_bootcamp_id: uuid.UUID, body: HrdBootcampUpdate, admin: HrdManager, service: ServiceDep
 ) -> HrdBootcampResponse:
     changes = _not_null(_sent(body), "name", "weekend_se", "day_night_se")
     updated = await service.update_hrd_bootcamp(hrd_bootcamp_id, changes, actor_id=admin.id)
@@ -202,7 +217,7 @@ async def update_hrd_bootcamp(
 
 @router.delete("/hrd-bootcamps/{hrd_bootcamp_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_hrd_bootcamp(
-    hrd_bootcamp_id: uuid.UUID, admin: Admin, service: ServiceDep
+    hrd_bootcamp_id: uuid.UUID, admin: HrdManager, service: ServiceDep
 ) -> Response:
     """운영과정·HRD 회차가 참조 중이면 409 in_use."""
     await service.delete_hrd_bootcamp(hrd_bootcamp_id, actor_id=admin.id)
@@ -212,7 +227,7 @@ async def delete_hrd_bootcamp(
 # ---------------------------------------------------------------- HRD 회차
 @router.get("/hrd-bootcamps/{hrd_bootcamp_id}/cohorts", response_model=list[HrdCohortResponse])
 async def list_hrd_cohorts(
-    hrd_bootcamp_id: uuid.UUID, _: Admin, service: ServiceDep
+    hrd_bootcamp_id: uuid.UUID, _: HrdReader, service: ServiceDep
 ) -> list[HrdCohortResponse]:
     return [
         HrdCohortResponse.model_validate(c) for c in await service.list_hrd_cohorts(hrd_bootcamp_id)
@@ -225,7 +240,7 @@ async def list_hrd_cohorts(
     status_code=status.HTTP_201_CREATED,
 )
 async def create_hrd_cohort(
-    hrd_bootcamp_id: uuid.UUID, body: HrdCohortFields, admin: Admin, service: ServiceDep
+    hrd_bootcamp_id: uuid.UUID, body: HrdCohortFields, admin: HrdManager, service: ServiceDep
 ) -> HrdCohortResponse:
     created = await service.create_hrd_cohort(hrd_bootcamp_id, body.model_dump(), actor_id=admin.id)
     return HrdCohortResponse.model_validate(created)
@@ -233,7 +248,7 @@ async def create_hrd_cohort(
 
 @router.patch("/hrd-cohorts/{hrd_cohort_id}", response_model=HrdCohortResponse)
 async def update_hrd_cohort(
-    hrd_cohort_id: uuid.UUID, body: HrdCohortUpdate, admin: Admin, service: ServiceDep
+    hrd_cohort_id: uuid.UUID, body: HrdCohortUpdate, admin: HrdManager, service: ServiceDep
 ) -> HrdCohortResponse:
     changes = _not_null(_sent(body), "cohort_number")
     updated = await service.update_hrd_cohort(hrd_cohort_id, changes, actor_id=admin.id)
@@ -242,7 +257,7 @@ async def update_hrd_cohort(
 
 @router.delete("/hrd-cohorts/{hrd_cohort_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_hrd_cohort(
-    hrd_cohort_id: uuid.UUID, admin: Admin, service: ServiceDep
+    hrd_cohort_id: uuid.UUID, admin: HrdManager, service: ServiceDep
 ) -> Response:
     """기수가 참조 중이면 409 in_use."""
     await service.delete_hrd_cohort(hrd_cohort_id, actor_id=admin.id)
@@ -252,7 +267,7 @@ async def delete_hrd_cohort(
 # ---------------------------------------------------------------- 운영과정
 @router.get("/bootcamps", response_model=list[BootcampResponse])
 async def list_bootcamps(
-    _: Admin, service: ServiceDep, include_inactive: bool = False
+    _: BootcampReader, service: ServiceDep, include_inactive: bool = False
 ) -> list[BootcampResponse]:
     """운영과정 목록. 기본은 활성 과정만."""
     bootcamps = await service.list_bootcamps(include_inactive=include_inactive)
@@ -261,20 +276,22 @@ async def list_bootcamps(
 
 @router.post("/bootcamps", response_model=BootcampResponse, status_code=status.HTTP_201_CREATED)
 async def create_bootcamp(
-    body: BootcampCreate, admin: Admin, service: ServiceDep
+    body: BootcampCreate, admin: BootcampManager, service: ServiceDep
 ) -> BootcampResponse:
     created = await service.create_bootcamp(body.model_dump(), actor_id=admin.id)
     return BootcampResponse.model_validate(created)
 
 
 @router.get("/bootcamps/{bootcamp_id}", response_model=BootcampResponse)
-async def get_bootcamp(bootcamp_id: uuid.UUID, _: Admin, service: ServiceDep) -> BootcampResponse:
+async def get_bootcamp(
+    bootcamp_id: uuid.UUID, _: BootcampReader, service: ServiceDep
+) -> BootcampResponse:
     return BootcampResponse.model_validate(await service.get_bootcamp(bootcamp_id))
 
 
 @router.patch("/bootcamps/{bootcamp_id}", response_model=BootcampResponse)
 async def update_bootcamp(
-    bootcamp_id: uuid.UUID, body: BootcampUpdate, admin: Admin, service: ServiceDep
+    bootcamp_id: uuid.UUID, body: BootcampUpdate, admin: BootcampManager, service: ServiceDep
 ) -> BootcampResponse:
     """이름·코드·활성 여부·Airtable 기수 별칭. 운영을 멈출 때는 삭제 대신 is_active=false.
 
@@ -286,7 +303,9 @@ async def update_bootcamp(
 
 
 @router.delete("/bootcamps/{bootcamp_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_bootcamp(bootcamp_id: uuid.UUID, admin: Admin, service: ServiceDep) -> Response:
+async def delete_bootcamp(
+    bootcamp_id: uuid.UUID, admin: BootcampManager, service: ServiceDep
+) -> Response:
     """기수·담당자가 있으면 409 in_use."""
     await service.delete_bootcamp(bootcamp_id, actor_id=admin.id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -295,7 +314,7 @@ async def delete_bootcamp(bootcamp_id: uuid.UUID, admin: Admin, service: Service
 # ---------------------------------------------------------------- 기수
 @router.get("/bootcamps/{bootcamp_id}/cohorts", response_model=list[CohortResponse])
 async def list_cohorts(
-    bootcamp_id: uuid.UUID, _: Admin, service: ServiceDep
+    bootcamp_id: uuid.UUID, _: BootcampCohortReader, service: ServiceDep
 ) -> list[CohortResponse]:
     return [CohortResponse.model_validate(c) for c in await service.list_cohorts(bootcamp_id)]
 
@@ -306,7 +325,7 @@ async def list_cohorts(
     status_code=status.HTTP_201_CREATED,
 )
 async def create_cohort(
-    bootcamp_id: uuid.UUID, body: CohortCreate, admin: Admin, service: ServiceDep
+    bootcamp_id: uuid.UUID, body: CohortCreate, admin: BootcampCohortManager, service: ServiceDep
 ) -> CohortResponse:
     """기수는 HRD 회차에 연결한다 (운영과정의 대표 HRD 과정과 달라도 된다, decisions D6)."""
     created = await service.create_cohort(bootcamp_id, body.model_dump(), actor_id=admin.id)
@@ -314,13 +333,13 @@ async def create_cohort(
 
 
 @router.get("/cohorts/{cohort_id}", response_model=CohortResponse)
-async def get_cohort(cohort_id: uuid.UUID, _: Admin, service: ServiceDep) -> CohortResponse:
+async def get_cohort(cohort_id: uuid.UUID, _: CohortReader, service: ServiceDep) -> CohortResponse:
     return CohortResponse.model_validate(await service.get_cohort(cohort_id))
 
 
 @router.patch("/cohorts/{cohort_id}", response_model=CohortResponse)
 async def update_cohort(
-    cohort_id: uuid.UUID, body: CohortUpdate, admin: Admin, service: ServiceDep
+    cohort_id: uuid.UUID, body: CohortUpdate, admin: CohortManager, service: ServiceDep
 ) -> CohortResponse:
     changes = _not_null(
         _sent(body), "hrd_net_cohort_id", "cohort_number", "start_date", "end_date", "status"
@@ -330,7 +349,9 @@ async def update_cohort(
 
 
 @router.delete("/cohorts/{cohort_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_cohort(cohort_id: uuid.UUID, admin: Admin, service: ServiceDep) -> Response:
+async def delete_cohort(
+    cohort_id: uuid.UUID, admin: CohortManager, service: ServiceDep
+) -> Response:
     """수강생·담당자가 있으면 409 in_use. 운영이 끝나면 상태를 ENDED·ARCHIVED로 바꾼다."""
     await service.delete_cohort(cohort_id, actor_id=admin.id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

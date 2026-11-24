@@ -62,6 +62,9 @@ admin_router = APIRouter(
 SettlementManager = Annotated[
     User, Depends(require_permission("mentoring.settlement.close", cohort_param="cohort_id"))
 ]
+SettlementReader = Annotated[
+    User, Depends(require_permission("mentoring.settlement.read", cohort_param="cohort_id"))
+]
 MONTH = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 
 
@@ -323,7 +326,7 @@ async def aggregate(
 @admin_router.get("", response_model=list[SettlementSummary])
 async def list_settlements(
     cohort_id: uuid.UUID,
-    _: SettlementManager,
+    _: SettlementReader,
     service: ServiceDep,
     presenter: PresenterDep,
     month: Annotated[str | None, Query(pattern=MONTH.pattern, description="YYYY-MM")] = None,
@@ -335,7 +338,7 @@ async def list_settlements(
 @admin_router.get("/export.csv", response_class=Response)
 async def export_cohort_month(
     cohort_id: uuid.UUID,
-    _: SettlementManager,
+    _: SettlementReader,
     service: ServiceDep,
     exporter: ExporterDep,
     month: Annotated[str, Query(pattern=MONTH.pattern, description="YYYY-MM")],
@@ -354,7 +357,7 @@ async def export_cohort_month(
 async def export_settlement(
     cohort_id: uuid.UUID,
     settlement_id: uuid.UUID,
-    _: SettlementManager,
+    _: SettlementReader,
     service: ServiceDep,
     exporter: ExporterDep,
     presenter: PresenterDep,
@@ -372,7 +375,7 @@ async def export_settlement(
 async def get_settlement(
     cohort_id: uuid.UUID,
     settlement_id: uuid.UUID,
-    _: SettlementManager,
+    _: SettlementReader,
     service: ServiceDep,
     presenter: PresenterDep,
 ) -> SettlementDetail:

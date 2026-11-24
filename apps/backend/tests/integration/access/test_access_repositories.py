@@ -6,6 +6,7 @@ from tortoise.exceptions import IntegrityError
 
 from app.contexts.access.domain.catalog import (
     COHORT_ASSISTANT,
+    LEGACY_PERMISSIONS,
     PERMISSIONS,
     ROLES,
     SUPER_ADMIN,
@@ -39,22 +40,51 @@ async def test_catalog_sync_is_idempotent_and_keeps_edited_mappings() -> None:
 
     assert await RoleModel.all().count() == len(ROLES)
     assert await _permission_codes(SUPER_ADMIN) == set(PERMISSIONS)
-    assert "contract.manage" not in await _permission_codes(COHORT_ASSISTANT)
+    assert "educator.contract.read" not in await _permission_codes(COHORT_ASSISTANT)
 
     # 화면에서 고친 매핑·이름은 다시 시드해도 덮지 않는다 (A84)
     assistant = await RoleModel.get(code=COHORT_ASSISTANT)
-    await assistant.permissions.add(await PermissionModel.get(code="contract.manage"))
+    await assistant.permissions.add(await PermissionModel.get(code="educator.contract.read"))
     assistant.name = "보조 매니저"
     await assistant.save()
     await catalog.sync(ROLES, PERMISSIONS)
-    assert "contract.manage" in await _permission_codes(COHORT_ASSISTANT)
+    assert "educator.contract.read" in await _permission_codes(COHORT_ASSISTANT)
     assert (await RoleModel.get(code=COHORT_ASSISTANT)).name == "보조 매니저"
 
     # 최고 관리자에게는 빠진 권한을 다시 채운다
     admin = await RoleModel.get(code=SUPER_ADMIN)
-    await admin.permissions.remove(await PermissionModel.get(code="org.manage"))
+    await admin.permissions.remove(await PermissionModel.get(code="org.department.read"))
     await catalog.sync(ROLES, PERMISSIONS)
     assert await _permission_codes(SUPER_ADMIN) == set(PERMISSIONS)
+
+
+async def test_sync_converts_legacy_permission_codes_once() -> None:
+    """예전 기능 묶음 코드를 가진 역할은 새 엔터티 코드로 바뀐다 (A86)."""
+    catalog = TortoiseRoleCatalogRepository()
+    await catalog.sync(ROLES, PERMISSIONS, LEGACY_PERMISSIONS)
+    # 예전 상태 흉내: 조교에 contract.manage(예전 코드)와 mentoring.request.read만
+    assistant = await RoleModel.get(code=COHORT_ASSISTANT)
+    await assistant.permissions.clear()
+    legacy = await PermissionModel.create(code="contract.manage", description="예전")
+    await assistant.permissions.add(
+        legacy, await PermissionModel.get(code="mentoring.request.read")
+    )
+
+    await catalog.sync(ROLES, PERMISSIONS, LEGACY_PERMISSIONS)
+    assert await _permission_codes(COHORT_ASSISTANT) == {
+        "educator.contract.read",
+        "educator.contract.manage",
+        "mentoring.request.read",
+        "mentoring.record.read",
+        "mentoring.chat.read",
+    }
+    assert not await PermissionModel.filter(code="contract.manage").exists()
+
+    # 전환 뒤에는 화면에서 끈 권한을 다시 켜지 않는다
+    assistant = await RoleModel.get(code=COHORT_ASSISTANT)
+    await assistant.permissions.remove(await PermissionModel.get(code="mentoring.chat.read"))
+    await catalog.sync(ROLES, PERMISSIONS, LEGACY_PERMISSIONS)
+    assert "mentoring.chat.read" not in await _permission_codes(COHORT_ASSISTANT)
 
 
 async def test_user_role_grant_lookup_and_expiry() -> None:

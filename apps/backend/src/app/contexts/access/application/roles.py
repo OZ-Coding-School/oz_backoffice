@@ -2,7 +2,7 @@
 
 import uuid
 
-from app.contexts.access.domain.catalog import PERMISSIONS, ROLES
+from app.contexts.access.domain.catalog import LEGACY_PERMISSIONS, PERMISSIONS, ROLES
 from app.contexts.access.domain.entities import RoleGrant, UserRole
 from app.contexts.access.domain.enums import RoleScopeType
 from app.contexts.access.domain.repositories import RoleCatalogRepository, UserRoleRepository
@@ -10,13 +10,13 @@ from app.core.clock import Clock
 
 
 class RoleCatalogSeeder:
-    """plan §2.3 권한표(access/domain/catalog.py)를 DB에 맞춘다. 멱등이다."""
+    """권한표(access/domain/catalog.py)를 DB에 맞춘다. 예전 권한 코드도 바꾼다(A86). 멱등."""
 
     def __init__(self, catalog: RoleCatalogRepository) -> None:
         self._catalog = catalog
 
     async def seed(self) -> None:
-        await self._catalog.sync(ROLES, PERMISSIONS)
+        await self._catalog.sync(ROLES, PERMISSIONS, LEGACY_PERMISSIONS)
 
 
 class RoleAssignmentService:
