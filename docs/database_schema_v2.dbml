@@ -177,31 +177,29 @@ Table employees {
 }
 
 Table bootcamp_staffs {
-  note: "담당 과정별 운영진 (담당자 표시용, 권한은 user_roles와 동기화)"
+  note: "과정 담당 운영진 (데이터 범위, A87·A89). 역할 칸 없음 — 권한은 직위가 정한다"
 
   id uuid [pk, note: "default=uuid7 사용"]
   employee_id uuid [not null, ref: > employees.id]
   bootcamp_id uuid [not null, ref: > bootcamps.id]
-  role StaffRole [not null, note: "담당 역할"]
   created_at timestamptz [not null, default: `now()`]
 
   indexes {
-    (employee_id, bootcamp_id, role) [unique]
+    (employee_id, bootcamp_id) [unique]
     bootcamp_id [note: "과정별 담당자 조회"]
   }
 }
 
 Table cohort_staffs {
-  note: "기수별 담당 운영진 (담당자 표시용, 권한은 user_roles와 동기화)"
+  note: "기수 담당 운영진 (데이터 범위, A87·A89). 기수 담당은 기수당 한 명만 신청·지정할 수 있다(A63)"
 
   id uuid [pk, note: "default=uuid7 사용"]
   employee_id uuid [not null, ref: > employees.id]
   cohort_id uuid [not null, ref: > cohorts.id]
-  role StaffRole [not null, note: "MANAGER(운영 매니저) / ASSISTANT(조교)"]
   created_at timestamptz [not null, default: `now()`]
 
   indexes {
-    (employee_id, cohort_id, role) [unique]
+    (employee_id, cohort_id) [unique]
     cohort_id
   }
 }
@@ -238,13 +236,12 @@ Table employee_registration_assignments {
 
   id uuid [pk, note: "default=uuid7 사용"]
   registration_id uuid [not null, ref: > employee_registrations.id, note: "ON DELETE CASCADE"]
-  role StaffRole [not null, note: "MANAGER(운영 매니저) / ASSISTANT(조교)"]
   bootcamp_id uuid [null, ref: > bootcamps.id, note: "과정 담당이면 과정"]
   cohort_id uuid [null, ref: > cohorts.id, note: "기수 담당이면 기수"]
   created_at timestamptz [not null, default: `now()`]
 
   indexes {
-    (registration_id, role, bootcamp_id, cohort_id) [unique, note: "NULLS NOT DISTINCT — 같은 담당 중복 방지 (raw SQL)"]
+    (registration_id, bootcamp_id, cohort_id) [unique, note: "NULLS NOT DISTINCT — 같은 담당 중복 방지 (raw SQL)"]
   }
   checks {
     `num_nonnulls(bootcamp_id, cohort_id) = 1` [name: "check_employee_registration_assignments_target"]
@@ -1049,11 +1046,6 @@ Enum SocialLoginProvider {
   KAKAO
   GOOGLE
   NAVER
-}
-
-Enum StaffRole {
-  MANAGER [note: "운영 매니저"]
-  ASSISTANT [note: "조교"]
 }
 
 Enum UnavailableRepeat {

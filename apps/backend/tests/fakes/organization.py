@@ -12,7 +12,7 @@ from app.contexts.organization.domain.entities import (
     EmployeePosition,
     Team,
 )
-from app.contexts.organization.domain.enums import EmployeeRegistrationStatus, StaffRole
+from app.contexts.organization.domain.enums import EmployeeRegistrationStatus
 from app.contexts.organization.domain.registration import EmployeeRegistration
 from app.shared.errors import BusinessRuleViolation
 
@@ -176,8 +176,8 @@ class InMemoryCohortStaffRepository:
     async def list_by_employee(self, employee_id: uuid.UUID) -> list[CohortStaff]:
         return [s for s in self.items.values() if s.employee_id == employee_id]
 
-    async def cohort_ids_with_role(self, role: StaffRole) -> set[uuid.UUID]:
-        return {s.cohort_id for s in self.items.values() if s.role is role}
+    async def staffed_cohort_ids(self) -> set[uuid.UUID]:
+        return {s.cohort_id for s in self.items.values()}
 
 
 class FakeStaffTargetCatalog:

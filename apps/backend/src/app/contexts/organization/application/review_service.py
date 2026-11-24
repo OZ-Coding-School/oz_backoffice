@@ -191,20 +191,17 @@ class StaffRegistrationReviewService:
         self, employee: Employee, assignments: list[RequestedAssignment]
     ) -> None:
         bootcamps = {
-            (s.bootcamp_id, s.role)
-            for s in await self._bootcamp_staffs.list_by_employee(employee.id)
+            s.bootcamp_id for s in await self._bootcamp_staffs.list_by_employee(employee.id)
         }
-        cohorts = {
-            (s.cohort_id, s.role) for s in await self._cohort_staffs.list_by_employee(employee.id)
-        }
+        cohorts = {s.cohort_id for s in await self._cohort_staffs.list_by_employee(employee.id)}
         for a in assignments:
-            if a.bootcamp_id is not None and (a.bootcamp_id, a.role) not in bootcamps:
+            if a.bootcamp_id is not None and a.bootcamp_id not in bootcamps:
                 await self._bootcamp_staffs.add(
-                    BootcampStaff(employee_id=employee.id, bootcamp_id=a.bootcamp_id, role=a.role)
+                    BootcampStaff(employee_id=employee.id, bootcamp_id=a.bootcamp_id)
                 )
-            if a.cohort_id is not None and (a.cohort_id, a.role) not in cohorts:
+            if a.cohort_id is not None and a.cohort_id not in cohorts:
                 await self._cohort_staffs.add(
-                    CohortStaff(employee_id=employee.id, cohort_id=a.cohort_id, role=a.role)
+                    CohortStaff(employee_id=employee.id, cohort_id=a.cohort_id)
                 )
 
 
@@ -216,7 +213,6 @@ def _snapshot(registration: EmployeeRegistration) -> dict[str, object]:
         "employment_type": registration.employment_type.value,
         "assignments": [
             {
-                "role": a.role.value,
                 "bootcamp_id": str(a.bootcamp_id) if a.bootcamp_id else None,
                 "cohort_id": str(a.cohort_id) if a.cohort_id else None,
             }

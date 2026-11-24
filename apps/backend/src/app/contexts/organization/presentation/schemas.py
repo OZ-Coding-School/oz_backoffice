@@ -11,7 +11,6 @@ from app.contexts.organization.domain.enums import (
     AssignmentScope,
     EmployeeRegistrationStatus,
     EmploymentType,
-    StaffRole,
 )
 from app.contexts.organization.domain.registration import MAX_ASSIGNMENTS, REJECT_REASON_MAX_LENGTH
 
@@ -57,16 +56,16 @@ class StaffRegistrationOptionsResponse(BaseModel):
     teams: list[TeamOption]
     positions: list[PositionOption]
     employment_types: list[EmploymentType]
-    staff_roles: list[StaffRole]
     bootcamps: list[BootcampOption]
     cohorts: list[CohortOption] = Field(
-        description="조교로 고를 수 있는 기수: 진행 예정·진행 중 기수 중 "
-        "승인된 조교가 없는 기수 (A63)"
+        description="기수 담당으로 고를 수 있는 기수: 진행 예정·진행 중 기수 중 "
+        "기수 담당자가 없는 기수 (A63·A89)"
     )
 
 
 class AssignmentPayload(BaseModel):
-    role: StaffRole
+    """담당 1건: 과정 또는 기수 (담당 방식은 직위가 정한다, A89)."""
+
     bootcamp_id: uuid.UUID | None = None
     cohort_id: uuid.UUID | None = None
 
@@ -131,11 +130,9 @@ class StaffUserSummary(BaseModel):
 class StaffMemberResponse(BaseModel):
     id: uuid.UUID
     employee_id: uuid.UUID
-    role: StaffRole
     user: StaffUserSummary | None
     created_at: datetime | None
 
 
 class AssignStaffRequest(BaseModel):
     employee_id: uuid.UUID
-    role: StaffRole

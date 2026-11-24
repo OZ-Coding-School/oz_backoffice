@@ -89,3 +89,4 @@
 | 85 | [역할별 권한 DB 판정·역할 관리 API (BE-3d)](85_role_permission_management.md) | 완료 (#132) |
 | 86 | [권한 엔터티 × 조회/관리 세분화 (BE-3f)](86_entity_permissions.md) | 완료 (#134) |
 | 87 | [직위 = 역할, 최고 관리자 필드, 데이터 범위 (BE-3g)](87_positions_as_roles.md) | 완료 (#135) |
+| 88 | [담당 역할 칸 제거·직원 수정에서 담당 지정 (BE-3h)](88_staff_assignments_without_role.md) | 완료 (#136) |

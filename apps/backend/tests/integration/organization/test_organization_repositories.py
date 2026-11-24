@@ -11,7 +11,7 @@ from app.contexts.organization.domain.entities import (
     EmployeePosition,
     Team,
 )
-from app.contexts.organization.domain.enums import AssignmentScope, EmploymentType, StaffRole
+from app.contexts.organization.domain.enums import AssignmentScope, EmploymentType
 from app.contexts.organization.infrastructure.repositories import (
     TortoiseBootcampStaffRepository,
     TortoiseBootcampTeamRepository,
@@ -149,33 +149,21 @@ async def test_staff_assignments() -> None:
     employee = await _create_employee()
     cohort = await create_cohort()
     cohort_staffs = TortoiseCohortStaffRepository()
-    manager = CohortStaff(employee_id=employee.id, cohort_id=cohort.id, role=StaffRole.MANAGER)
+    manager = CohortStaff(employee_id=employee.id, cohort_id=cohort.id)
     await cohort_staffs.add(manager)
     assert manager.created_at is not None
-    # 같은 직원이 같은 기수에서 다른 역할을 맡는 것은 허용, 같은 역할 중복은 거부
-    await cohort_staffs.add(
-        CohortStaff(employee_id=employee.id, cohort_id=cohort.id, role=StaffRole.ASSISTANT)
-    )
+    # 같은 직원이 같은 기수를 두 번 담당할 수 없다 (A89: 역할 칸 없음)
     with pytest.raises(IntegrityError):
-        await cohort_staffs.add(
-            CohortStaff(employee_id=employee.id, cohort_id=cohort.id, role=StaffRole.MANAGER)
-        )
-    assert {s.role for s in await cohort_staffs.list_by_cohort(cohort.id)} == {
-        StaffRole.MANAGER,
-        StaffRole.ASSISTANT,
-    }
+        await cohort_staffs.add(CohortStaff(employee_id=employee.id, cohort_id=cohort.id))
+    assert [s.id for s in await cohort_staffs.list_by_cohort(cohort.id)] == [manager.id]
+    assert await cohort_staffs.staffed_cohort_ids() == {cohort.id}
     await cohort_staffs.remove(manager.id)
-    assert [s.role for s in await cohort_staffs.list_by_employee(employee.id)] == [
-        StaffRole.ASSISTANT
-    ]
-    assert await cohort_staffs.cohort_ids_with_role(StaffRole.ASSISTANT) == {cohort.id}
-    assert await cohort_staffs.cohort_ids_with_role(StaffRole.MANAGER) == set()
+    assert await cohort_staffs.list_by_employee(employee.id) == []
+    assert await cohort_staffs.staffed_cohort_ids() == set()
 
     bootcamp_staffs = TortoiseBootcampStaffRepository()
     await bootcamp_staffs.add(
-        BootcampStaff(
-            employee_id=employee.id, bootcamp_id=cohort.bootcamp_id, role=StaffRole.MANAGER
-        )
+        BootcampStaff(employee_id=employee.id, bootcamp_id=cohort.bootcamp_id)
     )
     assert len(await bootcamp_staffs.list_by_bootcamp(cohort.bootcamp_id)) == 1
 

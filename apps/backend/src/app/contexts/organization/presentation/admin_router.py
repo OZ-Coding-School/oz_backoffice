@@ -1,6 +1,6 @@
 """운영진 가입 신청 검토 API (/admin/staff-registrations).
 
-권한: role.assign (전체 범위, SUPER_ADMIN).
+권한: staff.registration.read/manage (A86).
 """
 
 import uuid
@@ -108,7 +108,7 @@ async def approve_staff_registration(
         assignments=None
         if body.assignments is None
         else [
-            RequestedAssignment(role=a.role, bootcamp_id=a.bootcamp_id, cohort_id=a.cohort_id)
+            RequestedAssignment(bootcamp_id=a.bootcamp_id, cohort_id=a.cohort_id)
             for a in body.assignments
         ],
     )

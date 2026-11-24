@@ -13,7 +13,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { formatKst } from "@/lib/datetime";
 
 import { logout, meQuery, type Me } from "../api";
-import { EMPLOYMENT_TYPE_LABELS, STAFF_ROLE_LABELS } from "../messages";
+import { EMPLOYMENT_TYPE_LABELS } from "../messages";
 import { homePath } from "../navigation";
 import {
   assignmentLabel,
@@ -159,8 +159,9 @@ function RegistrationStatus({
     ? options.teams.find((t) => t.id === registration.team_id)?.name
     : "선택 안 함 (부서 직속)";
   const position = options.positions.find((p) => p.id === registration.position_id)?.name;
-  const roles = new Set(registration.assignments.map((a) => a.role));
-  const assignedTitle = roles.size === 1 ? (roles.has("ASSISTANT") ? "담당 기수" : "담당 과정") : "담당 과정·기수";
+  // 담당 방식은 직위가 정한다 (A89): 과정이면 '담당 과정', 기수면 '담당 기수'
+  const kinds = new Set(registration.assignments.map((a) => (a.cohort_id ? "cohort" : "course")));
+  const assignedTitle = kinds.size === 1 ? (kinds.has("cohort") ? "담당 기수" : "담당 과정") : "담당 과정·기수";
   const at = rejected ? registration.reviewed_at : registration.created_at;
 
   /** 알림 없이 다시 조회만 한다. 승인됐으면 운영진 홈으로 (F25) */
@@ -219,10 +220,10 @@ function RegistrationStatus({
           <ul className="flex flex-col gap-2">
             {registration.assignments.map((a) => (
               <li
-                key={`${a.role}-${a.bootcamp_id ?? ""}-${a.cohort_id ?? ""}`}
+                key={`${a.bootcamp_id ?? ""}-${a.cohort_id ?? ""}`}
                 className="flex items-center gap-2 rounded-lg border border-border px-3 py-2"
               >
-                <Badge variant="primary">{STAFF_ROLE_LABELS[a.role]}</Badge>
+                <Badge variant="primary">{a.cohort_id ? "기수" : "과정"}</Badge>
                 <span className="text-body-sm text-foreground">{assignmentLabel(options, a) ?? "-"}</span>
               </li>
             ))}

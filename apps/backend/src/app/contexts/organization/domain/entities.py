@@ -13,7 +13,6 @@ from app.contexts.organization.domain.enums import (
     AssignmentScope,
     DataScope,
     EmploymentType,
-    StaffRole,
 )
 from app.shared.domain import AggregateRoot
 from app.shared.errors import BusinessRuleViolation
@@ -149,7 +148,6 @@ class BootcampStaff(AggregateRoot):
 
     employee_id: uuid.UUID
     bootcamp_id: uuid.UUID
-    role: StaffRole
     created_at: datetime | None = None
 
 
@@ -159,5 +157,4 @@ class CohortStaff(AggregateRoot):
 
     employee_id: uuid.UUID
     cohort_id: uuid.UUID
-    role: StaffRole
     created_at: datetime | None = None

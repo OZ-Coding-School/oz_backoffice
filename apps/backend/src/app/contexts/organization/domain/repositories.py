@@ -12,7 +12,7 @@ from app.contexts.organization.domain.entities import (
     EmployeePosition,
     Team,
 )
-from app.contexts.organization.domain.enums import EmployeeRegistrationStatus, StaffRole
+from app.contexts.organization.domain.enums import EmployeeRegistrationStatus
 from app.contexts.organization.domain.registration import EmployeeRegistration
 
 
@@ -108,8 +108,8 @@ class CohortStaffRepository(Protocol):
     async def list_by_cohort(self, cohort_id: uuid.UUID) -> list[CohortStaff]: ...
     async def list_by_employee(self, employee_id: uuid.UUID) -> list[CohortStaff]: ...
     async def list_by_employees(self, employee_ids: list[uuid.UUID]) -> list[CohortStaff]: ...
-    async def cohort_ids_with_role(self, role: StaffRole) -> set[uuid.UUID]:
-        """그 역할의 담당자가 한 명이라도 있는 기수 (A63: 조교가 있는 기수)."""
+    async def staffed_cohort_ids(self) -> set[uuid.UUID]:
+        """기수 담당자가 한 명이라도 있는 기수 (A63·A89)."""
         ...
 
 

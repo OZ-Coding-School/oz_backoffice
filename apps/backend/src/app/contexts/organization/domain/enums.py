@@ -24,11 +24,6 @@ class DataScope(StrEnum):
     ALL = "ALL"  # 모든 과정·기수
 
 
-class StaffRole(StrEnum):
-    MANAGER = "MANAGER"  # 운영 매니저
-    ASSISTANT = "ASSISTANT"  # 조교
-
-
 class EmployeeRegistrationStatus(StrEnum):
     PENDING = "PENDING"  # 승인 대기 (신청자가 수정 가능)
     APPROVED = "APPROVED"  # 승인 (직원·담당자 생성됨)

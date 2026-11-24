@@ -16,15 +16,21 @@ from typing import Any, Protocol
 from app.contexts.academy.domain.entities import Bootcamp
 from app.contexts.access.domain.catalog import validate_permissions
 from app.contexts.audit.application.recorder import AuditRecorder
+from app.contexts.organization.application.registration_service import StaffTargetCatalog
 from app.contexts.organization.domain.entities import (
+    BootcampStaff,
+    CohortStaff,
     Department,
     Employee,
     EmployeePosition,
     Team,
 )
 from app.contexts.organization.domain.enums import AssignmentScope, DataScope, EmploymentType
+from app.contexts.organization.domain.registration import check_employee_assignments
 from app.contexts.organization.domain.repositories import (
+    BootcampStaffRepository,
     BootcampTeamRepository,
+    CohortStaffRepository,
     DepartmentRepository,
     EmployeePositionRepository,
     EmployeeRepository,
@@ -95,6 +101,8 @@ class EmployeeChanges:
     team_id: uuid.UUID | None = _UNSET
     position_id: uuid.UUID = _UNSET
     employment_type: EmploymentType = _UNSET
+    bootcamp_ids: list[uuid.UUID] = _UNSET  # 보내면 담당 과정을 통째로 바꾼다 (A89)
+    cohort_ids: list[uuid.UUID] = _UNSET  # 보내면 담당 기수를 통째로 바꾼다
 
 
 class OrganizationAdminService:
@@ -109,6 +117,9 @@ class OrganizationAdminService:
         employees: EmployeeRepository,
         audit: AuditRecorder,
         uow: UnitOfWork,
+        bootcamp_staffs: BootcampStaffRepository | None = None,
+        cohort_staffs: CohortStaffRepository | None = None,
+        staff_targets: StaffTargetCatalog | None = None,
     ) -> None:
         self._departments = departments
         self._teams = teams
@@ -118,6 +129,9 @@ class OrganizationAdminService:
         self._employees = employees
         self._audit = audit
         self._uow = uow
+        self._bootcamp_staffs = bootcamp_staffs
+        self._cohort_staffs = cohort_staffs
+        self._staff_targets = staff_targets
 
     # ------------------------------------------------------------------ 부서
     async def list_departments(self) -> list[Department]:
@@ -407,7 +421,60 @@ class OrganizationAdminService:
             await self._record(
                 actor_id, "employee.update", employee, before=before, after=_snapshot(employee)
             )
+            if changes.bootcamp_ids is not _UNSET or changes.cohort_ids is not _UNSET:
+                await self._replace_assignments(employee, changes, actor_id)
         return employee
+
+    async def _replace_assignments(
+        self, employee: Employee, changes: EmployeeChanges, actor_id: uuid.UUID
+    ) -> None:
+        """담당을 직위의 담당 방식대로 통째로 바꾼다 (A89). 보내지 않은 쪽은 비운다."""
+        if self._bootcamp_staffs is None or self._cohort_staffs is None or not self._staff_targets:
+            raise RuntimeError("담당을 바꾸려면 담당자 저장소가 필요합니다.")
+        bootcamp_ids = [] if changes.bootcamp_ids is _UNSET else list(changes.bootcamp_ids)
+        cohort_ids = [] if changes.cohort_ids is _UNSET else list(changes.cohort_ids)
+        position = await self._get_position(employee.position_id)
+        current_b = await self._bootcamp_staffs.list_by_employee(employee.id)
+        current_c = await self._cohort_staffs.list_by_employee(employee.id)
+        mine = {s.cohort_id for s in current_c}
+        check_employee_assignments(
+            position.assignment_scope,
+            bootcamp_ids=bootcamp_ids,
+            cohort_ids=cohort_ids,
+            taken_cohort_ids=await self._cohort_staffs.staffed_cohort_ids() - mine,
+        )
+        await self._staff_targets.ensure_staffable(
+            bootcamp_ids=[b for b in bootcamp_ids if b not in {s.bootcamp_id for s in current_b}],
+            cohort_ids=[c for c in cohort_ids if c not in mine],
+        )
+        for s in current_b:
+            if s.bootcamp_id not in bootcamp_ids:
+                await self._bootcamp_staffs.remove(s.id)
+        for staff in current_c:
+            if staff.cohort_id not in cohort_ids:
+                await self._cohort_staffs.remove(staff.id)
+        for b in bootcamp_ids:
+            if b not in {s.bootcamp_id for s in current_b}:
+                await self._bootcamp_staffs.add(
+                    BootcampStaff(employee_id=employee.id, bootcamp_id=b)
+                )
+        for c in cohort_ids:
+            if c not in mine:
+                await self._cohort_staffs.add(CohortStaff(employee_id=employee.id, cohort_id=c))
+        await self._audit.record(
+            actor_user_id=actor_id,
+            action="organization.employee.assignments",
+            target_type="employee",
+            target_id=employee.id,
+            before={
+                "bootcamp_ids": sorted(str(s.bootcamp_id) for s in current_b),
+                "cohort_ids": sorted(str(s.cohort_id) for s in current_c),
+            },
+            after={
+                "bootcamp_ids": sorted(str(b) for b in bootcamp_ids),
+                "cohort_ids": sorted(str(c) for c in cohort_ids),
+            },
+        )
 
     # ------------------------------------------------------------------ 내부
     async def _get_department(

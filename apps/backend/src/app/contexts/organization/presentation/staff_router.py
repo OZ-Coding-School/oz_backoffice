@@ -46,7 +46,6 @@ async def _responses(
             StaffMemberResponse(
                 id=member.id,
                 employee_id=member.employee_id,
-                role=member.role,
                 user=StaffUserSummary(id=user.id, email=user.email, name=user.name)
                 if user
                 else None,
@@ -65,7 +64,7 @@ async def _assign(
     users: UserQueries,
 ) -> StaffMemberResponse:
     member = await service.assign(
-        target, target_id, employee_id=body.employee_id, role=body.role, actor_id=admin.id
+        target, target_id, employee_id=body.employee_id, actor_id=admin.id
     )
     return (await _responses([member], users))[0]
 

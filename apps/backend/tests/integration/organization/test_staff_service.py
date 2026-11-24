@@ -6,7 +6,6 @@ from app.contexts.audit.infrastructure.models import AuditLogModel
 from app.contexts.identity.domain.entities import User
 from app.contexts.organization.application.employee_queries import EmployeeQueries
 from app.contexts.organization.application.staff_service import StaffTarget
-from app.contexts.organization.domain.enums import StaffRole
 from app.contexts.organization.infrastructure.repositories import (
     TortoiseBootcampStaffRepository,
     TortoiseCohortStaffRepository,
@@ -53,11 +52,10 @@ async def test_assign_and_unassign_cohort_staff_changes_scope(actor: User) -> No
         StaffTarget.COHORT,
         cohort.id,
         employee_id=employee.id,
-        role=StaffRole.ASSISTANT,
         actor_id=actor.id,
     )
 
-    assert (member.user_id, member.role) == (employee.user_id, StaffRole.ASSISTANT)
+    assert member.user_id == employee.user_id
     assert [m.id for m in await service.list_members(StaffTarget.COHORT, cohort.id)] == [member.id]
     assert await _scope(employee.user_id) == {("COHORT", cohort.id)}
 
@@ -80,14 +78,12 @@ async def test_bootcamp_staff_and_independent_scope(actor: User) -> None:
         StaffTarget.BOOTCAMP,
         cohort.bootcamp_id,
         employee_id=employee.id,
-        role=StaffRole.MANAGER,
         actor_id=actor.id,
     )
     cohort_member = await service.assign(
         StaffTarget.COHORT,
         cohort.id,
         employee_id=employee.id,
-        role=StaffRole.MANAGER,
         actor_id=actor.id,
     )
 
@@ -104,7 +100,6 @@ async def test_assign_errors(actor: User) -> None:
         StaffTarget.COHORT,
         cohort.id,
         employee_id=employee.id,
-        role=StaffRole.ASSISTANT,
         actor_id=actor.id,
     )
 
@@ -113,7 +108,6 @@ async def test_assign_errors(actor: User) -> None:
             StaffTarget.COHORT,
             cohort.id,
             employee_id=employee.id,
-            role=StaffRole.ASSISTANT,
             actor_id=actor.id,
         )
     assert conflict.value.code == "staff_already_assigned"
@@ -122,7 +116,6 @@ async def test_assign_errors(actor: User) -> None:
             StaffTarget.COHORT,
             cohort.id,
             employee_id=new_id(),
-            role=StaffRole.MANAGER,
             actor_id=actor.id,
         )
     assert missing.value.code == "employee_not_found"
@@ -131,7 +124,6 @@ async def test_assign_errors(actor: User) -> None:
             StaffTarget.COHORT,
             new_id(),
             employee_id=employee.id,
-            role=StaffRole.MANAGER,
             actor_id=actor.id,
         )
     assert target.value.code == "invalid_staff_target"

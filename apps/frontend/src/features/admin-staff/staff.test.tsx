@@ -30,7 +30,6 @@ const OPTIONS: StaffOptions = {
     { id: "p2", name: "조교", assignment_scope: "COHORT" },
   ],
   employment_types: ["REGULAR", "CONTRACT"],
-  staff_roles: ["MANAGER", "ASSISTANT"],
   bootcamps: [{ id: "b1", name: "백엔드 부트캠프", code: "BE", team_id: "t1" }],
   cohorts: [],
 };
@@ -65,7 +64,6 @@ function employee(overrides: Partial<Employee> = {}): Employee {
     assignments: [
       {
         staff_id: "s1",
-        role: "MANAGER",
         bootcamp_id: "b1",
         cohort_id: null,
         bootcamp_name: "백엔드 부트캠프",
@@ -73,7 +71,6 @@ function employee(overrides: Partial<Employee> = {}): Employee {
       },
       {
         staff_id: "s2",
-        role: "MANAGER",
         bootcamp_id: null,
         cohort_id: "c12",
         bootcamp_name: "백엔드 부트캠프",
@@ -95,7 +92,6 @@ const LEE = employee({
 const MEMBER: StaffMember = {
   id: "cs1",
   employee_id: "e2",
-  role: "ASSISTANT",
   user: { id: "u2", email: "lee@nextrunners.co.kr", name: "이조교" },
   created_at: "2026-11-18T01:00:00Z",
 };
@@ -181,7 +177,7 @@ describe("직원·담당자 (FE-15c)", () => {
     expect(await within(dialog).findByRole("radio", { name: "이조교" })).toBeDisabled(); // 담당 중
     await user.click(within(dialog).getByRole("radio", { name: "김운영" }));
     await user.click(within(dialog).getByRole("button", { name: "추가" }));
-    await waitFor(() => expect(calls.add).toEqual([{ employee_id: "e1", role: "ASSISTANT" }]));
+    await waitFor(() => expect(calls.add).toEqual([{ employee_id: "e1" }]));
 
     await user.click(await screen.findByRole("button", { name: "이조교 해제" }));
     await user.click(await screen.findByRole("button", { name: "빼기" }));

@@ -30,7 +30,6 @@ const OPTIONS: StaffOptions = {
     { id: "p3", name: "인턴", assignment_scope: null },
   ],
   employment_types: ["REGULAR"],
-  staff_roles: ["MANAGER", "ASSISTANT"],
   bootcamps: [
     { id: "b2", name: "프론트엔드 부트캠프", code: "FE", team_id: "t1" },
     { id: "b1", name: "백엔드 부트캠프", code: "BE", team_id: "t1" },

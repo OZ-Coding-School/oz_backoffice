@@ -900,7 +900,9 @@ export interface paths {
         head?: never;
         /**
          * Update Employee
-         * @description 부서·팀·직위·고용 형태 이동 (존재만 검사). 직원 생성은 가입 승인으로만 한다.
+         * @description 소속·직위·고용 형태(org.employee.manage)와 담당(staff.assignment.manage, A89)을 한 번에
+         *     바꾼다. 담당은 직위의 담당 방식을 따른다(422 `invalid_staff_assignment`). 직원 생성은 가입
+         *     승인으로만 한다.
          */
         patch: operations["update_employee_api_v1_admin_employees__employee_id__patch"];
         trace?: never;
@@ -3656,7 +3658,6 @@ export interface components {
              * Format: uuid
              */
             employee_id: string;
-            role: components["schemas"]["StaffRole"];
         };
         /** AssignmentCreate */
         AssignmentCreate: {
@@ -3763,9 +3764,11 @@ export interface components {
              */
             canceled_pending_requests: number;
         };
-        /** AssignmentPayload */
+        /**
+         * AssignmentPayload
+         * @description 담당 1건: 과정 또는 기수 (담당 방식은 직위가 정한다, A89).
+         */
         AssignmentPayload: {
-            role: components["schemas"]["StaffRole"];
             /** Bootcamp Id */
             bootcamp_id?: string | null;
             /** Cohort Id */
@@ -4516,10 +4519,9 @@ export interface components {
             /**
              * Staff Id
              * Format: uuid
-             * @description 담당자 행 (해제할 때 쓴다)
+             * @description 담당자 행
              */
             staff_id: string;
-            role: components["schemas"]["StaffRole"];
             /**
              * Bootcamp Id
              * @description 과정 담당이면 과정
@@ -4576,6 +4578,16 @@ export interface components {
             /** Position Id */
             position_id?: string | null;
             employment_type?: components["schemas"]["EmploymentType"] | null;
+            /**
+             * Bootcamp Ids
+             * @description 담당 과정 (보내면 통째로 교체, 직위가 과정 담당일 때, A89)
+             */
+            bootcamp_ids?: string[] | null;
+            /**
+             * Cohort Ids
+             * @description 담당 기수 (보내면 통째로 교체, 직위가 기수 담당일 때 하나)
+             */
+            cohort_ids?: string[] | null;
         };
         /**
          * EmploymentType
@@ -6656,7 +6668,6 @@ export interface components {
              * Format: uuid
              */
             employee_id: string;
-            role: components["schemas"]["StaffRole"];
             user: components["schemas"]["StaffUserSummary"] | null;
             /** Created At */
             created_at: string | null;
@@ -6686,13 +6697,11 @@ export interface components {
             positions: components["schemas"]["PositionOption"][];
             /** Employment Types */
             employment_types: components["schemas"]["EmploymentType"][];
-            /** Staff Roles */
-            staff_roles: components["schemas"]["StaffRole"][];
             /** Bootcamps */
             bootcamps: components["schemas"]["BootcampOption"][];
             /**
              * Cohorts
-             * @description 조교로 고를 수 있는 기수: 진행 예정·진행 중 기수 중 승인된 조교가 없는 기수 (A63)
+             * @description 기수 담당으로 고를 수 있는 기수: 진행 예정·진행 중 기수 중 기수 담당자가 없는 기수 (A63·A89)
              */
             cohorts: components["schemas"]["CohortOption"][];
         };
@@ -6744,11 +6753,6 @@ export interface components {
             /** Created At */
             created_at: string | null;
         };
-        /**
-         * StaffRole
-         * @enum {string}
-         */
-        StaffRole: "MANAGER" | "ASSISTANT";
         /** StaffUserSummary */
         StaffUserSummary: {
             /**

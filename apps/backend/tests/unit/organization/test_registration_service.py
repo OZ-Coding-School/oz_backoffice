@@ -16,7 +16,6 @@ from app.contexts.organization.domain.enums import (
     AssignmentScope,
     EmployeeRegistrationStatus,
     EmploymentType,
-    StaffRole,
 )
 from app.contexts.organization.domain.registration import (
     EmployeeRegistration,
@@ -83,9 +82,7 @@ class Harness:
             "team_id": self.team.id,
             "position_id": self.position.id,
             "employment_type": EmploymentType.REGULAR,
-            "assignments": [
-                RequestedAssignment(role=StaffRole.ASSISTANT, cohort_id=self.cohort.id)
-            ],
+            "assignments": [RequestedAssignment(cohort_id=self.cohort.id)],
         }
         values.update(overrides)
         return await self.service.submit(user, **values)  # type: ignore[arg-type]
@@ -115,7 +112,7 @@ async def test_submit_then_update_pending_registration(h: Harness) -> None:
     first = await h.submit(user)
     assert first.status is EmployeeRegistrationStatus.PENDING
 
-    manager = RequestedAssignment(role=StaffRole.MANAGER, bootcamp_id=h.bootcamp.id)
+    manager = RequestedAssignment(bootcamp_id=h.bootcamp.id)
     second = await h.submit(
         user,
         position_id=h.course_position.id,
@@ -182,9 +179,7 @@ async def test_unknown_department_team_or_position(h: Harness, field: str, code:
 
 async def test_unstaffable_target_is_rejected(h: Harness) -> None:
     with pytest.raises(BusinessRuleViolation) as exc:
-        await h.submit(
-            staff(), assignments=[RequestedAssignment(role=StaffRole.ASSISTANT, cohort_id=new_id())]
-        )
+        await h.submit(staff(), assignments=[RequestedAssignment(cohort_id=new_id())])
     assert exc.value.code == "invalid_staff_target"
     assert h.registrations.items == {}
 
@@ -206,7 +201,7 @@ async def test_department_direct_staff_without_team(h: Harness) -> None:
 
 async def test_assignment_must_follow_position_scope(h: Harness) -> None:
     """COURSE 직위는 소속 팀의 과정만 운영 매니저로 고른다 (A62)."""
-    other = RequestedAssignment(role=StaffRole.MANAGER, bootcamp_id=h.other_bootcamp.id)
+    other = RequestedAssignment(bootcamp_id=h.other_bootcamp.id)
     with pytest.raises(BusinessRuleViolation) as exc:
         await h.submit(staff(), position_id=h.course_position.id, assignments=[other])
     assert exc.value.code == "invalid_staff_assignment"
@@ -217,9 +212,7 @@ async def test_assignment_must_follow_position_scope(h: Harness) -> None:
 
 async def test_cohort_with_assistant_is_hidden_and_rejected(h: Harness) -> None:
     """승인된 조교가 있는 기수는 선택지에서 빠지고 신청하면 거부된다 (A63)."""
-    await h.cohort_staffs.add(
-        CohortStaff(employee_id=new_id(), cohort_id=h.cohort.id, role=StaffRole.ASSISTANT)
-    )
+    await h.cohort_staffs.add(CohortStaff(employee_id=new_id(), cohort_id=h.cohort.id))
     assert (await h.service.options(staff())).cohorts == []
     with pytest.raises(BusinessRuleViolation) as exc:
         await h.submit(staff())
@@ -227,9 +220,7 @@ async def test_cohort_with_assistant_is_hidden_and_rejected(h: Harness) -> None:
     assert h.registrations.items == {}
 
 
-async def test_manager_on_cohort_does_not_hide_it(h: Harness) -> None:
-    await h.cohort_staffs.add(
-        CohortStaff(employee_id=new_id(), cohort_id=h.cohort.id, role=StaffRole.MANAGER)
-    )
-    assert [c.id for c in (await h.service.options(staff())).cohorts] == [h.cohort.id]
-    assert (await h.submit(staff())).is_pending
+async def test_any_cohort_staff_hides_it(h: Harness) -> None:
+    """기수 담당자가 있는 기수는 고를 수 없다 (A63·A89: 역할 무관)."""
+    await h.cohort_staffs.add(CohortStaff(employee_id=new_id(), cohort_id=h.cohort.id))
+    assert (await h.service.options(staff())).cohorts == []

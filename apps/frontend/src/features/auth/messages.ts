@@ -29,8 +29,6 @@ export const GOOGLE_LOGIN_ERRORS: Record<string, AlertMessage> = {
   account_disabled: { variant: "error", title: "사용할 수 없는 계정이에요", description: "관리자에게 문의해 주세요." },
 };
 
-export const STAFF_ROLE_LABELS = { MANAGER: "운영 매니저", ASSISTANT: "조교" } as const;
-
 export const EMPLOYMENT_TYPE_LABELS: Record<string, string> = {
   REGULAR: "정규직",
   CONTRACT: "계약직",

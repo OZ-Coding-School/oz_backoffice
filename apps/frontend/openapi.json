@@ -2682,7 +2682,7 @@
           "admin-organization"
         ],
         "summary": "Update Employee",
-        "description": "부서·팀·직위·고용 형태 이동 (존재만 검사). 직원 생성은 가입 승인으로만 한다.",
+        "description": "소속·직위·고용 형태(org.employee.manage)와 담당(staff.assignment.manage, A89)을 한 번에\n바꾼다. 담당은 직위의 담당 방식을 따른다(422 `invalid_staff_assignment`). 직원 생성은 가입\n승인으로만 한다.",
         "operationId": "update_employee_api_v1_admin_employees__employee_id__patch",
         "security": [
           {
@@ -12932,15 +12932,11 @@
             "type": "string",
             "format": "uuid",
             "title": "Employee Id"
-          },
-          "role": {
-            "$ref": "#/components/schemas/StaffRole"
           }
         },
         "type": "object",
         "required": [
-          "employee_id",
-          "role"
+          "employee_id"
         ],
         "title": "AssignStaffRequest"
       },
@@ -13154,9 +13150,6 @@
       },
       "AssignmentPayload": {
         "properties": {
-          "role": {
-            "$ref": "#/components/schemas/StaffRole"
-          },
           "bootcamp_id": {
             "anyOf": [
               {
@@ -13183,10 +13176,8 @@
           }
         },
         "type": "object",
-        "required": [
-          "role"
-        ],
-        "title": "AssignmentPayload"
+        "title": "AssignmentPayload",
+        "description": "담당 1건: 과정 또는 기수 (담당 방식은 직위가 정한다, A89)."
       },
       "AssignmentResponse": {
         "properties": {
@@ -15043,10 +15034,7 @@
             "type": "string",
             "format": "uuid",
             "title": "Staff Id",
-            "description": "담당자 행 (해제할 때 쓴다)"
-          },
-          "role": {
-            "$ref": "#/components/schemas/StaffRole"
+            "description": "담당자 행"
           },
           "bootcamp_id": {
             "anyOf": [
@@ -15100,7 +15088,6 @@
         "type": "object",
         "required": [
           "staff_id",
-          "role",
           "bootcamp_id",
           "cohort_id",
           "bootcamp_name",
@@ -15226,6 +15213,38 @@
                 "type": "null"
               }
             ]
+          },
+          "bootcamp_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bootcamp Ids",
+            "description": "담당 과정 (보내면 통째로 교체, 직위가 과정 담당일 때, A89)"
+          },
+          "cohort_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cohort Ids",
+            "description": "담당 기수 (보내면 통째로 교체, 직위가 기수 담당일 때 하나)"
           }
         },
         "type": "object",
@@ -20417,9 +20436,6 @@
             "format": "uuid",
             "title": "Employee Id"
           },
-          "role": {
-            "$ref": "#/components/schemas/StaffRole"
-          },
           "user": {
             "anyOf": [
               {
@@ -20447,7 +20463,6 @@
         "required": [
           "id",
           "employee_id",
-          "role",
           "user",
           "created_at"
         ],
@@ -20508,13 +20523,6 @@
             "type": "array",
             "title": "Employment Types"
           },
-          "staff_roles": {
-            "items": {
-              "$ref": "#/components/schemas/StaffRole"
-            },
-            "type": "array",
-            "title": "Staff Roles"
-          },
           "bootcamps": {
             "items": {
               "$ref": "#/components/schemas/BootcampOption"
@@ -20528,7 +20536,7 @@
             },
             "type": "array",
             "title": "Cohorts",
-            "description": "조교로 고를 수 있는 기수: 진행 예정·진행 중 기수 중 승인된 조교가 없는 기수 (A63)"
+            "description": "기수 담당으로 고를 수 있는 기수: 진행 예정·진행 중 기수 중 기수 담당자가 없는 기수 (A63·A89)"
           }
         },
         "type": "object",
@@ -20537,7 +20545,6 @@
           "teams",
           "positions",
           "employment_types",
-          "staff_roles",
           "bootcamps",
           "cohorts"
         ],
@@ -20679,14 +20686,6 @@
           "created_at"
         ],
         "title": "StaffRegistrationResponse"
-      },
-      "StaffRole": {
-        "type": "string",
-        "enum": [
-          "MANAGER",
-          "ASSISTANT"
-        ],
-        "title": "StaffRole"
       },
       "StaffUserSummary": {
         "properties": {

@@ -15,7 +15,6 @@ from app.contexts.organization.domain.enums import (
     DataScope,
     EmployeeRegistrationStatus,
     EmploymentType,
-    StaffRole,
 )
 from app.shared.ids import new_id
 
@@ -120,12 +119,11 @@ class BootcampStaffModel(models.Model):
     bootcamp: fields.ForeignKeyRelation[Any] = fields.ForeignKeyField(
         "models.BootcampModel", related_name=False, on_delete=fields.RESTRICT
     )
-    role = fields.CharEnumField(StaffRole, max_length=20)
     created_at = fields.DatetimeField(auto_now_add=True)
 
     class Meta:
         table = "bootcamp_staffs"
-        unique_together = (("employee", "bootcamp", "role"),)
+        unique_together = (("employee", "bootcamp"),)
         indexes = (("bootcamp",),)
 
 
@@ -137,12 +135,11 @@ class CohortStaffModel(models.Model):
     cohort: fields.ForeignKeyRelation[Any] = fields.ForeignKeyField(
         "models.CohortModel", related_name=False, on_delete=fields.RESTRICT
     )
-    role = fields.CharEnumField(StaffRole, max_length=20)
     created_at = fields.DatetimeField(auto_now_add=True)
 
     class Meta:
         table = "cohort_staffs"
-        unique_together = (("employee", "cohort", "role"),)
+        unique_together = (("employee", "cohort"),)
         indexes = (("cohort",),)
 
 
@@ -182,7 +179,6 @@ class EmployeeRegistrationAssignmentModel(models.Model):
     registration: fields.ForeignKeyRelation[EmployeeRegistrationModel] = fields.ForeignKeyField(
         "models.EmployeeRegistrationModel", related_name="assignments", on_delete=fields.CASCADE
     )
-    role = fields.CharEnumField(StaffRole, max_length=20)
     bootcamp: fields.ForeignKeyNullableRelation[Any] = fields.ForeignKeyField(
         "models.BootcampModel", related_name=False, null=True, on_delete=fields.RESTRICT
     )

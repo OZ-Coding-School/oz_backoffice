@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import { EMPLOYMENT_TYPE_LABELS, STAFF_ROLE_LABELS } from "@/features/auth/messages";
+import { EMPLOYMENT_TYPE_LABELS } from "@/features/auth/messages";
 import { staffOptionsQuery, teamsOf, type StaffOptions } from "@/features/auth/staff-api";
 import { hasPermission, staffAccessQuery } from "@/features/staff/api";
 import { formatKst } from "@/lib/datetime";
@@ -360,9 +360,6 @@ function StaffTabView({
                   이메일
                 </th>
                 <th scope="col" className="px-4 py-2.5 font-normal">
-                  역할
-                </th>
-                <th scope="col" className="px-4 py-2.5 font-normal">
                   배정일
                 </th>
                 {canAssign ? (
@@ -377,7 +374,6 @@ function StaffTabView({
                 <tr key={m.id} className="border-t border-border">
                   <td className="px-4 py-3 text-body-strong text-foreground">{m.user?.name ?? "—"}</td>
                   <td className="px-4 py-3 break-all text-foreground">{m.user?.email ?? "—"}</td>
-                  <td className="px-4 py-3 text-foreground">{STAFF_ROLE_LABELS[m.role]}</td>
                   <td className="px-4 py-3 text-muted-foreground">
                     {m.created_at ? formatKst(m.created_at, "yyyy.MM.dd") : "—"}
                   </td>

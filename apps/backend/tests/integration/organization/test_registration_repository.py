@@ -8,7 +8,6 @@ from app.contexts.identity.infrastructure.repositories import TortoiseUserReposi
 from app.contexts.organization.domain.enums import (
     EmployeeRegistrationStatus,
     EmploymentType,
-    StaffRole,
 )
 from app.contexts.organization.domain.registration import (
     EmployeeRegistration,
@@ -40,8 +39,8 @@ async def _registration(**overrides: object) -> EmployeeRegistration:
 async def test_registration_round_trip_with_assignments() -> None:
     cohort = await create_cohort()
     assignments = [
-        RequestedAssignment(role=StaffRole.MANAGER, bootcamp_id=cohort.bootcamp_id),
-        RequestedAssignment(role=StaffRole.ASSISTANT, cohort_id=cohort.id),
+        RequestedAssignment(bootcamp_id=cohort.bootcamp_id),
+        RequestedAssignment(cohort_id=cohort.id),
     ]
     registration = await _registration(assignments=assignments)
     repo = TortoiseEmployeeRegistrationRepository()
@@ -111,14 +110,13 @@ async def test_rejected_registration_allows_new_one_and_latest_wins() -> None:
             "check_employee_registrations_employment_type",
         ),
         (
-            "INSERT INTO employee_registration_assignments (id, registration_id, role) "
-            "VALUES (gen_random_uuid(), "
-            "(SELECT id FROM employee_registrations LIMIT 1), 'MANAGER')",
+            "INSERT INTO employee_registration_assignments (id, registration_id) "
+            "VALUES (gen_random_uuid(), (SELECT id FROM employee_registrations LIMIT 1))",
             "check_employee_registration_assignments_target",
         ),
         (
-            "INSERT INTO employee_registration_assignments (id, registration_id, role, cohort_id) "
-            "SELECT gen_random_uuid(), registration_id, role, cohort_id "
+            "INSERT INTO employee_registration_assignments (id, registration_id, cohort_id) "
+            "SELECT gen_random_uuid(), registration_id, cohort_id "
             "FROM employee_registration_assignments",
             "uid_employee_registration_assignments_target",
         ),
@@ -126,9 +124,7 @@ async def test_rejected_registration_allows_new_one_and_latest_wins() -> None:
 )
 async def test_db_constraints(sql: str, constraint: str) -> None:
     cohort = await create_cohort()
-    registration = await _registration(
-        assignments=[RequestedAssignment(role=StaffRole.ASSISTANT, cohort_id=cohort.id)]
-    )
+    registration = await _registration(assignments=[RequestedAssignment(cohort_id=cohort.id)])
     await TortoiseEmployeeRegistrationRepository().add(registration)
     with pytest.raises(IntegrityError, match=constraint):
         await connections.get("default").execute_query(sql)
