@@ -39,7 +39,7 @@ describe("회원 공통 틀 (F27)", () => {
   it("멘토는 기수를 보지 않고 수강 등록도 부르지 않는다", async () => {
     const requested = vi.fn<() => void>();
     server.use(http.get(apiUrl("/api/v1/me/enrollments"), () => (requested(), HttpResponse.json([]))));
-    mockSignedIn(makeMe({ name: "김멘토", account_type: "MENTOR", roles: [] }));
+    mockSignedIn(makeMe({ name: "김멘토", account_type: "MENTOR", is_super_admin: false }));
     await renderRoute("/");
     expect(await screen.findByRole("heading", { name: "안녕하세요, 김멘토님" })).toBeInTheDocument();
     expect(screen.getByRole("list", { name: "할 일 요약" })).toBeInTheDocument(); // 멘토 홈 (F57)

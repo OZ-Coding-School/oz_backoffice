@@ -15,7 +15,7 @@ const MENTOR = makeMe({
   id: "u9",
   name: "김멘토",
   account_type: "MENTOR",
-  roles: [{ role: "MENTOR", scope_type: "GLOBAL", scope_id: null, expires_at: null }],
+  is_super_admin: false,
 });
 
 // 1순위 11/24 19:00 KST는 지났고, 2·3순위가 남았다

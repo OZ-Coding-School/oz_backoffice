@@ -16,7 +16,7 @@ const ADMIN = makeMe({
   name: "김관리",
   email: "boss@nextrunners.co.kr",
   account_type: "STAFF",
-  roles: [{ role: "SUPER_ADMIN", scope_type: "GLOBAL", scope_id: null, expires_at: null }],
+  is_super_admin: true,
 });
 
 const OPTIONS: StaffOptions = {
@@ -37,6 +37,8 @@ const OPTIONS: StaffOptions = {
 
 function access(codes: string[]): StaffAccess {
   return {
+    is_super_admin: false,
+    position: null,
     permissions: codes.map((code) => ({ code, is_global: true, bootcamp_ids: [], cohort_ids: [] })),
     cohorts: [
       {

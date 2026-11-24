@@ -15,7 +15,7 @@ const STAFF = makeMe({
   account_type: "STAFF",
   approval_status: "PENDING",
   approved_at: null,
-  roles: [],
+  is_super_admin: false,
 });
 
 const cohort = (id: string, bootcamp_id: string, cohort_number: number) => ({
@@ -251,7 +251,7 @@ describe("운영진 최초 정보 입력", () => {
           ...STAFF,
           approval_status: "APPROVED",
           approved_at: "2026-11-17T00:00:00Z",
-          roles: [{ role: "COHORT_MANAGER", scope_type: "BOOTCAMP", scope_id: "b1", expires_at: null }],
+          is_super_admin: false,
         }),
       ),
     );

@@ -129,7 +129,7 @@ describe("진행 기록 목록 (F33·A70)", () => {
 
   it("멘토는 들어올 수 없다", async () => {
     mockSessionList([]);
-    mockSignedIn(makeMe({ account_type: "MENTOR", name: "김멘토", roles: [] }));
+    mockSignedIn(makeMe({ account_type: "MENTOR", name: "김멘토", is_super_admin: false }));
     const { router } = await renderRoute("/mentoring/sessions");
     await waitFor(() => expect(router.state.location.pathname).toBe("/"));
   });

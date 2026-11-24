@@ -23,6 +23,8 @@ const C12: StaffCohort = {
 };
 
 const MANAGER_ACCESS: StaffAccess = {
+  is_super_admin: false,
+  position: { id: "p1", name: "운영 매니저", all_data: false },
   permissions: [{ code: "member.approval.read", is_global: false, bootcamp_ids: [], cohort_ids: ["c12"] }],
   cohorts: [C12],
 };
@@ -31,12 +33,7 @@ const STAFF = makeMe({
   name: "김운영",
   email: "staff@nextrunners.co.kr",
   account_type: "STAFF",
-  roles: [
-    { role: "SUPER_ADMIN", scope_type: "GLOBAL", scope_id: null, expires_at: null },
-    { role: "COHORT_MANAGER", scope_type: "COHORT", scope_id: "c12", expires_at: null },
-    { role: "COHORT_ASSISTANT", scope_type: "BOOTCAMP", scope_id: "b1", expires_at: null },
-    { role: "COHORT_ASSISTANT", scope_type: "COHORT", scope_id: "unknown", expires_at: null },
-  ],
+  is_super_admin: false,
 });
 
 describe("운영진 메뉴·역할 (F17·F58)", () => {
@@ -49,13 +46,13 @@ describe("운영진 메뉴·역할 (F17·F58)", () => {
     expect(currentStaffNav(modules, "/unknown")).toBeUndefined();
   });
 
-  it("역할 줄: 전체는 이름만, 과정·기수는 그 이름을 앞에, 모르는 범위는 이름만", () => {
-    expect(roleLines(STAFF.roles, [C12])).toEqual([
+  it("역할 줄: 최고 관리자, 직위와 데이터 범위 (A87)", () => {
+    expect(roleLines(MANAGER_ACCESS)).toEqual(["운영 매니저 · 담당 과정·기수"]);
+    expect(roleLines({ is_super_admin: true, position: { id: "p2", name: "팀리드", all_data: true } })).toEqual([
       "최고 관리자",
-      "백엔드 부트캠프 12기 운영 매니저",
-      "백엔드 부트캠프 조교",
-      "조교",
+      "팀리드 · 모든 과정·기수",
     ]);
+    expect(roleLines(undefined)).toEqual([]);
   });
 });
 
@@ -80,7 +77,7 @@ describe("운영진 틀 (FE-14a)", () => {
     await user.click(screen.getByRole("button", { name: "사용자 메뉴" }));
     const popup = await screen.findByRole("menu");
     expect(popup).toHaveTextContent("김운영");
-    expect(popup).toHaveTextContent("백엔드 부트캠프 12기 운영 매니저");
+    expect(popup).toHaveTextContent("운영 매니저 · 담당 과정·기수");
     expect(within(popup).getByRole("menuitem", { name: "로그아웃" })).toBeInTheDocument();
   });
 

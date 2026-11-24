@@ -108,7 +108,7 @@ describe("신청 내역 목록 (F29)", () => {
 
   it("수강생 메뉴에 신청 내역이 있고, 멘토는 들어올 수 없다", async () => {
     mockRequestList([]);
-    mockSignedIn(makeMe({ account_type: "MENTOR", name: "김멘토", roles: [] }));
+    mockSignedIn(makeMe({ account_type: "MENTOR", name: "김멘토", is_super_admin: false }));
     const { router } = await renderRoute("/mentoring/requests");
     await waitFor(() => expect(router.state.location.pathname).toBe("/"));
   });

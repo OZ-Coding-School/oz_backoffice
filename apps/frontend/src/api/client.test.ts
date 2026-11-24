@@ -14,7 +14,7 @@ const ME = {
   phone_number: null,
   approval_status: "APPROVED",
   approved_at: null,
-  roles: [],
+  is_super_admin: false,
 };
 
 function inMinutes(minutes: number): string {

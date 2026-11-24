@@ -8,9 +8,11 @@ const STAFF = {
   phone_number: null,
   approval_status: "APPROVED",
   approved_at: "2026-11-01T01:00:00Z",
-  roles: [{ role: "COHORT_MANAGER", scope_type: "COHORT", scope_id: "c12", expires_at: null }],
+  is_super_admin: false,
 };
 const ACCESS = {
+  is_super_admin: false,
+  position: { id: "p1", name: "운영 매니저", all_data: false },
   permissions: [{ code: "member.approval.read", is_global: false, bootcamp_ids: [], cohort_ids: ["c12"] }],
   cohorts: [
     {
@@ -39,5 +41,5 @@ test("운영진 틀: 모듈 레일·메뉴와 사용자 메뉴의 역할 (FE-14a
     page.getByRole("navigation", { name: "모듈" }).getByRole("link", { name: "홈", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "사용자 메뉴" }).click();
-  await expect(page.getByRole("menu")).toContainText("백엔드 부트캠프 12기 운영 매니저");
+  await expect(page.getByRole("menu")).toContainText("운영 매니저 · 담당 과정·기수");
 });

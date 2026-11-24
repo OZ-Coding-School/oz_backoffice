@@ -15,7 +15,7 @@ export function makeMe(overrides: Partial<Me> = {}): Me {
     phone_number: "01012345678",
     approval_status: "APPROVED",
     approved_at: "2026-11-16T01:00:00Z",
-    roles: [{ role: "STUDENT", scope_type: "COHORT", scope_id: "c1", expires_at: null }],
+    is_super_admin: false,
     ...overrides,
   };
 }
