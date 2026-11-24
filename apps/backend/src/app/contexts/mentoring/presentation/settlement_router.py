@@ -41,7 +41,7 @@ from app.contexts.mentoring.domain.enums import (
     SettlementItemType,
 )
 from app.contexts.mentoring.domain.session import MentoringSession
-from app.contexts.mentoring.domain.settlement import MentoringSettlement
+from app.contexts.mentoring.domain.settlement import MentoringSettlement, SettlementItem
 from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseCohortMentorRepository,
     TortoiseMentoringRequestRepository,
@@ -49,6 +49,7 @@ from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseMentoringSettlementRepository,
     TortoiseMentoringTeamRepository,
 )
+from app.contexts.mentoring.presentation.presenters import NameBook
 from app.core.clock import Clock
 from app.core.dependencies import get_clock
 from app.core.uow import UnitOfWork
@@ -158,6 +159,8 @@ class SettlementSummary(BaseModel):
     mentor_id: uuid.UUID
     mentor_name: str
     cohort_id: uuid.UUID
+    bootcamp_name: str | None = Field(description="기수의 과정명 (A80)")
+    cohort_number: int | None = Field(description="기수 번호 (A80)")
     month: str = Field(description="YYYY-MM")
     status: MentoringSettlementStatus
     session_count: int
@@ -169,6 +172,9 @@ class SettlementSummary(BaseModel):
 class SettlementItemResponse(BaseModel):
     session_id: uuid.UUID
     session_starts_at: datetime | None
+    session_topic: str | None = Field(description="세션 주제 (A80)")
+    team_label: str | None = Field(description="팀 멘토링이면 팀 이름 (A80)")
+    requester_name: str | None = Field(description="신청자 이름. 1:1 상대 (A80)")
     item_type: SettlementItemType
     settlement_policy: MentoringSettlementPolicy
     billable_minutes: int
@@ -213,6 +219,8 @@ class Presenter:
         self._mentors = cast("MentorDirectory", state.mentor_queries)
         self._users = cast("UserQueries", state.user_queries)
         self._sessions = TortoiseMentoringSessionRepository()
+        self._requests = TortoiseMentoringRequestRepository()
+        self._book = NameBook(request)
 
     async def _names(self, mentor_ids: list[uuid.UUID]) -> dict[uuid.UUID, str]:
         mentors = await self._mentors.get_many(list(set(mentor_ids)))
@@ -222,12 +230,16 @@ class Presenter:
         }
 
     @staticmethod
-    def _summary(s: MentoringSettlement, name: str) -> SettlementSummary:
+    def _summary(
+        s: MentoringSettlement, name: str, label: tuple[str, int] | None
+    ) -> SettlementSummary:
         return SettlementSummary(
             id=s.id,
             mentor_id=s.mentor_id,
             mentor_name=name,
             cohort_id=s.cohort_id,
+            bootcamp_name=label[0] if label else None,
+            cohort_number=label[1] if label else None,
             month=s.settlement_month.strftime("%Y-%m"),
             status=s.status,
             session_count=s.session_count,
@@ -238,38 +250,47 @@ class Presenter:
 
     async def summaries(self, items: list[MentoringSettlement]) -> list[SettlementSummary]:
         names = await self._names([s.mentor_id for s in items])
-        return [self._summary(s, names.get(s.mentor_id, "")) for s in items]
+        labels = await self._book.cohort_labels(list({s.cohort_id for s in items}))
+        return [
+            self._summary(s, names.get(s.mentor_id, ""), labels.get(s.cohort_id)) for s in items
+        ]
 
     async def detail(self, s: MentoringSettlement) -> SettlementDetail:
         names = await self._names([s.mentor_id])
+        labels = await self._book.cohort_labels([s.cohort_id])
         sessions = await self._sessions.get_many([i.session_id for i in s.items])
+        requests = await self._requests.get_many(list({x.request_id for x in sessions.values()}))
+        people = await self._book.of(list(requests.values()))
+
+        def item(i: SettlementItem) -> SettlementItemResponse:
+            session = sessions.get(i.session_id)
+            who = people.get(session.request_id) if session else None
+            return SettlementItemResponse(
+                session_id=i.session_id,
+                session_starts_at=session.starts_at if session else None,
+                session_topic=session.topic if session else None,
+                team_label=who.team_label if who else None,
+                requester_name=who.requester_name if who else None,
+                item_type=i.item_type,
+                settlement_policy=i.settlement_policy,
+                billable_minutes=i.billable_minutes,
+                pay_unit=i.pay_unit,
+                pay_rate=i.pay_rate,
+                amount=i.amount,
+                uncharged_overtime_minutes=session.uncharged_overtime_minutes if session else None,
+            )
+
+        ordered = sorted(
+            s.items,
+            key=lambda i: (
+                sessions[i.session_id].starts_at
+                if i.session_id in sessions
+                else datetime.min.replace(tzinfo=None)
+            ),
+        )
         return SettlementDetail(
-            **self._summary(s, names.get(s.mentor_id, "")).model_dump(),
-            items=[
-                SettlementItemResponse(
-                    session_id=i.session_id,
-                    session_starts_at=sessions[i.session_id].starts_at
-                    if i.session_id in sessions
-                    else None,
-                    item_type=i.item_type,
-                    settlement_policy=i.settlement_policy,
-                    billable_minutes=i.billable_minutes,
-                    pay_unit=i.pay_unit,
-                    pay_rate=i.pay_rate,
-                    amount=i.amount,
-                    uncharged_overtime_minutes=sessions[i.session_id].uncharged_overtime_minutes
-                    if i.session_id in sessions
-                    else None,
-                )
-                for i in sorted(
-                    s.items,
-                    key=lambda i: (
-                        sessions[i.session_id].starts_at
-                        if i.session_id in sessions
-                        else datetime.min.replace(tzinfo=None)
-                    ),
-                )
-            ],
+            **self._summary(s, names.get(s.mentor_id, ""), labels.get(s.cohort_id)).model_dump(),
+            items=[item(i) for i in ordered],
         )
 
     @staticmethod
