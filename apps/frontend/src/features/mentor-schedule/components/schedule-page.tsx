@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Ellipsis, Plus } from "lucide-react";
 import { useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { toast } from "sonner";
 
@@ -8,6 +8,12 @@ import { ErrorState } from "@/components/error-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { kstDateKey } from "@/features/apply/slots";
@@ -17,6 +23,7 @@ import { formatKst } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 
 import { scheduleQuery, useSetAccepting, weekSessionsQuery } from "../api";
+import { isLocked } from "../form";
 import {
   addDays,
   dayStartMs,
@@ -29,6 +36,7 @@ import {
   weekTitle,
   type UnavailablePeriod,
 } from "../schedule";
+import { DeleteUnavailableDialog, UnavailableDialog } from "./unavailable-dialogs";
 
 const DAY_MINUTES = 24 * 60;
 /** 처음 보이는 시각 (F52) */
@@ -42,6 +50,14 @@ interface Block {
   start: number; // 그날 00:00 기준 분
   end: number;
   sessionId?: string;
+  period?: UnavailablePeriod;
+}
+
+/** 수정·삭제 창 열기 (F53) */
+interface Editor {
+  edit: (period: UnavailablePeriod) => void;
+  remove: (period: UnavailablePeriod) => void;
+  now: number;
 }
 
 /** 멘토 일정 (Figma `일정 · 보기 (FE-11a)`, F51·F52·A37) */
@@ -49,15 +65,39 @@ export function SchedulePage({ monday }: { monday: string }) {
   const schedule = useQuery(scheduleQuery);
   const sessions = useQuery(weekSessionsQuery(monday));
   const [now] = useState(() => Date.now());
+  const [dialog, setDialog] = useState<{ open: boolean; period: UnavailablePeriod | null }>({
+    open: false,
+    period: null,
+  });
+  const [deleting, setDeleting] = useState<UnavailablePeriod | null>(null);
+  const editor: Editor = {
+    edit: (period) => setDialog({ open: true, period }),
+    remove: setDeleting,
+    now,
+  };
+  const today = kstDateKey(new Date(now));
 
   return (
     <div className="flex flex-col gap-4 md:gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-h1 text-foreground">일정</h1>
-        <p className="text-body text-muted-foreground">
-          안 되는 시간만 등록해요. 나머지 시간은 기수 운영시간 안에서 수강생이 신청할 수 있어요.
-        </p>
+      <div className="flex flex-col gap-3 md:flex-row md:items-start">
+        <div className="flex flex-1 flex-col gap-1">
+          <h1 className="text-h1 text-foreground">일정</h1>
+          <p className="text-body text-muted-foreground">
+            안 되는 시간만 등록해요. 나머지 시간은 기수 운영시간 안에서 수강생이 신청할 수 있어요.
+          </p>
+        </div>
+        <Button className="max-md:w-full" onClick={() => setDialog({ open: true, period: null })}>
+          <Plus aria-hidden />
+          불가 시간 추가
+        </Button>
       </div>
+      <UnavailableDialog
+        open={dialog.open}
+        period={dialog.period}
+        defaultDay={weekDays(monday).includes(today) ? today : monday}
+        onOpenChange={(open) => setDialog((d) => ({ ...d, open }))}
+      />
+      <DeleteUnavailableDialog period={deleting} onClose={() => setDeleting(null)} />
       {schedule.isPending ? (
         <div className="flex justify-center py-10">
           <Spinner />
@@ -73,8 +113,9 @@ export function SchedulePage({ monday }: { monday: string }) {
               now={now}
               periods={schedule.data.unavailable_periods}
               sessions={sessions.data?.items ?? []}
+              editor={editor}
             />
-            <PeriodList periods={schedule.data.unavailable_periods} />
+            <PeriodList periods={schedule.data.unavailable_periods} editor={editor} />
           </div>
         </>
       )}
@@ -156,6 +197,7 @@ function dayBlocks(key: string, periods: UnavailablePeriod[], sessions: Mentorin
           label: `${p.category ?? "불가 시간"} · ${repeatLabel(p)}`,
           start: seg[0],
           end: seg[1],
+          period: p,
         });
     }
   }
@@ -172,11 +214,13 @@ function WeekCard({
   now,
   periods,
   sessions,
+  editor,
 }: {
   monday: string;
   now: number;
   periods: UnavailablePeriod[];
   sessions: MentoringSession[];
+  editor: Editor;
 }) {
   const navigate = useNavigate();
   const days = weekDays(monday);
@@ -234,6 +278,7 @@ function WeekCard({
         selected={selected}
         today={today}
         columns={days.map((key) => dayBlocks(key, periods, sessions))}
+        editor={editor}
       />
     </section>
   );
@@ -244,11 +289,13 @@ function Timetable({
   selected,
   today,
   columns,
+  editor,
 }: {
   days: string[];
   selected: string;
   today: string;
   columns: Block[][];
+  editor: Editor;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
   // 처음에는 08:00이 맨 위에 오게 (F52)
@@ -292,7 +339,7 @@ function Timetable({
                   <div key={h} className="h-12 border-b border-border" />
                 ))}
                 {(columns[i] ?? []).map((b) => (
-                  <BlockView key={b.id} block={b} />
+                  <BlockView key={b.id} block={b} editor={editor} />
                 ))}
               </div>
             ))}
@@ -303,7 +350,7 @@ function Timetable({
   );
 }
 
-function BlockView({ block }: { block: Block }) {
+function BlockView({ block, editor }: { block: Block; editor: Editor }) {
   // 하루 1,440분 중 위치 (계산 값이라 인라인 스타일)
   const style: CSSProperties = {
     top: `${(block.start / DAY_MINUTES) * 100}%`,
@@ -324,6 +371,23 @@ function BlockView({ block }: { block: Block }) {
         {block.label}
       </Link>
     );
+  // 불가 시간 블록을 누르면 수정 창 (이미 시작한 한 번은 보기만, F53)
+  const period = block.period;
+  if (period && !isLocked(period, editor.now))
+    return (
+      <button
+        type="button"
+        style={style}
+        aria-label={`${block.label} 수정`}
+        onClick={() => editor.edit(period)}
+        className={cn(
+          className,
+          "text-left outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring",
+        )}
+      >
+        {block.label}
+      </button>
+    );
   return (
     <div style={style} className={className}>
       {block.label}
@@ -331,7 +395,7 @@ function BlockView({ block }: { block: Block }) {
   );
 }
 
-function PeriodList({ periods }: { periods: UnavailablePeriod[] }) {
+function PeriodList({ periods, editor }: { periods: UnavailablePeriod[]; editor: Editor }) {
   return (
     <section
       aria-labelledby="periods-title"
@@ -347,13 +411,35 @@ function PeriodList({ periods }: { periods: UnavailablePeriod[] }) {
       ) : (
         <ul className="flex flex-col divide-y divide-border border-t border-border">
           {periods.map((p) => (
-            <li key={p.id} className="flex flex-col gap-0.5 py-3">
-              <span className="flex items-center gap-2">
-                <span className="text-body-strong text-foreground">{p.category ?? "불가 시간"}</span>
-                <Badge variant="outline">{repeatLabel(p)}</Badge>
+            <li key={p.id} className="flex items-start gap-2 py-3">
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="flex items-center gap-2">
+                  <span className="text-body-strong text-foreground">{p.category ?? "불가 시간"}</span>
+                  <Badge variant="outline">{repeatLabel(p)}</Badge>
+                </span>
+                <span className="text-caption text-muted-foreground">{periodLabel(p)}</span>
+                {p.reason ? <span className="text-caption text-muted-foreground">{p.reason}</span> : null}
               </span>
-              <span className="text-caption text-muted-foreground">{periodLabel(p)}</span>
-              {p.reason ? <span className="text-caption text-muted-foreground">{p.reason}</span> : null}
+              {isLocked(p, editor.now) ? null : (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="size-8 px-0"
+                      aria-label={`${p.category ?? "불가 시간"} 메뉴`}
+                    >
+                      <Ellipsis aria-hidden />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onSelect={() => editor.edit(p)}>수정</DropdownMenuItem>
+                    <DropdownMenuItem className="text-destructive-text" onSelect={() => editor.remove(p)}>
+                      삭제
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </li>
           ))}
         </ul>
