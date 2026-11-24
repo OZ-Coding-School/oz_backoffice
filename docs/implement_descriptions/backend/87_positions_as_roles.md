@@ -1,7 +1,7 @@
 # 87. 직위 = 역할, 최고 관리자 필드, 데이터 범위 (BE-3g)
 
-- 상태: PR 진행 중
-- 관련 PR: (작성 중)
+- 상태: 완료 (2026-11-24 병합)
+- 관련 PR: #135
 - 관련 결정: `docs/decisions.md` A87·A88 (A84·A85·A16·A17·A36 변경)
 - 이전 기록: [86. 권한 엔터티 × 조회/관리 세분화 (BE-3f)](86_entity_permissions.md)
 
@@ -42,6 +42,9 @@
 - 마이그레이션: `aerich upgrade` → `migrate`(No changes) → `downgrade -v 31` → `upgrade`, DBML 파서 검증
 - 개발 DB: `seed-dev-org`로 직위 권한·데이터 범위 확인(팀리드 25·전체, 운영 매니저·러닝 코치 22, 조교 12)
 - 프론트엔드: `lint`, `format:check`, `typecheck`, `vitest` 304 passed, `build`, Playwright E2E 39 passed
+
+- GitHub Actions (PR #135): 백엔드·프론트엔드 검사·E2E 통과
+- 백엔드 PR은 CI 통과 후 바로 병합한다는 사용자 지시에 따라 병합했다(2026-11-24)
 
 ## 남은 작업
 - BE-3h 담당 역할 칸 제거·A63 변경·직원 수정에서 담당 지정(A88)
