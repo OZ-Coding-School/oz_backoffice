@@ -1,7 +1,7 @@
 # 86. 역할 보유자 목록·직접 부여 확장 (BE-3e)
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 중)
+- 관련 PR: #133
 - 관련 결정: `docs/decisions.md` A85, F63 (A17·A84)
 - 이전 기록: [85. 역할별 권한 DB 판정·역할 관리 API (BE-3d)](85_role_permission_management.md)
 
