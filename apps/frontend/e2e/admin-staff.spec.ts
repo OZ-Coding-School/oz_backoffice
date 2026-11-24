@@ -34,7 +34,6 @@ const OPTIONS = {
   teams: [{ id: "t1", department_id: "d1", name: "교육 1팀" }],
   positions: [{ id: "p2", name: "조교", assignment_scope: "COHORT" }],
   employment_types: ["REGULAR"],
-  staff_roles: ["MANAGER", "ASSISTANT"],
   bootcamps: [{ id: "b1", name: "백엔드 부트캠프", code: "BE", team_id: "t1" }],
   cohorts: [],
 };
@@ -63,7 +62,7 @@ test("담당자 탭: 과정·기수 고르고 조교 추가 (FE-15c)", async ({ 
   await page.route("**/api/v1/admin/bootcamps/b1/staffs", (route) => route.fulfill({ json: [] }));
   await page.route("**/api/v1/admin/cohorts/c12/staffs", (route) => {
     if (route.request().method() === "POST") {
-      const m = { id: "cs1", employee_id: "e2", role: "ASSISTANT", user: LEE.user, created_at: "2026-11-24T01:00:00Z" };
+      const m = { id: "cs1", employee_id: "e2", user: LEE.user, created_at: "2026-11-24T01:00:00Z" };
       members.push(m);
       return route.fulfill({ status: 201, json: m });
     }

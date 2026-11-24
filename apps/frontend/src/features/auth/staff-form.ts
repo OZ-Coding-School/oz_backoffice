@@ -23,16 +23,14 @@ export type StaffFormValues = z.infer<typeof staffFormSchema>;
 
 /** 신청(또는 승인할 신청)의 값으로 폼을 채운다 */
 export function staffFormValues(options: StaffOptions, initial: StaffFormSource | null): StaffFormValues {
-  const assistant = initial?.assignments.find((a) => a.role === "ASSISTANT" && a.cohort_id);
+  const assistant = initial?.assignments.find((a) => a.cohort_id);
   const cohort = assistant ? options.cohorts.find((c) => c.id === assistant.cohort_id) : undefined;
   return {
     department_id: initial?.department_id ?? "",
     team_id: initial ? (initial.team_id ?? NO_TEAM) : "",
     position_id: initial?.position_id ?? "",
     employment_type: initial?.employment_type ?? "",
-    bootcamp_ids: (initial?.assignments ?? [])
-      .filter((a) => a.role === "MANAGER" && a.bootcamp_id)
-      .map((a) => a.bootcamp_id as string),
+    bootcamp_ids: (initial?.assignments ?? []).filter((a) => a.bootcamp_id).map((a) => a.bootcamp_id as string),
     cohort_bootcamp_id: cohort?.bootcamp_id ?? "",
     cohort_id: cohort?.id ?? "",
   };
@@ -51,9 +49,9 @@ export function staffPayload(options: StaffOptions, values: StaffFormValues, wid
       !withTeam && !wide
         ? []
         : scope === "COURSE"
-          ? values.bootcamp_ids.map((id) => ({ role: "MANAGER" as const, bootcamp_id: id, cohort_id: null }))
+          ? values.bootcamp_ids.map((id) => ({ bootcamp_id: id, cohort_id: null }))
           : scope === "COHORT" && values.cohort_id
-            ? [{ role: "ASSISTANT" as const, bootcamp_id: null, cohort_id: values.cohort_id }]
+            ? [{ bootcamp_id: null, cohort_id: values.cohort_id }]
             : [],
   };
 }

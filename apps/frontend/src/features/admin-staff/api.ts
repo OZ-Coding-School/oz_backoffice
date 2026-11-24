@@ -6,7 +6,6 @@ import type { components } from "@/api/schema.gen";
 export type Employee = components["schemas"]["EmployeeResponse"];
 export type EmployeeAssignment = components["schemas"]["EmployeeAssignmentResponse"];
 export type StaffMember = components["schemas"]["StaffMemberResponse"];
-export type StaffRole = components["schemas"]["StaffRole"];
 export type EmployeeUpdate = components["schemas"]["EmployeeUpdateRequest"];
 
 export const PAGE_SIZE = 20;
@@ -82,7 +81,7 @@ function useInvalidate() {
 export function useAddStaff(t: StaffTarget) {
   const invalidate = useInvalidate();
   return useMutation({
-    mutationFn: (body: { employee_id: string; role: StaffRole }) =>
+    mutationFn: (body: { employee_id: string }) =>
       t.kind === "bootcamp"
         ? unwrap(
             api.POST("/api/v1/admin/bootcamps/{bootcamp_id}/staffs", { params: { path: { bootcamp_id: t.id } }, body }),

@@ -6,7 +6,6 @@ import type { components } from "@/api/schema.gen";
 export type StaffOptions = components["schemas"]["StaffRegistrationOptionsResponse"];
 export type StaffRegistration = components["schemas"]["StaffRegistrationResponse"];
 export type StaffRegistrationRequest = components["schemas"]["StaffRegistrationRequest"];
-export type StaffRole = components["schemas"]["StaffRole"];
 
 export const staffKeys = {
   options: ["staff-registration", "options"] as const,

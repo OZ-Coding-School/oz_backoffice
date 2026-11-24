@@ -42,7 +42,6 @@ const OPTIONS = {
     { id: "p3", name: "인턴", assignment_scope: null },
   ],
   employment_types: ["REGULAR", "CONTRACT"],
-  staff_roles: ["MANAGER", "ASSISTANT"],
   bootcamps: [
     { id: "b1", name: "백엔드 부트캠프", code: "BE", team_id: "t1" },
     { id: "b2", name: "프론트엔드 부트캠프", code: "FE", team_id: "t1" },
@@ -59,7 +58,7 @@ function registration(overrides: Partial<StaffRegistration> = {}): StaffRegistra
     team_id: "t1",
     position_id: "p1",
     employment_type: "REGULAR",
-    assignments: [{ role: "MANAGER", bootcamp_id: "b1", cohort_id: null }],
+    assignments: [{ bootcamp_id: "b1", cohort_id: null }],
     reviewed_at: null,
     reject_reason: null,
     created_at: "2026-11-16T01:24:00Z",
@@ -180,8 +179,8 @@ describe("운영진 최초 정보 입력", () => {
     expect(puts[0]).toMatchObject({
       team_id: "t1",
       assignments: [
-        { role: "MANAGER", bootcamp_id: "b1", cohort_id: null },
-        { role: "MANAGER", bootcamp_id: "b2", cohort_id: null },
+        { bootcamp_id: "b1", cohort_id: null },
+        { bootcamp_id: "b2", cohort_id: null },
       ],
     });
   });
@@ -214,7 +213,7 @@ describe("운영진 최초 정보 입력", () => {
     await screen.findByRole("heading", { name: "승인을 기다리고 있어요" });
     expect(puts[0]).toMatchObject({
       position_id: "p2",
-      assignments: [{ role: "ASSISTANT", bootcamp_id: null, cohort_id: "c10" }],
+      assignments: [{ bootcamp_id: null, cohort_id: "c10" }],
     });
   });
 

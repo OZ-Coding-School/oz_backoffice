@@ -41,7 +41,6 @@ const OPTIONS: StaffOptions = {
     { id: "p2", name: "조교", assignment_scope: "COHORT" },
   ],
   employment_types: ["REGULAR", "CONTRACT"],
-  staff_roles: ["MANAGER", "ASSISTANT"],
   bootcamps: [
     { id: "b1", name: "백엔드 부트캠프", code: "BE", team_id: "t1" },
     { id: "b2", name: "디자인 부트캠프", code: "DE", team_id: "t2" },
@@ -95,7 +94,7 @@ function registration(overrides: Partial<AdminRegistration> = {}): AdminRegistra
     team_id: "t1",
     position_id: "p1",
     employment_type: "REGULAR",
-    assignments: [{ role: "MANAGER", bootcamp_id: "b1", cohort_id: null }],
+    assignments: [{ bootcamp_id: "b1", cohort_id: null }],
     reviewed_at: null,
     reject_reason: null,
     created_at: "2026-11-18T01:00:00Z",
@@ -108,7 +107,7 @@ const ASSISTANT = registration({
   id: "r2",
   position_id: "p2",
   employment_type: "CONTRACT",
-  assignments: [{ role: "ASSISTANT", bootcamp_id: null, cohort_id: "c11" }],
+  assignments: [{ bootcamp_id: null, cohort_id: "c11" }],
   applicant: { id: "u2", email: "assistant@nextrunners.co.kr", name: "이조교", approval_status: "PENDING" },
 });
 
@@ -188,8 +187,8 @@ describe("운영진 승인 (FE-15b)", () => {
           position_id: "p1",
           employment_type: "REGULAR",
           assignments: [
-            { role: "MANAGER", bootcamp_id: "b1", cohort_id: null },
-            { role: "MANAGER", bootcamp_id: "b2", cohort_id: null },
+            { bootcamp_id: "b1", cohort_id: null },
+            { bootcamp_id: "b2", cohort_id: null },
           ],
         },
       ]),

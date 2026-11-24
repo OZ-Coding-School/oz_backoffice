@@ -24,7 +24,6 @@ const OPTIONS = {
   teams: [{ id: "t1", department_id: "d1", name: "교육 1팀" }],
   positions: [{ id: "p1", name: "운영 매니저", assignment_scope: "COURSE" }],
   employment_types: ["REGULAR"],
-  staff_roles: ["MANAGER", "ASSISTANT"],
   bootcamps: [{ id: "b1", name: "백엔드 부트캠프", code: "BE", team_id: "t1" }],
   cohorts: [],
 };
@@ -35,7 +34,7 @@ const REG = {
   team_id: "t1",
   position_id: "p1",
   employment_type: "REGULAR",
-  assignments: [{ role: "MANAGER", bootcamp_id: "b1", cohort_id: null }],
+  assignments: [{ bootcamp_id: "b1", cohort_id: null }],
   reviewed_at: null,
   reject_reason: null,
   created_at: "2026-11-18T01:00:00Z",

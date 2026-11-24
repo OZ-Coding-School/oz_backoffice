@@ -12,10 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { StaffFields } from "@/features/auth/components/staff-fields";
-import { STAFF_ROLE_LABELS } from "@/features/auth/messages";
 import { NO_TEAM, type StaffOptions } from "@/features/auth/staff-api";
 import { staffFormSchema, staffFormValues, type StaffFormValues } from "@/features/auth/staff-form";
 import { useDebounced } from "@/lib/use-debounced";
@@ -29,7 +27,6 @@ import {
   useUpdateEmployee,
   type Employee,
   type StaffMember,
-  type StaffRole,
   type StaffTarget,
 } from "../api";
 
@@ -128,7 +125,6 @@ export function AddStaffDialog({
   const query = useDebounced(q.trim());
   const found = useQuery({ ...employeeSearchQuery(query), placeholderData: keepPreviousData });
   const [selected, setSelected] = useState("");
-  const [role, setRole] = useState<StaffRole>(target.kind === "cohort" ? "ASSISTANT" : "MANAGER");
   const add = useAddStaff(target);
   const [error, setError] = useState<string | null>(null);
   const taken = new Set(members.map((m) => m.employee_id));
@@ -137,7 +133,7 @@ export function AddStaffDialog({
   const submit = async () => {
     setError(null);
     try {
-      await add.mutateAsync({ employee_id: selected, role });
+      await add.mutateAsync({ employee_id: selected });
       toast.success("담당자를 추가했어요");
       onClose();
     } catch (e) {
@@ -205,23 +201,6 @@ export function AddStaffDialog({
             })}
           </RadioGroup>
         )}
-        <div className="flex flex-col gap-1.5">
-          <span id="role-label" className="text-label text-foreground">
-            역할
-          </span>
-          <Select value={role} onValueChange={(v) => setRole(v as StaffRole)}>
-            <SelectTrigger aria-labelledby="role-label">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {(["MANAGER", "ASSISTANT"] as const).map((r) => (
-                <SelectItem key={r} value={r}>
-                  {STAFF_ROLE_LABELS[r]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
         {error ? <Alert variant="error" title={error} /> : null}
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={onClose}>
@@ -266,7 +245,7 @@ export function RemoveStaffDialog({
       <DialogContent className="flex max-w-110 flex-col gap-4 p-6">
         <DialogTitle className="text-h2 text-foreground">담당자에서 뺄까요?</DialogTitle>
         <DialogDescription className="text-body text-muted-foreground">
-          {name}님을 {targetName} {STAFF_ROLE_LABELS[member.role]}에서 빼요. 그 범위의 권한도 함께 없어져요.
+          {name}님을 {targetName} 담당자에서 빼요. 그 범위의 데이터에 미치던 권한도 함께 없어져요.
         </DialogDescription>
         {error ? <Alert variant="error" title={error} /> : null}
         <div className="flex justify-end gap-2">
