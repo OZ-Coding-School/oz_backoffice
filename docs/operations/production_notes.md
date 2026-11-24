@@ -137,7 +137,7 @@ app.workers.tasks.mentoring       # 배정 만료(매일 00:00 KST), 대기 신�
 1. 운영 DB를 만들고 `DATABASE_URL`을 넣는다. 로컬 개발용 `infra/postgres/init` SQL(테스트 DB 생성 등)은 운영에 쓰지 않는다.
    - **`btree_gist` 확장을 먼저 만든다**: `CREATE EXTENSION IF NOT EXISTS btree_gist;` (마이그레이션의 EXCLUDE 제약 — 금지 시간대·가능 시간 겹침, 이후 세션 겹침 — 에 필요. 로컬은 init SQL이 만든다). RDS는 마스터 사용자로 실행할 수 있다.
 2. 마이그레이션: `aerich upgrade` (api 이미지로 일회성 실행). 이후 배포마다 api를 띄우기 전에 실행한다.
-3. 역할·권한 시드: `python -m app.cli seed-roles` (멱등). **역할·권한 정의가 바뀐 배포마다** 실행한다. 판정은 코드 기준이라 시드 전에도 동작하지만 DB 사본을 맞춘다(A16). 예: P8-2에서 TEAM_LEAD·`mentor.manage`·`staff.assign` 추가.
+3. 역할·권한 시드: `python -m app.cli seed-roles` (멱등). **역할·권한 정의가 바뀐 배포마다, API를 새 버전으로 띄우기 전에** 실행한다. 판정은 DB `role_permissions` 기준이라(A84) 시드 전에는 새 권한 코드를 쓰는 API가 403이 된다. 화면에서 고친 매핑은 덮지 않는다. **A86(권한 세분화) 배포:** 예전 기능 묶음 코드(`org.manage` 등 14개)를 가진 역할은 이 시드가 엔터티 × 조회/관리 코드로 한 번 바꾸고 예전 코드를 지운다.
 4. 최고 관리자: `python -m app.cli create-super-admin <회사 이메일> [--name 이름]` (멱등, A14).
 5. 메일 확인: `python -m app.cli send-test-mail <받는주소>`.
 6. 명단 동기화: 첫 동기화는 운영진 화면(수동 실행) 또는 매시간 작업으로 돈다.
