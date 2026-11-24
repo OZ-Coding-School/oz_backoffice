@@ -1,7 +1,7 @@
 # 30. FE-14a 운영진 틀
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 중)
+- 관련 PR: #126
 - 관련 결정: `docs/decisions.md` F59 (F3·F15·F17·F58·A81)
 - 이전 기록: [29. FE-13 멘토 홈](29_mentor_home.md)
 
