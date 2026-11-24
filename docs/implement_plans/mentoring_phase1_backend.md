@@ -63,7 +63,7 @@
 
 ### 2.3 권한표 (M31)
 
-> 2026-11-24 이후: 역할별 권한은 DB가 출처(A84)이고, 권한 코드는 엔터티 × 조회/관리로 세분화됐다(A86, 코드 40개). 아래 표는 P3 당시의 기능 묶음 기준이며 최신 목록은 `access/domain/catalog.py`.
+> 2026-11-24 이후: 권한 코드는 엔터티 × 조회/관리로 세분화됐고(A86, 코드 40개), 직위가 곧 역할이다(A87: 직위별 권한 묶음·데이터 범위, 최고 관리자는 회원 필드, 역할 테이블 없음). 아래 표는 P3 당시의 기능 묶음 기준이며 최신 목록은 `access/domain/catalog.py`.
 
 역할 코드: `SUPER_ADMIN`(GLOBAL), `TEAM_LEAD`(GLOBAL, A36), `COHORT_MANAGER`(BOOTCAMP / COHORT 범위), `COHORT_ASSISTANT`(BOOTCAMP / COHORT 범위), `MENTOR`, `STUDENT`
 
