@@ -1,6 +1,6 @@
 # 86. 권한 엔터티 × 조회/관리 세분화 (BE-3f)
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-24 병합)
 - 관련 PR: #134
 - 관련 결정: `docs/decisions.md` A86 (A84·A83·A33)
 - 이전 기록: [85. 역할별 권한 DB 판정·역할 관리 API (BE-3d)](85_role_permission_management.md) (BE-3e 역할 보유자·직접 부여 #133은 A87로 병합하지 않고 닫았다)
@@ -35,6 +35,9 @@ FE-15d 역할·권한 시안을 보면서, 권한이 기능 묶음 단위(예: `
 - `ruff check`, `ruff format --check`, `mypy`, `mypy tests`, `lint-imports` 통과
 - `pytest` 936 passed (통합 포함). 단위: 기본 묶음·대응표가 정의된 코드만 쓰고 조회를 포함, 관리만 있으면 422. 통합: 예전 코드 전환·한 번만. API: 조회만 있는 새 역할은 부서 목록 200·추가 403, 권한 목록 메타데이터
 - 프론트엔드: `lint`, `format:check`, `typecheck`, `vitest` 304 passed(UTC·Asia/Seoul), `build`, Playwright E2E 39 passed
+
+- GitHub Actions (PR #134): 백엔드·프론트엔드 검사·E2E 통과
+- 사용자가 병합을 확인했다(2026-11-24). 이후 백엔드 PR은 CI 통과 후 바로 병합한다
 
 ## 남은 작업
 - BE-3g 직위 = 역할(A87): 직위 권한·데이터 범위, 최고 관리자 필드, 역할 테이블 정리. 이번의 '전체 범위 전용' 제한은 그때 없앤다
