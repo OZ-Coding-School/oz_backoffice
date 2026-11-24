@@ -1,11 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
 
-import { expertiseChips, mentorQuery } from "../api";
+import { expertiseChips, mentorQuery, type MentorProfile } from "../api";
 import { Chips, MentorAvatar } from "./mentor-step";
 
 /** 멘토 상세 소개 모달 (Figma `Screen / 1:1 멘토 소개 (모달)`, A64). 실명·연락처는 없다 */
@@ -27,36 +28,20 @@ export function MentorDialog({
       <DialogContent className="flex max-w-140 flex-col gap-4 p-6">
         {mentor.data ? (
           <>
-            <div className="flex items-start gap-3 pr-8">
-              <MentorAvatar mentor={mentor.data} />
-              <div className="flex min-w-0 flex-col">
-                <DialogTitle className="text-h2 text-foreground">{mentor.data.display_name}</DialogTitle>
-                <DialogDescription className="text-caption text-muted-foreground">
-                  {mentor.data.headline ?? "멘토 소개"}
-                </DialogDescription>
-              </div>
-            </div>
-            {mentor.data.accepting_requests ? (
-              <Badge variant="success" className="w-fit">
-                신청 받는 중
-              </Badge>
-            ) : (
-              <Badge variant="secondary" className="w-fit">
-                지금은 신청을 받지 않아요
-              </Badge>
-            )}
-            {expertiseChips(mentor.data.expertise).length ? (
-              <section className="flex flex-col gap-2">
-                <h3 className="text-caption text-muted-foreground">전문 분야</h3>
-                <Chips items={expertiseChips(mentor.data.expertise)} />
-              </section>
-            ) : null}
-            {mentor.data.introduction ? (
-              <section className="flex flex-col gap-2">
-                <h3 className="text-caption text-muted-foreground">소개</h3>
-                <p className="whitespace-pre-line text-body text-foreground">{mentor.data.introduction}</p>
-              </section>
-            ) : null}
+            <MentorIntro
+              mentor={mentor.data}
+              badge={
+                mentor.data.accepting_requests ? (
+                  <Badge variant="success" className="w-fit">
+                    신청 받는 중
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="w-fit">
+                    지금은 신청을 받지 않아요
+                  </Badge>
+                )
+              }
+            />
             <div className="flex justify-end gap-2">
               <Button variant="ghost" onClick={onClose}>
                 닫기
@@ -74,5 +59,45 @@ export function MentorDialog({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * 멘토 소개 본문 (머리·배지·전문 분야·소개). 수강생 멘토 상세와 멘토 내 프로필 미리보기(F56)가 같이 쓴다.
+ * Dialog 안에서만 쓴다 (제목·설명이 DialogTitle·DialogDescription)
+ */
+export function MentorIntro({
+  mentor,
+  badge,
+}: {
+  mentor: Pick<MentorProfile, "display_name" | "headline" | "profile_image_url" | "expertise" | "introduction">;
+  badge?: ReactNode;
+}) {
+  const chips = expertiseChips(mentor.expertise);
+  return (
+    <>
+      <div className="flex items-start gap-3 pr-8">
+        <MentorAvatar mentor={mentor} />
+        <div className="flex min-w-0 flex-col">
+          <DialogTitle className="text-h2 text-foreground">{mentor.display_name}</DialogTitle>
+          <DialogDescription className="text-caption text-muted-foreground">
+            {mentor.headline ?? "멘토 소개"}
+          </DialogDescription>
+        </div>
+      </div>
+      {badge}
+      {chips.length ? (
+        <section className="flex flex-col gap-2">
+          <h3 className="text-caption text-muted-foreground">전문 분야</h3>
+          <Chips items={chips} />
+        </section>
+      ) : null}
+      {mentor.introduction ? (
+        <section className="flex flex-col gap-2">
+          <h3 className="text-caption text-muted-foreground">소개</h3>
+          <p className="whitespace-pre-line text-body text-foreground">{mentor.introduction}</p>
+        </section>
+      ) : null}
+    </>
   );
 }

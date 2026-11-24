@@ -94,9 +94,13 @@ const MENTOR_SETTLEMENTS: MemberNavItem = {
   icon: Wallet,
 };
 
+/** 멘토는 같은 주소에서 멘토 프로필을 고친다 (F56) */
+const MENTOR_PROFILE: MemberNavItem = { to: "/my/profile", label: "내 프로필", shortLabel: "내 프로필", icon: User };
+
 const MENTOR_NAV: MemberNavGroup[] = [
   { items: [HOME] },
   { title: "멘토링", items: [RECEIVED, MENTOR_SESSIONS, MENTOR_SCHEDULE, CHAT, MENTOR_SETTLEMENTS] },
+  { title: "내 공간", items: [MENTOR_PROFILE] },
 ];
 
 export interface MemberNavOptions {
