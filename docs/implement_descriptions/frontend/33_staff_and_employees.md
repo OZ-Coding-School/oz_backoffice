@@ -1,6 +1,6 @@
 # 33. FE-15c 직원·담당자
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-24 병합)
 - 관련 PR: #131
 - 관련 결정: `docs/decisions.md` F62 (A17·A36·A62·A83·F58)
 - 이전 기록: [32. FE-15b 운영진 승인](32_staff_registration_approvals.md)
@@ -30,6 +30,9 @@ Figma는 `Admin - 회원·권한` 데스크톱 Section의 `직원·담당자 (FE
 - `vitest` 303 passed (TZ=UTC·America/Los_Angeles·Asia/Seoul). 새 테스트: 담당 요약, 직원 탭(검색·소속 수정 본문), 담당자 탭(목록·'담당 중' 막기·추가·해제), 권한별 탭·수정 버튼
 - `playwright` 39 passed. 새 E2E: 담당자 탭에서 과정·기수 고르고 조교 추가
 - 1440 직원 탭·담당자 탭·추가 창을 시안과 비교했다
+
+- GitHub Actions (PR #131): 프론트엔드 검사·E2E 통과
+- 사용자가 병합을 확인했다(2026-11-24)
 
 ## 남은 작업
 - FE-15d 역할·권한
