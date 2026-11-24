@@ -16,12 +16,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { Me } from "@/features/auth/api";
+import { approvalCountQuery } from "@/features/admin-approvals/api";
 import { useLogout } from "@/features/member/logout";
 import { cn } from "@/lib/utils";
 
 import { staffAccessQuery } from "../api";
 import { roleLines } from "../labels";
-import { currentStaffNav, staffModules, type StaffModule } from "../nav";
+import { currentStaffNav, staffModules, type StaffModule, type StaffNavItem } from "../nav";
 
 /**
  * 운영진 틀 (Figma `운영진 틀 (FE-14a)`, F3·F17·F58). 데스크톱만:
@@ -33,6 +34,10 @@ export function StaffShell({ me, children }: { me: Me; children: ReactNode }) {
   const modules = staffModules(access.data ?? { permissions: [] });
   const current = currentStaffNav(modules, pathname);
   const module = current?.module ?? modules[0];
+  // 메뉴 배지: 가입 승인 대기 (F60). 그 메뉴가 보일 때만 부른다
+  const showApprovals = modules.some((m) => m.items.some((i) => i.badge === "approvals"));
+  const approvals = useQuery({ ...approvalCountQuery("all"), enabled: showApprovals });
+  const badges: Partial<Record<NonNullable<StaffNavItem["badge"]>, number>> = { approvals: approvals.data };
 
   return (
     <div className="flex min-h-dvh min-w-[1280px] bg-background">
@@ -57,7 +62,7 @@ export function StaffShell({ me, children }: { me: Me; children: ReactNode }) {
           className="sticky top-0 flex h-dvh w-56 shrink-0 flex-col gap-1 border-r border-sidebar-border bg-sidebar px-3 py-4"
         >
           <div className="flex flex-col gap-0.5 px-2 pb-3">
-            <p className="text-h3 text-foreground">{module.label}</p>
+            <p className="text-h3 text-foreground">{module.title ?? module.label}</p>
             <p className="text-caption text-muted-foreground">{module.description}</p>
           </div>
           {module.items.map((item) => {
@@ -77,7 +82,13 @@ export function StaffShell({ me, children }: { me: Me; children: ReactNode }) {
                 )}
               >
                 <Icon aria-hidden className="size-4 shrink-0" />
-                {item.label}
+                <span className="flex-1">{item.label}</span>
+                {item.badge && badges[item.badge] ? (
+                  <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-caption-strong text-primary-foreground">
+                    <span className="sr-only">대기 </span>
+                    {(badges[item.badge] ?? 0) > 99 ? "99+" : badges[item.badge]}
+                  </span>
+                ) : null}
               </Link>
             );
           })}
@@ -88,8 +99,8 @@ export function StaffShell({ me, children }: { me: Me; children: ReactNode }) {
           <nav aria-label="위치" className="flex items-center gap-1.5 text-body-sm text-muted-foreground">
             {current ? (
               <>
-                <span>{current.module.label}</span>
-                {current.item.label !== current.module.label ? (
+                <span>{current.module.title ?? current.module.label}</span>
+                {current.item.label !== (current.module.title ?? current.module.label) ? (
                   <>
                     <ChevronRight aria-hidden className="size-3.5" />
                     <span className="text-foreground">{current.item.label}</span>
