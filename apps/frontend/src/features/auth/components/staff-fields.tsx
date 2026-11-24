@@ -20,6 +20,7 @@ export function StaffFields({
   wide = false,
   wideCohorts,
   courseHelper,
+  withAssignments = true,
 }: {
   form: UseFormReturn<StaffFormValues>;
   options: StaffOptions;
@@ -27,6 +28,8 @@ export function StaffFields({
   /** 넓게 볼 때 기수 목록 (없으면 신청 선택지의 기수) */
   wideCohorts?: StaffOptions["cohorts"];
   courseHelper?: string;
+  /** false면 담당 칸을 그리지 않는다 (직원 소속 수정, F62) */
+  withAssignments?: boolean;
 }) {
   const { errors } = form.formState;
   const [departmentId, teamId, positionId, cohortBootcampId] = useWatch({
@@ -41,7 +44,7 @@ export function StaffFields({
     wide && wideCohorts
       ? wideCohorts.filter((c) => c.bootcamp_id === bootcampId).sort((a, b) => a.cohort_number - b.cohort_number)
       : bootcampCohorts(options, bootcampId);
-  const showAssignments = scope !== null && teamId !== "" && (wide || teamId !== NO_TEAM);
+  const showAssignments = withAssignments && scope !== null && teamId !== "" && (wide || teamId !== NO_TEAM);
 
   const clearAssignments = () => {
     form.setValue("bootcamp_ids", [], { shouldDirty: true });
