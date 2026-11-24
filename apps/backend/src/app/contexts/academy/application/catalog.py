@@ -6,8 +6,9 @@
 """
 
 import uuid
-from collections.abc import Iterable
+from collections.abc import Collection, Iterable
 from dataclasses import dataclass
+from datetime import date
 
 from app.contexts.academy.domain.entities import Bootcamp, Cohort
 from app.contexts.academy.domain.enums import CohortStatus
@@ -24,6 +25,28 @@ class CohortLabel:
     cohort_id: uuid.UUID
     bootcamp_name: str
     cohort_number: int
+
+
+@dataclass(frozen=True, slots=True)
+class CohortSummary:
+    """운영진 '현재 기수' 선택지 (A81)."""
+
+    id: uuid.UUID
+    bootcamp_id: uuid.UUID
+    bootcamp_name: str
+    cohort_number: int
+    start_date: date
+    end_date: date
+    status: CohortStatus
+
+
+# 진행 중 → 예정 → 종료 → 비활성. 보관(ARCHIVED)은 목록에서 숨긴다
+_SCOPE_ORDER = {
+    CohortStatus.ONGOING: 0,
+    CohortStatus.PLANNED: 1,
+    CohortStatus.ENDED: 2,
+    CohortStatus.INACTIVE: 3,
+}
 
 
 class AcademyCatalog:
@@ -50,6 +73,37 @@ class AcademyCatalog:
         return {
             c.id: CohortLabel(c.id, names.get(c.bootcamp_id, ""), c.cohort_number) for c in cohorts
         }
+
+    async def cohorts_in_scope(
+        self,
+        *,
+        all_cohorts: bool,
+        bootcamp_ids: Collection[uuid.UUID] = (),
+        cohort_ids: Collection[uuid.UUID] = (),
+    ) -> list[CohortSummary]:
+        """권한 범위 안의 기수 (A81): 전체이거나, 그 과정의 기수와 그 기수. 보관은 뺀다.
+        진행 중 → 예정 → 종료 → 비활성, 같은 상태 안에서는 최근 시작 순."""
+        if not (all_cohorts or bootcamp_ids or cohort_ids):
+            return []
+        cohorts = await self._cohorts.list_by_statuses(tuple(_SCOPE_ORDER))
+        if not all_cohorts:
+            cohorts = [c for c in cohorts if c.bootcamp_id in bootcamp_ids or c.id in cohort_ids]
+        names = {bootcamp.id: bootcamp.name for bootcamp in await self._bootcamps.list_all()}
+        cohorts.sort(
+            key=lambda c: (_SCOPE_ORDER[c.status], -c.start_date.toordinal(), -c.cohort_number)
+        )
+        return [
+            CohortSummary(
+                id=c.id,
+                bootcamp_id=c.bootcamp_id,
+                bootcamp_name=names.get(c.bootcamp_id, ""),
+                cohort_number=c.cohort_number,
+                start_date=c.start_date,
+                end_date=c.end_date,
+                status=c.status,
+            )
+            for c in cohorts
+        ]
 
     async def staffable_bootcamps(self) -> list[Bootcamp]:
         return await self._bootcamps.list_active()
