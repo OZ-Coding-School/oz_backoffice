@@ -193,3 +193,100 @@ async def test_requires_user_approve(client: AsyncClient, settings: Settings) ->
     plain.approve(now=datetime.now(UTC))
     await TortoiseUserRepository().save(plain)
     assert (await client.get(API, headers=bearer(settings, plain))).status_code == 403
+
+
+async def test_candidates_for_student_rank_matches_within_scope(
+    client: AsyncClient, settings: Settings, admin: dict[str, str]
+) -> None:
+    """수동 승인 후보 (A82): 담당 범위의 미가입 명단, 일치 많은 순·신청 기수 먼저."""
+    requested, other, outside = await create_cohort(), await create_cohort(), await create_cohort()
+    user, _ = await create_applicant_signup(
+        MemberSignupType.STUDENT, cohort_id=requested.id, name="가수강", phone_number="01012341234"
+    )
+    students = TortoiseStudentRepository()
+    both = make_student(cohort_id=other.id, name="가수강", phone_number="01012341234")
+    name_only = make_student(cohort_id=requested.id, name="가수강", phone_number="01099990000")
+    phone_only = make_student(cohort_id=requested.id, name="가수현", phone_number="01012341234")
+    far = make_student(cohort_id=outside.id, name="가수강")
+    unrelated = make_student(cohort_id=requested.id, name="나수강")
+    for s in (both, name_only, phone_only, far, unrelated):
+        await students.add(s)
+
+    res = await client.get(f"{API}/{user.id}/candidates", headers=admin)
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["signup_type"] == "STUDENT"
+    assert body["contracts"] == []
+    ids = [c["student_id"] for c in body["students"]]
+    assert ids[0] == str(both.id)
+    assert set(ids) == {str(both.id), str(name_only.id), str(phone_only.id), str(far.id)}
+    first = body["students"][0]
+    assert (first["name_match"], first["phone_match"], first["same_cohort"]) == (True, True, False)
+    assert first["cohort_number"] == other.cohort_number
+    assert first["bootcamp_name"]
+
+    searched = await client.get(f"{API}/{user.id}/candidates", params={"q": "나수"}, headers=admin)
+    assert [c["student_id"] for c in searched.json()["students"]] == [str(unrelated.id)]
+
+    # 조교는 자기 기수 명단만
+    assistant = await _assistant(settings, requested.id)
+    scoped = await client.get(f"{API}/{user.id}/candidates", headers=assistant)
+    assert {c["student_id"] for c in scoped.json()["students"]} == {
+        str(name_only.id),
+        str(phone_only.id),
+    }
+    listed = (await client.get(API, headers=admin)).json()["items"][0]
+    assert listed["requested_bootcamp_name"]
+    assert listed["requested_cohort_number"] == requested.cohort_number
+
+
+async def test_candidates_for_mentor_are_unlinked_mentor_contracts(
+    client: AsyncClient, settings: Settings, admin: dict[str, str]
+) -> None:
+    from datetime import date
+
+    from app.contexts.educator.domain.entities import EducatorContract
+    from app.contexts.educator.domain.enums import EducatorType
+    from app.contexts.educator.infrastructure.repositories import TortoiseEducatorContractRepository
+    from tests.factories.educator import create_mentor
+    from tests.factories.organization import create_employee
+
+    employee = await create_employee()
+    contracts = TortoiseEducatorContractRepository()
+
+    async def contract(**overrides: object) -> EducatorContract:
+        values: dict[str, object] = {
+            "manager_employee_id": employee.id,
+            "educator_type": EducatorType.MENTOR,
+            "contractor_name": "김멘토",
+            "contractor_phone": "01077778888",
+            "title": "멘토 계약",
+            "start_date": date(2026, 1, 1),
+            "end_date": date(2026, 12, 31),
+        }
+        values.update(overrides)
+        entity = EducatorContract(**values)  # type: ignore[arg-type]
+        await contracts.add(entity)
+        return entity
+
+    user, _ = await create_applicant_signup(
+        MemberSignupType.MENTOR, name="김멘토", phone_number="01077778888"
+    )
+    match = await contract()
+    phone = await contract(contractor_name="김멘투")
+    await contract(educator_type=EducatorType.INSTRUCTOR)  # 강사 계약 제외
+    await contract(mentor_id=(await create_mentor()).id)  # 이미 연결 제외
+    other = await contract(contractor_name="이멘토", contractor_phone="01011112222")
+
+    body = (await client.get(f"{API}/{user.id}/candidates", headers=admin)).json()
+    assert body["signup_type"] == "MENTOR"
+    assert [c["contract_id"] for c in body["contracts"]] == [str(match.id), str(phone.id)]
+    assert (body["contracts"][1]["name_match"], body["contracts"][1]["phone_match"]) == (
+        False,
+        True,
+    )
+    searched = await client.get(f"{API}/{user.id}/candidates", params={"q": "이멘"}, headers=admin)
+    assert [c["contract_id"] for c in searched.json()["contracts"]] == [str(other.id)]
+
+    assistant = await _assistant(settings, (await create_cohort()).id)
+    assert (await client.get(f"{API}/{user.id}/candidates", headers=assistant)).status_code == 403

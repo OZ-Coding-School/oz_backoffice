@@ -14,14 +14,16 @@
 """
 
 import uuid
+from collections.abc import Collection
 from dataclasses import dataclass
 from typing import Protocol
 
+from app.contexts.academy.application.student_claims import ClaimCandidate
 from app.contexts.access.application.permissions import PermissionScope, PermissionTarget
 from app.contexts.access.domain.catalog import STUDENT
 from app.contexts.access.domain.enums import RoleScopeType
 from app.contexts.audit.application.recorder import AuditRecorder
-from app.contexts.educator.application.mentor_onboarding import MentorMatch
+from app.contexts.educator.application.mentor_onboarding import ContractCandidate, MentorMatch
 from app.contexts.educator.domain.enums import DisplayNamePreference
 from app.contexts.identity.application.signup import (
     MailDispatcher,
@@ -62,11 +64,24 @@ class StudentSelector(Protocol):
     """academy `StudentClaims`."""
 
     async def cohort_of_claimable(self, student_id: uuid.UUID) -> uuid.UUID: ...
+    async def candidates(
+        self,
+        *,
+        cohort_ids: Collection[uuid.UUID] | None,
+        name: str,
+        phone_number: str | None,
+        query: str | None,
+        limit: int,
+    ) -> list[ClaimCandidate]: ...
     async def claim_selected(self, student_id: uuid.UUID, *, user_id: uuid.UUID) -> uuid.UUID: ...
 
 
 class MentorApprover(Protocol):
     """educator `MentorOnboarding`."""
+
+    async def candidate_contracts(
+        self, *, name: str, phone_number: str | None, query: str | None, limit: int
+    ) -> list[ContractCandidate]: ...
 
     async def approve(
         self,
@@ -76,6 +91,52 @@ class MentorApprover(Protocol):
         display_name_preference: DisplayNamePreference,
         contract_ids: list[uuid.UUID],
     ) -> MentorMatch: ...
+
+
+class HasId(Protocol):
+    @property
+    def id(self) -> uuid.UUID: ...
+
+
+class CohortScopeCatalog(Protocol):
+    """academy `AcademyCatalog`: 과정 범위를 기수로 펼친다."""
+
+    async def cohorts_in_scope(
+        self,
+        *,
+        all_cohorts: bool,
+        bootcamp_ids: Collection[uuid.UUID] = (),
+        cohort_ids: Collection[uuid.UUID] = (),
+    ) -> Collection[HasId]: ...
+
+
+CANDIDATE_LIMIT = 20
+
+
+@dataclass(frozen=True, slots=True)
+class StudentCandidate:
+    candidate: ClaimCandidate
+    name_match: bool
+    phone_match: bool
+    same_cohort: bool  # 신청 기수의 명단인지
+
+
+@dataclass(frozen=True, slots=True)
+class MentorContractCandidate:
+    candidate: ContractCandidate
+    name_match: bool
+    phone_match: bool
+
+
+@dataclass(frozen=True, slots=True)
+class SignupCandidates:
+    signup_type: MemberSignupType
+    students: list[StudentCandidate]
+    contracts: list[MentorContractCandidate]
+
+
+def _digits(value: str | None) -> str:
+    return "".join(ch for ch in value or "" if ch.isdigit())
 
 
 @dataclass(frozen=True, slots=True)
@@ -145,6 +206,64 @@ class SignupReviewService:
         )
         users = {u.id: u for u in await self._users.list_by_ids([s.user_id for s in signups])}
         return [SignupView(s, users[s.user_id]) for s in signups if s.user_id in users], total
+
+    async def candidates(
+        self,
+        user_id: uuid.UUID,
+        *,
+        actor_id: uuid.UUID,
+        query: str | None,
+        cohorts: CohortScopeCatalog,
+    ) -> SignupCandidates:
+        """수동 승인 후보 (A82). 수강생은 승인자 담당 범위의 미가입 명단, 멘토는 미연결 계약.
+        일치(이름·휴대폰)가 많은 순, 수강생은 신청 기수가 먼저다."""
+        user, signup = await self._pending(user_id, None)
+        query = (query or "").strip() or None
+        phone = _digits(user.phone_number)
+        if signup.signup_type is MemberSignupType.STUDENT:
+            await self._require_student_scope(actor_id, signup)
+            scope = await self._permissions.scope_of(actor_id, APPROVE)
+            cohort_ids: set[uuid.UUID] | None = None
+            if not scope.is_global:
+                cohort_ids = set(scope.cohort_ids) | {
+                    c.id
+                    for c in await cohorts.cohorts_in_scope(
+                        all_cohorts=False, bootcamp_ids=scope.bootcamp_ids
+                    )
+                }
+            found = await self._students.candidates(
+                cohort_ids=cohort_ids,
+                name=user.name,
+                phone_number=phone or None,
+                query=query,
+                limit=CANDIDATE_LIMIT,
+            )
+            students = [
+                StudentCandidate(
+                    candidate=c,
+                    name_match=c.name == user.name,
+                    phone_match=bool(phone) and _digits(c.phone_number) == phone,
+                    same_cohort=c.cohort_id == signup.requested_cohort_id,
+                )
+                for c in found
+            ]
+            students.sort(
+                key=lambda s: (-(s.name_match + s.phone_match), not s.same_cohort, s.candidate.name)
+            )
+            return SignupCandidates(signup.signup_type, students, [])
+        await self._require_contract_manage(actor_id)
+        contracts = [
+            MentorContractCandidate(
+                candidate=c,
+                name_match=c.contractor_name == user.name,
+                phone_match=bool(phone) and _digits(c.contractor_phone) == phone,
+            )
+            for c in await self._mentors.candidate_contracts(
+                name=user.name, phone_number=phone or None, query=query, limit=CANDIDATE_LIMIT
+            )
+        ]
+        contracts.sort(key=lambda c: (-(c.name_match + c.phone_match), c.candidate.contractor_name))
+        return SignupCandidates(signup.signup_type, [], contracts)
 
     async def approve_student(
         self, user_id: uuid.UUID, *, student_id: uuid.UUID, actor_id: uuid.UUID

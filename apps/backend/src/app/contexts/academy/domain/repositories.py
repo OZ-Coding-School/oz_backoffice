@@ -63,6 +63,19 @@ class CohortRepository(Protocol):
 
 
 class StudentRepository(Protocol):
+    async def search_claimable(
+        self,
+        *,
+        cohort_ids: Collection[uuid.UUID] | None,
+        name: str,
+        phone_number: str | None,
+        query: str | None,
+        limit: int,
+    ) -> list[Student]:
+        """미가입·원천 존재 명단 (수강 상태 무관). cohort_ids가 None이면 전체.
+        query가 없으면 이름 또는 휴대폰이 같은 것, 있으면 이름·휴대폰에 query가 들어간 것."""
+        ...
+
     async def add(self, student: Student) -> None: ...
     async def save(self, student: Student) -> None: ...
     async def get(self, entity_id: uuid.UUID) -> Student | None: ...

@@ -860,6 +860,74 @@
         }
       }
     },
+    "/api/v1/admin/approvals/{user_id}/candidates": {
+      "get": {
+        "tags": [
+          "admin-approvals"
+        ],
+        "summary": "Candidates",
+        "description": "수동 승인 후보 (A82). q가 없으면 이름 또는 휴대폰이 같은 것, 최대 20개.",
+        "operationId": "candidates_api_v1_admin_approvals__user_id__candidates_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "이름·휴대폰",
+              "title": "Q"
+            },
+            "description": "이름·휴대폰"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidatesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/approvals/{user_id}/approve": {
       "post": {
         "tags": [
@@ -12493,6 +12561,30 @@
           },
           "signup": {
             "$ref": "#/components/schemas/MemberSignupResponse"
+          },
+          "requested_bootcamp_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Bootcamp Name",
+            "description": "신청 기수 과정명 (A82)"
+          },
+          "requested_cohort_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Cohort Number",
+            "description": "신청 기수 번호 (A82)"
           }
         },
         "type": "object",
@@ -13816,6 +13908,36 @@
         ],
         "title": "CancelBody"
       },
+      "CandidatesResponse": {
+        "properties": {
+          "signup_type": {
+            "$ref": "#/components/schemas/MemberSignupType"
+          },
+          "students": {
+            "items": {
+              "$ref": "#/components/schemas/StudentCandidateResponse"
+            },
+            "type": "array",
+            "title": "Students",
+            "description": "수강생 신청: 연결할 명단 후보"
+          },
+          "contracts": {
+            "items": {
+              "$ref": "#/components/schemas/ContractCandidateResponse"
+            },
+            "type": "array",
+            "title": "Contracts",
+            "description": "멘토 신청: 연결할 계약 후보"
+          }
+        },
+        "type": "object",
+        "required": [
+          "signup_type",
+          "students",
+          "contracts"
+        ],
+        "title": "CandidatesResponse"
+      },
       "ChangeBody": {
         "properties": {
           "topic": {
@@ -14226,6 +14348,69 @@
           "requester_label"
         ],
         "title": "ConflictResponse"
+      },
+      "ContractCandidateResponse": {
+        "properties": {
+          "contract_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Contract Id"
+          },
+          "contractor_name": {
+            "type": "string",
+            "title": "Contractor Name"
+          },
+          "contractor_phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contractor Phone"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Start Date"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "title": "End Date"
+          },
+          "name_match": {
+            "type": "boolean",
+            "title": "Name Match"
+          },
+          "phone_match": {
+            "type": "boolean",
+            "title": "Phone Match"
+          }
+        },
+        "type": "object",
+        "required": [
+          "contract_id",
+          "contractor_name",
+          "contractor_phone",
+          "title",
+          "status",
+          "start_date",
+          "end_date",
+          "name_match",
+          "phone_match"
+        ],
+        "title": "ContractCandidateResponse"
       },
       "ContractFields": {
         "properties": {
@@ -20411,6 +20596,88 @@
         ],
         "title": "StartBody",
         "description": "상대 하나: 팀(`team_id`), 수강생→멘토(`cohort_id`·`mentor_id`), 멘토→수강생(`student_id`)."
+      },
+      "StudentCandidateResponse": {
+        "properties": {
+          "student_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Student Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "phone_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone Number"
+          },
+          "cohort_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Cohort Id"
+          },
+          "bootcamp_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bootcamp Name"
+          },
+          "cohort_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cohort Number"
+          },
+          "enrollment_status": {
+            "type": "string",
+            "title": "Enrollment Status"
+          },
+          "name_match": {
+            "type": "boolean",
+            "title": "Name Match"
+          },
+          "phone_match": {
+            "type": "boolean",
+            "title": "Phone Match"
+          },
+          "same_cohort": {
+            "type": "boolean",
+            "title": "Same Cohort",
+            "description": "신청 기수의 명단"
+          }
+        },
+        "type": "object",
+        "required": [
+          "student_id",
+          "name",
+          "phone_number",
+          "cohort_id",
+          "bootcamp_name",
+          "cohort_number",
+          "enrollment_status",
+          "name_match",
+          "phone_match",
+          "same_cohort"
+        ],
+        "title": "StudentCandidateResponse"
       },
       "StudentStatus": {
         "type": "string",

@@ -50,6 +50,24 @@ class InMemoryContractRepository:
             if c.status is ContractStatus.ACTIVE and c.end_date < today
         ]
 
+    async def search_unlinked_mentor_contracts(
+        self, *, name: str, phone_number: str | None, query: str | None, limit: int
+    ) -> list[EducatorContract]:
+        def hit(c: EducatorContract) -> bool:
+            if query:
+                return query in c.contractor_name or (
+                    len(query) >= 3 and query in (c.contractor_phone or "")
+                )
+            return c.contractor_name == name or (
+                phone_number is not None and c.contractor_phone == phone_number
+            )
+
+        return [
+            dataclasses.replace(c)
+            for c in self.items.values()
+            if c.educator_type is EducatorType.MENTOR and c.mentor_id is None and hit(c)
+        ][:limit]
+
     async def find_unlinked_mentor_contracts(
         self, contractor_name: str, contractor_phone: str
     ) -> list[EducatorContract]:
