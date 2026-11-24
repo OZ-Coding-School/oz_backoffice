@@ -1,7 +1,7 @@
 # 33. FE-15c 직원·담당자
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 중)
+- 관련 PR: #131
 - 관련 결정: `docs/decisions.md` F62 (A17·A36·A62·A83·F58)
 - 이전 기록: [32. FE-15b 운영진 승인](32_staff_registration_approvals.md)
 
