@@ -151,6 +151,9 @@ class InMemoryCohortStaffRepository:
     def __init__(self, *staffs: CohortStaff) -> None:
         self.items = {s.id: s for s in staffs}
 
+    async def list_by_employees(self, employee_ids: list[uuid.UUID]) -> list[CohortStaff]:
+        return [s for s in self.items.values() if s.employee_id in employee_ids]
+
     async def add(self, staff: CohortStaff) -> None:
         self.items[staff.id] = staff
 
