@@ -8,11 +8,23 @@
 """
 
 import uuid
+from collections.abc import Collection
 from dataclasses import dataclass
 
 from app.contexts.academy.domain.entities import Student
 from app.contexts.academy.domain.repositories import StudentRepository
 from app.shared.errors import BusinessRuleViolation, NotFoundError
+
+
+@dataclass(frozen=True, slots=True)
+class ClaimCandidate:
+    """운영진 수동 승인 후보 명단 (A82)."""
+
+    student_id: uuid.UUID
+    name: str
+    phone_number: str | None
+    cohort_id: uuid.UUID
+    status: str  # 수강 상태
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,6 +51,30 @@ class StudentClaims:
         student.claim(user_id)
         await self._students.save(student)
         return ClaimOutcome(candidate_count=1, student_id=student.id)
+
+    async def candidates(
+        self,
+        *,
+        cohort_ids: Collection[uuid.UUID] | None,
+        name: str,
+        phone_number: str | None,
+        query: str | None,
+        limit: int,
+    ) -> list[ClaimCandidate]:
+        """운영진 수동 승인 후보 (A82): 미가입·원천 존재 명단, 수강 상태 무관 (A33)."""
+        students = await self._students.search_claimable(
+            cohort_ids=cohort_ids, name=name, phone_number=phone_number, query=query, limit=limit
+        )
+        return [
+            ClaimCandidate(
+                student_id=s.id,
+                name=s.name,
+                phone_number=s.phone_number,
+                cohort_id=s.cohort_id,
+                status=str(s.status),
+            )
+            for s in students
+        ]
 
     async def cohort_of_claimable(self, student_id: uuid.UUID) -> uuid.UUID:
         """운영진이 고른 명단이 연결 가능한지 확인하고 그 기수를 돌려준다 (P7-5, A33).

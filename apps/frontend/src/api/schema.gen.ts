@@ -361,6 +361,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/approvals/{user_id}/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Candidates
+         * @description 수동 승인 후보 (A82). q가 없으면 이름 또는 휴대폰이 같은 것, 최대 20개.
+         */
+        get: operations["candidates_api_v1_admin_approvals__user_id__candidates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/approvals/{user_id}/approve": {
         parameters: {
             query?: never;
@@ -3477,6 +3497,16 @@ export interface components {
             phone_number: string | null;
             approval_status: components["schemas"]["UserApprovalStatus"];
             signup: components["schemas"]["MemberSignupResponse"];
+            /**
+             * Requested Bootcamp Name
+             * @description 신청 기수 과정명 (A82)
+             */
+            requested_bootcamp_name?: string | null;
+            /**
+             * Requested Cohort Number
+             * @description 신청 기수 번호 (A82)
+             */
+            requested_cohort_number?: number | null;
         };
         /** ApplicantSummary */
         ApplicantSummary: {
@@ -4031,6 +4061,20 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** CandidatesResponse */
+        CandidatesResponse: {
+            signup_type: components["schemas"]["MemberSignupType"];
+            /**
+             * Students
+             * @description 수강생 신청: 연결할 명단 후보
+             */
+            students: components["schemas"]["StudentCandidateResponse"][];
+            /**
+             * Contracts
+             * @description 멘토 신청: 연결할 계약 후보
+             */
+            contracts: components["schemas"]["ContractCandidateResponse"][];
+        };
         /**
          * ChangeBody
          * @description 같은 멘토·같은 방식(1:1/팀)에서 내용만 바꾼다.
@@ -4225,6 +4269,36 @@ export interface components {
              * @description 팀이면 팀 이름, 1:1이면 수강생 이름 (A79)
              */
             requester_label: string;
+        };
+        /** ContractCandidateResponse */
+        ContractCandidateResponse: {
+            /**
+             * Contract Id
+             * Format: uuid
+             */
+            contract_id: string;
+            /** Contractor Name */
+            contractor_name: string;
+            /** Contractor Phone */
+            contractor_phone: string | null;
+            /** Title */
+            title: string;
+            /** Status */
+            status: string;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            /**
+             * End Date
+             * Format: date
+             */
+            end_date: string;
+            /** Name Match */
+            name_match: boolean;
+            /** Phone Match */
+            phone_match: boolean;
         };
         /** ContractFields */
         ContractFields: {
@@ -6607,6 +6681,38 @@ export interface components {
             /** Student Id */
             student_id?: string | null;
         };
+        /** StudentCandidateResponse */
+        StudentCandidateResponse: {
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /** Name */
+            name: string;
+            /** Phone Number */
+            phone_number: string | null;
+            /**
+             * Cohort Id
+             * Format: uuid
+             */
+            cohort_id: string;
+            /** Bootcamp Name */
+            bootcamp_name: string | null;
+            /** Cohort Number */
+            cohort_number: number | null;
+            /** Enrollment Status */
+            enrollment_status: string;
+            /** Name Match */
+            name_match: boolean;
+            /** Phone Match */
+            phone_match: boolean;
+            /**
+             * Same Cohort
+             * @description 신청 기수의 명단
+             */
+            same_cohort: boolean;
+        };
         /**
          * StudentStatus
          * @description HRD-Net 상태 (Airtable `HRD상태`를 매핑, roster.py).
@@ -7845,6 +7951,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_ApplicantResponse_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    candidates_api_v1_admin_approvals__user_id__candidates_get: {
+        parameters: {
+            query?: {
+                /** @description 이름·휴대폰 */
+                q?: string | null;
+            };
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidatesResponse"];
                 };
             };
             /** @description Validation Error */

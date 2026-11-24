@@ -27,6 +27,13 @@ class EducatorContractRepository(Protocol):
     ) -> tuple[list[EducatorContract], int]: ...
     async def list_active_ended_before(self, today: date) -> list[EducatorContract]: ...
     async def count_by_mentors(self, mentor_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]: ...
+    async def search_unlinked_mentor_contracts(
+        self, *, name: str, phone_number: str | None, query: str | None, limit: int
+    ) -> list[EducatorContract]:
+        """멘토에 연결되지 않은 MENTOR 계약 (상태 무관).
+        query가 없으면 이름 또는 휴대폰이 같은 것."""
+        ...
+
     async def find_unlinked_mentor_contracts(
         self, contractor_name: str, contractor_phone: str
     ) -> list[EducatorContract]:

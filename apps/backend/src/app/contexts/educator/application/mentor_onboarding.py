@@ -9,6 +9,7 @@ MENTOR 역할은 멘토 배정(P8)에서 부여한다(A17). 트랜잭션은 호�
 
 import uuid
 from dataclasses import dataclass
+from datetime import date
 
 from app.contexts.educator.domain.entities import EducatorContract
 from app.contexts.educator.domain.enums import DisplayNamePreference, EducatorType
@@ -21,6 +22,19 @@ from app.shared.errors import BusinessRuleViolation, NotFoundError
 class MentorMatch:
     contract_ids: list[uuid.UUID]
     mentor_id: uuid.UUID | None  # 만든(또는 이미 있던) 멘토 프로필
+
+
+@dataclass(frozen=True, slots=True)
+class ContractCandidate:
+    """운영진 수동 승인 후보 계약 (A82)."""
+
+    contract_id: uuid.UUID
+    contractor_name: str
+    contractor_phone: str | None
+    title: str
+    status: str
+    start_date: date
+    end_date: date
 
 
 class MentorOnboarding:
@@ -41,6 +55,26 @@ class MentorOnboarding:
         if not contracts:
             return MentorMatch(contract_ids=[], mentor_id=None)
         return await self._onboard(user_id, nickname, display_name_preference, contracts)
+
+    async def candidate_contracts(
+        self, *, name: str, phone_number: str | None, query: str | None, limit: int
+    ) -> list[ContractCandidate]:
+        """운영진 수동 승인 후보 (A82): 미연결 MENTOR 계약, 상태 무관 (A33)."""
+        contracts = await self._contracts.search_unlinked_mentor_contracts(
+            name=name, phone_number=phone_number, query=query, limit=limit
+        )
+        return [
+            ContractCandidate(
+                contract_id=c.id,
+                contractor_name=c.contractor_name,
+                contractor_phone=c.contractor_phone,
+                title=c.title,
+                status=str(c.status),
+                start_date=c.start_date,
+                end_date=c.end_date,
+            )
+            for c in contracts
+        ]
 
     async def approve(
         self,

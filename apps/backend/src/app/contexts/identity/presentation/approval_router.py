@@ -11,7 +11,7 @@ POST /me/member-signup                         → 반려 후 재신청 (자동 
 """
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Any, cast
 
 from fastapi import APIRouter, Depends, Query, Request, status
@@ -31,6 +31,7 @@ from app.contexts.identity.application.signup_matching import (
     SignupMatcher,
 )
 from app.contexts.identity.application.signup_review import (
+    CohortScopeCatalog,
     MemberSignupSelfService,
     MentorApprover,
     ResubmitForm,
@@ -146,9 +147,11 @@ class ApplicantResponse(BaseModel):
     phone_number: str | None
     approval_status: UserApprovalStatus
     signup: MemberSignupResponse
+    requested_bootcamp_name: str | None = Field(default=None, description="신청 기수 과정명 (A82)")
+    requested_cohort_number: int | None = Field(default=None, description="신청 기수 번호 (A82)")
 
     @classmethod
-    def of(cls, view: SignupView) -> "ApplicantResponse":
+    def of(cls, view: SignupView, label: tuple[str, int] | None = None) -> "ApplicantResponse":
         return cls(
             user_id=view.user.id,
             name=view.user.name,
@@ -156,7 +159,40 @@ class ApplicantResponse(BaseModel):
             phone_number=view.user.phone_number,
             approval_status=view.user.approval_status,
             signup=MemberSignupResponse.of(view.signup),
+            requested_bootcamp_name=label[0] if label else None,
+            requested_cohort_number=label[1] if label else None,
         )
+
+
+class StudentCandidateResponse(BaseModel):
+    student_id: uuid.UUID
+    name: str
+    phone_number: str | None
+    cohort_id: uuid.UUID
+    bootcamp_name: str | None
+    cohort_number: int | None
+    enrollment_status: str
+    name_match: bool
+    phone_match: bool
+    same_cohort: bool = Field(description="신청 기수의 명단")
+
+
+class ContractCandidateResponse(BaseModel):
+    contract_id: uuid.UUID
+    contractor_name: str
+    contractor_phone: str | None
+    title: str
+    status: str
+    start_date: date
+    end_date: date
+    name_match: bool
+    phone_match: bool
+
+
+class CandidatesResponse(BaseModel):
+    signup_type: MemberSignupType
+    students: list[StudentCandidateResponse] = Field(description="수강생 신청: 연결할 명단 후보")
+    contracts: list[ContractCandidateResponse] = Field(description="멘토 신청: 연결할 계약 후보")
 
 
 class ApproveRequest(BaseModel):
@@ -182,6 +218,7 @@ class ResubmitRequest(BaseModel):
 async def list_pending(
     user: Approver,
     review: ReviewDep,
+    catalog: Annotated[AcademyCatalog, Depends(get_academy_catalog)],
     signup_type: MemberSignupType | None = None,
     cohort_id: uuid.UUID | None = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
@@ -191,8 +228,72 @@ async def list_pending(
     views, total = await review.list_pending(
         user.id, signup_type=signup_type, cohort_id=cohort_id, limit=limit, offset=offset
     )
+    labels = await catalog.cohort_labels(
+        {v.signup.requested_cohort_id for v in views if v.signup.requested_cohort_id}
+    )
+
+    def label(view: SignupView) -> tuple[str, int] | None:
+        found = (
+            labels.get(view.signup.requested_cohort_id) if view.signup.requested_cohort_id else None
+        )
+        return (found.bootcamp_name, found.cohort_number) if found else None
+
     return Page(
-        items=[ApplicantResponse.of(v) for v in views], total=total, limit=limit, offset=offset
+        items=[ApplicantResponse.of(v, label(v)) for v in views],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@admin_router.get("/{user_id}/candidates", response_model=CandidatesResponse)
+async def candidates(
+    user_id: uuid.UUID,
+    user: Approver,
+    review: ReviewDep,
+    catalog: Annotated[AcademyCatalog, Depends(get_academy_catalog)],
+    q: Annotated[str | None, Query(max_length=50, description="이름·휴대폰")] = None,
+) -> CandidatesResponse:
+    """수동 승인 후보 (A82). q가 없으면 이름 또는 휴대폰이 같은 것, 최대 20개."""
+    found = await review.candidates(
+        user_id, actor_id=user.id, query=q, cohorts=cast("CohortScopeCatalog", catalog)
+    )
+    labels = await catalog.cohort_labels({s.candidate.cohort_id for s in found.students})
+    return CandidatesResponse(
+        signup_type=found.signup_type,
+        students=[
+            StudentCandidateResponse(
+                student_id=s.candidate.student_id,
+                name=s.candidate.name,
+                phone_number=s.candidate.phone_number,
+                cohort_id=s.candidate.cohort_id,
+                bootcamp_name=labels[s.candidate.cohort_id].bootcamp_name
+                if s.candidate.cohort_id in labels
+                else None,
+                cohort_number=labels[s.candidate.cohort_id].cohort_number
+                if s.candidate.cohort_id in labels
+                else None,
+                enrollment_status=s.candidate.status,
+                name_match=s.name_match,
+                phone_match=s.phone_match,
+                same_cohort=s.same_cohort,
+            )
+            for s in found.students
+        ],
+        contracts=[
+            ContractCandidateResponse(
+                contract_id=c.candidate.contract_id,
+                contractor_name=c.candidate.contractor_name,
+                contractor_phone=c.candidate.contractor_phone,
+                title=c.candidate.title,
+                status=c.candidate.status,
+                start_date=c.candidate.start_date,
+                end_date=c.candidate.end_date,
+                name_match=c.name_match,
+                phone_match=c.phone_match,
+            )
+            for c in found.contracts
+        ],
     )
 
 

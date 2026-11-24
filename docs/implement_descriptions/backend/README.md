@@ -84,3 +84,4 @@
 | 80 | [CI 시간 줄이기](80_ci_speedup.md) | 완료 (#121) |
 | 81 | [CI 변경 감지: 이전 커밋이 통과했을 때만 건너뛰기](81_ci_change_base_fix.md) | 완료 (#123) |
 | 82 | [운영진 유효 권한·담당 기수 (BE-3)](82_staff_access.md) | 완료 (#125) |
+| 83 | [가입 수동 승인 후보 (BE-3b)](83_approval_candidates.md) | 완료 (#127) |

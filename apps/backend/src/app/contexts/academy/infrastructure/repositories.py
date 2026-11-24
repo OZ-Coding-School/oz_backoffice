@@ -1,8 +1,11 @@
 """academy 리포지토리 구현 (Tortoise)."""
 
+import re
 import uuid
 from collections.abc import Collection
 from datetime import datetime
+
+from tortoise.expressions import Q
 
 from app.contexts.academy.domain.entities import (
     Bootcamp,
@@ -218,6 +221,32 @@ class TortoiseStudentRepository(TortoiseRepository[Student, StudentModel]):
     async def get_by_record_id(self, airtable_record_id: str) -> Student | None:
         row = await StudentModel.get_or_none(airtable_record_id=airtable_record_id)
         return self.to_entity(row) if row else None
+
+    async def search_claimable(
+        self,
+        *,
+        cohort_ids: Collection[uuid.UUID] | None,
+        name: str,
+        phone_number: str | None,
+        query: str | None,
+        limit: int,
+    ) -> list[Student]:
+        rows = StudentModel.filter(user_id__isnull=True, is_removed_in_source=False)
+        if cohort_ids is not None:
+            if not cohort_ids:
+                return []
+            rows = rows.filter(cohort_id__in=list(cohort_ids))
+        if query:
+            cond = Q(name__icontains=query)
+            digits = re.sub(r"\D", "", query)
+            if len(digits) >= 3:
+                cond |= Q(phone_number__contains=digits)
+        else:
+            cond = Q(name=name)
+            if phone_number:
+                cond |= Q(phone_number=phone_number)
+        found = await rows.filter(cond).order_by("name", "id").limit(limit)
+        return [self.to_entity(row) for row in found]
 
     async def find_claimable_by_name_and_phone(self, name: str, phone_number: str) -> list[Student]:
         rows = await StudentModel.filter(

@@ -1,5 +1,6 @@
 """educator 리포지토리 구현 (Tortoise)."""
 
+import re
 import uuid
 from datetime import date
 
@@ -85,6 +86,24 @@ class TortoiseEducatorContractRepository(
             status=ContractStatus.ACTIVE, end_date__lt=today
         ).order_by("end_date", "id")
         return [self.to_entity(row) for row in rows]
+
+    async def search_unlinked_mentor_contracts(
+        self, *, name: str, phone_number: str | None, query: str | None, limit: int
+    ) -> list[EducatorContract]:
+        rows = EducatorContractModel.filter(
+            educator_type=EducatorType.MENTOR, mentor_id__isnull=True
+        )
+        if query:
+            cond = Q(contractor_name__icontains=query)
+            digits = re.sub(r"\D", "", query)
+            if len(digits) >= 3:
+                cond |= Q(contractor_phone__contains=digits)
+        else:
+            cond = Q(contractor_name=name)
+            if phone_number:
+                cond |= Q(contractor_phone=phone_number)
+        found = await rows.filter(cond).order_by("contractor_name", "-created_at").limit(limit)
+        return [self.to_entity(row) for row in found]
 
     async def find_unlinked_mentor_contracts(
         self, contractor_name: str, contractor_phone: str
