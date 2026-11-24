@@ -22,3 +22,7 @@ export function roleLines(roles: Me["roles"], cohorts: readonly StaffCohort[]): 
   });
   return [...new Set(lines)];
 }
+
+export function staffCohortLabel(c: Pick<StaffCohort, "bootcamp_name" | "cohort_number">): string {
+  return `${c.bootcamp_name} ${c.cohort_number}기`;
+}

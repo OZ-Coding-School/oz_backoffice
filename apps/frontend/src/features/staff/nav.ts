@@ -1,4 +1,4 @@
-import { LayoutGrid, type LucideIcon } from "lucide-react";
+import { LayoutGrid, ShieldCheck, UserCheck, type LucideIcon } from "lucide-react";
 
 import { hasPermission, type StaffAccess } from "./api";
 
@@ -6,13 +6,18 @@ export interface StaffNavItem {
   to: string;
   label: string;
   icon: LucideIcon;
-  /** 이 권한이 있어야 보인다 (없으면 모두) */
-  permission?: string;
+  /** 이 권한 중 하나라도 있어야 보인다 (없으면 모두) */
+  permissions?: string[];
+  /** 메뉴 배지 (대기 건수) */
+  badge?: "approvals";
 }
 
 export interface StaffModule {
   key: string;
+  /** 레일의 짧은 이름 */
   label: string;
+  /** 모듈 메뉴 제목·위치 (없으면 label) */
+  title?: string;
   /** 모듈 메뉴 제목 아래 설명 */
   description: string;
   icon: LucideIcon;
@@ -31,13 +36,30 @@ const MODULES: StaffModule[] = [
     icon: LayoutGrid,
     items: [{ to: "/admin", label: "홈", icon: LayoutGrid }],
   },
+  {
+    key: "members",
+    label: "회원",
+    title: "회원·권한",
+    description: "회원 가입·운영진 권한",
+    icon: ShieldCheck,
+    items: [
+      {
+        to: "/admin/members/approvals",
+        label: "가입 승인",
+        icon: UserCheck,
+        // 수강생은 user.approve, 멘토는 contract.manage (A33)
+        permissions: ["user.approve", "contract.manage"],
+        badge: "approvals",
+      },
+    ],
+  },
 ];
 
 /** 권한으로 거른 모듈 (메뉴가 하나도 없는 모듈은 뺀다, F17) */
 export function staffModules(access: Pick<StaffAccess, "permissions">): StaffModule[] {
   return MODULES.map((m) => ({
     ...m,
-    items: m.items.filter((item) => !item.permission || hasPermission(access, item.permission)),
+    items: m.items.filter((item) => !item.permissions || item.permissions.some((code) => hasPermission(access, code))),
   })).filter((m) => m.items.length > 0);
 }
 
