@@ -87,3 +87,4 @@
 | 83 | [가입 수동 승인 후보 (BE-3b)](83_approval_candidates.md) | 완료 (#127) |
 | 84 | [직원 목록 검색·팀 필터·담당 (BE-3c)](84_employee_list_assignments.md) | 완료 (#130) |
 | 85 | [역할별 권한 DB 판정·역할 관리 API (BE-3d)](85_role_permission_management.md) | 완료 (#132) |
+| 86 | [역할 보유자 목록·직접 부여 확장 (BE-3e)](86_role_holders.md) | PR 진행 중 |
