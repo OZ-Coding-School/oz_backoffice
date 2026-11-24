@@ -81,3 +81,4 @@
 | 77 | [기록 제출 시 잔여 부족 처리 (BE-2l)](77_record_overtime_shortfall.md) | 완료 (#113) |
 | 78 | [불가 시간 충돌 응답에 주제·신청자 (BE-2m)](78_schedule_conflict_detail.md) | 완료 (#116) |
 | 79 | [정산 응답에 기수·항목 상대·주제 (BE-2n)](79_settlement_labels.md) | 완료 (#119) |
+| 80 | [CI 시간 줄이기](80_ci_speedup.md) | PR 진행 중 |
