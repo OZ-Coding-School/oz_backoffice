@@ -45,7 +45,8 @@ from app.shared.errors import NotFoundError, ServiceUnavailableError
 
 router = APIRouter(prefix="/admin", tags=["admin-rosters"])
 
-PERMISSION = "roster.sync"
+READ = "academy.roster.read"
+SYNC = "academy.roster.sync"
 
 
 def get_roster_sync_service(
@@ -187,7 +188,7 @@ async def _start(
     "/rosters/sync", response_model=RosterSyncRunResponse, status_code=status.HTTP_202_ACCEPTED
 )
 async def sync_all_rosters(
-    user: Annotated[User, Depends(require_permission(PERMISSION))],
+    user: Annotated[User, Depends(require_permission(SYNC))],
     service: SyncServiceDep,
     dispatcher: DispatcherDep,
 ) -> RosterSyncRunResponse:
@@ -202,7 +203,7 @@ async def sync_all_rosters(
 )
 async def sync_bootcamp_rosters(
     bootcamp_id: uuid.UUID,
-    user: Annotated[User, Depends(require_permission(PERMISSION, bootcamp_param="bootcamp_id"))],
+    user: Annotated[User, Depends(require_permission(SYNC, bootcamp_param="bootcamp_id"))],
     service: SyncServiceDep,
     dispatcher: DispatcherDep,
 ) -> RosterSyncRunResponse:
@@ -218,7 +219,7 @@ async def sync_bootcamp_rosters(
 )
 async def sync_cohort_rosters(
     cohort_id: uuid.UUID,
-    user: Annotated[User, Depends(require_permission(PERMISSION, cohort_param="cohort_id"))],
+    user: Annotated[User, Depends(require_permission(SYNC, cohort_param="cohort_id"))],
     service: SyncServiceDep,
     dispatcher: DispatcherDep,
 ) -> RosterSyncRunResponse:
@@ -236,7 +237,7 @@ def _target(run: RosterSyncRun) -> PermissionTarget:
 
 @router.get("/rosters/sync-runs", response_model=RosterSyncRunPage)
 async def list_sync_runs(
-    user: Annotated[User, Depends(require_permission(PERMISSION, any_scope=True))],
+    user: Annotated[User, Depends(require_permission(READ, any_scope=True))],
     queries: QueriesDep,
     checker: PermissionCheckerDep,
     before: uuid.UUID | None = None,
@@ -244,7 +245,7 @@ async def list_sync_runs(
 ) -> RosterSyncRunPage:
     """최근 실행부터. 담당 범위 밖의 실행은 빠지므로 한 페이지가 limit보다 적을 수 있다."""
     runs = await queries.recent_runs(before=before, limit=limit)
-    visible = [r for r in runs if await checker.has(user.id, PERMISSION, _target(r))]
+    visible = [r for r in runs if await checker.has(user.id, READ, _target(r))]
     return RosterSyncRunPage(
         items=[RosterSyncRunResponse.of(r) for r in visible],
         next_before=runs[-1].id if len(runs) == limit else None,
@@ -254,12 +255,12 @@ async def list_sync_runs(
 @router.get("/rosters/sync-runs/{run_id}", response_model=RosterSyncRunResponse)
 async def get_sync_run(
     run_id: uuid.UUID,
-    user: Annotated[User, Depends(require_permission(PERMISSION, any_scope=True))],
+    user: Annotated[User, Depends(require_permission(READ, any_scope=True))],
     queries: QueriesDep,
     checker: PermissionCheckerDep,
 ) -> RosterSyncRunResponse:
     run = await queries.get_run(run_id)
-    if not await checker.has(user.id, PERMISSION, _target(run)):
+    if not await checker.has(user.id, READ, _target(run)):
         raise NotFoundError("동기화 실행을 찾을 수 없습니다.", code="roster_sync_run_not_found")
     return RosterSyncRunResponse.of(run)
 
@@ -267,7 +268,7 @@ async def get_sync_run(
 @router.get("/cohorts/{cohort_id}/rosters", response_model=list[RosterStudentResponse])
 async def list_cohort_rosters(
     cohort_id: uuid.UUID,
-    _: Annotated[User, Depends(require_permission(PERMISSION, cohort_param="cohort_id"))],
+    _: Annotated[User, Depends(require_permission(READ, cohort_param="cohort_id"))],
     queries: QueriesDep,
     claimed: bool | None = None,
     include_removed: bool = False,
@@ -284,7 +285,7 @@ async def list_cohort_rosters(
 
 @router.get("/rosters/unmapped", response_model=UnmappedRecordsResponse)
 async def latest_unmapped_records(
-    _: Annotated[User, Depends(require_permission(PERMISSION))],
+    _: Annotated[User, Depends(require_permission(READ))],
     queries: QueriesDep,
 ) -> UnmappedRecordsResponse:
     """가장 최근에 성공한 전체 동기화에서 처리하지 못한 레코드 (운영진 확인 대상)."""

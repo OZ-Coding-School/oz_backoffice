@@ -47,7 +47,12 @@ me_router = APIRouter(prefix="/me/mentor-assignments", tags=["mentor-assignments
 CohortManager = Annotated[
     User, Depends(require_permission("mentoring.assignment.manage", cohort_param="cohort_id"))
 ]
-MentorManager = Annotated[User, Depends(require_permission("mentor.manage", any_scope=True))]
+CohortReader = Annotated[
+    User, Depends(require_permission("mentoring.assignment.read", cohort_param="cohort_id"))
+]
+MentorManager = Annotated[
+    User, Depends(require_permission("educator.mentor.manage", any_scope=True))
+]
 AssignmentPayUnit = Literal[PayUnit.HOURLY, PayUnit.PER_SESSION]
 
 
@@ -250,7 +255,7 @@ class BulkReactivateResponse(BaseModel):
 )
 async def list_assignments(
     cohort_id: uuid.UUID,
-    _: CohortManager,
+    _: CohortReader,
     service: ServiceDep,
     presenter: PresenterDep,
     include_inactive: bool = False,

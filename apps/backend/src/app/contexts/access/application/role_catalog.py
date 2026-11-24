@@ -8,20 +8,13 @@
 import uuid
 from dataclasses import dataclass
 
-from app.contexts.access.domain.catalog import GLOBAL_ONLY_PERMISSIONS, PERMISSIONS
+from app.contexts.access.domain.catalog import PERMISSION_DEFINITIONS, PermissionDefinition
 from app.contexts.access.domain.enums import RoleScopeKind
 from app.contexts.access.domain.repositories import RoleRepository
 from app.contexts.access.domain.roles import Role
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.core.uow import UnitOfWork
 from app.shared.errors import BusinessRuleViolation, ConflictError, NotFoundError
-
-
-@dataclass(frozen=True, slots=True)
-class PermissionInfo:
-    code: str
-    description: str
-    global_only: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,7 +25,7 @@ class RoleSummary:
 
 @dataclass(frozen=True, slots=True)
 class RoleCatalogView:
-    permissions: list[PermissionInfo]
+    permissions: list[PermissionDefinition]
     roles: list[RoleSummary]
 
 
@@ -55,10 +48,7 @@ class RoleCatalogAdministration:
     async def catalog(self) -> RoleCatalogView:
         counts = await self._roles.holder_counts()
         return RoleCatalogView(
-            permissions=[
-                PermissionInfo(code, description, code in GLOBAL_ONLY_PERMISSIONS)
-                for code, description in PERMISSIONS.items()
-            ],
+            permissions=list(PERMISSION_DEFINITIONS),
             roles=[
                 RoleSummary(role, counts.get(role.code, 0))
                 for role in await self._roles.list_all()

@@ -42,7 +42,8 @@ from app.integrations.s3 import S3Storage
 me_router = APIRouter(prefix="/me/mentor-profile", tags=["mentor-profile"])
 admin_router = APIRouter(prefix="/admin/mentors", tags=["admin-mentors"])
 
-Manager = Annotated[User, Depends(require_permission("mentor.manage", any_scope=True))]
+Manager = Annotated[User, Depends(require_permission("educator.mentor.manage", any_scope=True))]
+Reader = Annotated[User, Depends(require_permission("educator.mentor.read", any_scope=True))]
 
 
 def get_mentor_profile_service(
@@ -192,7 +193,7 @@ async def delete_my_image(
 # ---------------------------------------------------------------- 운영진
 @admin_router.get("", response_model=Page[MentorListItem])
 async def list_mentors(
-    _: Manager,
+    _: Reader,
     profiles: ProfilesDep,
     users: UsersDep,
     q: Annotated[str | None, Query(max_length=50, description="이름·이메일·휴대폰·닉네임")] = None,
@@ -230,7 +231,7 @@ async def list_mentors(
 
 @admin_router.get("/{mentor_id}/profile", response_model=MentorProfileResponse)
 async def get_mentor_profile(
-    mentor_id: uuid.UUID, _: Manager, profiles: ProfilesDep, users: UsersDep
+    mentor_id: uuid.UUID, _: Reader, profiles: ProfilesDep, users: UsersDep
 ) -> MentorProfileResponse:
     return await _profile(await profiles.get(mentor_id), profiles, users)
 

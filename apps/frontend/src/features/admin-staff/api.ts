@@ -111,7 +111,7 @@ export function useRemoveStaff(t: StaffTarget) {
   });
 }
 
-/** 직원 소속 수정 (org.manage) */
+/** 직원 소속 수정 (org.employee.manage) */
 export function useUpdateEmployee(id: string) {
   const invalidate = useInvalidate();
   return useMutation({

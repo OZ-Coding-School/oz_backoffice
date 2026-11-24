@@ -1,7 +1,7 @@
 """access 인메모리 리포지토리."""
 
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 
 from app.contexts.access.domain.catalog import (
@@ -26,7 +26,12 @@ class InMemoryRoleCatalogRepository:
         self.roles: dict[str, frozenset[str]] = {}
         self.sync_count = 0
 
-    async def sync(self, roles: Sequence[RoleDefinition], permissions: dict[str, str]) -> None:
+    async def sync(
+        self,
+        roles: Sequence[RoleDefinition],
+        permissions: dict[str, str],
+        legacy: Mapping[str, frozenset[str]] | None = None,
+    ) -> None:
         self.sync_count += 1
         self.roles = {role.code: role.permissions for role in roles}
 

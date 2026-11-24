@@ -54,7 +54,7 @@ admin_router = APIRouter(
 )
 
 SessionReader = Annotated[
-    User, Depends(require_permission("mentoring.request.read", cohort_param="cohort_id"))
+    User, Depends(require_permission("mentoring.record.read", cohort_param="cohort_id"))
 ]
 
 

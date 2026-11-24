@@ -11,7 +11,10 @@ const ADMIN = {
   roles: [{ role: "SUPER_ADMIN", scope_type: "GLOBAL", scope_id: null, expires_at: null }],
 };
 const ACCESS = {
-  permissions: [{ code: "staff.assign", is_global: true, bootcamp_ids: [], cohort_ids: [] }],
+  permissions: [
+    { code: "staff.assignment.read", is_global: true, bootcamp_ids: [], cohort_ids: [] },
+    { code: "staff.assignment.manage", is_global: true, bootcamp_ids: [], cohort_ids: [] },
+  ],
   cohorts: [
     {
       id: "c12",

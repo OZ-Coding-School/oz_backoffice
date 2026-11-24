@@ -1,7 +1,7 @@
 """access 리포지토리 인터페이스."""
 
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import Protocol
 
@@ -11,7 +11,12 @@ from app.contexts.access.domain.roles import Role
 
 
 class RoleCatalogRepository(Protocol):
-    async def sync(self, roles: Sequence[RoleDefinition], permissions: dict[str, str]) -> None:
+    async def sync(
+        self,
+        roles: Sequence[RoleDefinition],
+        permissions: dict[str, str],
+        legacy: Mapping[str, frozenset[str]] | None = None,
+    ) -> None:
         """없는 권한·역할만 만든다 (멱등, A84).
 
         권한 설명은 정의대로 고친다. 역할을 새로 만들 때만 초기 권한 묶음을 넣고, 이미 있는

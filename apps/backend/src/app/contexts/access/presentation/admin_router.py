@@ -57,7 +57,8 @@ def get_role_administration(
     )
 
 
-Admin = Annotated[User, Depends(require_permission("role.assign"))]
+Admin = Annotated[User, Depends(require_permission("access.role.manage"))]
+AdminReader = Annotated[User, Depends(require_permission("access.role.read"))]
 ServiceDep = Annotated[RoleAdministration, Depends(get_role_administration)]
 
 
@@ -75,7 +76,10 @@ def _response(user_role: UserRole, now: datetime) -> UserRoleResponse:
 
 @router.get("", response_model=list[UserRoleResponse])
 async def list_user_roles(
-    user_id: uuid.UUID, _: Admin, service: ServiceDep, clock: Annotated[Clock, Depends(get_clock)]
+    user_id: uuid.UUID,
+    _: AdminReader,
+    service: ServiceDep,
+    clock: Annotated[Clock, Depends(get_clock)],
 ) -> list[UserRoleResponse]:
     """회원의 모든 역할 (만료된 것 포함)."""
     now = clock.now()

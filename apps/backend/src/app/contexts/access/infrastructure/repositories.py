@@ -1,7 +1,7 @@
 """access 리포지토리 구현 (Tortoise)."""
 
 import uuid
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 
 from tortoise.expressions import Q
@@ -21,10 +21,16 @@ from app.shared.errors import ConflictError
 
 
 class TortoiseRoleCatalogRepository:
-    async def sync(self, roles: Sequence[RoleDefinition], permissions: dict[str, str]) -> None:
+    async def sync(
+        self,
+        roles: Sequence[RoleDefinition],
+        permissions: dict[str, str],
+        legacy: Mapping[str, frozenset[str]] | None = None,
+    ) -> None:
         """없는 권한·역할만 만들고, 새 역할에만 초기 권한 묶음을 넣는다 (A84).
 
-        정의에서 빠진 역할·권한 행은 지우지 않는다 (부여 이력 보존).
+        예전 권한 코드(`legacy`)를 가진 역할에는 대응하는 새 코드를 붙이고 예전 코드를 지운다(A86).
+        정의에서 빠진 역할 행은 지우지 않는다 (부여 이력 보존).
         """
         by_code: dict[str, PermissionModel] = {}
         for code, description in permissions.items():
@@ -32,6 +38,21 @@ class TortoiseRoleCatalogRepository:
                 code=code, defaults={"description": description}
             )
             by_code[code] = permission
+
+        # 예전 코드 전환은 예전에만 있던 코드가 DB에 남아 있을 때 한 번만 한다. 새 목록에도 있는
+        # 코드(예: mentoring.request.read)는 전환 뒤 화면에서 고친 값을 다시 덮지 않기 위해서다.
+        retired = [code for code in (legacy or {}) if code not in permissions]
+        if legacy and await PermissionModel.filter(code__in=retired).exists():
+            for role in await RoleModel.filter(permissions__code__in=list(legacy)).distinct():
+                held = await role.permissions.all()
+                current = {p.code for p in held}
+                wanted = set().union(*(legacy[c] for c in current if c in legacy)) - current
+                if wanted:
+                    await role.permissions.add(*[by_code[c] for c in sorted(wanted)])
+                old = [p for p in held if p.code in retired]
+                if old:
+                    await role.permissions.remove(*old)
+            await PermissionModel.filter(code__in=retired).delete()
 
         for definition in roles:
             role, created = await RoleModel.get_or_create(

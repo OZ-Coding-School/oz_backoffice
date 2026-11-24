@@ -50,6 +50,9 @@ me_router = APIRouter(prefix="/me/mentoring-teams", tags=["mentoring-teams"])
 TeamManager = Annotated[
     User, Depends(require_permission("mentoring.team.manage", cohort_param="cohort_id"))
 ]
+TeamReader = Annotated[
+    User, Depends(require_permission("mentoring.team.read", cohort_param="cohort_id"))
+]
 
 
 def get_team_service(
@@ -262,7 +265,7 @@ PresenterDep = Annotated[Presenter, Depends(Presenter)]
 @admin_router.get("", response_model=list[TeamResponse])
 async def list_teams(
     cohort_id: uuid.UUID,
-    _: TeamManager,
+    _: TeamReader,
     service: ServiceDep,
     presenter: PresenterDep,
 ) -> list[TeamResponse]:
@@ -273,7 +276,7 @@ async def list_teams(
 @admin_router.get("/unassigned-students", response_model=list[StudentSummary])
 async def list_unassigned_students(
     cohort_id: uuid.UUID,
-    _: TeamManager,
+    _: TeamReader,
     service: ServiceDep,
 ) -> list[StudentSummary]:
     """팀이 없는 수강 중 수강생 (가입 여부 무관, 이름순)."""

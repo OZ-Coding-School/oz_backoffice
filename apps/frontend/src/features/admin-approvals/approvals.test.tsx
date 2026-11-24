@@ -20,8 +20,10 @@ const ADMIN = makeMe({
 
 const ACCESS: StaffAccess = {
   permissions: [
-    { code: "user.approve", is_global: true, bootcamp_ids: [], cohort_ids: [] },
-    { code: "contract.manage", is_global: true, bootcamp_ids: [], cohort_ids: [] },
+    { code: "member.approval.read", is_global: true, bootcamp_ids: [], cohort_ids: [] },
+    { code: "member.approval.manage", is_global: true, bootcamp_ids: [], cohort_ids: [] },
+    { code: "educator.contract.read", is_global: true, bootcamp_ids: [], cohort_ids: [] },
+    { code: "educator.contract.manage", is_global: true, bootcamp_ids: [], cohort_ids: [] },
   ],
   cohorts: [
     {

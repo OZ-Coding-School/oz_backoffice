@@ -8,6 +8,7 @@ import { ErrorState } from "@/components/error-state";
 import { LoadMore } from "@/components/load-more";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { hasPermission, staffAccessQuery } from "@/features/staff/api";
 import { Spinner } from "@/components/ui/spinner";
 import { maskPhone } from "@/features/profile/mask";
 import { StaffCohortSelect } from "@/features/staff/components/staff-cohort-select";
@@ -31,6 +32,11 @@ export function ApprovalsPage({ tab, cohortId }: { tab: ApprovalTab; cohortId: s
   const mentors = useQuery(approvalCountQuery("MENTOR"));
   const navigate = useNavigate();
   const [action, setAction] = useState<Action>(null);
+  const access = useQuery(staffAccessQuery);
+  // 수강생은 회원 가입 승인 관리, 멘토는 계약 관리가 있어야 승인·반려 (A33·A86)
+  const canDecide = access.data
+    ? hasPermission(access.data, tab === "student" ? "member.approval.manage" : "educator.contract.manage")
+    : false;
   const items = list.data?.pages.flatMap((p) => p.items) ?? [];
   const counts = { student: students.data, mentor: mentors.data };
 
@@ -112,9 +118,11 @@ export function ApprovalsPage({ tab, cohortId }: { tab: ApprovalTab; cohortId: s
                 <th scope="col" className="w-24 px-4 py-2.5 font-normal">
                   신청일
                 </th>
-                <th scope="col" className="w-40 px-4 py-2.5">
-                  <span className="sr-only">동작</span>
-                </th>
+                {canDecide ? (
+                  <th scope="col" className="w-40 px-4 py-2.5">
+                    <span className="sr-only">동작</span>
+                  </th>
+                ) : null}
               </tr>
             </thead>
             <tbody>
@@ -130,25 +138,27 @@ export function ApprovalsPage({ tab, cohortId }: { tab: ApprovalTab; cohortId: s
                       <Badge variant={match.badge}>{match.label}</Badge>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{appliedAt(a)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          aria-label={`${a.name} 반려`}
-                          onClick={() => setAction({ kind: "reject", applicant: a })}
-                        >
-                          반려
-                        </Button>
-                        <Button
-                          size="sm"
-                          aria-label={`${a.name} 승인`}
-                          onClick={() => setAction({ kind: "approve", applicant: a })}
-                        >
-                          승인
-                        </Button>
-                      </div>
-                    </td>
+                    {canDecide ? (
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            aria-label={`${a.name} 반려`}
+                            onClick={() => setAction({ kind: "reject", applicant: a })}
+                          >
+                            반려
+                          </Button>
+                          <Button
+                            size="sm"
+                            aria-label={`${a.name} 승인`}
+                            onClick={() => setAction({ kind: "approve", applicant: a })}
+                          >
+                            승인
+                          </Button>
+                        </div>
+                      </td>
+                    ) : null}
                   </tr>
                 );
               })}

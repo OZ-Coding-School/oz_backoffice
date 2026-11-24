@@ -5,7 +5,10 @@ import pytest
 from app.contexts.access.domain.catalog import (
     COHORT_ASSISTANT,
     COHORT_MANAGER,
+    GLOBAL_ONLY_PERMISSIONS,
+    LEGACY_PERMISSIONS,
     PERMISSIONS,
+    PERMISSIONS_BY_CODE,
     ROLES_BY_CODE,
     STUDENT,
     SUPER_ADMIN,
@@ -22,26 +25,41 @@ NOW = datetime(2026, 11, 6, tzinfo=UTC)
 
 
 def test_permission_table_matches_plan() -> None:
-    """plan §2.3 권한표: 매니저는 조교 권한 + 계약·멘토·설정·배정·정산,
-    팀리드는 매니저 + 담당자 배정(A36), SUPER_ADMIN은 전부."""
+    """기본 묶음 (A36·A86): 매니저는 조교 권한 + 계약·멘토·설정·배정·정산,
+    팀리드는 매니저 + 담당자 + 직원 조회, 최고 관리자는 전부."""
     admin = ROLES_BY_CODE[SUPER_ADMIN].permissions
     manager = ROLES_BY_CODE[COHORT_MANAGER].permissions
     team_lead = ROLES_BY_CODE[TEAM_LEAD].permissions
     assistant = ROLES_BY_CODE[COHORT_ASSISTANT].permissions
     assert admin == set(PERMISSIONS)
     assert assistant < manager < team_lead < admin
-    assert team_lead - manager == {"staff.assign"}
-    assert admin - team_lead == {"org.manage", "role.assign"}
-    assert manager - assistant == {
-        "contract.manage",
-        "mentor.manage",
-        "mentoring.settings.manage",
-        "mentoring.assignment.manage",
-        "mentoring.settlement.close",
+    assert team_lead - manager == {
+        "staff.assignment.read",
+        "staff.assignment.manage",
+        "org.employee.read",
     }
-    assert {"org.manage", "role.assign"}.isdisjoint(manager)
+    assert {p.rsplit(".", 1)[0] for p in manager - assistant} == {
+        "educator.contract",
+        "educator.mentor",
+        "mentoring.settings",
+        "mentoring.assignment",
+        "mentoring.settlement",
+    }
+    assert GLOBAL_ONLY_PERMISSIONS.isdisjoint(manager)
     for role in ROLES_BY_CODE.values():
         assert role.permissions <= set(PERMISSIONS)
+        for code in role.permissions:  # 관리·특별 동작은 조회와 함께 (A86)
+            needed = PERMISSIONS_BY_CODE[code].requires
+            assert needed is None or needed in role.permissions
+
+
+def test_legacy_codes_map_to_known_permissions() -> None:
+    assert len(PERMISSIONS) == 40
+    for old, new in LEGACY_PERMISSIONS.items():
+        assert new <= set(PERMISSIONS), old
+        for code in new:
+            needed = PERMISSIONS_BY_CODE[code].requires
+            assert needed is None or needed in new, (old, code)
 
 
 @pytest.mark.parametrize(

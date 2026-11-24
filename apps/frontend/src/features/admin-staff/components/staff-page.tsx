@@ -45,12 +45,16 @@ const ALL = "all";
 export function StaffPage({ search }: { search: StaffSearch }) {
   const access = useQuery(staffAccessQuery);
   const options = useQuery(staffOptionsQuery);
-  const canManageOrg = access.data ? hasPermission(access.data, "org.manage") : false;
-  const canAssign = access.data ? hasPermission(access.data, "staff.assign") : false;
-  const tab: StaffTab = search.tab === "staff" && canAssign ? "staff" : "employees";
+  const can = (code: string) => (access.data ? hasPermission(access.data, code) : false);
+  // 조회·관리를 나눠 본다 (A86): 조회만 있으면 고치는 버튼을 숨긴다
+  const canReadEmployees = can("org.employee.read");
+  const canEditEmployees = can("org.employee.manage");
+  const canReadStaff = can("staff.assignment.read");
+  const canAssign = can("staff.assignment.manage");
+  const tab: StaffTab = (search.tab === "staff" || !canReadEmployees) && canReadStaff ? "staff" : "employees";
   const tabs: { value: StaffTab; label: string; show: boolean }[] = [
-    { value: "employees", label: "직원", show: canManageOrg || canAssign },
-    { value: "staff", label: "담당자", show: canAssign },
+    { value: "employees", label: "직원", show: canReadEmployees },
+    { value: "staff", label: "담당자", show: canReadStaff },
   ];
 
   return (
@@ -91,9 +95,9 @@ export function StaffPage({ search }: { search: StaffSearch }) {
           <Spinner />
         </div>
       ) : tab === "staff" ? (
-        <StaffTabView search={search} options={options.data} />
+        <StaffTabView search={search} options={options.data} canAssign={canAssign} />
       ) : (
-        <EmployeesTab search={search} options={options.data} canEdit={canManageOrg} />
+        <EmployeesTab search={search} options={options.data} canEdit={canEditEmployees} />
       )}
     </div>
   );
@@ -271,7 +275,15 @@ function EmployeesTab({ search, options, canEdit }: { search: StaffSearch; optio
   );
 }
 
-function StaffTabView({ search, options }: { search: StaffSearch; options: StaffOptions }) {
+function StaffTabView({
+  search,
+  options,
+  canAssign,
+}: {
+  search: StaffSearch;
+  options: StaffOptions;
+  canAssign: boolean;
+}) {
   const navigate = useNavigate();
   const access = useQuery(staffAccessQuery);
   const bootcamps = [...options.bootcamps].sort((a, b) => a.name.localeCompare(b.name, "ko"));
@@ -315,7 +327,7 @@ function StaffTabView({ search, options }: { search: StaffSearch; options: Staff
           />
         ) : null}
         <div className="flex-1" />
-        {target ? (
+        {target && canAssign ? (
           <Button onClick={() => setAdding(true)}>
             <Plus aria-hidden />
             담당자 추가
@@ -353,9 +365,11 @@ function StaffTabView({ search, options }: { search: StaffSearch; options: Staff
                 <th scope="col" className="px-4 py-2.5 font-normal">
                   배정일
                 </th>
-                <th scope="col" className="w-24 px-4 py-2.5">
-                  <span className="sr-only">동작</span>
-                </th>
+                {canAssign ? (
+                  <th scope="col" className="w-24 px-4 py-2.5">
+                    <span className="sr-only">동작</span>
+                  </th>
+                ) : null}
               </tr>
             </thead>
             <tbody>
@@ -367,18 +381,20 @@ function StaffTabView({ search, options }: { search: StaffSearch; options: Staff
                   <td className="px-4 py-3 text-muted-foreground">
                     {m.created_at ? formatKst(m.created_at, "yyyy.MM.dd") : "—"}
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex justify-end">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        aria-label={`${m.user?.name ?? "담당자"} 해제`}
-                        onClick={() => setRemoving(m)}
-                      >
-                        해제
-                      </Button>
-                    </div>
-                  </td>
+                  {canAssign ? (
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          aria-label={`${m.user?.name ?? "담당자"} 해제`}
+                          onClick={() => setRemoving(m)}
+                        >
+                          해제
+                        </Button>
+                      </div>
+                    </td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>

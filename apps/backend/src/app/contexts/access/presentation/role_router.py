@@ -25,8 +25,12 @@ router = APIRouter(prefix="/admin/roles", tags=["admin-roles"])
 
 class PermissionDefinitionResponse(BaseModel):
     code: str
+    area: str = Field(description="화면 묶음: 조직·학사·회원·권한·강사·멘토·멘토링")
+    entity: str = Field(description="엔터티 이름 (같은 엔터티의 권한은 한 행)")
+    action: str = Field(description="동작: 조회·관리·동기화·취소·마감")
     description: str
     global_only: bool = Field(description="전체 범위 역할에만 켤 수 있음")
+    requires: str | None = Field(description="함께 켜야 하는 조회 권한 (A86)")
 
 
 class RoleDefinitionResponse(BaseModel):
@@ -69,7 +73,8 @@ def get_role_catalog_administration(request: Request) -> RoleCatalogAdministrati
     )
 
 
-Admin = Annotated[User, Depends(require_permission("role.assign"))]
+Admin = Annotated[User, Depends(require_permission("access.role.manage"))]
+AdminReader = Annotated[User, Depends(require_permission("access.role.read"))]
 ServiceDep = Annotated[RoleCatalogAdministration, Depends(get_role_catalog_administration)]
 
 _ORDER = {code: i for i, code in enumerate(PERMISSIONS)}
@@ -90,12 +95,18 @@ def _response(summary: RoleSummary) -> RoleDefinitionResponse:
 
 
 @router.get("", response_model=RoleCatalogResponse)
-async def role_catalog(_: Admin, service: ServiceDep) -> RoleCatalogResponse:
+async def role_catalog(_: AdminReader, service: ServiceDep) -> RoleCatalogResponse:
     view = await service.catalog()
     return RoleCatalogResponse(
         permissions=[
             PermissionDefinitionResponse(
-                code=p.code, description=p.description, global_only=p.global_only
+                code=p.code,
+                area=p.area,
+                entity=p.entity,
+                action=p.action,
+                description=p.description,
+                global_only=p.global_only,
+                requires=p.requires,
             )
             for p in view.permissions
         ],
@@ -131,7 +142,8 @@ async def replace_role_permissions(
     code: str, body: ReplacePermissionsRequest, admin: Admin, service: ServiceDep
 ) -> RoleDefinitionResponse:
     """권한 묶음 교체. 최고 관리자는 422 role_permissions_locked,
-    과정·기수 범위 역할에 전체 전용 권한은 422 global_only_permission."""
+    과정·기수 범위 역할에 전체 전용 권한은 422 global_only_permission,
+    조회 없이 관리·동기화·취소·마감만 있으면 422 permission_requires_read (A86)."""
     await service.replace_permissions(code, body.permissions, actor_id=admin.id)
     return _response(await service.get(code))
 

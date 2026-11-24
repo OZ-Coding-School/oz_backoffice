@@ -62,7 +62,7 @@ admin_router = APIRouter(
 )
 
 ChatReader = Annotated[
-    User, Depends(require_permission("mentoring.request.read", cohort_param="cohort_id"))
+    User, Depends(require_permission("mentoring.chat.read", cohort_param="cohort_id"))
 ]
 Before = Annotated[uuid.UUID | None, Query(description="이 메시지보다 앞선 것 (다음 페이지 커서)")]
 Limit = Annotated[int, Query(ge=1, le=100)]

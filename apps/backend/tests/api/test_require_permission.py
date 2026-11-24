@@ -59,7 +59,7 @@ class World:
 def world(app: FastAPI, settings: Settings) -> World:
     @app.get("/_test/global")
     async def global_only(
-        user: Annotated[User, Depends(require_permission("org.manage"))],
+        user: Annotated[User, Depends(require_permission("org.department.manage"))],
     ) -> dict[str, str]:
         return {"email": user.email}
 
@@ -109,4 +109,4 @@ def test_invalid_declarations_fail_fast() -> None:
     with pytest.raises(ValueError, match="정의되지 않은 권한"):
         require_permission("no.such.permission")
     with pytest.raises(ValueError, match="하나만"):
-        require_permission("roster.sync", cohort_param="cohort_id", any_scope=True)
+        require_permission("academy.roster.sync", cohort_param="cohort_id", any_scope=True)

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { EMPLOYMENT_TYPE_LABELS } from "@/features/auth/messages";
 import { assignmentLabel, staffOptionsQuery, type StaffOptions } from "@/features/auth/staff-api";
-import { staffAccessQuery } from "@/features/staff/api";
+import { hasPermission, staffAccessQuery } from "@/features/staff/api";
 import { formatKst } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 
@@ -34,6 +34,7 @@ export function RegistrationsPage({ tab }: { tab: RegistrationTab }) {
   const items = list.data?.pages.flatMap((p) => p.items) ?? [];
   const labels = options.data ? withAllCohorts(options.data, access.data?.cohorts ?? []) : null;
   const processed = tab !== "pending";
+  const canReview = access.data ? hasPermission(access.data, "staff.registration.manage") : false; // A86
 
   return (
     <div className="flex flex-col gap-6">
@@ -127,7 +128,7 @@ export function RegistrationsPage({ tab }: { tab: RegistrationTab }) {
                   <td className="px-4 py-3">
                     {processed ? (
                       <span className="text-body-sm text-muted-foreground">{r.reject_reason ?? ""}</span>
-                    ) : (
+                    ) : canReview ? (
                       <div className="flex justify-end">
                         <Button
                           size="sm"
@@ -137,7 +138,7 @@ export function RegistrationsPage({ tab }: { tab: RegistrationTab }) {
                           검토
                         </Button>
                       </div>
-                    )}
+                    ) : null}
                   </td>
                 </tr>
               ))}

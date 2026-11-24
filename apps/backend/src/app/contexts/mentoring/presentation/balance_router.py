@@ -54,7 +54,10 @@ admin_router = APIRouter(
 me_router = APIRouter(prefix="/me/balances", tags=["mentoring-balances"])
 
 BalanceManager = Annotated[
-    User, Depends(require_permission("mentoring.balance.grant", cohort_param="cohort_id"))
+    User, Depends(require_permission("mentoring.balance.manage", cohort_param="cohort_id"))
+]
+BalanceReader = Annotated[
+    User, Depends(require_permission("mentoring.balance.read", cohort_param="cohort_id"))
 ]
 IdempotencyKey = Annotated[
     str,
@@ -220,7 +223,7 @@ Before = Annotated[uuid.UUID | None, Query(description="이 원장 ID보다 이�
 @admin_router.get("", response_model=Page[AccountResponse])
 async def list_accounts(
     cohort_id: uuid.UUID,
-    _: BalanceManager,
+    _: BalanceReader,
     service: ServiceDep,
     clock: ClockDep,
     owner: OwnerType | None = None,
@@ -318,7 +321,7 @@ async def adjust(
 async def list_transactions(
     cohort_id: uuid.UUID,
     account_id: uuid.UUID,
-    _: BalanceManager,
+    _: BalanceReader,
     service: ServiceDep,
     before: Before = None,
     limit: Limit = 50,

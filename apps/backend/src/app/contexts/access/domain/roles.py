@@ -13,6 +13,7 @@ from app.contexts.access.domain.catalog import (
     GLOBAL_ONLY_PERMISSIONS,
     HIDDEN_ROLE_CODES,
     PERMISSIONS,
+    PERMISSIONS_BY_CODE,
     ROLES_BY_CODE,
     SUPER_ADMIN,
 )
@@ -124,4 +125,15 @@ class Role(AggregateRoot):
                     + ", ".join(global_only),
                     code="global_only_permission",
                 )
+        missing_read = sorted(
+            code
+            for code in wanted
+            if (needed := PERMISSIONS_BY_CODE[code].requires) and needed not in wanted
+        )
+        if missing_read:
+            raise BusinessRuleViolation(
+                "관리·동기화·취소·마감 권한은 조회 권한과 함께 줘야 합니다: "
+                + ", ".join(missing_read),
+                code="permission_requires_read",
+            )
         self.permissions = wanted

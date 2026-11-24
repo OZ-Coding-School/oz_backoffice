@@ -59,7 +59,10 @@ from app.core.uow import UnitOfWork
 admin_router = APIRouter(prefix="/admin/approvals", tags=["admin-approvals"])
 me_router = APIRouter(prefix="/me/member-signup", tags=["member-signup"])
 
-Approver = Annotated[User, Depends(require_permission("user.approve", any_scope=True))]
+Approver = Annotated[User, Depends(require_permission("member.approval.manage", any_scope=True))]
+ApproverReader = Annotated[
+    User, Depends(require_permission("member.approval.read", any_scope=True))
+]
 
 
 def _login_url(settings: Any) -> str:
@@ -216,7 +219,7 @@ class ResubmitRequest(BaseModel):
 # ---------------------------------------------------------------- 운영진
 @admin_router.get("", response_model=Page[ApplicantResponse])
 async def list_pending(
-    user: Approver,
+    user: ApproverReader,
     review: ReviewDep,
     catalog: Annotated[AcademyCatalog, Depends(get_academy_catalog)],
     signup_type: MemberSignupType | None = None,
@@ -249,7 +252,7 @@ async def list_pending(
 @admin_router.get("/{user_id}/candidates", response_model=CandidatesResponse)
 async def candidates(
     user_id: uuid.UUID,
-    user: Approver,
+    user: ApproverReader,
     review: ReviewDep,
     catalog: Annotated[AcademyCatalog, Depends(get_academy_catalog)],
     q: Annotated[str | None, Query(max_length=50, description="이름·휴대폰")] = None,

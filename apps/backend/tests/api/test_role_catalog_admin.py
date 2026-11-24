@@ -7,7 +7,7 @@ from httpx import AsyncClient
 
 from app.cli import create_super_admin
 from app.contexts.access.application.roles import RoleAssignmentService
-from app.contexts.access.domain.catalog import TEAM_LEAD
+from app.contexts.access.domain.catalog import GLOBAL_ONLY_PERMISSIONS, TEAM_LEAD
 from app.contexts.access.domain.enums import RoleScopeType
 from app.contexts.access.infrastructure.repositories import TortoiseUserRoleRepository
 from app.contexts.audit.infrastructure.models import AuditLogModel
@@ -62,7 +62,14 @@ async def test_catalog_lists_staff_roles_and_permissions(
     assert manager["scope_kind"] == "SCOPED"
     assert manager["permissions_editable"]
     global_only = {p["code"] for p in body["permissions"] if p["global_only"]}
-    assert global_only == {"org.manage", "role.assign", "staff.assign"}
+    manage = next(p for p in body["permissions"] if p["code"] == "org.department.manage")
+    assert (manage["area"], manage["entity"], manage["action"], manage["requires"]) == (
+        "조직",
+        "부서·팀",
+        "관리",
+        "org.department.read",
+    )
+    assert global_only == GLOBAL_ONLY_PERMISSIONS
 
 
 async def test_custom_role_lifecycle_controls_access(
@@ -81,10 +88,17 @@ async def test_custom_role_lifecycle_controls_access(
     assert (await client.get("/api/v1/admin/departments", headers=headers)).status_code == 403
 
     granted = await client.put(
-        f"{URL}/ORG_EDITOR/permissions", json={"permissions": ["org.manage"]}, headers=admin
+        f"{URL}/ORG_EDITOR/permissions",
+        json={"permissions": ["org.department.read"]},
+        headers=admin,
     )
-    assert granted.json()["permissions"] == ["org.manage"]
+    assert granted.json()["permissions"] == ["org.department.read"]
     assert (await client.get("/api/v1/admin/departments", headers=headers)).status_code == 200
+    # 조회만 있으면 바꿀 수 없다 (A86)
+    create = await client.post(
+        "/api/v1/admin/departments", json={"name": "새 부서"}, headers=headers
+    )
+    assert create.status_code == 403
 
     in_use = await client.delete(f"{URL}/ORG_EDITOR", headers=admin)
     assert (in_use.status_code, in_use.json()["error"]["code"]) == (409, "role_in_use")
@@ -106,7 +120,7 @@ async def test_editing_builtin_role_changes_its_holders(
     current = next(
         r for r in (await client.get(URL, headers=admin)).json()["roles"] if r["code"] == TEAM_LEAD
     )
-    narrowed = [p for p in current["permissions"] if p != "staff.assign"]
+    narrowed = [p for p in current["permissions"] if not p.startswith("staff.assignment.")]
     await client.put(f"{URL}/TEAM_LEAD/permissions", json={"permissions": narrowed}, headers=admin)
     assert (await client.get(staff_url, headers=lead)).status_code == 403
 
@@ -125,10 +139,15 @@ async def test_rule_violations(client: AsyncClient, admin: dict[str, str]) -> No
         409,
         "role_name_taken",
     )
-    assert await error("PUT", f"{URL}/HELPER/permissions", {"permissions": ["org.manage"]}) == (
+    assert await error(
+        "PUT", f"{URL}/HELPER/permissions", {"permissions": ["org.department.read"]}
+    ) == (
         422,
         "global_only_permission",
     )
+    assert await error(
+        "PUT", f"{URL}/HELPER/permissions", {"permissions": ["mentoring.team.manage"]}
+    ) == (422, "permission_requires_read")
     assert await error("PUT", f"{URL}/SUPER_ADMIN/permissions", {"permissions": []}) == (
         422,
         "role_permissions_locked",
