@@ -13,7 +13,6 @@ from enum import StrEnum
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.organization.application.registration_service import StaffTargetCatalog
 from app.contexts.organization.domain.entities import BootcampStaff, CohortStaff
-from app.contexts.organization.domain.enums import StaffRole
 from app.contexts.organization.domain.repositories import (
     BootcampStaffRepository,
     CohortStaffRepository,
@@ -37,7 +36,6 @@ class StaffMember:
     target_id: uuid.UUID
     employee_id: uuid.UUID
     user_id: uuid.UUID | None
-    role: StaffRole
     created_at: datetime | None
 
 
@@ -85,7 +83,6 @@ class StaffAssignmentService:
         target_id: uuid.UUID,
         *,
         employee_id: uuid.UUID,
-        role: StaffRole,
         actor_id: uuid.UUID,
     ) -> StaffMember:
         if target is StaffTarget.BOOTCAMP:
@@ -97,23 +94,21 @@ class StaffAssignmentService:
             if employee is None:
                 raise NotFoundError("직원을 찾을 수 없습니다.", code="employee_not_found")
             existing = await self._list_rows(target, target_id)
-            if any(s.employee_id == employee_id and s.role is role for s in existing):
-                raise ConflictError(
-                    "이미 같은 역할로 배정된 담당자입니다.", code="staff_already_assigned"
-                )
+            if any(s.employee_id == employee_id for s in existing):
+                raise ConflictError("이미 배정된 담당자입니다.", code="staff_already_assigned")
             staff: Staff
             if target is StaffTarget.BOOTCAMP:
-                staff = BootcampStaff(employee_id=employee_id, bootcamp_id=target_id, role=role)
+                staff = BootcampStaff(employee_id=employee_id, bootcamp_id=target_id)
                 await self._bootcamp_staffs.add(staff)
             else:
-                staff = CohortStaff(employee_id=employee_id, cohort_id=target_id, role=role)
+                staff = CohortStaff(employee_id=employee_id, cohort_id=target_id)
                 await self._cohort_staffs.add(staff)
             await self._audit.record(
                 actor_user_id=actor_id,
                 action="organization.staff.assign",
                 target_type=target.value.lower(),
                 target_id=target_id,
-                after={"employee_id": str(employee_id), "role": role.value},
+                after={"employee_id": str(employee_id)},
             )
         return _member(target, target_id, staff, employee.user_id)
 
@@ -135,7 +130,7 @@ class StaffAssignmentService:
                 action="organization.staff.unassign",
                 target_type=target.value.lower(),
                 target_id=target_id,
-                before={"employee_id": str(staff.employee_id), "role": staff.role.value},
+                before={"employee_id": str(staff.employee_id)},
             )
 
     async def _list_rows(self, target: StaffTarget, target_id: uuid.UUID) -> list[Staff]:
@@ -153,6 +148,5 @@ def _member(
         target_id=target_id,
         employee_id=staff.employee_id,
         user_id=user_id,
-        role=staff.role,
         created_at=staff.created_at,
     )

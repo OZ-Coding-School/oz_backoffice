@@ -1,6 +1,6 @@
 """운영진 가입 신청 (decisions A11).
 
-최초 로그인한 운영진이 부서·팀·직위·고용 형태·담당(역할 + 과정 또는 기수)을 입력해 신청한다.
+최초 로그인한 운영진이 부서·팀·직위·고용 형태·담당(과정 또는 기수)을 입력해 신청한다.
 어드민이 항목을 조정해 승인하면 직원·담당자가 만들어진다 (승인·반려는 P3-2b).
 담당은 소속 팀의 과정 안에서 직위의 담당 방식대로 고른다 (A62, `check_assignment_scope`).
 신청할 때만 이 규칙을 검사하고 승인할 때 어드민의 조정은 자유다.
@@ -14,7 +14,6 @@ from app.contexts.organization.domain.enums import (
     AssignmentScope,
     EmployeeRegistrationStatus,
     EmploymentType,
-    StaffRole,
 )
 from app.shared.domain import AggregateRoot
 from app.shared.errors import BusinessRuleViolation
@@ -30,9 +29,8 @@ def _require(condition: bool, message: str, code: str) -> None:
 
 @dataclass(frozen=True, slots=True)
 class RequestedAssignment:
-    """신청한 담당 1건: 역할 + 과정 또는 기수 (둘 중 하나만)."""
+    """신청한 담당 1건: 과정 또는 기수 (둘 중 하나만). 담당 방식은 직위가 정한다 (A89)."""
 
-    role: StaffRole
     bootcamp_id: uuid.UUID | None = None
     cohort_id: uuid.UUID | None = None
 
@@ -63,15 +61,15 @@ def check_assignment_scope(
     *,
     team_bootcamp_ids: set[uuid.UUID],
     cohort_bootcamps: dict[uuid.UUID, uuid.UUID],
-    assisted_cohort_ids: set[uuid.UUID] | None = None,
+    staffed_cohort_ids: set[uuid.UUID] | None = None,
 ) -> None:
     """직위 담당 방식에 맞는 담당인지 검사한다 (A62, 신청할 때만).
 
     - 담당 방식 없음: 담당을 고를 수 없다
-    - COURSE: 운영 매니저 + 소속 팀의 과정 (여러 개)
-    - COHORT: 조교 + 소속 팀 과정의 기수 (하나)
+    - COURSE: 소속 팀의 과정 (여러 개)
+    - COHORT: 소속 팀 과정의 기수 (하나)
     `cohort_bootcamps`는 기수 → 과정. 팀이 없으면 `team_bootcamp_ids`가 비어 담당을 고를 수 없다.
-    `assisted_cohort_ids`는 이미 조교가 배정된 기수다. 조교로 고를 수 없다 (A63).
+    `staffed_cohort_ids`는 이미 기수 담당자가 있는 기수다. 고를 수 없다 (A63·A89).
     """
     if not assignments:
         return
@@ -82,31 +80,66 @@ def check_assignment_scope(
     if scope is AssignmentScope.COHORT:
         _require(
             len(assignments) <= 1,
-            "조교 직위는 기수를 하나만 고를 수 있습니다.",
+            "기수 담당 직위는 기수를 하나만 고를 수 있습니다.",
             "invalid_staff_assignment",
         )
     for a in assignments:
         if scope is AssignmentScope.COURSE:
-            ok = (
-                a.role is StaffRole.MANAGER
-                and a.bootcamp_id is not None
-                and a.bootcamp_id in team_bootcamp_ids
-            )
-            message = "소속 팀이 담당하는 과정을 운영 매니저로 골라야 합니다."
+            ok = a.bootcamp_id is not None and a.bootcamp_id in team_bootcamp_ids
+            message = "소속 팀이 담당하는 과정을 골라야 합니다."
         else:
-            ok = (
-                a.role is StaffRole.ASSISTANT
-                and a.cohort_id is not None
-                and cohort_bootcamps.get(a.cohort_id) in team_bootcamp_ids
-            )
-            message = "소속 팀 과정의 기수를 조교로 골라야 합니다."
+            ok = a.cohort_id is not None and cohort_bootcamps.get(a.cohort_id) in team_bootcamp_ids
+            message = "소속 팀 과정의 기수를 골라야 합니다."
         _require(ok, message, "invalid_staff_assignment")
         if scope is AssignmentScope.COHORT:
             _require(
-                a.cohort_id not in (assisted_cohort_ids or set()),
-                "이미 조교가 배정된 기수입니다.",
+                a.cohort_id not in (staffed_cohort_ids or set()),
+                "이미 기수 담당자가 있는 기수입니다.",
                 "invalid_staff_assignment",
             )
+
+
+def check_employee_assignments(
+    scope: AssignmentScope | None,
+    *,
+    bootcamp_ids: list[uuid.UUID],
+    cohort_ids: list[uuid.UUID],
+    taken_cohort_ids: set[uuid.UUID],
+) -> None:
+    """직원 수정의 담당 지정 (A89): 직위의 담당 방식을 따른다.
+
+    과정 방식은 과정 여러 개, 기수 방식은 기수 하나, 없으면 담당 없음. 다른 직원이 담당한 기수는
+    고를 수 없다(A63). 소속 팀과 상관없이 고른다(관리자 조정).
+    """
+    _require(
+        len(set(bootcamp_ids)) == len(bootcamp_ids) and len(set(cohort_ids)) == len(cohort_ids),
+        "같은 담당을 두 번 고를 수 없습니다.",
+        "duplicate_staff_assignment",
+    )
+    if scope is None:
+        _require(
+            not bootcamp_ids and not cohort_ids,
+            "이 직위는 담당 과정·기수를 고르지 않습니다.",
+            "invalid_staff_assignment",
+        )
+    elif scope is AssignmentScope.COURSE:
+        _require(not cohort_ids, "과정 담당 직위는 과정만 고릅니다.", "invalid_staff_assignment")
+        _require(
+            len(bootcamp_ids) <= MAX_ASSIGNMENTS,
+            f"담당 과정은 {MAX_ASSIGNMENTS}개까지입니다.",
+            "invalid_staff_assignment",
+        )
+    else:
+        _require(
+            not bootcamp_ids and len(cohort_ids) <= 1,
+            "기수 담당 직위는 기수를 하나만 고릅니다.",
+            "invalid_staff_assignment",
+        )
+        _require(
+            not set(cohort_ids) & taken_cohort_ids,
+            "이미 기수 담당자가 있는 기수입니다.",
+            "invalid_staff_assignment",
+        )
 
 
 @dataclass(kw_only=True, eq=False)

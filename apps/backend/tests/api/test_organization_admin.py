@@ -225,14 +225,14 @@ async def test_employees_search_team_and_assignments(
     assert (
         await client.post(
             f"{staffs}/bootcamps/{cohort.bootcamp_id}/staffs",
-            json={"employee_id": str(manager.id), "role": "MANAGER"},
+            json={"employee_id": str(manager.id)},
             headers=admin,
         )
     ).status_code in (200, 201)
     assert (
         await client.post(
             f"{staffs}/cohorts/{cohort.id}/staffs",
-            json={"employee_id": str(assistant.id), "role": "ASSISTANT"},
+            json={"employee_id": str(assistant.id)},
             headers=admin,
         )
     ).status_code in (200, 201)
@@ -241,8 +241,7 @@ async def test_employees_search_team_and_assignments(
     by_name = (await client.get(url, params={"q": "김운"}, headers=admin)).json()
     assert [e["id"] for e in by_name["items"]] == [str(manager.id)]
     (assignment,) = by_name["items"][0]["assignments"]
-    assert (assignment["role"], assignment["bootcamp_id"], assignment["cohort_id"]) == (
-        "MANAGER",
+    assert (assignment["bootcamp_id"], assignment["cohort_id"]) == (
         str(cohort.bootcamp_id),
         None,
     )

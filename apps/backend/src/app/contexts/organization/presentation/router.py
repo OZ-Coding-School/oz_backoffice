@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends
 
 from app.contexts.access.presentation.dependencies import CurrentUser
 from app.contexts.organization.application.registration_service import StaffRegistrationService
-from app.contexts.organization.domain.enums import EmploymentType, StaffRole
+from app.contexts.organization.domain.enums import EmploymentType
 from app.contexts.organization.domain.registration import (
     EmployeeRegistration,
     RequestedAssignment,
@@ -41,7 +41,7 @@ def to_registration_response(registration: EmployeeRegistration) -> StaffRegistr
         position_id=registration.position_id,
         employment_type=registration.employment_type,
         assignments=[
-            AssignmentPayload(role=a.role, bootcamp_id=a.bootcamp_id, cohort_id=a.cohort_id)
+            AssignmentPayload(bootcamp_id=a.bootcamp_id, cohort_id=a.cohort_id)
             for a in registration.assignments
         ],
         reviewed_at=registration.reviewed_at,
@@ -67,7 +67,6 @@ async def registration_options(
             for p in options.positions
         ],
         employment_types=list(EmploymentType),
-        staff_roles=list(StaffRole),
         bootcamps=[
             BootcampOption(id=b.id, name=b.name, code=b.code, team_id=bootcamp_teams.get(b.id))
             for b in options.bootcamps
@@ -111,7 +110,7 @@ async def submit_registration(
         position_id=body.position_id,
         employment_type=body.employment_type,
         assignments=[
-            RequestedAssignment(role=a.role, bootcamp_id=a.bootcamp_id, cohort_id=a.cohort_id)
+            RequestedAssignment(bootcamp_id=a.bootcamp_id, cohort_id=a.cohort_id)
             for a in body.assignments
         ],
     )

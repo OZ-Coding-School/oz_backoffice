@@ -11,7 +11,6 @@ from app.contexts.organization.application.review_service import RegistrationAdj
 from app.contexts.organization.domain.enums import (
     EmployeeRegistrationStatus,
     EmploymentType,
-    StaffRole,
 )
 from app.contexts.organization.domain.registration import RequestedAssignment
 from app.contexts.organization.infrastructure.repositories import (
@@ -62,8 +61,8 @@ async def test_approve_creates_employee_staffs_roles_and_approves_user() -> None
     registration = await create_registration(
         applicant,
         [
-            RequestedAssignment(role=StaffRole.MANAGER, bootcamp_id=cohort.bootcamp_id),
-            RequestedAssignment(role=StaffRole.ASSISTANT, cohort_id=cohort.id),
+            RequestedAssignment(bootcamp_id=cohort.bootcamp_id),
+            RequestedAssignment(cohort_id=cohort.id),
         ],
     )
     admin = await create_applicant()
@@ -76,10 +75,8 @@ async def test_approve_creates_employee_staffs_roles_and_approves_user() -> None
     assert employee.department_id == registration.department_id
     bootcamp_staffs = await TortoiseBootcampStaffRepository().list_by_employee(employee.id)
     cohort_staffs = await TortoiseCohortStaffRepository().list_by_employee(employee.id)
-    assert [(s.bootcamp_id, s.role) for s in bootcamp_staffs] == [
-        (cohort.bootcamp_id, StaffRole.MANAGER)
-    ]
-    assert [(s.cohort_id, s.role) for s in cohort_staffs] == [(cohort.id, StaffRole.ASSISTANT)]
+    assert [s.bootcamp_id for s in bootcamp_staffs] == [cohort.bootcamp_id]
+    assert [s.cohort_id for s in cohort_staffs] == [cohort.id]
     assert await _scope(applicant.id) == {
         ("BOOTCAMP", cohort.bootcamp_id),
         ("COHORT", cohort.id),
@@ -97,7 +94,7 @@ async def test_approve_with_adjustment(actor: User) -> None:
     cohort = await create_cohort()
     applicant = await create_applicant()
     registration = await create_registration(
-        applicant, [RequestedAssignment(role=StaffRole.MANAGER, cohort_id=cohort.id)]
+        applicant, [RequestedAssignment(bootcamp_id=cohort.bootcamp_id)]
     )
     other_department = await create_department()
 
@@ -107,7 +104,7 @@ async def test_approve_with_adjustment(actor: User) -> None:
         adjustment=RegistrationAdjustment(
             department_id=other_department.id,
             employment_type=EmploymentType.CONTRACT,
-            assignments=[RequestedAssignment(role=StaffRole.ASSISTANT, cohort_id=cohort.id)],
+            assignments=[RequestedAssignment(cohort_id=cohort.id)],
         ),
     )
 
@@ -121,8 +118,8 @@ async def test_approve_with_adjustment(actor: User) -> None:
     )
     assert await _scope(applicant.id) == {("COHORT", cohort.id)}
     log = await AuditLogModel.get(target_id=registration.id)
-    assert log.before["assignments"][0]["role"] == "MANAGER"  # type: ignore[index]
-    assert log.after["assignments"][0]["role"] == "ASSISTANT"  # type: ignore[index]
+    assert log.before["assignments"][0]["bootcamp_id"] is not None  # type: ignore[index]
+    assert log.after["assignments"][0]["cohort_id"] == str(cohort.id)  # type: ignore[index]
 
 
 async def test_approve_sets_team_freely(actor: User) -> None:
@@ -138,9 +135,7 @@ async def test_approve_sets_team_freely(actor: User) -> None:
         adjustment=RegistrationAdjustment(
             team_changed=True,
             team_id=team.id,
-            assignments=[
-                RequestedAssignment(role=StaffRole.MANAGER, bootcamp_id=cohort.bootcamp_id)
-            ],
+            assignments=[RequestedAssignment(bootcamp_id=cohort.bootcamp_id)],
         ),
     )
 
@@ -164,7 +159,7 @@ async def test_approve_sets_team_freely(actor: User) -> None:
 async def test_second_approval_updates_employee_and_skips_existing_staff(actor: User) -> None:
     cohort = await create_cohort()
     applicant = await create_applicant()
-    same = [RequestedAssignment(role=StaffRole.ASSISTANT, cohort_id=cohort.id)]
+    same = [RequestedAssignment(cohort_id=cohort.id)]
     service = build_review_service()
     await service.approve((await create_registration(applicant, same)).id, actor_id=actor.id)
     second = await create_registration(applicant, same)
@@ -186,7 +181,7 @@ async def test_invalid_adjustment_rolls_back_everything(actor: User) -> None:
             registration.id,
             actor_id=actor.id,
             adjustment=RegistrationAdjustment(
-                assignments=[RequestedAssignment(role=StaffRole.ASSISTANT, cohort_id=new_id())]
+                assignments=[RequestedAssignment(cohort_id=new_id())]
             ),
         )
     assert exc.value.code == "invalid_staff_target"

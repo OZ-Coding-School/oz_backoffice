@@ -8,7 +8,6 @@ from httpx import AsyncClient
 from app.cli import create_super_admin
 from app.contexts.identity.domain.entities import User
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
-from app.contexts.organization.domain.enums import StaffRole
 from app.contexts.organization.domain.registration import RequestedAssignment
 from app.contexts.organization.infrastructure.repositories import TortoiseCohortStaffRepository
 from app.core.config import Settings
@@ -56,9 +55,7 @@ async def test_approve_with_adjustment_then_applicant_has_roles(
 ) -> None:
     cohort = await create_cohort()
     applicant = await create_applicant()
-    registration = await create_registration(
-        applicant, [RequestedAssignment(role=StaffRole.MANAGER, cohort_id=cohort.id)]
-    )
+    registration = await create_registration(applicant, [RequestedAssignment(cohort_id=cohort.id)])
     department = await create_department()
     team = await create_team(department.id)
 
@@ -67,7 +64,7 @@ async def test_approve_with_adjustment_then_applicant_has_roles(
         json={
             "department_id": str(department.id),
             "team_id": str(team.id),
-            "assignments": [{"role": "ASSISTANT", "cohort_id": str(cohort.id)}],
+            "assignments": [{"cohort_id": str(cohort.id)}],
         },
         headers=admin_headers,
     )
@@ -81,7 +78,7 @@ async def test_approve_with_adjustment_then_applicant_has_roles(
     assert me["approval_status"] == "APPROVED"
     # 권한은 직위가, 데이터 범위는 담당이 정한다 (A87): 조정한 기수 담당이 생긴다
     staffs = await TortoiseCohortStaffRepository().list_by_cohort(cohort.id)
-    assert [s.role for s in staffs] == [StaffRole.ASSISTANT]
+    assert len(staffs) == 1
 
 
 async def test_approve_without_body_uses_requested_values(

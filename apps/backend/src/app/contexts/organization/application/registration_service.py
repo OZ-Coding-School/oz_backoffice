@@ -18,7 +18,7 @@ from app.contexts.organization.domain.entities import (
     EmployeePosition,
     Team,
 )
-from app.contexts.organization.domain.enums import EmploymentType, StaffRole
+from app.contexts.organization.domain.enums import EmploymentType
 from app.contexts.organization.domain.registration import (
     EmployeeRegistration,
     RequestedAssignment,
@@ -76,7 +76,7 @@ class RegistrationChoiceValidator:
         position_id: uuid.UUID,
         assignments: list[RequestedAssignment],
         strict: bool,
-        assisted_cohort_ids: set[uuid.UUID] | None = None,
+        staffed_cohort_ids: set[uuid.UUID] | None = None,
     ) -> None:
         if await self._departments.get(department_id) is None:
             raise BusinessRuleViolation("존재하지 않는 부서입니다.", code="department_not_found")
@@ -109,7 +109,7 @@ class RegistrationChoiceValidator:
             assignments,
             team_bootcamp_ids=team_bootcamp_ids,
             cohort_bootcamps=cohort_bootcamps,
-            assisted_cohort_ids=assisted_cohort_ids,
+            staffed_cohort_ids=staffed_cohort_ids,
         )
 
 
@@ -187,7 +187,7 @@ class StaffRegistrationService:
             position_id=position_id,
             assignments=assignments,
             strict=True,
-            assisted_cohort_ids=await self._cohort_staffs.cohort_ids_with_role(StaffRole.ASSISTANT)
+            staffed_cohort_ids=await self._cohort_staffs.staffed_cohort_ids()
             if any(a.cohort_id for a in assignments)
             else set(),
         )
@@ -216,9 +216,12 @@ class StaffRegistrationService:
             return registration
 
     async def _open_cohorts(self) -> list[Cohort]:
-        """조교로 고를 수 있는 기수: 담당 가능한 기수 중 승인된 조교가 없는 기수 (A63)."""
-        assisted = await self._cohort_staffs.cohort_ids_with_role(StaffRole.ASSISTANT)
-        return [c for c in await self._catalog.staffable_cohorts() if c.id not in assisted]
+        """기수 담당으로 고를 수 있는 기수: 담당 가능한 기수 중 기수 담당자가 없는 기수.
+
+        A63·A89.
+        """
+        staffed = await self._cohort_staffs.staffed_cohort_ids()
+        return [c for c in await self._catalog.staffable_cohorts() if c.id not in staffed]
 
     def _ensure_staff_account(self, user: User) -> None:
         if not user.email.endswith(self._staff_suffix):

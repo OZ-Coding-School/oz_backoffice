@@ -7,13 +7,13 @@ from app.contexts.organization.domain.enums import (
     AssignmentScope,
     EmployeeRegistrationStatus,
     EmploymentType,
-    StaffRole,
 )
 from app.contexts.organization.domain.registration import (
     MAX_ASSIGNMENTS,
     EmployeeRegistration,
     RequestedAssignment,
     check_assignment_scope,
+    check_employee_assignments,
 )
 from app.shared.errors import BusinessRuleViolation
 from app.shared.ids import new_id
@@ -33,29 +33,22 @@ def make_registration(**overrides: object) -> EmployeeRegistration:
 
 
 def test_assignment_targets_exactly_one_scope() -> None:
-    RequestedAssignment(role=StaffRole.MANAGER, bootcamp_id=new_id())
-    RequestedAssignment(role=StaffRole.ASSISTANT, cohort_id=new_id())
+    RequestedAssignment(bootcamp_id=new_id())
+    RequestedAssignment(cohort_id=new_id())
     with pytest.raises(BusinessRuleViolation):
-        RequestedAssignment(role=StaffRole.MANAGER)
+        RequestedAssignment()
     with pytest.raises(BusinessRuleViolation):
-        RequestedAssignment(role=StaffRole.MANAGER, bootcamp_id=new_id(), cohort_id=new_id())
+        RequestedAssignment(bootcamp_id=new_id(), cohort_id=new_id())
 
 
 def test_registration_rejects_duplicate_and_too_many_assignments() -> None:
     cohort_id = new_id()
-    same = RequestedAssignment(role=StaffRole.ASSISTANT, cohort_id=cohort_id)
+    same = RequestedAssignment(cohort_id=cohort_id)
     with pytest.raises(BusinessRuleViolation) as exc:
         make_registration(assignments=[same, same])
     assert exc.value.code == "duplicate_staff_assignment"
-    # 같은 기수라도 역할이 다르면 허용한다
-    make_registration(
-        assignments=[same, RequestedAssignment(role=StaffRole.MANAGER, cohort_id=cohort_id)]
-    )
 
-    too_many = [
-        RequestedAssignment(role=StaffRole.ASSISTANT, cohort_id=new_id())
-        for _ in range(MAX_ASSIGNMENTS + 1)
-    ]
+    too_many = [RequestedAssignment(cohort_id=new_id()) for _ in range(MAX_ASSIGNMENTS + 1)]
     with pytest.raises(BusinessRuleViolation):
         make_registration(assignments=too_many)
 
@@ -69,7 +62,7 @@ def test_registration_without_assignment_is_allowed() -> None:
 def test_only_pending_registration_can_be_updated() -> None:
     registration = make_registration()
     new_department = new_id()
-    assignment = RequestedAssignment(role=StaffRole.MANAGER, bootcamp_id=new_id())
+    assignment = RequestedAssignment(bootcamp_id=new_id())
     new_team = new_id()
     registration.update(
         department_id=new_department,
@@ -112,11 +105,9 @@ NOW = datetime(2026, 11, 6, 9, 0, tzinfo=UTC)
 
 
 def test_approve_applies_adjusted_values() -> None:
-    registration = make_registration(
-        assignments=[RequestedAssignment(role=StaffRole.ASSISTANT, cohort_id=new_id())]
-    )
+    registration = make_registration(assignments=[RequestedAssignment(cohort_id=new_id())])
     department_id, position_id = new_id(), new_id()
-    adjusted = [RequestedAssignment(role=StaffRole.MANAGER, bootcamp_id=new_id())]
+    adjusted = [RequestedAssignment(bootcamp_id=new_id())]
 
     registration.approve(
         now=NOW,
@@ -178,10 +169,10 @@ class TestAssignmentScope:
         )
 
     def manager(self, bootcamp_id: uuid.UUID) -> RequestedAssignment:
-        return RequestedAssignment(role=StaffRole.MANAGER, bootcamp_id=bootcamp_id)
+        return RequestedAssignment(bootcamp_id=bootcamp_id)
 
     def assistant(self, cohort_id: uuid.UUID) -> RequestedAssignment:
-        return RequestedAssignment(role=StaffRole.ASSISTANT, cohort_id=cohort_id)
+        return RequestedAssignment(cohort_id=cohort_id)
 
     def test_no_assignment_is_always_allowed(self) -> None:
         for scope in (None, AssignmentScope.COURSE, AssignmentScope.COHORT):
@@ -192,7 +183,6 @@ class TestAssignmentScope:
         for wrong in (
             self.manager(self.other_bootcamp),
             self.assistant(self.team_cohort),
-            RequestedAssignment(role=StaffRole.ASSISTANT, bootcamp_id=self.team_bootcamp),
         ):
             with pytest.raises(BusinessRuleViolation) as exc:
                 self.check(AssignmentScope.COURSE, wrong)
@@ -203,7 +193,7 @@ class TestAssignmentScope:
         for wrong in (
             (self.assistant(self.other_cohort),),
             (self.manager(self.team_bootcamp),),
-            (self.assistant(self.team_cohort), self.assistant(self.team_cohort)),
+            (self.assistant(self.team_cohort), self.assistant(self.other_cohort)),
         ):
             with pytest.raises(BusinessRuleViolation) as exc:
                 self.check(AssignmentScope.COHORT, *wrong)
@@ -216,7 +206,7 @@ class TestAssignmentScope:
                 [self.assistant(self.team_cohort)],
                 team_bootcamp_ids={self.team_bootcamp},
                 cohort_bootcamps={self.team_cohort: self.team_bootcamp},
-                assisted_cohort_ids={self.team_cohort},
+                staffed_cohort_ids={self.team_cohort},
             )
         assert exc.value.code == "invalid_staff_assignment"
 
@@ -224,3 +214,31 @@ class TestAssignmentScope:
         with pytest.raises(BusinessRuleViolation) as exc:
             self.check(None, self.manager(self.team_bootcamp))
         assert exc.value.code == "invalid_staff_assignment"
+
+
+class TestEmployeeAssignments:
+    """직원 수정의 담당 지정 (A89)."""
+
+    def test_rules(self) -> None:
+        b1, b2, c1, c2 = new_id(), new_id(), new_id(), new_id()
+
+        def check(scope: AssignmentScope | None, bs: list[uuid.UUID], cs: list[uuid.UUID]) -> None:
+            check_employee_assignments(scope, bootcamp_ids=bs, cohort_ids=cs, taken_cohort_ids={c2})
+
+        check(None, [], [])
+        check(AssignmentScope.COURSE, [b1, b2], [])
+        check(AssignmentScope.COHORT, [], [c1])
+        check(AssignmentScope.COHORT, [], [])
+        for scope, bs, cs, code in (
+            (None, [b1], [], "invalid_staff_assignment"),
+            (AssignmentScope.COURSE, [b1], [c1], "invalid_staff_assignment"),
+            (AssignmentScope.COURSE, [b1, b1], [], "duplicate_staff_assignment"),
+            (AssignmentScope.COHORT, [b1], [], "invalid_staff_assignment"),
+            (AssignmentScope.COHORT, [], [c1, c2], "invalid_staff_assignment"),
+            (AssignmentScope.COHORT, [], [c2], "invalid_staff_assignment"),  # 이미 담당 있음
+        ):
+            with pytest.raises(BusinessRuleViolation) as exc:
+                check(scope, bs, cs)
+            assert exc.value.code == code
+        with pytest.raises(BusinessRuleViolation):
+            check(AssignmentScope.COURSE, [new_id() for _ in range(MAX_ASSIGNMENTS + 1)], [])

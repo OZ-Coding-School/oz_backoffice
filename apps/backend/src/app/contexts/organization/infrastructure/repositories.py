@@ -13,7 +13,7 @@ from app.contexts.organization.domain.entities import (
     EmployeePosition,
     Team,
 )
-from app.contexts.organization.domain.enums import EmployeeRegistrationStatus, StaffRole
+from app.contexts.organization.domain.enums import EmployeeRegistrationStatus
 from app.contexts.organization.domain.registration import (
     EmployeeRegistration,
     RequestedAssignment,
@@ -198,7 +198,7 @@ class TortoiseEmployeeRepository(TortoiseRepository[Employee, EmployeeModel]):
 class TortoiseBootcampStaffRepository(TortoiseRepository[BootcampStaff, BootcampStaffModel]):
     model = BootcampStaffModel
     entity = BootcampStaff
-    fields = ("employee_id", "bootcamp_id", "role", "created_at")
+    fields = ("employee_id", "bootcamp_id", "created_at")
 
     async def add(self, entity: BootcampStaff) -> None:
         values = self.to_values(entity)
@@ -210,7 +210,7 @@ class TortoiseBootcampStaffRepository(TortoiseRepository[BootcampStaff, Bootcamp
         await BootcampStaffModel.filter(id=staff_id).delete()
 
     async def list_by_bootcamp(self, bootcamp_id: uuid.UUID) -> list[BootcampStaff]:
-        rows = await BootcampStaffModel.filter(bootcamp_id=bootcamp_id).order_by("role", "id")
+        rows = await BootcampStaffModel.filter(bootcamp_id=bootcamp_id).order_by("id")
         return [self.to_entity(row) for row in rows]
 
     async def list_by_employee(self, employee_id: uuid.UUID) -> list[BootcampStaff]:
@@ -227,7 +227,7 @@ class TortoiseBootcampStaffRepository(TortoiseRepository[BootcampStaff, Bootcamp
 class TortoiseCohortStaffRepository(TortoiseRepository[CohortStaff, CohortStaffModel]):
     model = CohortStaffModel
     entity = CohortStaff
-    fields = ("employee_id", "cohort_id", "role", "created_at")
+    fields = ("employee_id", "cohort_id", "created_at")
 
     async def add(self, entity: CohortStaff) -> None:
         values = self.to_values(entity)
@@ -239,7 +239,7 @@ class TortoiseCohortStaffRepository(TortoiseRepository[CohortStaff, CohortStaffM
         await CohortStaffModel.filter(id=staff_id).delete()
 
     async def list_by_cohort(self, cohort_id: uuid.UUID) -> list[CohortStaff]:
-        rows = await CohortStaffModel.filter(cohort_id=cohort_id).order_by("role", "id")
+        rows = await CohortStaffModel.filter(cohort_id=cohort_id).order_by("id")
         return [self.to_entity(row) for row in rows]
 
     async def list_by_employee(self, employee_id: uuid.UUID) -> list[CohortStaff]:
@@ -252,10 +252,8 @@ class TortoiseCohortStaffRepository(TortoiseRepository[CohortStaff, CohortStaffM
         rows = await CohortStaffModel.filter(employee_id__in=employee_ids).order_by("id")
         return [self.to_entity(row) for row in rows]
 
-    async def cohort_ids_with_role(self, role: StaffRole) -> set[uuid.UUID]:
-        ids = (
-            await CohortStaffModel.filter(role=role).distinct().values_list("cohort_id", flat=True)
-        )
+    async def staffed_cohort_ids(self) -> set[uuid.UUID]:
+        ids = await CohortStaffModel.all().distinct().values_list("cohort_id", flat=True)
         return {uuid.UUID(str(i)) for i in ids}
 
 
@@ -318,7 +316,6 @@ class TortoiseEmployeeRegistrationRepository(
         registration.created_at = row.created_at
         registration.assignments = [
             RequestedAssignment(
-                role=a.role,
                 bootcamp_id=a.bootcamp_id,  # type: ignore[attr-defined]  # Tortoise FK 컬럼 속성
                 cohort_id=a.cohort_id,  # type: ignore[attr-defined]
             )
@@ -332,7 +329,6 @@ class TortoiseEmployeeRegistrationRepository(
             [
                 EmployeeRegistrationAssignmentModel(
                     registration_id=entity.id,
-                    role=a.role,
                     bootcamp_id=a.bootcamp_id,
                     cohort_id=a.cohort_id,
                 )

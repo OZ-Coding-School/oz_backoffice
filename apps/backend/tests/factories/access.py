@@ -9,7 +9,7 @@ import uuid
 from app.contexts.access.domain.catalog import DEV_POSITION_PERMISSIONS
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
 from app.contexts.organization.domain.entities import BootcampStaff, CohortStaff, Employee
-from app.contexts.organization.domain.enums import DataScope, EmploymentType, StaffRole
+from app.contexts.organization.domain.enums import DataScope, EmploymentType
 from app.contexts.organization.infrastructure.repositories import (
     TortoiseBootcampStaffRepository,
     TortoiseCohortStaffRepository,
@@ -80,11 +80,11 @@ async def assign(
 ) -> None:
     for bootcamp_id in bootcamp_ids:
         await TortoiseBootcampStaffRepository().add(
-            BootcampStaff(employee_id=employee.id, bootcamp_id=bootcamp_id, role=StaffRole.MANAGER)
+            BootcampStaff(employee_id=employee.id, bootcamp_id=bootcamp_id)
         )
     for cohort_id in cohort_ids:
         await TortoiseCohortStaffRepository().add(
-            CohortStaff(employee_id=employee.id, cohort_id=cohort_id, role=StaffRole.ASSISTANT)
+            CohortStaff(employee_id=employee.id, cohort_id=cohort_id)
         )
 
 

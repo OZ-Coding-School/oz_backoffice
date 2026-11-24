@@ -91,7 +91,7 @@ def body(**overrides: object) -> dict[str, object]:
         "team_id": str(TEAM.id),
         "position_id": str(POSITION.id),
         "employment_type": "REGULAR",
-        "assignments": [{"role": "MANAGER", "bootcamp_id": str(BOOTCAMP.id)}],
+        "assignments": [{"bootcamp_id": str(BOOTCAMP.id)}],
     }
     values.update(overrides)
     return values
@@ -121,7 +121,7 @@ async def test_pending_staff_gets_options(api: AsyncClient, pending_staff: dict[
     }
     assert options["cohorts"][0]["cohort_number"] == 3
     assert "REGULAR" in options["employment_types"]
-    assert options["staff_roles"] == ["MANAGER", "ASSISTANT"]
+    assert "staff_roles" not in options  # 담당 역할 없음 (A89)
 
 
 async def test_submit_update_and_read_registration(
@@ -149,14 +149,14 @@ async def test_submit_update_and_read_registration(
     [
         (body(assignments=[{"role": "MANAGER"}]), 422, "invalid_staff_assignment"),
         (
-            body(assignments=[{"role": "ASSISTANT", "cohort_id": str(new_id())}]),
+            body(assignments=[{"cohort_id": str(new_id())}]),
             422,
             "invalid_staff_target",
         ),
         (body(department_id=str(new_id())), 422, "department_not_found"),
         (body(team_id=str(OTHER_TEAM.id), assignments=[]), 422, "team_not_in_department"),
         (
-            body(assignments=[{"role": "ASSISTANT", "cohort_id": str(COHORT.id)}]),
+            body(assignments=[{"cohort_id": str(COHORT.id)}]),
             422,
             "invalid_staff_assignment",
         ),

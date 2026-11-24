@@ -11,8 +11,11 @@ from typing import Annotated, Any, Protocol, cast
 from fastapi import APIRouter, Depends, Query, Request, Response, status
 from pydantic import BaseModel, Field
 
+from app.contexts.access.application.permissions import PermissionTarget
 from app.contexts.access.domain.catalog import PERMISSIONS
 from app.contexts.access.presentation.dependencies import (
+    ApprovedUser,
+    PermissionCheckerDep,
     require_permission,
 )
 from app.contexts.identity.application.auth_service import UserQueries
@@ -34,7 +37,6 @@ from app.contexts.organization.domain.enums import (
     AssignmentScope,
     DataScope,
     EmploymentType,
-    StaffRole,
 )
 from app.contexts.organization.infrastructure.repositories import (
     TortoiseBootcampStaffRepository,
@@ -46,6 +48,7 @@ from app.contexts.organization.presentation.dependencies import (
 )
 from app.contexts.organization.presentation.schemas import StaffUserSummary
 from app.core.pagination import Page
+from app.shared.errors import PermissionDeniedError
 
 router = APIRouter(prefix="/admin", tags=["admin-organization"])
 
@@ -56,6 +59,20 @@ PositionManager = Annotated[User, Depends(require_permission("org.position.manag
 PermissionManager = Annotated[User, Depends(require_permission("access.role.manage"))]
 EmployeeReader = Annotated[User, Depends(require_permission("org.employee.read"))]
 EmployeeManager = Annotated[User, Depends(require_permission("org.employee.manage"))]
+
+
+async def require_employee_editor(user: ApprovedUser, checker: PermissionCheckerDep) -> User:
+    """직원 수정: 소속·직위(org.employee.manage) 또는 담당(staff.assignment.manage) 중 하나.
+
+    A89.
+    """
+    for code in ("org.employee.manage", "staff.assignment.manage"):
+        if await checker.has(user.id, code, PermissionTarget.global_()):
+            return user
+    raise PermissionDeniedError("이 작업을 할 권한이 없습니다.", code="permission_denied")
+
+
+EmployeeEditor = Annotated[User, Depends(require_employee_editor)]
 ServiceDep = Annotated[OrganizationAdminService, Depends(get_organization_admin_service)]
 UsersDep = Annotated[UserQueries, Depends(get_user_queries)]
 
@@ -170,8 +187,7 @@ class PositionPermissionsRequest(BaseModel):
 
 
 class EmployeeAssignmentResponse(BaseModel):
-    staff_id: uuid.UUID = Field(description="담당자 행 (해제할 때 쓴다)")
-    role: StaffRole
+    staff_id: uuid.UUID = Field(description="담당자 행")
     bootcamp_id: uuid.UUID | None = Field(description="과정 담당이면 과정")
     cohort_id: uuid.UUID | None = Field(description="기수 담당이면 기수")
     bootcamp_name: str | None
@@ -195,6 +211,12 @@ class EmployeeUpdateRequest(BaseModel):
     team_id: uuid.UUID | None = None
     position_id: uuid.UUID | None = None
     employment_type: EmploymentType | None = None
+    bootcamp_ids: list[uuid.UUID] | None = Field(
+        default=None, description="담당 과정 (보내면 통째로 교체, 직위가 과정 담당일 때, A89)"
+    )
+    cohort_ids: list[uuid.UUID] | None = Field(
+        default=None, description="담당 기수 (보내면 통째로 교체, 직위가 기수 담당일 때 하나)"
+    )
 
 
 def _sent(body: BaseModel, nullable: tuple[str, ...] = ()) -> dict[str, Any]:
@@ -234,7 +256,6 @@ async def _employees(
         assignments[b.employee_id].append(
             EmployeeAssignmentResponse(
                 staff_id=b.id,
-                role=b.role,
                 bootcamp_id=b.bootcamp_id,
                 cohort_id=None,
                 bootcamp_name=names.get(b.bootcamp_id),
@@ -246,7 +267,6 @@ async def _employees(
         assignments[c.employee_id].append(
             EmployeeAssignmentResponse(
                 staff_id=c.id,
-                role=c.role,
                 bootcamp_id=None,
                 cohort_id=c.cohort_id,
                 bootcamp_name=label.bootcamp_name if label else None,
@@ -465,12 +485,21 @@ async def get_employee(
 async def update_employee(
     employee_id: uuid.UUID,
     body: EmployeeUpdateRequest,
-    admin: EmployeeManager,
+    admin: EmployeeEditor,
+    checker: PermissionCheckerDep,
     service: ServiceDep,
     users: UsersDep,
     academy: AcademyDep,
 ) -> EmployeeResponse:
-    """부서·팀·직위·고용 형태 이동 (존재만 검사). 직원 생성은 가입 승인으로만 한다."""
+    """소속·직위·고용 형태(org.employee.manage)와 담당(staff.assignment.manage, A89)을 한 번에
+    바꾼다. 담당은 직위의 담당 방식을 따른다(422 `invalid_staff_assignment`). 직원 생성은 가입
+    승인으로만 한다."""
+    sent = body.model_fields_set
+    org_fields = {"department_id", "team_id", "position_id", "employment_type"}
+    if sent & org_fields:
+        await checker.require(admin.id, "org.employee.manage", PermissionTarget.global_())
+    if sent & {"bootcamp_ids", "cohort_ids"}:
+        await checker.require(admin.id, "staff.assignment.manage", PermissionTarget.global_())
     employee = await service.update_employee(
         employee_id, EmployeeChanges(**_sent(body, ("team_id",))), actor_id=admin.id
     )

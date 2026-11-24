@@ -47,12 +47,9 @@ async def test_cohort_staff_lifecycle_controls_permissions(
     employee = await create_employee()
     url = f"/api/v1/admin/cohorts/{cohort.id}/staffs"
 
-    created = await client.post(
-        url, json={"employee_id": str(employee.id), "role": "MANAGER"}, headers=admin
-    )
+    created = await client.post(url, json={"employee_id": str(employee.id)}, headers=admin)
     assert created.status_code == 201
     staff = created.json()
-    assert staff["role"] == "MANAGER"
     assert staff["user"]["id"] == str(employee.user_id)
 
     listed = await client.get(url, headers=admin)
@@ -79,7 +76,7 @@ async def test_bootcamp_staff_and_errors(client: AsyncClient, admin: dict[str, s
     cohort = await create_cohort()
     employee = await create_employee()
     url = f"/api/v1/admin/bootcamps/{cohort.bootcamp_id}/staffs"
-    body = {"employee_id": str(employee.id), "role": "ASSISTANT"}
+    body = {"employee_id": str(employee.id)}
 
     assert (await client.post(url, json=body, headers=admin)).status_code == 201
     duplicate = await client.post(url, json=body, headers=admin)
@@ -87,16 +84,12 @@ async def test_bootcamp_staff_and_errors(client: AsyncClient, admin: dict[str, s
         409,
         "staff_already_assigned",
     )
-    unknown_employee = await client.post(
-        url, json={"employee_id": str(new_id()), "role": "MANAGER"}, headers=admin
-    )
+    unknown_employee = await client.post(url, json={"employee_id": str(new_id())}, headers=admin)
     assert unknown_employee.status_code == 404
     unknown_target = await client.post(
         f"/api/v1/admin/bootcamps/{new_id()}/staffs", json=body, headers=admin
     )
     assert unknown_target.json()["error"]["code"] == "invalid_staff_target"
     assert (await client.delete(f"{url}/{new_id()}", headers=admin)).status_code == 404
-    assert (
-        await client.post(url, json={**body, "role": "OWNER"}, headers=admin)
-    ).status_code == 422
+    assert (await client.post(url, json={}, headers=admin)).status_code == 422
     assert (await client.get(url)).status_code == 401

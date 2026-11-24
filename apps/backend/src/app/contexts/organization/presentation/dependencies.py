@@ -115,4 +115,7 @@ def get_organization_admin_service(request: Request) -> OrganizationAdminService
         employees=TortoiseEmployeeRepository(),
         audit=cast("AuditRecorder", request.app.state.audit_recorder),
         uow=UnitOfWork(),
+        bootcamp_staffs=TortoiseBootcampStaffRepository(),
+        cohort_staffs=TortoiseCohortStaffRepository(),
+        staff_targets=cast("StaffTargetCatalog", request.app.state.academy_catalog),
     )
