@@ -51,7 +51,7 @@ npm run api:gen           # openapi.json → src/api/schema.gen.ts (tools/openap
 
 - **백엔드 API를 바꾸면** 같은 PR에서 `npm run api:schema && npm run api:gen`을 실행하고 `openapi.json`·`schema.gen.ts`를 함께 커밋한다. CI가 두 파일이 백엔드와 맞는지 확인한다(백엔드 잡: 스키마, 프론트 잡: 생성 타입).
 
-- PR 전에 `lint`, `format:check`, `typecheck`, `test`, `build`, `e2e`를 모두 통과시킨다. CI(`.github/workflows/ci.yml`)도 같은 명령을 실행하고, E2E는 3개로 나눠 실행한다.
+- PR 전에 `lint`, `format:check`, `typecheck`, `test`, `build`, `e2e`를 모두 통과시킨다. CI(`.github/workflows/ci.yml`)도 같은 명령을 실행하고, E2E는 Playwright 공식 컨테이너에서 작업 하나로 실행한다(decisions R9). `@playwright/test`를 올리면 `ci.yml`의 이미지 태그와 버전 확인도 함께 올린다.
 - npm 10(Node 23 이하)은 이 의존성 조합에서 설치 오류(`Cannot read properties of null (reading 'edgesOut')`)가 난다. Node 24를 쓰거나 `npx -y npm@11 install`로 설치한다.
 - msw의 postinstall 스크립트는 허용하지 않았다. 브라우저 워커(`public/mockServiceWorker.js`)는 `npx msw init public`으로 만들어 커밋했다(msw 버전을 올리면 다시 만든다).
 

@@ -13,6 +13,8 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: isCI,
   retries: isCI ? 1 : 0,
+  // CI는 E2E를 작업 하나에서 돌린다 (샤드 없음). 러너 코어를 모두 쓴다
+  workers: isCI ? "100%" : undefined,
   reporter: isCI ? [["github"], ["list"]] : "list",
   use: {
     baseURL: `http://localhost:${PORT}`,
