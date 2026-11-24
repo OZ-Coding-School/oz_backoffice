@@ -29,4 +29,4 @@
 | 25 | [FE-11a 멘토 일정 보기](25_mentor_schedule_view.md) | 완료 (#117) |
 | 26 | [FE-11b 멘토 불가 시간 추가·수정·삭제·충돌 확인](26_mentor_unavailable_edit.md) | 완료 (#118) |
 | 27 | [FE-12a 멘토 정산 목록·명세](27_mentor_settlements.md) | 완료 (#120) |
-| 28 | [FE-12b 멘토 내 프로필](28_mentor_profile.md) | PR 진행 중 |
+| 28 | [FE-12b 멘토 내 프로필](28_mentor_profile.md) | 완료 (#122) |
