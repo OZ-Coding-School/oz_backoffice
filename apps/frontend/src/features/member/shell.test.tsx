@@ -42,7 +42,7 @@ describe("회원 공통 틀 (F27)", () => {
     mockSignedIn(makeMe({ name: "김멘토", account_type: "MENTOR", roles: [] }));
     await renderRoute("/");
     expect(await screen.findByRole("heading", { name: "안녕하세요, 김멘토님" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "처리할 신청·오늘 세션이 곧 여기에 모여요" })).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "할 일 요약" })).toBeInTheDocument(); // 멘토 홈 (F57)
     expect(screen.getAllByText("멘토").length).toBeGreaterThan(0);
     expect(requested).not.toHaveBeenCalled();
   });
