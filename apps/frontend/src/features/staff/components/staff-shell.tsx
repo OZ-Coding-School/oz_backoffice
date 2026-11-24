@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { Me } from "@/features/auth/api";
 import { approvalCountQuery } from "@/features/admin-approvals/api";
+import { pendingRegistrationsQuery } from "@/features/admin-staff-registrations/api";
 import { useLogout } from "@/features/member/logout";
 import { cn } from "@/lib/utils";
 
@@ -37,7 +38,12 @@ export function StaffShell({ me, children }: { me: Me; children: ReactNode }) {
   // 메뉴 배지: 가입 승인 대기 (F60). 그 메뉴가 보일 때만 부른다
   const showApprovals = modules.some((m) => m.items.some((i) => i.badge === "approvals"));
   const approvals = useQuery({ ...approvalCountQuery("all"), enabled: showApprovals });
-  const badges: Partial<Record<NonNullable<StaffNavItem["badge"]>, number>> = { approvals: approvals.data };
+  const showRegistrations = modules.some((m) => m.items.some((i) => i.badge === "staffRegistrations"));
+  const registrations = useQuery({ ...pendingRegistrationsQuery, enabled: showRegistrations });
+  const badges: Partial<Record<NonNullable<StaffNavItem["badge"]>, number>> = {
+    approvals: approvals.data,
+    staffRegistrations: registrations.data,
+  };
 
   return (
     <div className="flex min-h-dvh min-w-[1280px] bg-background">

@@ -1,4 +1,4 @@
-import { LayoutGrid, ShieldCheck, UserCheck, type LucideIcon } from "lucide-react";
+import { LayoutGrid, ShieldCheck, UserCheck, UserCog, type LucideIcon } from "lucide-react";
 
 import { hasPermission, type StaffAccess } from "./api";
 
@@ -9,7 +9,7 @@ export interface StaffNavItem {
   /** 이 권한 중 하나라도 있어야 보인다 (없으면 모두) */
   permissions?: string[];
   /** 메뉴 배지 (대기 건수) */
-  badge?: "approvals";
+  badge?: "approvals" | "staffRegistrations";
 }
 
 export interface StaffModule {
@@ -50,6 +50,14 @@ const MODULES: StaffModule[] = [
         // 수강생은 user.approve, 멘토는 contract.manage (A33)
         permissions: ["user.approve", "contract.manage"],
         badge: "approvals",
+      },
+      {
+        to: "/admin/members/staff-registrations",
+        label: "운영진 승인",
+        icon: UserCog,
+        // 운영진 가입 승인은 role.assign (A12·A17)
+        permissions: ["role.assign"],
+        badge: "staffRegistrations",
       },
     ],
   },
