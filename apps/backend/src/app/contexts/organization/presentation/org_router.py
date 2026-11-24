@@ -5,12 +5,18 @@ null을 보내면 값을 비운다 (A62).
 """
 
 import uuid
-from typing import Annotated, Any
+from collections.abc import Iterable
+from typing import Annotated, Any, Protocol, cast
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from pydantic import BaseModel, Field
 
-from app.contexts.access.presentation.dependencies import require_permission
+from app.contexts.access.application.permissions import PermissionTarget
+from app.contexts.access.presentation.dependencies import (
+    ApprovedUser,
+    PermissionCheckerDep,
+    require_permission,
+)
 from app.contexts.identity.application.auth_service import UserQueries
 from app.contexts.identity.domain.entities import User
 from app.contexts.organization.application.org_service import (
@@ -26,13 +32,18 @@ from app.contexts.organization.domain.entities import (
     EmployeePosition,
     Team,
 )
-from app.contexts.organization.domain.enums import AssignmentScope, EmploymentType
+from app.contexts.organization.domain.enums import AssignmentScope, EmploymentType, StaffRole
+from app.contexts.organization.infrastructure.repositories import (
+    TortoiseBootcampStaffRepository,
+    TortoiseCohortStaffRepository,
+)
 from app.contexts.organization.presentation.dependencies import (
     get_organization_admin_service,
     get_user_queries,
 )
 from app.contexts.organization.presentation.schemas import StaffUserSummary
 from app.core.pagination import Page
+from app.shared.errors import PermissionDeniedError
 
 router = APIRouter(prefix="/admin", tags=["admin-organization"])
 
@@ -130,6 +141,15 @@ class PositionUpdateRequest(BaseModel):
     assignment_scope: AssignmentScope | None = None
 
 
+class EmployeeAssignmentResponse(BaseModel):
+    staff_id: uuid.UUID = Field(description="담당자 행 (해제할 때 쓴다)")
+    role: StaffRole
+    bootcamp_id: uuid.UUID | None = Field(description="과정 담당이면 과정")
+    cohort_id: uuid.UUID | None = Field(description="기수 담당이면 기수")
+    bootcamp_name: str | None
+    cohort_number: int | None
+
+
 class EmployeeResponse(BaseModel):
     id: uuid.UUID
     user: StaffUserSummary | None
@@ -137,6 +157,9 @@ class EmployeeResponse(BaseModel):
     team_id: uuid.UUID | None
     position_id: uuid.UUID
     employment_type: EmploymentType
+    assignments: list[EmployeeAssignmentResponse] = Field(
+        default_factory=list, description="담당 과정·기수 (A83)"
+    )
 
 
 class EmployeeUpdateRequest(BaseModel):
@@ -155,8 +178,53 @@ def _sent(body: BaseModel, nullable: tuple[str, ...] = ()) -> dict[str, Any]:
     }
 
 
-async def _employees(employees: list[Employee], users: UserQueries) -> list[EmployeeResponse]:
+class AcademyNames(Protocol):
+    """academy `AcademyCatalog`: 담당 대상 이름 (A83)."""
+
+    async def bootcamp_names(self, bootcamp_ids: Iterable[uuid.UUID]) -> dict[uuid.UUID, str]: ...
+    async def cohort_labels(self, cohort_ids: Iterable[uuid.UUID]) -> dict[uuid.UUID, Any]: ...
+
+
+def get_academy_names(request: Request) -> AcademyNames:
+    return cast("AcademyNames", request.app.state.academy_catalog)
+
+
+AcademyDep = Annotated[AcademyNames, Depends(get_academy_names)]
+
+
+async def _employees(
+    employees: list[Employee], users: UserQueries, academy: AcademyNames
+) -> list[EmployeeResponse]:
+    ids = [e.id for e in employees]
     found = await users.get_many([e.user_id for e in employees])
+    bootcamp_staffs = await TortoiseBootcampStaffRepository().list_by_employees(ids)
+    cohort_staffs = await TortoiseCohortStaffRepository().list_by_employees(ids)
+    names = await academy.bootcamp_names({s.bootcamp_id for s in bootcamp_staffs})
+    labels = await academy.cohort_labels({s.cohort_id for s in cohort_staffs})
+    assignments: dict[uuid.UUID, list[EmployeeAssignmentResponse]] = {i: [] for i in ids}
+    for b in bootcamp_staffs:
+        assignments[b.employee_id].append(
+            EmployeeAssignmentResponse(
+                staff_id=b.id,
+                role=b.role,
+                bootcamp_id=b.bootcamp_id,
+                cohort_id=None,
+                bootcamp_name=names.get(b.bootcamp_id),
+                cohort_number=None,
+            )
+        )
+    for c in cohort_staffs:
+        label = labels.get(c.cohort_id)
+        assignments[c.employee_id].append(
+            EmployeeAssignmentResponse(
+                staff_id=c.id,
+                role=c.role,
+                bootcamp_id=None,
+                cohort_id=c.cohort_id,
+                bootcamp_name=label.bootcamp_name if label else None,
+                cohort_number=label.cohort_number if label else None,
+            )
+        )
     responses = []
     for e in employees:
         user = found.get(e.user_id)
@@ -170,9 +238,21 @@ async def _employees(employees: list[Employee], users: UserQueries) -> list[Empl
                 team_id=e.team_id,
                 position_id=e.position_id,
                 employment_type=e.employment_type,
+                assignments=assignments.get(e.id, []),
             )
         )
     return responses
+
+
+async def require_employee_viewer(user: ApprovedUser, checker: PermissionCheckerDep) -> User:
+    """직원 조회: org.manage 또는 staff.assign(전체 범위) — 팀리드가 담당자를 고를 때 (A83)."""
+    for code in ("org.manage", "staff.assign"):
+        if await checker.has(user.id, code, PermissionTarget.global_()):
+            return user
+    raise PermissionDeniedError("이 작업을 할 권한이 없습니다.", code="permission_denied")
+
+
+EmployeeViewer = Annotated[User, Depends(require_employee_viewer)]
 
 
 # ---------------------------------------------------------------- 부서
@@ -311,25 +391,34 @@ async def delete_position(position_id: uuid.UUID, admin: Admin, service: Service
 # ---------------------------------------------------------------- 직원
 @router.get("/employees", response_model=Page[EmployeeResponse])
 async def list_employees(
-    _: Admin,
+    _: EmployeeViewer,
     service: ServiceDep,
     users: UsersDep,
+    academy: AcademyDep,
     department_id: uuid.UUID | None = None,
+    team_id: uuid.UUID | None = None,
+    q: Annotated[str | None, Query(max_length=50, description="이름·이메일")] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> Page[EmployeeResponse]:
-    """직원 목록 (담당자 배정 화면에서 직원을 고를 때도 쓴다)."""
+    """직원 목록 (담당자 배정 화면에서 직원을 고를 때도 쓴다). 담당을 함께 준다 (A83)."""
     employees, total = await service.list_employees(
-        department_id=department_id, limit=limit, offset=offset
+        department_id=department_id, team_id=team_id, query=q, limit=limit, offset=offset
     )
-    return Page(items=await _employees(employees, users), total=total, limit=limit, offset=offset)
+    return Page(
+        items=await _employees(employees, users, academy), total=total, limit=limit, offset=offset
+    )
 
 
 @router.get("/employees/{employee_id}", response_model=EmployeeResponse)
 async def get_employee(
-    employee_id: uuid.UUID, _: Admin, service: ServiceDep, users: UsersDep
+    employee_id: uuid.UUID,
+    _: EmployeeViewer,
+    service: ServiceDep,
+    users: UsersDep,
+    academy: AcademyDep,
 ) -> EmployeeResponse:
-    return (await _employees([await service.get_employee(employee_id)], users))[0]
+    return (await _employees([await service.get_employee(employee_id)], users, academy))[0]
 
 
 @router.patch("/employees/{employee_id}", response_model=EmployeeResponse)
@@ -339,9 +428,10 @@ async def update_employee(
     admin: Admin,
     service: ServiceDep,
     users: UsersDep,
+    academy: AcademyDep,
 ) -> EmployeeResponse:
     """부서·팀·직위·고용 형태 이동 (존재만 검사). 직원 생성은 가입 승인으로만 한다."""
     employee = await service.update_employee(
         employee_id, EmployeeChanges(**_sent(body, ("team_id",))), actor_id=admin.id
     )
-    return (await _employees([employee], users))[0]
+    return (await _employees([employee], users, academy))[0]

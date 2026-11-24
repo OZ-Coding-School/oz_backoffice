@@ -2535,7 +2535,7 @@
           "admin-organization"
         ],
         "summary": "List Employees",
-        "description": "직원 목록 (담당자 배정 화면에서 직원을 고를 때도 쓴다).",
+        "description": "직원 목록 (담당자 배정 화면에서 직원을 고를 때도 쓴다). 담당을 함께 준다 (A83).",
         "operationId": "list_employees_api_v1_admin_employees_get",
         "security": [
           {
@@ -2559,6 +2559,42 @@
               ],
               "title": "Department Id"
             }
+          },
+          {
+            "name": "team_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Team Id"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "이름·이메일",
+              "title": "Q"
+            },
+            "description": "이름·이메일"
           },
           {
             "name": "limit",
@@ -15006,6 +15042,77 @@
         ],
         "title": "EmailCodeVerifyRequest"
       },
+      "EmployeeAssignmentResponse": {
+        "properties": {
+          "staff_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Staff Id",
+            "description": "담당자 행 (해제할 때 쓴다)"
+          },
+          "role": {
+            "$ref": "#/components/schemas/StaffRole"
+          },
+          "bootcamp_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bootcamp Id",
+            "description": "과정 담당이면 과정"
+          },
+          "cohort_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cohort Id",
+            "description": "기수 담당이면 기수"
+          },
+          "bootcamp_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bootcamp Name"
+          },
+          "cohort_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cohort Number"
+          }
+        },
+        "type": "object",
+        "required": [
+          "staff_id",
+          "role",
+          "bootcamp_id",
+          "cohort_id",
+          "bootcamp_name",
+          "cohort_number"
+        ],
+        "title": "EmployeeAssignmentResponse"
+      },
       "EmployeeRegistrationStatus": {
         "type": "string",
         "enum": [
@@ -15056,6 +15163,14 @@
           },
           "employment_type": {
             "$ref": "#/components/schemas/EmploymentType"
+          },
+          "assignments": {
+            "items": {
+              "$ref": "#/components/schemas/EmployeeAssignmentResponse"
+            },
+            "type": "array",
+            "title": "Assignments",
+            "description": "담당 과정·기수 (A83)"
           }
         },
         "type": "object",

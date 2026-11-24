@@ -2,6 +2,8 @@
 
 import uuid
 
+from tortoise.expressions import Q
+
 from app.contexts.organization.domain.entities import (
     BootcampStaff,
     BootcampTeam,
@@ -124,13 +126,25 @@ class TortoiseEmployeeRepository(TortoiseRepository[Employee, EmployeeModel]):
         return self.to_entity(row) if row else None
 
     async def list_page(
-        self, *, department_id: uuid.UUID | None, limit: int, offset: int
+        self,
+        *,
+        department_id: uuid.UUID | None,
+        limit: int,
+        offset: int,
+        team_id: uuid.UUID | None = None,
+        query: str | None = None,
     ) -> tuple[list[Employee], int]:
-        query = EmployeeModel.all()
+        rows_query = EmployeeModel.all()
         if department_id is not None:
-            query = query.filter(department_id=department_id)
-        rows = await query.order_by("created_at", "id").offset(offset).limit(limit)
-        return [self.to_entity(row) for row in rows], await query.count()
+            rows_query = rows_query.filter(department_id=department_id)
+        if team_id is not None:
+            rows_query = rows_query.filter(team_id=team_id)
+        if query:
+            rows_query = rows_query.filter(
+                Q(user__name__icontains=query) | Q(user__email__icontains=query)
+            )
+        rows = await rows_query.order_by("created_at", "id").offset(offset).limit(limit)
+        return [self.to_entity(row) for row in rows], await rows_query.count()
 
     async def list_by_ids(self, employee_ids: list[uuid.UUID]) -> list[Employee]:
         if not employee_ids:
@@ -160,6 +174,12 @@ class TortoiseBootcampStaffRepository(TortoiseRepository[BootcampStaff, Bootcamp
         rows = await BootcampStaffModel.filter(employee_id=employee_id).order_by("id")
         return [self.to_entity(row) for row in rows]
 
+    async def list_by_employees(self, employee_ids: list[uuid.UUID]) -> list[BootcampStaff]:
+        if not employee_ids:
+            return []
+        rows = await BootcampStaffModel.filter(employee_id__in=employee_ids).order_by("id")
+        return [self.to_entity(row) for row in rows]
+
 
 class TortoiseCohortStaffRepository(TortoiseRepository[CohortStaff, CohortStaffModel]):
     model = CohortStaffModel
@@ -181,6 +201,12 @@ class TortoiseCohortStaffRepository(TortoiseRepository[CohortStaff, CohortStaffM
 
     async def list_by_employee(self, employee_id: uuid.UUID) -> list[CohortStaff]:
         rows = await CohortStaffModel.filter(employee_id=employee_id).order_by("id")
+        return [self.to_entity(row) for row in rows]
+
+    async def list_by_employees(self, employee_ids: list[uuid.UUID]) -> list[CohortStaff]:
+        if not employee_ids:
+            return []
+        rows = await CohortStaffModel.filter(employee_id__in=employee_ids).order_by("id")
         return [self.to_entity(row) for row in rows]
 
     async def cohort_ids_with_role(self, role: StaffRole) -> set[uuid.UUID]:

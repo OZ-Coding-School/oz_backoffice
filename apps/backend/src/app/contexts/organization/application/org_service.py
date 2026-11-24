@@ -312,10 +312,20 @@ class OrganizationAdminService:
 
     # ------------------------------------------------------------------ 직원
     async def list_employees(
-        self, *, department_id: uuid.UUID | None, limit: int, offset: int
+        self,
+        *,
+        department_id: uuid.UUID | None,
+        limit: int,
+        offset: int,
+        team_id: uuid.UUID | None = None,
+        query: str | None = None,
     ) -> tuple[list[Employee], int]:
         return await self._employees.list_page(
-            department_id=department_id, limit=limit, offset=offset
+            department_id=department_id,
+            team_id=team_id,
+            query=(query or "").strip() or None,
+            limit=limit,
+            offset=offset,
         )
 
     async def get_employee(self, employee_id: uuid.UUID) -> Employee:

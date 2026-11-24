@@ -105,6 +105,13 @@ class AcademyCatalog:
             for c in cohorts
         ]
 
+    async def bootcamp_names(self, bootcamp_ids: Iterable[uuid.UUID]) -> dict[uuid.UUID, str]:
+        """과정 id → 이름 (A83). 한 번에 읽는다."""
+        wanted = set(bootcamp_ids)
+        if not wanted:
+            return {}
+        return {b.id: b.name for b in await self._bootcamps.list_all() if b.id in wanted}
+
     async def staffable_bootcamps(self) -> list[Bootcamp]:
         return await self._bootcamps.list_active()
 

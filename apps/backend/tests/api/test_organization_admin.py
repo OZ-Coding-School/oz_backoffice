@@ -205,3 +205,74 @@ async def test_requires_org_manage(client: AsyncClient, settings: Settings) -> N
         await client.get("/api/v1/admin/departments", headers=bearer(settings, user))
     ).status_code == 403
     assert (await client.get("/api/v1/admin/departments")).status_code == 401
+
+
+async def test_employees_search_team_and_assignments(
+    client: AsyncClient, settings: Settings, admin: dict[str, str]
+) -> None:
+    """직원 목록: 이름·이메일 검색, 팀 필터, 담당 (A83). 팀리드는 조회만."""
+    from app.contexts.access.application.roles import RoleAssignmentService
+    from app.contexts.access.domain.catalog import TEAM_LEAD
+    from app.contexts.access.domain.enums import RoleScopeType
+    from app.contexts.access.infrastructure.repositories import TortoiseUserRoleRepository
+    from tests.factories.identity import make_user
+    from tests.factories.staff_review import seed_roles
+
+    users = TortoiseUserRepository()
+    kim = make_user(name="김운영", email="kim.manager@nextrunners.co.kr")
+    lee = make_user(name="이조교", email="lee@nextrunners.co.kr")
+    for u in (kim, lee):
+        await users.add(u)
+    manager, assistant = await create_employee(kim), await create_employee(lee)
+    cohort = await create_cohort(cohort_number=12)
+    staffs = "/api/v1/admin"
+    assert (
+        await client.post(
+            f"{staffs}/bootcamps/{cohort.bootcamp_id}/staffs",
+            json={"employee_id": str(manager.id), "role": "MANAGER"},
+            headers=admin,
+        )
+    ).status_code in (200, 201)
+    assert (
+        await client.post(
+            f"{staffs}/cohorts/{cohort.id}/staffs",
+            json={"employee_id": str(assistant.id), "role": "ASSISTANT"},
+            headers=admin,
+        )
+    ).status_code in (200, 201)
+
+    url = "/api/v1/admin/employees"
+    by_name = (await client.get(url, params={"q": "김운"}, headers=admin)).json()
+    assert [e["id"] for e in by_name["items"]] == [str(manager.id)]
+    (assignment,) = by_name["items"][0]["assignments"]
+    assert (assignment["role"], assignment["bootcamp_id"], assignment["cohort_id"]) == (
+        "MANAGER",
+        str(cohort.bootcamp_id),
+        None,
+    )
+    assert assignment["bootcamp_name"]
+    by_email = (await client.get(url, params={"q": "lee@"}, headers=admin)).json()
+    (row,) = by_email["items"]
+    assert (row["assignments"][0]["cohort_id"], row["assignments"][0]["cohort_number"]) == (
+        str(cohort.id),
+        12,
+    )
+
+    team = await create_team(manager.department_id)
+    await client.patch(f"{url}/{manager.id}", json={"team_id": str(team.id)}, headers=admin)
+    in_team = (await client.get(url, params={"team_id": str(team.id)}, headers=admin)).json()
+    assert [e["id"] for e in in_team["items"]] == [str(manager.id)]
+
+    await seed_roles()
+    lead = make_user(email="lead@nextrunners.co.kr")
+    lead.approve(now=datetime.now(UTC))
+    await users.add(lead)
+    await RoleAssignmentService(TortoiseUserRoleRepository()).grant(
+        lead.id, TEAM_LEAD, RoleScopeType.GLOBAL, None
+    )
+    viewer = bearer(settings, lead)
+    assert (await client.get(url, headers=viewer)).status_code == 200
+    assert (await client.get(f"{url}/{manager.id}", headers=viewer)).status_code == 200
+    assert (
+        await client.patch(f"{url}/{manager.id}", json={"team_id": None}, headers=viewer)
+    ).status_code == 403

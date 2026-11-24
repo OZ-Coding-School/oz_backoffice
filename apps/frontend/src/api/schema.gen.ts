@@ -861,7 +861,7 @@ export interface paths {
         };
         /**
          * List Employees
-         * @description 직원 목록 (담당자 배정 화면에서 직원을 고를 때도 쓴다).
+         * @description 직원 목록 (담당자 배정 화면에서 직원을 고를 때도 쓴다). 담당을 함께 준다 (A83).
          */
         get: operations["list_employees_api_v1_admin_employees_get"];
         put?: never;
@@ -4493,6 +4493,30 @@ export interface components {
             /** Code */
             code: string;
         };
+        /** EmployeeAssignmentResponse */
+        EmployeeAssignmentResponse: {
+            /**
+             * Staff Id
+             * Format: uuid
+             * @description 담당자 행 (해제할 때 쓴다)
+             */
+            staff_id: string;
+            role: components["schemas"]["StaffRole"];
+            /**
+             * Bootcamp Id
+             * @description 과정 담당이면 과정
+             */
+            bootcamp_id: string | null;
+            /**
+             * Cohort Id
+             * @description 기수 담당이면 기수
+             */
+            cohort_id: string | null;
+            /** Bootcamp Name */
+            bootcamp_name: string | null;
+            /** Cohort Number */
+            cohort_number: number | null;
+        };
         /**
          * EmployeeRegistrationStatus
          * @enum {string}
@@ -4519,6 +4543,11 @@ export interface components {
              */
             position_id: string;
             employment_type: components["schemas"]["EmploymentType"];
+            /**
+             * Assignments
+             * @description 담당 과정·기수 (A83)
+             */
+            assignments?: components["schemas"]["EmployeeAssignmentResponse"][];
         };
         /** EmployeeUpdateRequest */
         EmployeeUpdateRequest: {
@@ -8996,6 +9025,9 @@ export interface operations {
         parameters: {
             query?: {
                 department_id?: string | null;
+                team_id?: string | null;
+                /** @description 이름·이메일 */
+                q?: string | null;
                 limit?: number;
                 offset?: number;
             };
