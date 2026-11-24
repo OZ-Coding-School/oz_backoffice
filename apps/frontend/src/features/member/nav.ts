@@ -87,9 +87,16 @@ const MENTOR_SCHEDULE: MemberNavItem = {
   icon: CalendarDays,
 };
 
+const MENTOR_SETTLEMENTS: MemberNavItem = {
+  to: "/mentor/settlements",
+  label: "정산",
+  shortLabel: "정산",
+  icon: Wallet,
+};
+
 const MENTOR_NAV: MemberNavGroup[] = [
   { items: [HOME] },
-  { title: "멘토링", items: [RECEIVED, MENTOR_SESSIONS, MENTOR_SCHEDULE, CHAT] },
+  { title: "멘토링", items: [RECEIVED, MENTOR_SESSIONS, MENTOR_SCHEDULE, CHAT, MENTOR_SETTLEMENTS] },
 ];
 
 export interface MemberNavOptions {
@@ -129,7 +136,14 @@ export function currentNavItem(groups: readonly MemberNavGroup[], pathname: stri
 
 /** 하단 탭에 바로 둘 수 있는 메뉴 수. 넘으면 앞 4개 + 더보기 (F36) */
 export const MAX_BOTTOM_TABS = 5;
-const PINNED_TABS = ["/", "/mentoring/apply", "/mentoring/sessions", "/mentoring/requests"];
+const STUDENT_PINNED_TABS = ["/", "/mentoring/apply", "/mentoring/sessions", "/mentoring/requests"];
+/** 멘토는 채팅을 고정한다 (F54): 홈·받은 신청·세션·채팅 */
+const MENTOR_PINNED_TABS = ["/", "/mentor/requests", "/mentor/sessions", "/mentoring/chat"];
+
+/** 하단 탭에 먼저 둘 메뉴 (계정 종류별) */
+export function pinnedTabs(accountType: Me["account_type"]): readonly string[] {
+  return accountType === "MENTOR" ? MENTOR_PINNED_TABS : STUDENT_PINNED_TABS;
+}
 
 export interface BottomTabLayout {
   tabs: MemberNavItem[];
@@ -138,13 +152,17 @@ export interface BottomTabLayout {
 }
 
 /**
- * 하단 탭 (F36): 메뉴가 5개 이하면 모두, 넘으면 홈·신청·진행 기록·신청 내역(있는 것) 4개 + 더보기.
+ * 하단 탭 (F36): 메뉴가 5개 이하면 모두, 넘으면 고정 메뉴(있는 것) 4개 + 더보기.
+ * 수강생은 홈·신청·진행 기록·신청 내역, 멘토는 홈·받은 신청·세션·채팅이다 (F54).
  * 고정 메뉴가 4개보다 적으면 사이드바 순서대로 채운다.
  */
-export function bottomTabLayout(groups: readonly MemberNavGroup[]): BottomTabLayout {
+export function bottomTabLayout(
+  groups: readonly MemberNavGroup[],
+  pinnedPaths: readonly string[] = STUDENT_PINNED_TABS,
+): BottomTabLayout {
   const items = navItems(groups);
   if (items.length <= MAX_BOTTOM_TABS) return { tabs: items, more: [] };
-  const pinned = PINNED_TABS.map((to) => items.find((i) => i.to === to)).filter((i): i is MemberNavItem => !!i);
+  const pinned = pinnedPaths.map((to) => items.find((i) => i.to === to)).filter((i): i is MemberNavItem => !!i);
   const tabs = [...pinned, ...items.filter((i) => !pinned.includes(i))].slice(0, MAX_BOTTOM_TABS - 1);
   const more = groups
     .map((g) => ({ ...g, items: g.items.filter((i) => !tabs.includes(i)) }))
