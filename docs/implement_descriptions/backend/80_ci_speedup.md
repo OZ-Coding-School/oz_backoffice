@@ -1,7 +1,7 @@
 # 80. CI 시간 줄이기
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 중)
+- 관련 PR: #121
 - 관련 결정: `docs/decisions.md` R9 (R5·F19)
 - 이전 기록: [79. 정산 응답에 기수·항목 상대·주제 (BE-2n)](79_settlement_labels.md)
 
