@@ -1,7 +1,7 @@
 # 84. 직원 목록 검색·팀 필터·담당 (BE-3c)
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 중)
+- 관련 PR: #130
 - 관련 결정: `docs/decisions.md` A83, F62 (A17·A36·A62)
 - 이전 기록: [83. 가입 수동 승인 후보 (BE-3b)](83_approval_candidates.md)
 
