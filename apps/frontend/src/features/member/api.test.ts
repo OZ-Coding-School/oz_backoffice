@@ -34,7 +34,7 @@ describe("활성 기수 (F27)", () => {
 });
 
 describe("회원 메뉴 (F27)", () => {
-  it("수강생은 만든 메뉴를 모두 보고, 멘토는 홈·받은 신청·세션·일정·채팅·정산이라 하단 탭이 있다", () => {
+  it("수강생은 만든 메뉴를 모두 보고, 멘토는 홈·받은 신청·세션·일정·채팅·정산·내 프로필이라 하단 탭이 있다", () => {
     expect(navItems(memberNav("STUDENT")).map((i) => i.label)).toEqual([
       "홈",
       "신청 내역",
@@ -60,7 +60,8 @@ describe("회원 메뉴 (F27)", () => {
       "일정",
       "채팅",
       "정산",
-    ]); // F40·F43·F47·F54
+      "내 프로필",
+    ]); // F40·F43·F47·F54·F56
     expect(showBottomTabs(memberNav("MENTOR"))).toBe(true);
   });
 
@@ -79,16 +80,21 @@ describe("회원 메뉴 (F27)", () => {
 
 describe("하단 탭 더보기 (F36)", () => {
   it("메뉴가 5개 이하면 모두 탭이다", () => {
-    const groups = memberNav("MENTOR").map((g) => ({ ...g, items: g.items.filter((i) => i.label !== "정산") }));
+    const groups = memberNav("MENTOR")
+      .map((g) => ({ ...g, items: g.items.filter((i) => !["정산", "내 프로필"].includes(i.label)) }))
+      .filter((g) => g.items.length > 0);
     const layout = bottomTabLayout(groups, pinnedTabs("MENTOR"));
     expect(layout.tabs.map((i) => i.shortLabel)).toEqual(["홈", "받은 신청", "세션", "일정", "채팅"]);
     expect(layout.more).toEqual([]);
   });
 
-  it("멘토는 채팅을 고정하고 일정·정산은 더보기 (F54)", () => {
+  it("멘토는 채팅을 고정하고 일정·정산·내 프로필은 더보기 (F54·F56)", () => {
     const layout = bottomTabLayout(memberNav("MENTOR"), pinnedTabs("MENTOR"));
     expect(layout.tabs.map((i) => i.shortLabel)).toEqual(["홈", "받은 신청", "세션", "채팅"]);
-    expect(layout.more.map((g) => [g.title, g.items.map((i) => i.label)])).toEqual([["멘토링", ["일정", "정산"]]]);
+    expect(layout.more.map((g) => [g.title, g.items.map((i) => i.label)])).toEqual([
+      ["멘토링", ["일정", "정산"]],
+      ["내 공간", ["내 프로필"]],
+    ]);
   });
 
   it("팀이 있으면 '내 팀'이 진행 기록 다음에 들어간다 (F39)", () => {
