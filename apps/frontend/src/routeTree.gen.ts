@@ -28,6 +28,7 @@ import { Route as StaffAuthStaffLoginRouteImport } from './routes/_staffAuth/sta
 import { Route as StaffAuthStaffRegistrationRouteImport } from './routes/_staffAuth/staff/registration'
 import { Route as MemberMentorRequestsIndexRouteImport } from './routes/_member/mentor/requests/index'
 import { Route as MemberMentorRequestsRequestIdRouteImport } from './routes/_member/mentor/requests/$requestId'
+import { Route as MemberMentorScheduleIndexRouteImport } from './routes/_member/mentor/schedule/index'
 import { Route as MemberMentorSessionsIndexRouteImport } from './routes/_member/mentor/sessions/index'
 import { Route as MemberMentorSessionsSessionIdRouteImport } from './routes/_member/mentor/sessions/$sessionId'
 import { Route as MemberMentoringChatIndexRouteImport } from './routes/_member/mentoring/chat/index'
@@ -133,6 +134,12 @@ const MemberMentorRequestsRequestIdRoute =
     path: '/mentor/requests/$requestId',
     getParentRoute: () => MemberRoute,
   } as any)
+const MemberMentorScheduleIndexRoute =
+  MemberMentorScheduleIndexRouteImport.update({
+    id: '/mentor/schedule/',
+    path: '/mentor/schedule/',
+    getParentRoute: () => MemberRoute,
+  } as any)
 const MemberMentorSessionsIndexRoute =
   MemberMentorSessionsIndexRouteImport.update({
     id: '/mentor/sessions/',
@@ -208,6 +215,7 @@ export interface FileRoutesByFullPath {
   '/mentoring/requests/$requestId': typeof MemberMentoringRequestsRequestIdRoute
   '/mentoring/sessions/$sessionId': typeof MemberMentoringSessionsSessionIdRoute
   '/mentor/requests/': typeof MemberMentorRequestsIndexRoute
+  '/mentor/schedule/': typeof MemberMentorScheduleIndexRoute
   '/mentor/sessions/': typeof MemberMentorSessionsIndexRoute
   '/mentoring/chat/': typeof MemberMentoringChatIndexRoute
   '/mentoring/requests/': typeof MemberMentoringRequestsIndexRoute
@@ -234,6 +242,7 @@ export interface FileRoutesByTo {
   '/mentoring/requests/$requestId': typeof MemberMentoringRequestsRequestIdRoute
   '/mentoring/sessions/$sessionId': typeof MemberMentoringSessionsSessionIdRoute
   '/mentor/requests': typeof MemberMentorRequestsIndexRoute
+  '/mentor/schedule': typeof MemberMentorScheduleIndexRoute
   '/mentor/sessions': typeof MemberMentorSessionsIndexRoute
   '/mentoring/chat': typeof MemberMentoringChatIndexRoute
   '/mentoring/requests': typeof MemberMentoringRequestsIndexRoute
@@ -265,6 +274,7 @@ export interface FileRoutesById {
   '/_member/mentoring/requests/$requestId': typeof MemberMentoringRequestsRequestIdRoute
   '/_member/mentoring/sessions/$sessionId': typeof MemberMentoringSessionsSessionIdRoute
   '/_member/mentor/requests/': typeof MemberMentorRequestsIndexRoute
+  '/_member/mentor/schedule/': typeof MemberMentorScheduleIndexRoute
   '/_member/mentor/sessions/': typeof MemberMentorSessionsIndexRoute
   '/_member/mentoring/chat/': typeof MemberMentoringChatIndexRoute
   '/_member/mentoring/requests/': typeof MemberMentoringRequestsIndexRoute
@@ -293,6 +303,7 @@ export interface FileRouteTypes {
     | '/mentoring/requests/$requestId'
     | '/mentoring/sessions/$sessionId'
     | '/mentor/requests/'
+    | '/mentor/schedule/'
     | '/mentor/sessions/'
     | '/mentoring/chat/'
     | '/mentoring/requests/'
@@ -319,6 +330,7 @@ export interface FileRouteTypes {
     | '/mentoring/requests/$requestId'
     | '/mentoring/sessions/$sessionId'
     | '/mentor/requests'
+    | '/mentor/schedule'
     | '/mentor/sessions'
     | '/mentoring/chat'
     | '/mentoring/requests'
@@ -349,6 +361,7 @@ export interface FileRouteTypes {
     | '/_member/mentoring/requests/$requestId'
     | '/_member/mentoring/sessions/$sessionId'
     | '/_member/mentor/requests/'
+    | '/_member/mentor/schedule/'
     | '/_member/mentor/sessions/'
     | '/_member/mentoring/chat/'
     | '/_member/mentoring/requests/'
@@ -499,6 +512,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MemberMentorRequestsRequestIdRouteImport
       parentRoute: typeof MemberRoute
     }
+    '/_member/mentor/schedule/': {
+      id: '/_member/mentor/schedule/'
+      path: '/mentor/schedule'
+      fullPath: '/mentor/schedule/'
+      preLoaderRoute: typeof MemberMentorScheduleIndexRouteImport
+      parentRoute: typeof MemberRoute
+    }
     '/_member/mentor/sessions/': {
       id: '/_member/mentor/sessions/'
       path: '/mentor/sessions'
@@ -593,6 +613,7 @@ interface MemberRouteChildren {
   MemberMentoringRequestsRequestIdRoute: typeof MemberMentoringRequestsRequestIdRoute
   MemberMentoringSessionsSessionIdRoute: typeof MemberMentoringSessionsSessionIdRoute
   MemberMentorRequestsIndexRoute: typeof MemberMentorRequestsIndexRoute
+  MemberMentorScheduleIndexRoute: typeof MemberMentorScheduleIndexRoute
   MemberMentorSessionsIndexRoute: typeof MemberMentorSessionsIndexRoute
   MemberMentoringChatIndexRoute: typeof MemberMentoringChatIndexRoute
   MemberMentoringRequestsIndexRoute: typeof MemberMentoringRequestsIndexRoute
@@ -612,6 +633,7 @@ const MemberRouteChildren: MemberRouteChildren = {
   MemberMentoringRequestsRequestIdRoute: MemberMentoringRequestsRequestIdRoute,
   MemberMentoringSessionsSessionIdRoute: MemberMentoringSessionsSessionIdRoute,
   MemberMentorRequestsIndexRoute: MemberMentorRequestsIndexRoute,
+  MemberMentorScheduleIndexRoute: MemberMentorScheduleIndexRoute,
   MemberMentorSessionsIndexRoute: MemberMentorSessionsIndexRoute,
   MemberMentoringChatIndexRoute: MemberMentoringChatIndexRoute,
   MemberMentoringRequestsIndexRoute: MemberMentoringRequestsIndexRoute,
