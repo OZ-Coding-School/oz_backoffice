@@ -80,7 +80,9 @@ test.describe("멘토 일정", () => {
     );
 
     await page.goto("/");
-    await page.getByRole("navigation", { name: "하단 메뉴" }).getByRole("link", { name: "일정" }).click();
+    // 멘토 메뉴가 6개라 일정은 더보기 안에 있다 (F54)
+    await page.getByRole("navigation", { name: "하단 메뉴" }).getByRole("button", { name: "더보기" }).click();
+    await page.getByRole("dialog", { name: "더보기" }).getByRole("link", { name: "일정" }).click();
     await expect(page).toHaveURL(/\/mentor\/schedule$/);
     const tuesday = page.getByRole("group", { name: "11월 24일 (화)" });
     await expect(tuesday.getByText("본업 · 매주")).toBeVisible();

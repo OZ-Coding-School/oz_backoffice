@@ -34,6 +34,7 @@ import {
   currentNavItem,
   memberNav,
   navItems,
+  pinnedTabs,
   showBottomTabs,
   type MemberNavGroup,
   type MemberNavItem,
@@ -131,7 +132,13 @@ export function MemberShell({ me, children }: { me: Me; children: ReactNode }) {
           </main>
         )}
         {showBottomTabs(groups) ? (
-          <BottomTabs groups={groups} current={current} hidden={immersive} badges={badges} />
+          <BottomTabs
+            groups={groups}
+            pinned={pinnedTabs(me.account_type)}
+            current={current}
+            hidden={immersive}
+            badges={badges}
+          />
         ) : null}
       </div>
     </div>
@@ -242,17 +249,20 @@ function UserMenu({ me, roleLine }: { me: Me; roleLine: string }) {
 
 function BottomTabs({
   groups,
+  pinned,
   current,
   hidden,
   badges,
 }: {
   groups: MemberNavGroup[];
+  /** 하단 탭에 먼저 둘 메뉴 (F36·F54) */
+  pinned: readonly string[];
   current: MemberNavItem | undefined;
   /** 휴대폰 채팅 대화처럼 전체 화면일 때 숨긴다 (F40) */
   hidden: boolean;
   badges: Badges;
 }) {
-  const { tabs, more } = bottomTabLayout(groups);
+  const { tabs, more } = bottomTabLayout(groups, pinned);
   const moreItems = more.flatMap((g) => g.items).filter((i) => (badges[i.to] ?? 0) > 0);
   const moreBadge = moreItems.reduce((sum, i) => sum + (badges[i.to] ?? 0), 0);
   // 더보기 안 배지가 한 종류면 그 말로, 섞이면 '새 항목'으로 읽는다
