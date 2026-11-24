@@ -1,7 +1,7 @@
 # 26. FE-11b 멘토 불가 시간 추가·수정·삭제·충돌 확인
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #118
 - 관련 결정: `docs/decisions.md` F53 (A37·A45·A79·F51·F52)
 - 이전 기록: [25. FE-11a 멘토 일정 보기](25_mentor_schedule_view.md)
 
