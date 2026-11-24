@@ -1,6 +1,6 @@
 # 32. FE-15b 운영진 승인
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-24 병합)
 - 관련 PR: #129
 - 관련 결정: `docs/decisions.md` F61 (A11·A12·A62·A63·A81·F26·F60)
 - 이전 기록: [31. FE-15a 회원 가입 승인](31_signup_approvals.md)
@@ -33,6 +33,9 @@ Figma는 `Admin - 회원·권한` 데스크톱 Section의 `운영진 승인 (FE-
 - `vitest` 299 passed (TZ=UTC·America/Los_Angeles·Asia/Seoul). 새 테스트: 선택지 합치기, 목록(메뉴 권한·배지·이름표·끝난 기수 이름), 검토(다른 팀 과정 추가 후 승인 본문), 반려, 반려 탭 읽기만. FE-1c 운영진 신청 테스트(41개)도 그대로 통과
 - `playwright` 38 passed. 새 E2E: 메뉴 → 검토 → 승인
 - 1440 목록과 검토 창을 시안과 비교했다
+
+- GitHub Actions (PR #129): 프론트엔드 검사·E2E 통과
+- 사용자가 병합을 확인했다(2026-11-24)
 
 ## 남은 작업
 - FE-15c 직원·담당자
