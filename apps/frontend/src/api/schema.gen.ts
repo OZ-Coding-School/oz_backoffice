@@ -653,9 +653,10 @@ export interface paths {
         put?: never;
         /**
          * Grant User Role
-         * @description 직접 관리 역할(SUPER_ADMIN·TEAM_LEAD)을 부여한다.
+         * @description 직접 관리 역할(최고 관리자·팀리드·새 역할)을 운영진 계정에 부여한다.
          *
-         *     다른 역할은 422 role_managed_by_assignment.
+         *     다른 역할은 422 role_managed_by_assignment, 운영진이 아니면 422 staff_only,
+         *     역할의 허용 범위와 다르면 422 invalid_role_scope.
          */
         post: operations["grant_user_role_api_v1_admin_users__user_id__roles_post"];
         delete?: never;
@@ -740,6 +741,26 @@ export interface paths {
          *     과정·기수 범위 역할에 전체 전용 권한은 422 global_only_permission.
          */
         put: operations["replace_role_permissions_api_v1_admin_roles__code__permissions_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/role-holders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Role Holders
+         * @description 멘토·수강생을 뺀 역할 보유자 (사람 단위, 이름순, 만료된 부여 포함).
+         */
+        get: operations["list_role_holders_api_v1_admin_role_holders_get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -4740,6 +4761,13 @@ export interface components {
         GrantRoleRequest: {
             /** Role */
             role: string;
+            /** @description 없으면 GLOBAL. 새 과정·기수 범위 역할은 BOOTCAMP·COHORT */
+            scope_type?: components["schemas"]["RoleScopeType"] | null;
+            /**
+             * Scope Id
+             * @description 과정·기수 id (GLOBAL이면 없음)
+             */
+            scope_id?: string | null;
             /** Expires At */
             expires_at?: string | null;
         };
@@ -4777,6 +4805,45 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** HolderRoleResponse */
+        HolderRoleResponse: {
+            /**
+             * Id
+             * Format: uuid
+             * @description 역할 부여 id (회수할 때 씀)
+             */
+            id: string;
+            /** Role */
+            role: string;
+            /** Role Name */
+            role_name: string;
+            scope_type: components["schemas"]["RoleScopeType"];
+            /** Scope Id */
+            scope_id: string | null;
+            /**
+             * Bootcamp Name
+             * @description 과정·기수 범위면 과정명
+             */
+            bootcamp_name: string | null;
+            /**
+             * Cohort Number
+             * @description 기수 범위면 기수 번호
+             */
+            cohort_number: number | null;
+            /** Expires At */
+            expires_at: string | null;
+            /**
+             * Is Effective
+             * @description false면 만료
+             */
+            is_effective: boolean;
+            /**
+             * Managed By
+             * @description direct = 이 화면에서 회수, assignment = 담당자 배정에서 관리
+             * @enum {string}
+             */
+            managed_by: "direct" | "assignment";
         };
         /** HolidayCreate */
         HolidayCreate: {
@@ -5569,6 +5636,17 @@ export interface components {
             /** Offset */
             offset: number;
         };
+        /** Page[RoleHolderResponse] */
+        Page_RoleHolderResponse_: {
+            /** Items */
+            items: components["schemas"]["RoleHolderResponse"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
         /** Page[ThreadResponse] */
         Page_ThreadResponse_: {
             /** Items */
@@ -6044,6 +6122,26 @@ export interface components {
             scope_id: string | null;
             /** Expires At */
             expires_at: string | null;
+        };
+        /** RoleHolderResponse */
+        RoleHolderResponse: {
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Name */
+            name: string;
+            /** Email */
+            email: string;
+            /** Department Name */
+            department_name: string | null;
+            /** Team Name */
+            team_name: string | null;
+            /** Position Name */
+            position_name: string | null;
+            /** Roles */
+            roles: components["schemas"]["HolderRoleResponse"][];
         };
         /**
          * RoleScopeKind
@@ -8898,6 +8996,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RoleDefinitionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_role_holders_api_v1_admin_role_holders_get: {
+        parameters: {
+            query?: {
+                /** @description 이 역할을 가진 사람만 */
+                role?: string | null;
+                /** @description 이름·이메일 */
+                q?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_RoleHolderResponse_"];
                 };
             };
             /** @description Validation Error */

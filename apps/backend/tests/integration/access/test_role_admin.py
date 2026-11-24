@@ -2,11 +2,20 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from app.contexts.academy.application.catalog import AcademyCatalog
+from app.contexts.academy.infrastructure.repositories import (
+    TortoiseBootcampRepository,
+    TortoiseCohortRepository,
+)
 from app.contexts.access.application.role_admin import RoleAdministration
 from app.contexts.access.application.roles import RoleAssignmentService
 from app.contexts.access.domain.catalog import COHORT_ASSISTANT, SUPER_ADMIN
-from app.contexts.access.domain.enums import RoleScopeType
-from app.contexts.access.infrastructure.repositories import TortoiseUserRoleRepository
+from app.contexts.access.domain.enums import RoleScopeKind, RoleScopeType
+from app.contexts.access.domain.roles import Role
+from app.contexts.access.infrastructure.repositories import (
+    TortoiseRoleRepository,
+    TortoiseUserRoleRepository,
+)
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.audit.infrastructure.models import AuditLogModel
 from app.contexts.audit.infrastructure.repositories import TortoiseAuditLogRepository
@@ -17,6 +26,8 @@ from app.core.clock import FixedClock
 from app.core.uow import UnitOfWork
 from app.shared.errors import BusinessRuleViolation, ConflictError, NotFoundError
 from app.shared.ids import new_id
+from tests.factories.academy import create_cohort
+from tests.factories.identity import make_user
 from tests.factories.staff_review import create_applicant, seed_roles
 
 pytestmark = pytest.mark.integration
@@ -24,14 +35,15 @@ pytestmark = pytest.mark.integration
 NOW = datetime.now(UTC)
 
 
-def service() -> RoleAdministration:
-    clock = FixedClock(NOW)
+def service(now: datetime = NOW) -> RoleAdministration:
     return RoleAdministration(
         user_roles=TortoiseUserRoleRepository(),
+        roles=TortoiseRoleRepository(),
         users=UserQueries(TortoiseUserRepository()),
-        audit=AuditRecorder(TortoiseAuditLogRepository(), clock),
+        scopes=AcademyCatalog(TortoiseBootcampRepository(), TortoiseCohortRepository()),
+        audit=AuditRecorder(TortoiseAuditLogRepository(), FixedClock(now)),
         uow=UnitOfWork(),
-        clock=clock,
+        clock=FixedClock(now),
     )
 
 
@@ -90,13 +102,7 @@ async def test_expired_admin_does_not_count_as_remaining(boss: User) -> None:
     grant = await service().grant(
         temp.id, SUPER_ADMIN, actor_id=boss.id, expires_at=NOW + timedelta(seconds=1)
     )
-    later = RoleAdministration(
-        user_roles=TortoiseUserRoleRepository(),
-        users=UserQueries(TortoiseUserRepository()),
-        audit=AuditRecorder(TortoiseAuditLogRepository(), FixedClock(NOW)),
-        uow=UnitOfWork(),
-        clock=FixedClock(NOW + timedelta(hours=1)),
-    )
+    later = service(NOW + timedelta(hours=1))
     (boss_role,) = await later.list_for_user(boss.id)
     with pytest.raises(ConflictError):
         await later.revoke(boss.id, boss_role.id, actor_id=boss.id)
@@ -138,3 +144,65 @@ async def test_grant_and_revoke_errors(boss: User) -> None:
     with pytest.raises(NotFoundError) as wrong_user:
         await service().revoke(pending.id, boss_role.id, actor_id=boss.id)
     assert wrong_user.value.code == "user_role_not_found"
+
+
+async def add_role(code: str, kind: RoleScopeKind) -> None:
+    await TortoiseRoleRepository().add(
+        Role.create(code=code, name=code, description=None, scope_kind=kind)
+    )
+
+
+async def test_custom_roles_are_granted_in_their_scope(boss: User) -> None:
+    await add_role("AUDITOR", RoleScopeKind.SCOPED)
+    await add_role("ORG_EDITOR", RoleScopeKind.GLOBAL)
+    cohort = await create_cohort()
+    user = await approved_user()
+
+    first = await service().grant(
+        user.id,
+        "AUDITOR",
+        actor_id=boss.id,
+        scope_type=RoleScopeType.COHORT,
+        scope_id=cohort.id,
+    )
+    second = await service().grant(
+        user.id,
+        "AUDITOR",
+        actor_id=boss.id,
+        scope_type=RoleScopeType.BOOTCAMP,
+        scope_id=cohort.bootcamp_id,
+    )
+    await service().grant(user.id, "ORG_EDITOR", actor_id=boss.id)
+    assert {r.id for r in await service().list_for_user(user.id)} >= {first.id, second.id}
+    await service().revoke(user.id, first.id, actor_id=boss.id)
+
+    async def code_of(**kw: object) -> str:
+        with pytest.raises((BusinessRuleViolation, NotFoundError)) as exc:
+            await service().grant(user.id, actor_id=boss.id, **kw)  # type: ignore[arg-type]
+        return exc.value.code
+
+    assert await code_of(role_code="AUDITOR") == "invalid_role_scope"  # 전체 범위로는 안 됨
+    assert (
+        await code_of(role_code="AUDITOR", scope_type=RoleScopeType.COHORT) == "invalid_role_scope"
+    )
+    assert (
+        await code_of(role_code="ORG_EDITOR", scope_type=RoleScopeType.COHORT, scope_id=cohort.id)
+        == "invalid_role_scope"
+    )
+    assert (
+        await code_of(role_code="AUDITOR", scope_type=RoleScopeType.COHORT, scope_id=new_id())
+        == "cohort_not_found"
+    )
+    assert (
+        await code_of(role_code="AUDITOR", scope_type=RoleScopeType.BOOTCAMP, scope_id=new_id())
+        == "bootcamp_not_found"
+    )
+
+
+async def test_only_staff_accounts_can_receive_roles(boss: User) -> None:
+    student = make_user()  # 수강생 계정
+    student.approve(now=NOW)
+    await TortoiseUserRepository().add(student)
+    with pytest.raises(BusinessRuleViolation) as exc:
+        await service().grant(student.id, SUPER_ADMIN, actor_id=boss.id)
+    assert exc.value.code == "staff_only"

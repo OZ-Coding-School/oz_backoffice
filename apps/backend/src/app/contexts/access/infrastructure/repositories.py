@@ -213,6 +213,42 @@ class TortoiseUserRoleRepository:
         )
         return [uuid.UUID(str(user_id)) for user_id in rows]
 
+    async def list_holder_ids(
+        self,
+        *,
+        exclude_roles: frozenset[str],
+        role_code: str | None,
+        query: str | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[uuid.UUID], int]:
+        rows = UserRoleModel.exclude(role__code__in=list(exclude_roles))
+        if role_code is not None:
+            rows = rows.filter(role__code=role_code)
+        if query:
+            rows = rows.filter(Q(user__name__icontains=query) | Q(user__email__icontains=query))
+        # 운영진 보유자는 많지 않아 회원 단위로 모은 뒤 자른다
+        holders = (
+            await rows.distinct()
+            .order_by("user__name", "user_id")
+            .values_list("user__name", "user_id")  # DISTINCT는 정렬 열을 함께 고른다
+        )
+        ids = [uuid.UUID(str(user_id)) for _, user_id in holders]
+        return ids[offset : offset + limit], len(ids)
+
+    async def list_by_users(
+        self, user_ids: list[uuid.UUID], *, exclude_roles: frozenset[str]
+    ) -> list[UserRole]:
+        if not user_ids:
+            return []
+        rows = (
+            await UserRoleModel.filter(user_id__in=user_ids)
+            .exclude(role__code__in=list(exclude_roles))
+            .select_related("role")
+            .order_by("created_at", "id")
+        )
+        return [_to_user_role(row) for row in rows]
+
     async def list_grants(self, user_id: uuid.UUID, *, now: datetime) -> list[RoleGrant]:
         rows = (
             await UserRoleModel.filter(

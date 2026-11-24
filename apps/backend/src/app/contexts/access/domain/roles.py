@@ -15,6 +15,7 @@ from app.contexts.access.domain.catalog import (
     PERMISSIONS,
     ROLES_BY_CODE,
     SUPER_ADMIN,
+    TEAM_LEAD,
 )
 from app.contexts.access.domain.enums import RoleScopeKind, RoleScopeType
 from app.shared.domain import AggregateRoot
@@ -125,3 +126,11 @@ class Role(AggregateRoot):
                     code="global_only_permission",
                 )
         self.permissions = wanted
+
+
+def is_directly_managed(code: str) -> bool:
+    """역할 화면에서 직접 부여·회수하는 역할: 최고 관리자·팀리드·새 역할 (A17·A36·A85).
+
+    운영 매니저·조교는 담당자 배정, 멘토·수강생은 배정·가입에서만 바뀐다.
+    """
+    return code in (SUPER_ADMIN, TEAM_LEAD) or code not in BUILTIN_ROLE_CODES

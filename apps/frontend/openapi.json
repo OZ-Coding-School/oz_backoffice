@@ -1800,7 +1800,7 @@
           "admin-user-roles"
         ],
         "summary": "Grant User Role",
-        "description": "직접 관리 역할(SUPER_ADMIN·TEAM_LEAD)을 부여한다.\n\n다른 역할은 422 role_managed_by_assignment.",
+        "description": "직접 관리 역할(최고 관리자·팀리드·새 역할)을 운영진 계정에 부여한다.\n\n다른 역할은 422 role_managed_by_assignment, 운영진이 아니면 422 staff_only,\n역할의 허용 범위와 다르면 422 invalid_role_scope.",
         "operationId": "grant_user_role_api_v1_admin_users__user_id__roles_post",
         "security": [
           {
@@ -2113,6 +2113,106 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RoleDefinitionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/role-holders": {
+      "get": {
+        "tags": [
+          "admin-role-holders"
+        ],
+        "summary": "List Role Holders",
+        "description": "멘토·수강생을 뺀 역할 보유자 (사람 단위, 이름순, 만료된 부여 포함).",
+        "operationId": "list_role_holders_api_v1_admin_role_holders_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "role",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "이 역할을 가진 사람만",
+              "title": "Role"
+            },
+            "description": "이 역할을 가진 사람만"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "이름·이메일",
+              "title": "Q"
+            },
+            "description": "이름·이메일"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_RoleHolderResponse_"
                 }
               }
             }
@@ -15714,6 +15814,30 @@
             "type": "string",
             "title": "Role"
           },
+          "scope_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoleScopeType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "없으면 GLOBAL. 새 과정·기수 범위 역할은 BOOTCAMP·COHORT"
+          },
+          "scope_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope Id",
+            "description": "과정·기수 id (GLOBAL이면 없음)"
+          },
           "expires_at": {
             "anyOf": [
               {
@@ -15794,6 +15918,103 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "HolderRoleResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id",
+            "description": "역할 부여 id (회수할 때 씀)"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "role_name": {
+            "type": "string",
+            "title": "Role Name"
+          },
+          "scope_type": {
+            "$ref": "#/components/schemas/RoleScopeType"
+          },
+          "scope_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope Id"
+          },
+          "bootcamp_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bootcamp Name",
+            "description": "과정·기수 범위면 과정명"
+          },
+          "cohort_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cohort Number",
+            "description": "기수 범위면 기수 번호"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "is_effective": {
+            "type": "boolean",
+            "title": "Is Effective",
+            "description": "false면 만료"
+          },
+          "managed_by": {
+            "type": "string",
+            "enum": [
+              "direct",
+              "assignment"
+            ],
+            "title": "Managed By",
+            "description": "direct = 이 화면에서 회수, assignment = 담당자 배정에서 관리"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "role",
+          "role_name",
+          "scope_type",
+          "scope_id",
+          "bootcamp_name",
+          "cohort_number",
+          "expires_at",
+          "is_effective",
+          "managed_by"
+        ],
+        "title": "HolderRoleResponse"
       },
       "HolidayCreate": {
         "properties": {
@@ -17895,6 +18116,37 @@
         ],
         "title": "Page[MentorListItem]"
       },
+      "Page_RoleHolderResponse_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RoleHolderResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "Page[RoleHolderResponse]"
+      },
       "Page_ThreadResponse_": {
         "properties": {
           "items": {
@@ -19219,6 +19471,74 @@
           "expires_at"
         ],
         "title": "RoleGrantResponse"
+      },
+      "RoleHolderResponse": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "department_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Name"
+          },
+          "team_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Name"
+          },
+          "position_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position Name"
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/HolderRoleResponse"
+            },
+            "type": "array",
+            "title": "Roles"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "name",
+          "email",
+          "department_name",
+          "team_name",
+          "position_name",
+          "roles"
+        ],
+        "title": "RoleHolderResponse"
       },
       "RoleScopeKind": {
         "type": "string",

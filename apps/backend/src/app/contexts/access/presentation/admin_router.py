@@ -1,6 +1,6 @@
-"""회원 역할 관리 API (/admin/users/{user_id}/roles). 권한: role.assign (전체 범위, SUPER_ADMIN).
+"""회원 역할 관리 API (/admin/users/{user_id}/roles). 권한: role.assign (전체 범위).
 
-직접 부여·회수할 수 있는 역할은 SUPER_ADMIN·TEAM_LEAD(GLOBAL)다 (decisions A17·A36).
+직접 부여·회수할 수 있는 역할은 최고 관리자·팀리드·새 역할이다 (decisions A17·A36·A85).
 매니저·조교 역할은 담당자 API, 멘토·수강생 역할은 배정·가입 기능이 관리한다.
 """
 
@@ -9,16 +9,20 @@ from datetime import datetime
 from typing import Annotated, Literal, cast
 
 from fastapi import APIRouter, Depends, Request, Response, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.contexts.access.application.role_admin import (
-    DIRECTLY_MANAGED_ROLES,
     RoleAdministration,
+    ScopeTargets,
     UserDirectory,
 )
 from app.contexts.access.domain.entities import UserRole
 from app.contexts.access.domain.enums import RoleScopeType
-from app.contexts.access.infrastructure.repositories import TortoiseUserRoleRepository
+from app.contexts.access.domain.roles import is_directly_managed
+from app.contexts.access.infrastructure.repositories import (
+    TortoiseRoleRepository,
+    TortoiseUserRoleRepository,
+)
 from app.contexts.access.presentation.dependencies import require_permission
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.identity.domain.entities import User
@@ -41,6 +45,10 @@ class UserRoleResponse(BaseModel):
 
 class GrantRoleRequest(BaseModel):
     role: str
+    scope_type: RoleScopeType | None = Field(
+        default=None, description="없으면 GLOBAL. 새 과정·기수 범위 역할은 BOOTCAMP·COHORT"
+    )
+    scope_id: uuid.UUID | None = Field(default=None, description="과정·기수 id (GLOBAL이면 없음)")
     expires_at: datetime | None = None  # 임시 권한 (예: 대리 확인)
 
 
@@ -50,7 +58,9 @@ def get_role_administration(
     state = request.app.state
     return RoleAdministration(
         user_roles=TortoiseUserRoleRepository(),
+        roles=TortoiseRoleRepository(),
         users=cast("UserDirectory", state.user_queries),
+        scopes=cast("ScopeTargets", state.academy_catalog),
         audit=cast("AuditRecorder", state.audit_recorder),
         uow=UnitOfWork(),
         clock=clock,
@@ -69,7 +79,7 @@ def _response(user_role: UserRole, now: datetime) -> UserRoleResponse:
         scope_id=user_role.scope_id,
         expires_at=user_role.expires_at,
         is_effective=user_role.is_effective(now),
-        managed_by="direct" if user_role.role_code in DIRECTLY_MANAGED_ROLES else "assignment",
+        managed_by="direct" if is_directly_managed(user_role.role_code) else "assignment",
     )
 
 
@@ -90,12 +100,18 @@ async def grant_user_role(
     service: ServiceDep,
     clock: Annotated[Clock, Depends(get_clock)],
 ) -> UserRoleResponse:
-    """직접 관리 역할(SUPER_ADMIN·TEAM_LEAD)을 부여한다.
+    """직접 관리 역할(최고 관리자·팀리드·새 역할)을 운영진 계정에 부여한다.
 
-    다른 역할은 422 role_managed_by_assignment.
+    다른 역할은 422 role_managed_by_assignment, 운영진이 아니면 422 staff_only,
+    역할의 허용 범위와 다르면 422 invalid_role_scope.
     """
     user_role = await service.grant(
-        user_id, body.role, actor_id=admin.id, expires_at=body.expires_at
+        user_id,
+        body.role,
+        actor_id=admin.id,
+        scope_type=body.scope_type,
+        scope_id=body.scope_id,
+        expires_at=body.expires_at,
     )
     return _response(user_role, clock.now())
 

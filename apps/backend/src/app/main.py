@@ -33,7 +33,12 @@ from app.contexts.identity.application.user_admin import UserAdministration
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
 from app.contexts.mentoring.infrastructure.chat_events import RedisChatEvents
 from app.contexts.organization.application.employee_queries import EmployeeQueries
-from app.contexts.organization.infrastructure.repositories import TortoiseEmployeeRepository
+from app.contexts.organization.infrastructure.repositories import (
+    TortoiseDepartmentRepository,
+    TortoiseEmployeePositionRepository,
+    TortoiseEmployeeRepository,
+    TortoiseTeamRepository,
+)
 from app.core.clock import SystemClock
 from app.core.config import Settings, get_settings
 from app.core.database import build_tortoise_config
@@ -87,7 +92,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.user_admin = UserAdministration(TortoiseUserRepository(), clock)
     app.state.audit_recorder = AuditRecorder(TortoiseAuditLogRepository(), clock)
     app.state.roster_sync_dispatcher = TaskiqRosterSyncDispatcher()
-    app.state.employee_queries = EmployeeQueries(TortoiseEmployeeRepository())
+    app.state.employee_queries = EmployeeQueries(
+        TortoiseEmployeeRepository(),
+        departments=TortoiseDepartmentRepository(),
+        teams=TortoiseTeamRepository(),
+        positions=TortoiseEmployeePositionRepository(),
+    )
     app.state.mail_dispatcher = TaskiqMailDispatcher()
     app.state.meet_scheduler = TaskiqMeetScheduler()
     # 가입 자동 매칭(A31)·승인(A33): academy·educator·access 공개 서비스를 가입 트랜잭션 안에서 쓴다

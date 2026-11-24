@@ -151,6 +151,11 @@ class TortoiseEmployeeRepository(TortoiseRepository[Employee, EmployeeModel]):
             return []
         return [self.to_entity(row) for row in await EmployeeModel.filter(id__in=employee_ids)]
 
+    async def list_by_users(self, user_ids: list[uuid.UUID]) -> list[Employee]:
+        if not user_ids:
+            return []
+        return [self.to_entity(row) for row in await EmployeeModel.filter(user_id__in=user_ids)]
+
 
 class TortoiseBootcampStaffRepository(TortoiseRepository[BootcampStaff, BootcampStaffModel]):
     model = BootcampStaffModel

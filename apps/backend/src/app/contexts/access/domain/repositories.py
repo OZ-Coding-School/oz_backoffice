@@ -73,6 +73,24 @@ class UserRoleRepository(Protocol):
         """역할을 가진(만료되지 않은) 회원 ID. 행을 잠가 동시 회수 경합을 막는다 (UoW 안에서)."""
         ...
 
+    async def list_holder_ids(
+        self,
+        *,
+        exclude_roles: frozenset[str],
+        role_code: str | None,
+        query: str | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[uuid.UUID], int]:
+        """역할을 가진 회원 ID (만료 포함, 이름순)와 전체 수 (A85)."""
+        ...
+
+    async def list_by_users(
+        self, user_ids: list[uuid.UUID], *, exclude_roles: frozenset[str]
+    ) -> list[UserRole]:
+        """회원들의 역할 부여 (만료 포함, 부여 순)."""
+        ...
+
     async def list_grants(self, user_id: uuid.UUID, *, now: datetime) -> list[RoleGrant]:
         """만료되지 않은 역할만."""
         ...

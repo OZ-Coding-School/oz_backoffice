@@ -78,6 +78,22 @@ class InMemoryUserRoleRepository:
     async def lock_effective_holders(self, role_code: str, *, now: datetime) -> list[uuid.UUID]:
         return [r.user_id for r in self.items if r.role_code == role_code and r.is_effective(now)]
 
+    async def list_holder_ids(
+        self,
+        *,
+        exclude_roles: frozenset[str],
+        role_code: str | None,
+        query: str | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[uuid.UUID], int]:
+        raise NotImplementedError("이름순 정렬은 통합 테스트에서 확인한다")
+
+    async def list_by_users(
+        self, user_ids: list[uuid.UUID], *, exclude_roles: frozenset[str]
+    ) -> list[UserRole]:
+        return [r for r in self.items if r.user_id in user_ids and r.role_code not in exclude_roles]
+
     async def list_grants(self, user_id: uuid.UUID, *, now: datetime) -> list[RoleGrant]:
         return [
             RoleGrant(
