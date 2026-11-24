@@ -203,8 +203,8 @@ FE-0a 디자인 토큰 ─ FE-0b API 클라이언트 ─ FE-1 인증·로그인�
 | PR | 화면 | 주요 API |
 | --- | --- | --- |
 | FE-14 | 운영진 틀(모듈 레일·메뉴·현재 기수·권한 숨김, 범위 밖 모듈 제외), 홈(처리할 일 요약) | BE-3, 기존 목록 API(가입 승인 대기, 운영진 승인 대기, 기록 미제출 등) |
-| FE-15 | 회원·권한: 회원 가입 승인, 운영진 승인, 직원·담당자, 역할·권한 | `/admin/approvals*`, `/admin/staff-registrations*`, `/admin/employees*`, `/admin/bootcamps|cohorts/{id}/staffs`, `/admin/users/{id}/roles` |
-| FE-16 | 설정: 조직(부서·직위), 공휴일 | `/admin/departments`, `/admin/positions`, `/admin/mentoring-holidays` |
+| FE-15 | 회원 관리·조직 설정 (F64로 개편): 회원 관리 모듈(가입 승인 — 탭 3개: 수강생 · 멘토·강사 · 직원, 전체 회원 — 조회·비활성화), 조직 설정 모듈(부서·직위·직원·권한) | `/admin/approvals*`, `/admin/staff-registrations*`, `/admin/employees*`, `/admin/departments`·`/admin/teams`, `/admin/positions`(권한·데이터 범위), `/admin/users*`(새) |
+| FE-16 | 설정: 공휴일 (조직·직위는 FE-15 조직 설정 모듈로 옮김, F64) | `/admin/mentoring-holidays` |
 | FE-17 | 학사: 과정·기수, HRD 과정·회차, 수강생 명단·상세(기본·수강·멘토링 요약), 명단 동기화(실행·이력·매핑 실패) | `/admin/bootcamps*`, `/admin/cohorts*`, `/admin/hrd-*`, `/admin/rosters*` |
 | FE-18 | 강사·멘토: 멘토 목록·프로필 대리 수정·활성화/비활성화·일정 대리, 계약(업로드·확정·해지·연결·파일 보기), 기수 배정 | `/admin/mentors*`, `/admin/contracts*`, `/admin/contract-files/uploads*`, `/admin/cohorts/{id}/mentor-assignments*` |
 | FE-19 | 멘토링 설정(기본 규칙·운영시간·금지 시간대·휴일 한 페이지), 팀 관리·팀 상세(팀원·팀 시간 계좌·팀 채팅 열람·신청·세션) | `…/mentoring-settings`, `…/mentoring-block-times`, `…/mentoring-teams*`, `…/mentoring-balances*`, `…/mentoring/chat/threads?team_id` |
@@ -261,7 +261,7 @@ FE-0a 디자인 토큰 ─ FE-0b API 클라이언트 ─ FE-1 인증·로그인�
 - [ ] 운영진 Figma 마무리 (F58: PR마다 그 화면만, 데스크톱 1440만)
 - [x] BE-3 운영진 권한 코드 응답 (A81: `GET /me/staff-access` 완료(#125, 구현 기록 backend/82))
 - [ ] FE-14 운영진 틀·홈 (F59: 14a 틀 완료(#126, 구현 기록 frontend/30) → 14b 홈은 갈 화면이 생긴 뒤로 미룸(F60))
-- [ ] FE-15 회원·권한 (F60: BE-3b 승인 후보 완료(#127, 구현 기록 backend/83, A82) → 15a 가입 승인 완료(#128, 구현 기록 frontend/31) → 15b 운영진 승인 완료(#129, 구현 기록 frontend/32, F61) → BE-3c 직원 목록 보완 완료(#130, 구현 기록 backend/84, A83) → 15c 직원·담당자 완료(#131, 구현 기록 frontend/33, F62) → BE-3d 역할별 권한 DB 판정·역할 관리 완료(#132, 구현 기록 backend/85, A84) → BE-3e 역할 보유자·직접 부여(#133, A85)는 A87로 닫음 → BE-3f 권한 엔터티 × 조회/관리 세분화 진행 중(구현 기록 backend/86, A86) → BE-3g 직위 = 역할(A87) → 15d 직위·권한(F63))
+- [ ] FE-15 회원 관리·조직 설정 (F60: BE-3b 승인 후보 완료(#127, 구현 기록 backend/83, A82) → 15a 가입 승인 완료(#128, 구현 기록 frontend/31) → 15b 운영진 승인 완료(#129, 구현 기록 frontend/32, F61) → BE-3c 직원 목록 보완 완료(#130, 구현 기록 backend/84, A83) → 15c 직원·담당자 완료(#131, 구현 기록 frontend/33, F62) → BE-3d 역할별 권한 DB 판정·역할 관리 완료(#132, 구현 기록 backend/85, A84) → BE-3e 역할 보유자·직접 부여(#133, A85)는 A87로 닫음 → BE-3f 권한 엔터티 × 조회/관리 세분화 진행 중(구현 기록 backend/86, A86) → BE-3g 직위 = 역할(A87·A88) → 15d 조직 설정 모듈 + 권한(F63·F64) → 15e 메뉴 개편(회원 관리·가입 승인 통합·직원 이동) → 15f 부서·직위 관리 → BE-3h 전체 회원 API → 15g 전체 회원)
 - [ ] FE-16 설정
 - [ ] FE-17 학사
 - [ ] FE-18 강사·멘토
