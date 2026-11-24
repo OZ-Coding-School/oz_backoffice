@@ -1,7 +1,7 @@
 # 29. FE-13 멘토 홈
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 중)
+- 관련 PR: #124
 - 관련 결정: `docs/decisions.md` F57 (F42·F47·F52·A77)
 - 이전 기록: [28. FE-12b 멘토 내 프로필](28_mentor_profile.md)
 
