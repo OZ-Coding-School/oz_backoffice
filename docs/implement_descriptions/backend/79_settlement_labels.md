@@ -1,6 +1,6 @@
 # 79. 정산 응답에 기수·항목 상대·주제 (BE-2n)
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-24 병합)
 - 관련 PR: #119
 - 관련 결정: `docs/decisions.md` A80, F54 (A55·A56·A78)
 - 이전 기록: [78. 불가 시간 충돌 응답에 주제·신청자 (BE-2m)](78_schedule_conflict_detail.md)
@@ -29,6 +29,9 @@ FE-12 멘토 정산 시안은 목록에 기수 이름('백엔드 부트캠프 12
 - `ruff check`, `ruff format --check`, `mypy`, `mypy tests`, `lint-imports` 통과
 - `pytest` 902 passed (통합 테스트 포함)
 - 프론트엔드: `typecheck`, `vitest` 255 passed
+
+- GitHub Actions (PR #119): 백엔드·프론트엔드 검사·E2E 3개 통과
+- 사용자가 병합을 확인했다(2026-11-24)
 
 ## 남은 작업
 - FE-12a 멘토 정산 목록·상세, FE-12b 내 프로필
