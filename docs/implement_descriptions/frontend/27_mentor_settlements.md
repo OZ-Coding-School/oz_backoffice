@@ -1,7 +1,7 @@
 # 27. FE-12a 멘토 정산 목록·명세
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 중)
+- 관련 PR: #120
 - 관련 결정: `docs/decisions.md` F55 (F54·A55·A56·A78·A80·F36)
 - 이전 기록: [26. FE-11b 멘토 불가 시간 추가·수정·삭제·충돌 확인](26_mentor_unavailable_edit.md)
 
