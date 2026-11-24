@@ -1,7 +1,7 @@
 # 86. 권한 엔터티 × 조회/관리 세분화 (BE-3f)
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 중)
+- 관련 PR: #134
 - 관련 결정: `docs/decisions.md` A86 (A84·A83·A33)
 - 이전 기록: [85. 역할별 권한 DB 판정·역할 관리 API (BE-3d)](85_role_permission_management.md) (BE-3e 역할 보유자·직접 부여 #133은 A87로 병합하지 않고 닫았다)
 
