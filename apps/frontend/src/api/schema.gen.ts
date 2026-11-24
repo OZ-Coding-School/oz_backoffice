@@ -6191,6 +6191,16 @@ export interface components {
              */
             cohort_id: string;
             /**
+             * Bootcamp Name
+             * @description 기수의 과정명 (A80)
+             */
+            bootcamp_name: string | null;
+            /**
+             * Cohort Number
+             * @description 기수 번호 (A80)
+             */
+            cohort_number: number | null;
+            /**
              * Month
              * @description YYYY-MM
              */
@@ -6219,6 +6229,21 @@ export interface components {
             session_id: string;
             /** Session Starts At */
             session_starts_at: string | null;
+            /**
+             * Session Topic
+             * @description 세션 주제 (A80)
+             */
+            session_topic: string | null;
+            /**
+             * Team Label
+             * @description 팀 멘토링이면 팀 이름 (A80)
+             */
+            team_label: string | null;
+            /**
+             * Requester Name
+             * @description 신청자 이름. 1:1 상대 (A80)
+             */
+            requester_name: string | null;
             item_type: components["schemas"]["SettlementItemType"];
             settlement_policy: components["schemas"]["MentoringSettlementPolicy"];
             /** Billable Minutes */
@@ -6258,6 +6283,16 @@ export interface components {
              * Format: uuid
              */
             cohort_id: string;
+            /**
+             * Bootcamp Name
+             * @description 기수의 과정명 (A80)
+             */
+            bootcamp_name: string | null;
+            /**
+             * Cohort Number
+             * @description 기수 번호 (A80)
+             */
+            cohort_number: number | null;
             /**
              * Month
              * @description YYYY-MM

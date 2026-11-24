@@ -1009,8 +1009,21 @@ async def test_settlement_csv_and_mentor_view(
     await client.post(f"{base}/{summary['id']}/close", json={"confirm": True}, headers=admin)
     listed = (await client.get(mine, headers=mentor_h)).json()
     assert [s["id"] for s in listed] == [summary["id"]]
+    assert (listed[0]["bootcamp_name"], listed[0]["cohort_number"]) == (
+        summary["bootcamp_name"],
+        summary["cohort_number"],
+    )
+    assert summary["bootcamp_name"]
+    assert summary["cohort_number"]
     detail = (await client.get(f"{mine}/{summary['id']}", headers=mentor_h)).json()
-    assert [i["amount"] for i in detail["items"]] == [30000]
+    (row,) = detail["items"]
+    assert (row["amount"], row["session_topic"], row["requester_name"], row["team_label"]) == (
+        30000,
+        "포트폴리오",
+        "가수강",
+        None,
+    )
+    assert detail["cohort_number"] == summary["cohort_number"]
     assert (await client.get(mine, headers=student_h)).status_code == 404  # 멘토 아님
 
 

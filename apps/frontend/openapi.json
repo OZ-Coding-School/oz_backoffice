@@ -19445,6 +19445,30 @@
             "format": "uuid",
             "title": "Cohort Id"
           },
+          "bootcamp_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bootcamp Name",
+            "description": "기수의 과정명 (A80)"
+          },
+          "cohort_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cohort Number",
+            "description": "기수 번호 (A80)"
+          },
           "month": {
             "type": "string",
             "title": "Month",
@@ -19492,6 +19516,8 @@
           "mentor_id",
           "mentor_name",
           "cohort_id",
+          "bootcamp_name",
+          "cohort_number",
           "month",
           "status",
           "session_count",
@@ -19520,6 +19546,42 @@
               }
             ],
             "title": "Session Starts At"
+          },
+          "session_topic": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Topic",
+            "description": "세션 주제 (A80)"
+          },
+          "team_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Label",
+            "description": "팀 멘토링이면 팀 이름 (A80)"
+          },
+          "requester_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requester Name",
+            "description": "신청자 이름. 1:1 상대 (A80)"
           },
           "item_type": {
             "$ref": "#/components/schemas/SettlementItemType"
@@ -19559,6 +19621,9 @@
         "required": [
           "session_id",
           "session_starts_at",
+          "session_topic",
+          "team_label",
+          "requester_name",
           "item_type",
           "settlement_policy",
           "billable_minutes",
@@ -19597,6 +19662,30 @@
             "type": "string",
             "format": "uuid",
             "title": "Cohort Id"
+          },
+          "bootcamp_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bootcamp Name",
+            "description": "기수의 과정명 (A80)"
+          },
+          "cohort_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cohort Number",
+            "description": "기수 번호 (A80)"
           },
           "month": {
             "type": "string",
@@ -19638,6 +19727,8 @@
           "mentor_id",
           "mentor_name",
           "cohort_id",
+          "bootcamp_name",
+          "cohort_number",
           "month",
           "status",
           "session_count",
