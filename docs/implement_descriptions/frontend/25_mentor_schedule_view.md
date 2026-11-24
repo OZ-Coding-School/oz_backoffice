@@ -1,7 +1,7 @@
 # 25. FE-11a 멘토 일정 보기
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #117
 - 관련 결정: `docs/decisions.md` F51·F52 (A37·A45·F49)
 - 이전 기록: [24. FE-10c 멘토 다시 보기 · Figma 크기별 배치](24_mentor_session_replay.md)
 - 선행: 백엔드 [78. 불가 시간 충돌 응답에 주제·신청자 (BE-2m)](../backend/78_schedule_conflict_detail.md)

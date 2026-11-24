@@ -26,4 +26,4 @@
 | 22 | [FE-10a 멘토 세션 목록](22_mentor_sessions_list.md) | 완료 (#112) |
 | 23 | [FE-10b 멘토 세션 상세·기록·내부 메모](23_mentor_session_detail.md) | 완료 (#114) |
 | 24 | [FE-10c 멘토 다시 보기 · Figma 크기별 배치](24_mentor_session_replay.md) | 완료 (#115) |
-| 25 | [FE-11a 멘토 일정 보기](25_mentor_schedule_view.md) | PR 진행 중 |
+| 25 | [FE-11a 멘토 일정 보기](25_mentor_schedule_view.md) | PR 진행 중 (#117) |
