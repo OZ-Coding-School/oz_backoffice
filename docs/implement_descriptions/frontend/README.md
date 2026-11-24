@@ -34,3 +34,4 @@
 | 30 | [FE-14a 운영진 틀](30_staff_shell.md) | 완료 (#126) |
 | 31 | [FE-15a 회원 가입 승인](31_signup_approvals.md) | 완료 (#128) |
 | 32 | [FE-15b 운영진 승인](32_staff_registration_approvals.md) | 완료 (#129) |
+| 33 | [FE-15c 직원·담당자](33_staff_and_employees.md) | PR 진행 중 |
