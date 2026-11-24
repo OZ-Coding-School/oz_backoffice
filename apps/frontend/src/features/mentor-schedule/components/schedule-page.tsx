@@ -1,0 +1,366 @@
+import { useQuery } from "@tanstack/react-query";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { toast } from "sonner";
+
+import { ErrorState } from "@/components/error-state";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Spinner } from "@/components/ui/spinner";
+import { Switch } from "@/components/ui/switch";
+import { kstDateKey } from "@/features/apply/slots";
+import { targetLabel } from "@/features/mentor-sessions/labels";
+import type { MentoringSession } from "@/features/sessions/api";
+import { formatKst } from "@/lib/datetime";
+import { cn } from "@/lib/utils";
+
+import { scheduleQuery, useSetAccepting, weekSessionsQuery } from "../api";
+import {
+  addDays,
+  dayStartMs,
+  daySegment,
+  occurrences,
+  periodLabel,
+  repeatLabel,
+  weekDays,
+  weekdayLabel,
+  weekTitle,
+  type UnavailablePeriod,
+} from "../schedule";
+
+const DAY_MINUTES = 24 * 60;
+/** 처음 보이는 시각 (F52) */
+const FIRST_VISIBLE_HOUR = 8;
+const HOURS = Array.from({ length: 24 }, (_, h) => h);
+
+interface Block {
+  id: string;
+  kind: "unavailable" | "session";
+  label: string;
+  start: number; // 그날 00:00 기준 분
+  end: number;
+  sessionId?: string;
+}
+
+/** 멘토 일정 (Figma `일정 · 보기 (FE-11a)`, F51·F52·A37) */
+export function SchedulePage({ monday }: { monday: string }) {
+  const schedule = useQuery(scheduleQuery);
+  const sessions = useQuery(weekSessionsQuery(monday));
+  const [now] = useState(() => Date.now());
+
+  return (
+    <div className="flex flex-col gap-4 md:gap-6">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-h1 text-foreground">일정</h1>
+        <p className="text-body text-muted-foreground">
+          안 되는 시간만 등록해요. 나머지 시간은 기수 운영시간 안에서 수강생이 신청할 수 있어요.
+        </p>
+      </div>
+      {schedule.isPending ? (
+        <div className="flex justify-center py-10">
+          <Spinner />
+        </div>
+      ) : schedule.isError ? (
+        <ErrorState onRetry={() => void schedule.refetch()} />
+      ) : (
+        <>
+          <AcceptingCard accepting={schedule.data.accepting_requests} />
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_22.5rem] lg:items-start lg:gap-6">
+            <WeekCard
+              monday={monday}
+              now={now}
+              periods={schedule.data.unavailable_periods}
+              sessions={sessions.data?.items ?? []}
+            />
+            <PeriodList periods={schedule.data.unavailable_periods} />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** 신청 받기 (F52): 끌 때만 확인 창, 켜기는 바로 */
+function AcceptingCard({ accepting }: { accepting: boolean }) {
+  const set = useSetAccepting();
+  const [confirming, setConfirming] = useState(false);
+  const change = async (next: boolean) => {
+    try {
+      const result = await set.mutateAsync(next);
+      setConfirming(false);
+      toast.success(
+        next
+          ? "신청 받기를 켰어요"
+          : result.canceled_pending_requests > 0
+            ? `신청 받기를 껐어요. 대기 중인 신청 ${result.canceled_pending_requests}건을 취소했어요`
+            : "신청 받기를 껐어요",
+      );
+    } catch {
+      toast.error("신청 받기를 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.");
+    }
+  };
+  return (
+    <section
+      aria-labelledby="accepting-title"
+      className="flex items-center gap-4 rounded-xl border border-border bg-card p-4 md:p-5"
+    >
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <h2 id="accepting-title" className="text-h3 text-foreground">
+          신청 받기
+        </h2>
+        <p className="text-body-sm text-muted-foreground">끄면 새 신청만 막아요. 이미 받은 신청과 세션은 그대로예요.</p>
+      </div>
+      <label className="inline-flex shrink-0 items-center gap-2 text-body text-foreground">
+        <Switch
+          aria-labelledby="accepting-title"
+          checked={accepting}
+          disabled={set.isPending}
+          onCheckedChange={(next) => (next ? void change(true) : setConfirming(true))}
+        />
+        {accepting ? "받는 중" : "받지 않음"}
+      </label>
+      <Dialog open={confirming} onOpenChange={setConfirming}>
+        <DialogContent className="flex max-w-110 flex-col gap-4 p-6">
+          <DialogTitle className="text-h2 text-foreground">신청 받기를 끌까요?</DialogTitle>
+          <DialogDescription className="text-body text-muted-foreground">
+            새 신청을 받지 않아요. 대기 중인 신청은 자동으로 취소되고 신청자에게 시간이 돌아가요. 이미 승인한 세션은
+            그대로예요.
+          </DialogDescription>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setConfirming(false)}>
+              돌아가기
+            </Button>
+            <Button variant="destructive" disabled={set.isPending} onClick={() => void change(false)}>
+              끄기
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </section>
+  );
+}
+
+function dayBlocks(key: string, periods: UnavailablePeriod[], sessions: MentoringSession[]): Block[] {
+  const from = dayStartMs(key);
+  const to = dayStartMs(addDays(key, 1));
+  const blocks: Block[] = [];
+  for (const p of periods) {
+    for (const range of occurrences(p, from, to)) {
+      const seg = daySegment(range, key);
+      if (seg)
+        blocks.push({
+          id: `${p.id}-${range[0]}`,
+          kind: "unavailable",
+          label: `${p.category ?? "불가 시간"} · ${repeatLabel(p)}`,
+          start: seg[0],
+          end: seg[1],
+        });
+    }
+  }
+  for (const s of sessions) {
+    const seg = daySegment([Date.parse(s.starts_at), Date.parse(s.ends_at)], key);
+    if (seg)
+      blocks.push({ id: s.id, kind: "session", label: targetLabel(s), start: seg[0], end: seg[1], sessionId: s.id });
+  }
+  return blocks;
+}
+
+function WeekCard({
+  monday,
+  now,
+  periods,
+  sessions,
+}: {
+  monday: string;
+  now: number;
+  periods: UnavailablePeriod[];
+  sessions: MentoringSession[];
+}) {
+  const navigate = useNavigate();
+  const days = weekDays(monday);
+  const today = kstDateKey(new Date(now));
+  const [picked, setPicked] = useState(days.includes(today) ? today : monday);
+  const selected = days.includes(picked) ? picked : monday;
+  const go = (offset: number) => void navigate({ to: "/mentor/schedule", search: { week: addDays(monday, offset) } });
+
+  return (
+    <section
+      aria-label="주간 일정"
+      className="flex min-w-0 flex-col gap-3 rounded-xl border border-border bg-card p-4 md:p-5"
+    >
+      <div className="flex items-center gap-2">
+        <h2 className="flex-1 text-h3 text-foreground">{weekTitle(monday)}</h2>
+        <Button variant="outline" size="sm" className="size-8 px-0" aria-label="이전 주" onClick={() => go(-7)}>
+          <ChevronLeft aria-hidden />
+        </Button>
+        <Button variant="outline" size="sm" className="size-8 px-0" aria-label="다음 주" onClick={() => go(7)}>
+          <ChevronRight aria-hidden />
+        </Button>
+      </div>
+      <div className="flex items-center gap-4 text-caption text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5">
+          <span aria-hidden className="size-3 rounded-sm bg-destructive-subtle" />
+          불가 시간
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span aria-hidden className="size-3 rounded-sm bg-accent" />
+          세션
+        </span>
+      </div>
+      {/* 휴대폰은 하루 보기: 요일 칩으로 날짜를 고른다 (F51) */}
+      <div role="tablist" aria-label="날짜" className="flex gap-1 md:hidden">
+        {days.map((key) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={key === selected}
+            aria-label={formatKst(dayStartMs(key), "M월 d일 (EEE)")}
+            onClick={() => setPicked(key)}
+            className={cn(
+              "flex flex-1 flex-col items-center gap-0.5 rounded-lg py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              key === selected ? "bg-accent text-primary-text" : "text-muted-foreground",
+            )}
+          >
+            <span className="text-caption">{weekdayLabel(key)}</span>
+            <span className="text-body-strong">{key.slice(8).replace(/^0/, "")}</span>
+          </button>
+        ))}
+      </div>
+      <Timetable
+        days={days}
+        selected={selected}
+        today={today}
+        columns={days.map((key) => dayBlocks(key, periods, sessions))}
+      />
+    </section>
+  );
+}
+
+function Timetable({
+  days,
+  selected,
+  today,
+  columns,
+}: {
+  days: string[];
+  selected: string;
+  today: string;
+  columns: Block[][];
+}) {
+  const scroller = useRef<HTMLDivElement>(null);
+  // 처음에는 08:00이 맨 위에 오게 (F52)
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    if (el) el.scrollTop = (el.scrollHeight * FIRST_VISIBLE_HOUR) / 24;
+  }, []);
+  return (
+    <div className="flex flex-col">
+      <div className="hidden pl-12 md:grid md:grid-cols-7">
+        {days.map((key) => (
+          <span
+            key={key}
+            className={cn(
+              "pb-2 text-center text-caption",
+              key === today ? "text-body-strong text-primary-text" : "text-muted-foreground",
+            )}
+          >
+            {key.slice(8).replace(/^0/, "")} {weekdayLabel(key)}
+          </span>
+        ))}
+      </div>
+      <div ref={scroller} className="h-120 overflow-y-auto border-t border-border">
+        <div className="relative flex pt-2">
+          <div className="w-12 shrink-0">
+            {HOURS.map((h) => (
+              <div key={h} className="h-12 -translate-y-2 pr-2 text-right font-mono text-caption text-muted-foreground">
+                {h === 0 ? "" : `${String(h).padStart(2, "0")}:00`}
+              </div>
+            ))}
+          </div>
+          <div className="grid flex-1 grid-cols-1 md:grid-cols-7">
+            {days.map((key, i) => (
+              <div
+                key={key}
+                aria-label={formatKst(dayStartMs(key), "M월 d일 (EEE)")}
+                role="group"
+                className={cn("relative border-l border-border", key !== selected && "max-md:hidden")}
+              >
+                {HOURS.map((h) => (
+                  <div key={h} className="h-12 border-b border-border" />
+                ))}
+                {(columns[i] ?? []).map((b) => (
+                  <BlockView key={b.id} block={b} />
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BlockView({ block }: { block: Block }) {
+  // 하루 1,440분 중 위치 (계산 값이라 인라인 스타일)
+  const style: CSSProperties = {
+    top: `${(block.start / DAY_MINUTES) * 100}%`,
+    height: `${((block.end - block.start) / DAY_MINUTES) * 100}%`,
+  };
+  const className = cn(
+    "absolute inset-x-0.5 overflow-hidden rounded-md px-1.5 py-1 text-caption",
+    block.kind === "unavailable" ? "bg-destructive-subtle text-destructive-text" : "bg-accent text-primary-text",
+  );
+  if (block.sessionId)
+    return (
+      <Link
+        to="/mentor/sessions/$sessionId"
+        params={{ sessionId: block.sessionId }}
+        style={style}
+        className={cn(className, "outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring")}
+      >
+        {block.label}
+      </Link>
+    );
+  return (
+    <div style={style} className={className}>
+      {block.label}
+    </div>
+  );
+}
+
+function PeriodList({ periods }: { periods: UnavailablePeriod[] }) {
+  return (
+    <section
+      aria-labelledby="periods-title"
+      className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 md:p-5"
+    >
+      <h2 id="periods-title" className="text-h3 text-foreground">
+        등록한 불가 시간
+      </h2>
+      {periods.length === 0 ? (
+        <p className="text-body-sm text-muted-foreground">
+          등록한 불가 시간이 없어요. 나머지 시간은 모두 신청을 받아요.
+        </p>
+      ) : (
+        <ul className="flex flex-col divide-y divide-border border-t border-border">
+          {periods.map((p) => (
+            <li key={p.id} className="flex flex-col gap-0.5 py-3">
+              <span className="flex items-center gap-2">
+                <span className="text-body-strong text-foreground">{p.category ?? "불가 시간"}</span>
+                <Badge variant="outline">{repeatLabel(p)}</Badge>
+              </span>
+              <span className="text-caption text-muted-foreground">{periodLabel(p)}</span>
+              {p.reason ? <span className="text-caption text-muted-foreground">{p.reason}</span> : null}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="text-caption text-muted-foreground">
+        수강생은 기수 운영시간 안에서만 신청해요. 기수마다 운영시간이 달라요.
+      </p>
+    </section>
+  );
+}
