@@ -1,7 +1,7 @@
 # 79. 정산 응답에 기수·항목 상대·주제 (BE-2n)
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 중)
+- 관련 PR: #119
 - 관련 결정: `docs/decisions.md` A80, F54 (A55·A56·A78)
 - 이전 기록: [78. 불가 시간 충돌 응답에 주제·신청자 (BE-2m)](78_schedule_conflict_detail.md)
 
