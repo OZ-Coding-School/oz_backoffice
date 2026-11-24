@@ -664,6 +664,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/staff-access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Staff Access */
+        get: operations["my_staff_access_api_v1_me_staff_access_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/departments": {
         parameters: {
             query?: never;
@@ -5430,6 +5447,29 @@ export interface components {
          * @enum {string}
          */
         PayUnit: "HOURLY" | "PER_SESSION" | "MONTHLY" | "LUMP_SUM";
+        /** PermissionScopeResponse */
+        PermissionScopeResponse: {
+            /**
+             * Code
+             * @description 권한 코드 (access/domain/catalog.py)
+             */
+            code: string;
+            /**
+             * Is Global
+             * @description 전체 범위
+             */
+            is_global: boolean;
+            /**
+             * Bootcamp Ids
+             * @description 과정 범위 (그 과정의 기수 전부)
+             */
+            bootcamp_ids: string[];
+            /**
+             * Cohort Ids
+             * @description 기수 범위
+             */
+            cohort_ids: string[];
+        };
         /** PhoneCodeRequest */
         PhoneCodeRequest: {
             /** Signup Token */
@@ -6390,6 +6430,19 @@ export interface components {
              */
             expires_in: number;
         };
+        /** StaffAccessResponse */
+        StaffAccessResponse: {
+            /**
+             * Permissions
+             * @description 가진 권한만
+             */
+            permissions: components["schemas"]["PermissionScopeResponse"][];
+            /**
+             * Cohorts
+             * @description 권한이 미치는 기수. 진행 중 → 예정 → 종료 → 비활성, 최근 시작 순 (A81)
+             */
+            cohorts: components["schemas"]["StaffCohortResponse"][];
+        };
         /** StaffCancelBody */
         StaffCancelBody: {
             /** Reason */
@@ -6400,6 +6453,38 @@ export interface components {
              * @default true
              */
             refund: boolean;
+        };
+        /** StaffCohortResponse */
+        StaffCohortResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Bootcamp Id
+             * Format: uuid
+             */
+            bootcamp_id: string;
+            /** Bootcamp Name */
+            bootcamp_name: string;
+            /** Cohort Number */
+            cohort_number: number;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            /**
+             * End Date
+             * Format: date
+             */
+            end_date: string;
+            /**
+             * Status
+             * @description ONGOING·PLANNED·ENDED·INACTIVE (보관은 없음)
+             */
+            status: string;
         };
         /** StaffMemberResponse */
         StaffMemberResponse: {
@@ -8354,6 +8439,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_staff_access_api_v1_me_staff_access_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StaffAccessResponse"];
                 };
             };
         };

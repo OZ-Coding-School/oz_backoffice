@@ -1837,6 +1837,32 @@
         }
       }
     },
+    "/api/v1/me/staff-access": {
+      "get": {
+        "tags": [
+          "me-staff-access"
+        ],
+        "summary": "My Staff Access",
+        "operationId": "my_staff_access_api_v1_me_staff_access_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffAccessResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/departments": {
       "get": {
         "tags": [
@@ -17443,6 +17469,46 @@
         ],
         "title": "PayUnit"
       },
+      "PermissionScopeResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "권한 코드 (access/domain/catalog.py)"
+          },
+          "is_global": {
+            "type": "boolean",
+            "title": "Is Global",
+            "description": "전체 범위"
+          },
+          "bootcamp_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Bootcamp Ids",
+            "description": "과정 범위 (그 과정의 기수 전부)"
+          },
+          "cohort_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Cohort Ids",
+            "description": "기수 범위"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "is_global",
+          "bootcamp_ids",
+          "cohort_ids"
+        ],
+        "title": "PermissionScopeResponse"
+      },
       "PhoneCodeRequest": {
         "properties": {
           "signup_token": {
@@ -19906,6 +19972,32 @@
         ],
         "title": "SignupTokenResponse"
       },
+      "StaffAccessResponse": {
+        "properties": {
+          "permissions": {
+            "items": {
+              "$ref": "#/components/schemas/PermissionScopeResponse"
+            },
+            "type": "array",
+            "title": "Permissions",
+            "description": "가진 권한만"
+          },
+          "cohorts": {
+            "items": {
+              "$ref": "#/components/schemas/StaffCohortResponse"
+            },
+            "type": "array",
+            "title": "Cohorts",
+            "description": "권한이 미치는 기수. 진행 중 → 예정 → 종료 → 비활성, 최근 시작 순 (A81)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "permissions",
+          "cohorts"
+        ],
+        "title": "StaffAccessResponse"
+      },
       "StaffCancelBody": {
         "properties": {
           "reason": {
@@ -19926,6 +20018,54 @@
           "reason"
         ],
         "title": "StaffCancelBody"
+      },
+      "StaffCohortResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "bootcamp_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Bootcamp Id"
+          },
+          "bootcamp_name": {
+            "type": "string",
+            "title": "Bootcamp Name"
+          },
+          "cohort_number": {
+            "type": "integer",
+            "title": "Cohort Number"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Start Date"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "title": "End Date"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "ONGOING·PLANNED·ENDED·INACTIVE (보관은 없음)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "bootcamp_id",
+          "bootcamp_name",
+          "cohort_number",
+          "start_date",
+          "end_date",
+          "status"
+        ],
+        "title": "StaffCohortResponse"
       },
       "StaffMemberResponse": {
         "properties": {
