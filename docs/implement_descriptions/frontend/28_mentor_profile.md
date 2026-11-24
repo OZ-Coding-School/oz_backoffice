@@ -1,7 +1,7 @@
 # 28. FE-12b 멘토 내 프로필
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 중)
+- 관련 PR: #122
 - 관련 결정: `docs/decisions.md` F56 (F54·A22·A28·F30·F37·A72)
 - 이전 기록: [27. FE-12a 멘토 정산 목록·명세](27_mentor_settlements.md)
 
