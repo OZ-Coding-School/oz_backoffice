@@ -1,6 +1,6 @@
 # 85. 역할별 권한 DB 판정·역할 관리 API (BE-3d)
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-24 병합)
 - 관련 PR: #132
 - 관련 결정: `docs/decisions.md` A84, F63 (A16·A17 변경)
 - 이전 기록: [84. 직원 목록 검색·팀 필터·담당 (BE-3c)](84_employee_list_assignments.md)
@@ -39,6 +39,9 @@ FE-15d 역할·권한 화면에서 역할별 권한 표를 고치고 운영진 �
 - 마이그레이션: `aerich upgrade` → `aerich migrate`(No changes detected) → `aerich downgrade -v 30` → `aerich upgrade`
 - DBML 파서(@dbml/core 11) 검증 통과
 - 프론트엔드: `typecheck` 통과
+
+- GitHub Actions (PR #132): 백엔드·프론트엔드 검사·E2E 통과
+- 사용자가 병합을 확인했다(2026-11-24). 역할·권한·부여·판정 흐름 정리를 함께 확인했다
 
 ## 남은 작업
 - BE-3e 역할 보유자 목록·직접 부여 확장(새 역할·범위)
