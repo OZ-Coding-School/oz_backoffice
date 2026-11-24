@@ -1,7 +1,7 @@
 # 32. FE-15b 운영진 승인
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 중)
+- 관련 PR: #129
 - 관련 결정: `docs/decisions.md` F61 (A11·A12·A62·A63·A81·F26·F60)
 - 이전 기록: [31. FE-15a 회원 가입 승인](31_signup_approvals.md)
 
