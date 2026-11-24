@@ -1,4 +1,4 @@
-import { LayoutGrid, ShieldCheck, UserCheck, UserCog, type LucideIcon } from "lucide-react";
+import { LayoutGrid, ShieldCheck, UserCheck, UserCog, Users, type LucideIcon } from "lucide-react";
 
 import { hasPermission, type StaffAccess } from "./api";
 
@@ -58,6 +58,13 @@ const MODULES: StaffModule[] = [
         // 운영진 가입 승인은 role.assign (A12·A17)
         permissions: ["role.assign"],
         badge: "staffRegistrations",
+      },
+      {
+        to: "/admin/members/staff",
+        label: "직원·담당자",
+        icon: Users,
+        // 직원 조회는 org.manage 또는 staff.assign (A83)
+        permissions: ["org.manage", "staff.assign"],
       },
     ],
   },

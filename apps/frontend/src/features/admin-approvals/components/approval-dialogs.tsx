@@ -1,6 +1,6 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Search } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/api/errors";
@@ -14,6 +14,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { maskPhone } from "@/features/profile/mask";
+import { useDebounced } from "@/lib/use-debounced";
 import { cn } from "@/lib/utils";
 
 import { candidatesQuery, useApprove, useReject, type Applicant, type StudentCandidate } from "../api";
@@ -32,16 +33,6 @@ const ERRORS: Record<string, string> = {
 function errorMessage(e: unknown, fallback: string): string {
   const code = e instanceof ApiError ? e.code : undefined;
   return (code && ERRORS[code]) ?? fallback;
-}
-
-/** 입력이 멈추고 0.3초 뒤의 값 (후보 검색) */
-function useDebounced(value: string, ms = 300): string {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(value), ms);
-    return () => clearTimeout(t);
-  }, [value, ms]);
-  return debounced;
 }
 
 function Shell({
