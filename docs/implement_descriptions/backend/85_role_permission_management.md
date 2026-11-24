@@ -1,7 +1,7 @@
 # 85. 역할별 권한 DB 판정·역할 관리 API (BE-3d)
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 중)
+- 관련 PR: #132
 - 관련 결정: `docs/decisions.md` A84, F63 (A16·A17 변경)
 - 이전 기록: [84. 직원 목록 검색·팀 필터·담당 (BE-3c)](84_employee_list_assignments.md)
 
