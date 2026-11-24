@@ -4,8 +4,21 @@ import uuid
 from collections.abc import Sequence
 from datetime import datetime
 
-from app.contexts.access.domain.catalog import RoleDefinition
+from app.contexts.access.domain.catalog import (
+    PERMISSIONS,
+    ROLES_BY_CODE,
+    SUPER_ADMIN,
+    RoleDefinition,
+)
 from app.contexts.access.domain.entities import RoleGrant, UserRole
+
+
+def default_permissions(role_code: str) -> frozenset[str]:
+    """기본 역할의 초기 권한 묶음 (최고 관리자는 전체)."""
+    if role_code == SUPER_ADMIN:
+        return frozenset(PERMISSIONS)
+    role = ROLES_BY_CODE.get(role_code)
+    return role.permissions if role else frozenset()
 
 
 class InMemoryRoleCatalogRepository:
@@ -21,6 +34,7 @@ class InMemoryRoleCatalogRepository:
 class InMemoryUserRoleRepository:
     def __init__(self) -> None:
         self.items: list[UserRole] = []
+        self.role_permissions: dict[str, frozenset[str]] = {}  # 기본값과 다르게 둘 역할만
 
     async def add(self, user_role: UserRole) -> None:
         self.items.append(user_role)
@@ -66,7 +80,13 @@ class InMemoryUserRoleRepository:
 
     async def list_grants(self, user_id: uuid.UUID, *, now: datetime) -> list[RoleGrant]:
         return [
-            RoleGrant(r.role_code, r.scope_type, r.scope_id, r.expires_at)
+            RoleGrant(
+                r.role_code,
+                r.scope_type,
+                r.scope_id,
+                r.expires_at,
+                self.role_permissions.get(r.role_code, default_permissions(r.role_code)),
+            )
             for r in self.items
             if r.user_id == user_id and r.is_effective(now)
         ]

@@ -1905,6 +1905,231 @@
         }
       }
     },
+    "/api/v1/admin/roles": {
+      "get": {
+        "tags": [
+          "admin-roles"
+        ],
+        "summary": "Role Catalog",
+        "operationId": "role_catalog_api_v1_admin_roles_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleCatalogResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "admin-roles"
+        ],
+        "summary": "Create Role",
+        "description": "새 역할 (권한 없음). 코드·이름 중복은 409 role_code_taken·role_name_taken.",
+        "operationId": "create_role_api_v1_admin_roles_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRoleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleDefinitionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/roles/{code}": {
+      "patch": {
+        "tags": [
+          "admin-roles"
+        ],
+        "summary": "Update Role",
+        "operationId": "update_role_api_v1_admin_roles__code__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Code"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRoleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleDefinitionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin-roles"
+        ],
+        "summary": "Delete Role",
+        "description": "기본 역할은 422 builtin_role, 보유자가 있으면 409 role_in_use.",
+        "operationId": "delete_role_api_v1_admin_roles__code__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Code"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/roles/{code}/permissions": {
+      "put": {
+        "tags": [
+          "admin-roles"
+        ],
+        "summary": "Replace Role Permissions",
+        "description": "권한 묶음 교체. 최고 관리자는 422 role_permissions_locked,\n과정·기수 범위 역할에 전체 전용 권한은 422 global_only_permission.",
+        "operationId": "replace_role_permissions_api_v1_admin_roles__code__permissions_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Code"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplacePermissionsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleDefinitionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/me/staff-access": {
       "get": {
         "tags": [
@@ -14847,6 +15072,40 @@
         "title": "ContractUpdate",
         "description": "보낸 필드만 바꾼다. 확정된 계약은 manager_employee_id만 바꿀 수 있다."
       },
+      "CreateRoleRequest": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "description": "영문 대문자로 시작, 대문자·숫자·밑줄 2~50자"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "scope_kind": {
+            "$ref": "#/components/schemas/RoleScopeKind"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "name",
+          "scope_kind"
+        ],
+        "title": "CreateRoleRequest"
+      },
       "DayNightSeType": {
         "type": "string",
         "enum": [
@@ -17769,6 +18028,30 @@
         ],
         "title": "PayUnit"
       },
+      "PermissionDefinitionResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "global_only": {
+            "type": "boolean",
+            "title": "Global Only",
+            "description": "전체 범위 역할에만 켤 수 있음"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "description",
+          "global_only"
+        ],
+        "title": "PermissionDefinitionResponse"
+      },
       "PermissionScopeResponse": {
         "properties": {
           "code": {
@@ -18243,6 +18526,22 @@
           "reason"
         ],
         "title": "RejectStaffRegistrationRequest"
+      },
+      "ReplacePermissionsRequest": {
+        "properties": {
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Permissions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "permissions"
+        ],
+        "title": "ReplacePermissionsRequest"
       },
       "RequestBalanceResponse": {
         "properties": {
@@ -18791,6 +19090,93 @@
         ],
         "title": "ResubmitRequest"
       },
+      "RoleCatalogResponse": {
+        "properties": {
+          "permissions": {
+            "items": {
+              "$ref": "#/components/schemas/PermissionDefinitionResponse"
+            },
+            "type": "array",
+            "title": "Permissions"
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/RoleDefinitionResponse"
+            },
+            "type": "array",
+            "title": "Roles",
+            "description": "기본 역할 → 새 역할(만든 순서)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "permissions",
+          "roles"
+        ],
+        "title": "RoleCatalogResponse"
+      },
+      "RoleDefinitionResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "scope_kind": {
+            "$ref": "#/components/schemas/RoleScopeKind",
+            "description": "GLOBAL = 전체, SCOPED = 과정·기수"
+          },
+          "builtin": {
+            "type": "boolean",
+            "title": "Builtin",
+            "description": "기본 역할 (지울 수 없음)"
+          },
+          "permissions_editable": {
+            "type": "boolean",
+            "title": "Permissions Editable",
+            "description": "false면 최고 관리자 (항상 모든 권한)"
+          },
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Permissions",
+            "description": "권한 코드, 권한 정의 순서"
+          },
+          "holder_count": {
+            "type": "integer",
+            "title": "Holder Count",
+            "description": "부여받은 회원 수 (만료 포함)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "name",
+          "description",
+          "scope_kind",
+          "builtin",
+          "permissions_editable",
+          "permissions",
+          "holder_count"
+        ],
+        "title": "RoleDefinitionResponse"
+      },
       "RoleGrantResponse": {
         "properties": {
           "role": {
@@ -18833,6 +19219,15 @@
           "expires_at"
         ],
         "title": "RoleGrantResponse"
+      },
+      "RoleScopeKind": {
+        "type": "string",
+        "enum": [
+          "GLOBAL",
+          "SCOPED"
+        ],
+        "title": "RoleScopeKind",
+        "description": "역할을 줄 수 있는 범위 (A84). GLOBAL = 전체, SCOPED = 과정·기수."
       },
       "RoleScopeType": {
         "type": "string",
@@ -21750,6 +22145,30 @@
           "title"
         ],
         "title": "UnrecordedResponse"
+      },
+      "UpdateRoleRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "UpdateRoleRequest"
       },
       "UploadRequest": {
         "properties": {

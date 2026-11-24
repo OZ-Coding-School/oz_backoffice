@@ -11,7 +11,7 @@ from typing import Any
 
 from tortoise import fields, models
 
-from app.contexts.access.domain.enums import RoleScopeType
+from app.contexts.access.domain.enums import RoleScopeKind, RoleScopeType
 from app.shared.ids import new_id
 
 
@@ -29,6 +29,8 @@ class RoleModel(models.Model):
     code = fields.CharField(max_length=50, unique=True)
     name = fields.CharField(max_length=50)
     description = fields.TextField(null=True)
+    # 새 역할의 허용 범위 (A84). 기본 역할은 null이고 코드 정의(catalog.py)를 따른다
+    scope_kind = fields.CharEnumField(RoleScopeKind, max_length=20, null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
     permissions: fields.ManyToManyRelation[PermissionModel] = fields.ManyToManyField(
         "models.PermissionModel",

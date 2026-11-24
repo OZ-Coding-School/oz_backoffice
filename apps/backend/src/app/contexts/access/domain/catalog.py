@@ -1,4 +1,8 @@
-"""역할·권한 정의 (plan §2.3 권한표, decisions M31). 시드의 단일 출처다.
+"""역할·권한 정의 (plan §2.3 권한표, decisions M31·A84).
+
+권한 코드 목록과 기본 역할은 코드가 정한다. 기본 역할의 권한 묶음은 **초기값**이고,
+역할을 처음 만들 때만 DB에 넣는다. 이후 역할별 권한은 DB `role_permissions`가 출처다(A84).
+최고 관리자는 항상 모든 권한이다.
 
 역할은 계층이 아니라 권한 집합이다. 멘토·수강생 기능은 권한 코드가 아니라 소유 관계로 검사하므로
 MENTOR·STUDENT 역할에는 권한 코드가 없다.
@@ -24,6 +28,9 @@ PERMISSIONS: dict[str, str] = {
     "mentoring.request.cancel": "운영진 취소, 환불 선택",
     "mentoring.settlement.close": "정산 집계·마감·조회",
 }
+
+# 전체 범위가 있어야 쓰는 권한 — 과정·기수 범위 역할에는 켤 수 없다 (A84)
+GLOBAL_ONLY_PERMISSIONS = frozenset({"org.manage", "role.assign", "staff.assign"})
 
 _ASSISTANT = frozenset(
     {
@@ -95,3 +102,6 @@ ROLES: tuple[RoleDefinition, ...] = (
 )
 
 ROLES_BY_CODE = {role.code: role for role in ROLES}
+BUILTIN_ROLE_CODES = frozenset(ROLES_BY_CODE)
+# 권한 코드가 없고 소유 관계로 검사하는 역할 — 역할·권한 관리 화면에 나오지 않는다
+HIDDEN_ROLE_CODES = frozenset({MENTOR, STUDENT})

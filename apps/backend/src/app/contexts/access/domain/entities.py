@@ -21,14 +21,13 @@ class UserRole(AggregateRoot):
     expires_at: datetime | None = None
 
     def __post_init__(self) -> None:
-        role = ROLES_BY_CODE.get(self.role_code)
-        if role is None:
-            raise BusinessRuleViolation("존재하지 않는 역할입니다.", code="role_not_found")
         if (self.scope_type is RoleScopeType.GLOBAL) != (self.scope_id is None):
             raise BusinessRuleViolation(
                 "전체 범위만 대상 없이 부여할 수 있습니다.", code="invalid_role_scope"
             )
-        if self.scope_type not in role.scopes:
+        # 기본 역할은 정의된 범위만. 새 역할(A84)의 범위는 부여하는 서비스가 역할 정의로 검사한다
+        role = ROLES_BY_CODE.get(self.role_code)
+        if role is not None and self.scope_type not in role.scopes:
             raise BusinessRuleViolation(
                 f"{role.name} 역할은 이 범위로 부여할 수 없습니다.", code="invalid_role_scope"
             )
@@ -45,3 +44,4 @@ class RoleGrant:
     scope_type: RoleScopeType
     scope_id: uuid.UUID | None
     expires_at: datetime | None
+    permissions: frozenset[str] = frozenset()  # 그 역할의 유효 권한 (최고 관리자는 전체, A84)

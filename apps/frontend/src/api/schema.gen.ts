@@ -684,6 +684,69 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Role Catalog */
+        get: operations["role_catalog_api_v1_admin_roles_get"];
+        put?: never;
+        /**
+         * Create Role
+         * @description 새 역할 (권한 없음). 코드·이름 중복은 409 role_code_taken·role_name_taken.
+         */
+        post: operations["create_role_api_v1_admin_roles_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/roles/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Role
+         * @description 기본 역할은 422 builtin_role, 보유자가 있으면 409 role_in_use.
+         */
+        delete: operations["delete_role_api_v1_admin_roles__code__delete"];
+        options?: never;
+        head?: never;
+        /** Update Role */
+        patch: operations["update_role_api_v1_admin_roles__code__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/roles/{code}/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Replace Role Permissions
+         * @description 권한 묶음 교체. 최고 관리자는 422 role_permissions_locked,
+         *     과정·기수 범위 역할에 전체 전용 권한은 422 global_only_permission.
+         */
+        put: operations["replace_role_permissions_api_v1_admin_roles__code__permissions_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/staff-access": {
         parameters: {
             query?: never;
@@ -4423,6 +4486,19 @@ export interface components {
             /** Contract File Id */
             contract_file_id?: string | null;
         };
+        /** CreateRoleRequest */
+        CreateRoleRequest: {
+            /**
+             * Code
+             * @description 영문 대문자로 시작, 대문자·숫자·밑줄 2~50자
+             */
+            code: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            scope_kind: components["schemas"]["RoleScopeKind"];
+        };
         /**
          * DayNightSeType
          * @enum {string}
@@ -5550,6 +5626,18 @@ export interface components {
          * @enum {string}
          */
         PayUnit: "HOURLY" | "PER_SESSION" | "MONTHLY" | "LUMP_SUM";
+        /** PermissionDefinitionResponse */
+        PermissionDefinitionResponse: {
+            /** Code */
+            code: string;
+            /** Description */
+            description: string;
+            /**
+             * Global Only
+             * @description 전체 범위 역할에만 켤 수 있음
+             */
+            global_only: boolean;
+        };
         /** PermissionScopeResponse */
         PermissionScopeResponse: {
             /**
@@ -5716,6 +5804,11 @@ export interface components {
         RejectStaffRegistrationRequest: {
             /** Reason */
             reason: string;
+        };
+        /** ReplacePermissionsRequest */
+        ReplacePermissionsRequest: {
+            /** Permissions */
+            permissions: string[];
         };
         /** RequestBalanceResponse */
         RequestBalanceResponse: {
@@ -5901,6 +5994,47 @@ export interface components {
             nickname?: string | null;
             display_name_preference?: components["schemas"]["DisplayNamePreference"] | null;
         };
+        /** RoleCatalogResponse */
+        RoleCatalogResponse: {
+            /** Permissions */
+            permissions: components["schemas"]["PermissionDefinitionResponse"][];
+            /**
+             * Roles
+             * @description 기본 역할 → 새 역할(만든 순서)
+             */
+            roles: components["schemas"]["RoleDefinitionResponse"][];
+        };
+        /** RoleDefinitionResponse */
+        RoleDefinitionResponse: {
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string | null;
+            /** @description GLOBAL = 전체, SCOPED = 과정·기수 */
+            scope_kind: components["schemas"]["RoleScopeKind"];
+            /**
+             * Builtin
+             * @description 기본 역할 (지울 수 없음)
+             */
+            builtin: boolean;
+            /**
+             * Permissions Editable
+             * @description false면 최고 관리자 (항상 모든 권한)
+             */
+            permissions_editable: boolean;
+            /**
+             * Permissions
+             * @description 권한 코드, 권한 정의 순서
+             */
+            permissions: string[];
+            /**
+             * Holder Count
+             * @description 부여받은 회원 수 (만료 포함)
+             */
+            holder_count: number;
+        };
         /** RoleGrantResponse */
         RoleGrantResponse: {
             /** Role */
@@ -5911,6 +6045,12 @@ export interface components {
             /** Expires At */
             expires_at: string | null;
         };
+        /**
+         * RoleScopeKind
+         * @description 역할을 줄 수 있는 범위 (A84). GLOBAL = 전체, SCOPED = 과정·기수.
+         * @enum {string}
+         */
+        RoleScopeKind: "GLOBAL" | "SCOPED";
         /**
          * RoleScopeType
          * @enum {string}
@@ -7135,6 +7275,13 @@ export interface components {
             starts_at: string;
             /** Title */
             title: string;
+        };
+        /** UpdateRoleRequest */
+        UpdateRoleRequest: {
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
         };
         /** UploadRequest */
         UploadRequest: {
@@ -8600,6 +8747,158 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    role_catalog_api_v1_admin_roles_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleCatalogResponse"];
+                };
+            };
+        };
+    };
+    create_role_api_v1_admin_roles_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleDefinitionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_role_api_v1_admin_roles__code__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_role_api_v1_admin_roles__code__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleDefinitionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    replace_role_permissions_api_v1_admin_roles__code__permissions_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplacePermissionsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleDefinitionResponse"];
+                };
             };
             /** @description Validation Error */
             422: {

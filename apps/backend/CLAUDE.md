@@ -79,7 +79,7 @@ docker compose exec api aerich migrate --name <설명>    # 모델 변경 → mi
 docker compose exec api aerich upgrade                 # 적용
 
 docker compose exec api python -m app.cli create-super-admin <email> [--name 이름]  # 최고 관리자 등록 (멱등)
-docker compose exec api python -m app.cli seed-roles   # 역할·권한 정의(access/domain/catalog.py)를 DB에 반영 (멱등)
+docker compose exec api python -m app.cli seed-roles   # 역할·권한 정의(access/domain/catalog.py) 중 없는 것만 DB에 추가 (멱등, 고친 매핑은 덮지 않음 A84)
 docker compose exec api python -m app.cli seed-dev-org # 개발용 부서·팀·직위·과정 담당 팀 (멱등, local·test 전용, A62)
 docker compose exec api python -m app.cli send-test-mail <받는주소>  # 현재 MAIL_DRIVER로 확인 메일 발송 (Gmail 설정 확인)
 ```
@@ -122,7 +122,7 @@ src/app/
 
 - 의존 방향: `presentation → (application | infrastructure) → domain`. 도메인은 `fastapi`, `tortoise`, `redis`, `httpx`, `app.core`를 import하지 않는다.
 - 다른 컨텍스트는 `application`(공개 서비스)으로만 호출한다. 다른 컨텍스트의 `infrastructure`/`presentation` import 금지. 예외로 `access.presentation`의 권한 의존성은 공개한다.
-- 다른 컨텍스트의 공개 서비스에 리포지토리 구현을 넣어야 하면, composition root `app.main`이 만들어 `app.state`에 연결하고 presentation 의존성이 `request.app.state`에서 꺼낸다 (decisions B10, 예: `app.state.user_queries`). 인증 의존성은 `access.presentation.dependencies`의 `CurrentUser`(로그인) / `ApprovedUser`(승인된 회원)를 쓴다. 운영진 API는 `Depends(require_permission("<권한 코드>", cohort_param="cohort_id" | bootcamp_param=... | any_scope=True))`로 권한과 범위를 검사한다(기본은 GLOBAL, decisions A16). 리소스 소유(본인 신청 등)는 서비스에서 검사한다.
+- 다른 컨텍스트의 공개 서비스에 리포지토리 구현을 넣어야 하면, composition root `app.main`이 만들어 `app.state`에 연결하고 presentation 의존성이 `request.app.state`에서 꺼낸다 (decisions B10, 예: `app.state.user_queries`). 인증 의존성은 `access.presentation.dependencies`의 `CurrentUser`(로그인) / `ApprovedUser`(승인된 회원)를 쓴다. 운영진 API는 `Depends(require_permission("<권한 코드>", cohort_param="cohort_id" | bootcamp_param=... | any_scope=True))`로 권한과 범위를 검사한다(기본은 GLOBAL, decisions A16). 역할별 권한은 DB `role_permissions`가 출처다(A84, 최고 관리자는 항상 전체). 리소스 소유(본인 신청 등)는 서비스에서 검사한다.
 - 앱 공통 의존성(설정·시계·JWT·외부 HTTP 클라이언트)은 `app.core.dependencies`에서 가져온다. 시각은 `get_clock`(테스트는 `app.state.clock`을 `FixedClock`으로 교체)을 쓴다.
 - 트랜잭션은 서비스에서 `UnitOfWork`로 연다. 외부 API 호출은 `uow.on_commit(...)`으로 커밋 후에 실행한다.
 - 도메인은 시각을 직접 읽지 않고 `now`를 인자로 받는다. 서비스가 `Clock`에서 꺼내 넘긴다.
