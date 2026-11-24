@@ -1,6 +1,6 @@
 # 84. 직원 목록 검색·팀 필터·담당 (BE-3c)
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-24 병합)
 - 관련 PR: #130
 - 관련 결정: `docs/decisions.md` A83, F62 (A17·A36·A62)
 - 이전 기록: [83. 가입 수동 승인 후보 (BE-3b)](83_approval_candidates.md)
@@ -28,6 +28,9 @@ FE-15c 직원·담당자 화면은 직원마다 담당 과정·기수를 보여 
 - `ruff check`, `ruff format --check`, `mypy`, `mypy tests`, `lint-imports` 통과
 - `pytest` 910 passed (통합 포함). API: 이름·이메일 검색, 팀 필터, 과정·기수 담당, 팀리드는 조회 200·수정 403
 - 프론트엔드: `typecheck` 통과
+
+- GitHub Actions (PR #130): 백엔드·프론트엔드 검사·E2E 통과
+- 사용자가 병합을 확인했다(2026-11-24)
 
 ## 남은 작업
 - FE-15c 직원·담당자 화면
