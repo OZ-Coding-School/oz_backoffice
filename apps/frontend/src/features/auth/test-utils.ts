@@ -145,6 +145,16 @@ export function resetAuth(): void {
     http.get(apiUrl("/api/v1/me/balances"), () => HttpResponse.json([])),
     // 멘토 메뉴의 받은 신청 대기 건수 (F44). 기본은 없음
     http.get(apiUrl("/api/v1/me/mentor-requests"), () => HttpResponse.json(emptyPage(REQUEST_COUNTS))),
+    // 멘토 홈의 세션·신청 받기 (F57). 기본은 세션 없음, 신청 받는 중
+    http.get(apiUrl("/api/v1/me/mentor-sessions"), () =>
+      HttpResponse.json({
+        ...emptyPage(SESSION_COUNTS),
+        view_counts: { upcoming: 0, record_missing: 0, past: 0, all: 0 },
+      }),
+    ),
+    http.get(apiUrl("/api/v1/me/mentor-schedule"), () =>
+      HttpResponse.json({ mentor_id: "m1", accepting_requests: true, unavailable_periods: [] }),
+    ),
   );
 }
 
