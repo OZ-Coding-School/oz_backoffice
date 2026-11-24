@@ -160,3 +160,8 @@ class UserQueries:
 
     async def get(self, user_id: uuid.UUID) -> User | None:
         return await self._users.get(user_id)
+
+    async def is_super_admin(self, user_id: uuid.UUID) -> bool:
+        """권한 판정용 (A87). 정지·탈퇴 계정은 아니다."""
+        user = await self._users.get(user_id)
+        return user is not None and user.is_super_admin and user.can_login

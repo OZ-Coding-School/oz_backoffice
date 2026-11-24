@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from app.contexts.academy.domain.entities import Bootcamp
+from app.contexts.access.domain.catalog import validate_permissions
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.organization.domain.entities import (
     Department,
@@ -21,7 +22,7 @@ from app.contexts.organization.domain.entities import (
     EmployeePosition,
     Team,
 )
-from app.contexts.organization.domain.enums import AssignmentScope, EmploymentType
+from app.contexts.organization.domain.enums import AssignmentScope, DataScope, EmploymentType
 from app.contexts.organization.domain.repositories import (
     BootcampTeamRepository,
     DepartmentRepository,
@@ -50,6 +51,15 @@ def _snapshot(entity: object) -> dict[str, Any]:
 
 
 @dataclass(frozen=True, slots=True)
+class PositionView:
+    """직위 + 권한 묶음 + 직원 수 (A87)."""
+
+    position: EmployeePosition
+    permissions: frozenset[str]
+    employee_count: int
+
+
+@dataclass(frozen=True, slots=True)
 class DepartmentChanges:
     """부서 수정 항목. 보내지 않은 항목은 _UNSET(그대로)."""
 
@@ -74,6 +84,7 @@ class PositionChanges:
     name: str = _UNSET
     priority: int = _UNSET
     assignment_scope: AssignmentScope | None = _UNSET
+    data_scope: DataScope = _UNSET
 
 
 @dataclass(frozen=True, slots=True)
@@ -264,9 +275,21 @@ class OrganizationAdminService:
                 )
         return team_id
 
-    # ------------------------------------------------------------------ 직위
-    async def list_positions(self) -> list[EmployeePosition]:
-        return await self._positions.list_all()
+    # ------------------------------------------------------------------ 직위 (= 역할, A87)
+    async def list_positions(self) -> list[PositionView]:
+        permissions = await self._positions.permissions_by_position()
+        counts = await self._employees.count_by_position()
+        return [
+            PositionView(p, permissions.get(p.id, frozenset()), counts.get(p.id, 0))
+            for p in await self._positions.list_all()
+        ]
+
+    async def get_position(self, position_id: uuid.UUID) -> PositionView:
+        position = await self._get_position(position_id)
+        counts = await self._employees.count_by_position()
+        return PositionView(
+            position, await self._positions.permissions_of(position_id), counts.get(position_id, 0)
+        )
 
     async def create_position(
         self,
@@ -275,8 +298,11 @@ class OrganizationAdminService:
         priority: int,
         assignment_scope: AssignmentScope | None,
         actor_id: uuid.UUID,
+        data_scope: DataScope = DataScope.ASSIGNED,
     ) -> EmployeePosition:
-        position = EmployeePosition(name=name, priority=priority, assignment_scope=assignment_scope)
+        position = EmployeePosition(
+            name=name, priority=priority, assignment_scope=assignment_scope, data_scope=data_scope
+        )
         async with self._uow:
             await self._ensure_position_name_free(position.name)
             await self._positions.add(position)
@@ -295,6 +321,7 @@ class OrganizationAdminService:
                 assignment_scope=position.assignment_scope
                 if changes.assignment_scope is _UNSET
                 else changes.assignment_scope,
+                data_scope=None if changes.data_scope is _UNSET else changes.data_scope,
             )
             if position.name != before["name"]:
                 await self._ensure_position_name_free(position.name)
@@ -303,6 +330,24 @@ class OrganizationAdminService:
                 actor_id, "position.update", position, before=before, after=_snapshot(position)
             )
         return position
+
+    async def replace_position_permissions(
+        self, position_id: uuid.UUID, codes: list[str], *, actor_id: uuid.UUID
+    ) -> PositionView:
+        """직위의 권한 묶음을 통째로 바꾼다 (A87). 관리는 조회와 함께 (A86)."""
+        wanted = validate_permissions(codes)
+        async with self._uow:
+            position = await self._get_position(position_id)
+            before = await self._positions.permissions_of(position_id)
+            await self._positions.replace_permissions(position_id, wanted)
+            await self._record(
+                actor_id,
+                "position.permissions",
+                position,
+                before={"permissions": sorted(before)},
+                after={"permissions": sorted(wanted)},
+            )
+        return await self.get_position(position_id)
 
     async def delete_position(self, position_id: uuid.UUID, *, actor_id: uuid.UUID) -> None:
         async with self._uow:

@@ -2,12 +2,11 @@ from datetime import UTC, datetime
 
 import pytest
 
-from app.contexts.access.domain.catalog import COHORT_ASSISTANT, COHORT_MANAGER
-from app.contexts.access.infrastructure.repositories import TortoiseUserRoleRepository
 from app.contexts.audit.infrastructure.models import AuditLogModel
 from app.contexts.identity.domain.entities import User
 from app.contexts.identity.domain.enums import UserApprovalStatus
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
+from app.contexts.organization.application.employee_queries import EmployeeQueries
 from app.contexts.organization.application.review_service import RegistrationAdjustment
 from app.contexts.organization.domain.enums import (
     EmployeeRegistrationStatus,
@@ -18,6 +17,7 @@ from app.contexts.organization.domain.registration import RequestedAssignment
 from app.contexts.organization.infrastructure.repositories import (
     TortoiseBootcampStaffRepository,
     TortoiseCohortStaffRepository,
+    TortoiseEmployeePositionRepository,
     TortoiseEmployeeRepository,
 )
 from app.shared.errors import BusinessRuleViolation, NotFoundError
@@ -28,7 +28,6 @@ from tests.factories.staff_review import (
     build_review_service,
     create_applicant,
     create_registration,
-    seed_roles,
 )
 
 pytestmark = pytest.mark.integration
@@ -42,13 +41,22 @@ async def actor() -> User:
     return await create_applicant()
 
 
-async def _roles(user_id: object) -> set[tuple[str, str, object]]:
-    grants = await TortoiseUserRoleRepository().list_grants(user_id, now=NOW)  # type: ignore[arg-type]
-    return {(g.role_code, g.scope_type.value, g.scope_id) for g in grants}
+async def _scope(user_id: object) -> set[tuple[str, object]]:
+    """담당 배정 = 데이터 범위 (A87)."""
+    access = await EmployeeQueries(
+        TortoiseEmployeeRepository(),
+        positions=TortoiseEmployeePositionRepository(),
+        bootcamp_staffs=TortoiseBootcampStaffRepository(),
+        cohort_staffs=TortoiseCohortStaffRepository(),
+    ).access_of(user_id)  # type: ignore[arg-type]
+    if access is None:
+        return set()
+    return {("BOOTCAMP", b) for b in access.bootcamp_ids} | {
+        ("COHORT", c) for c in access.cohort_ids
+    }
 
 
 async def test_approve_creates_employee_staffs_roles_and_approves_user() -> None:
-    await seed_roles()
     cohort = await create_cohort()
     applicant = await create_applicant()
     registration = await create_registration(
@@ -72,9 +80,9 @@ async def test_approve_creates_employee_staffs_roles_and_approves_user() -> None
         (cohort.bootcamp_id, StaffRole.MANAGER)
     ]
     assert [(s.cohort_id, s.role) for s in cohort_staffs] == [(cohort.id, StaffRole.ASSISTANT)]
-    assert await _roles(applicant.id) == {
-        (COHORT_MANAGER, "BOOTCAMP", cohort.bootcamp_id),
-        (COHORT_ASSISTANT, "COHORT", cohort.id),
+    assert await _scope(applicant.id) == {
+        ("BOOTCAMP", cohort.bootcamp_id),
+        ("COHORT", cohort.id),
     }
     user = await TortoiseUserRepository().get(applicant.id)
     assert user is not None
@@ -86,7 +94,6 @@ async def test_approve_creates_employee_staffs_roles_and_approves_user() -> None
 
 
 async def test_approve_with_adjustment(actor: User) -> None:
-    await seed_roles()
     cohort = await create_cohort()
     applicant = await create_applicant()
     registration = await create_registration(
@@ -112,7 +119,7 @@ async def test_approve_with_adjustment(actor: User) -> None:
         other_department.id,
         EmploymentType.CONTRACT,
     )
-    assert await _roles(applicant.id) == {(COHORT_ASSISTANT, "COHORT", cohort.id)}
+    assert await _scope(applicant.id) == {("COHORT", cohort.id)}
     log = await AuditLogModel.get(target_id=registration.id)
     assert log.before["assignments"][0]["role"] == "MANAGER"  # type: ignore[index]
     assert log.after["assignments"][0]["role"] == "ASSISTANT"  # type: ignore[index]
@@ -120,7 +127,6 @@ async def test_approve_with_adjustment(actor: User) -> None:
 
 async def test_approve_sets_team_freely(actor: User) -> None:
     """승인 조정은 자유다: 다른 부서의 팀·팀 밖 과정도 존재만 확인한다 (A62)."""
-    await seed_roles()
     cohort = await create_cohort()  # 어느 팀에도 속하지 않은 과정
     applicant = await create_applicant()
     registration = await create_registration(applicant)
@@ -156,7 +162,6 @@ async def test_approve_sets_team_freely(actor: User) -> None:
 
 
 async def test_second_approval_updates_employee_and_skips_existing_staff(actor: User) -> None:
-    await seed_roles()
     cohort = await create_cohort()
     applicant = await create_applicant()
     same = [RequestedAssignment(role=StaffRole.ASSISTANT, cohort_id=cohort.id)]
@@ -170,11 +175,10 @@ async def test_second_approval_updates_employee_and_skips_existing_staff(actor: 
     assert employee is not None
     assert employee.department_id == second.department_id
     assert len(await TortoiseCohortStaffRepository().list_by_employee(employee.id)) == 1
-    assert len(await _roles(applicant.id)) == 1
+    assert len(await _scope(applicant.id)) == 1
 
 
 async def test_invalid_adjustment_rolls_back_everything(actor: User) -> None:
-    await seed_roles()
     applicant = await create_applicant()
     registration = await create_registration(applicant)
     with pytest.raises(BusinessRuleViolation) as exc:

@@ -6,16 +6,13 @@ import pytest
 from httpx import AsyncClient
 
 from app.cli import create_super_admin
-from app.contexts.access.application.roles import RoleAssignmentService
-from app.contexts.access.domain.catalog import COHORT_ASSISTANT, COHORT_MANAGER
-from app.contexts.access.domain.enums import RoleScopeType
-from app.contexts.access.infrastructure.repositories import TortoiseUserRoleRepository
 from app.contexts.identity.domain.entities import User
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
 from app.core.config import Settings
 from app.core.security import JWTService
 from tests.factories.academy import create_cohort
-from tests.factories.staff_review import create_applicant, seed_roles
+from tests.factories.access import ASSISTANT, MANAGER, give_role
+from tests.factories.staff_review import create_applicant
 
 pytestmark = pytest.mark.api
 
@@ -43,16 +40,10 @@ async def admin(settings: Settings) -> dict[str, str]:
 
 
 async def _staff(settings: Settings, role: str, cohort_id: object) -> dict[str, str]:
-    await seed_roles()
     user = await create_applicant()
     user.approve(now=datetime.now(UTC))
     await TortoiseUserRepository().save(user)
-    await RoleAssignmentService(TortoiseUserRoleRepository()).grant(
-        user.id,
-        role,
-        RoleScopeType.COHORT,
-        cohort_id,  # type: ignore[arg-type]
-    )
+    await give_role(user.id, role, cohort_id=cohort_id)  # type: ignore[arg-type]
     return bearer(settings, user)
 
 
@@ -169,8 +160,8 @@ async def test_holidays(client: AsyncClient, admin: dict[str, str]) -> None:
 
 async def test_permissions(client: AsyncClient, settings: Settings) -> None:
     mine, other = await create_cohort(), await create_cohort()
-    manager = await _staff(settings, COHORT_MANAGER, mine.id)
-    assistant = await _staff(settings, COHORT_ASSISTANT, mine.id)
+    manager = await _staff(settings, MANAGER, mine.id)
+    assistant = await _staff(settings, ASSISTANT, mine.id)
 
     assert (
         await client.put(

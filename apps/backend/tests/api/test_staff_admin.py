@@ -8,6 +8,9 @@ from httpx import AsyncClient
 from app.cli import create_super_admin
 from app.contexts.identity.domain.entities import User
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
+from app.contexts.organization.infrastructure.repositories import (
+    TortoiseEmployeePositionRepository,
+)
 from app.core.config import Settings
 from app.core.security import JWTService
 from app.shared.ids import new_id
@@ -55,16 +58,21 @@ async def test_cohort_staff_lifecycle_controls_permissions(
     listed = await client.get(url, headers=admin)
     assert [s["id"] for s in listed.json()] == [staff["id"]]
 
+    # 담당 배정은 데이터 범위다 (A87): 직위 권한이 그 기수에만 미친다
+    await TortoiseEmployeePositionRepository().replace_permissions(
+        employee.position_id, frozenset({"mentoring.request.read"})
+    )
     manager = await _approved_bearer(settings, employee.user_id)
-    me = (await client.get("/api/v1/me", headers=manager)).json()
-    assert me["roles"][0]["role"] == "COHORT_MANAGER"
-    # 담당자 관리는 SUPER_ADMIN만 (매니저는 403)
+    access = (await client.get("/api/v1/me/staff-access", headers=manager)).json()
+    assert access["permissions"][0]["cohort_ids"] == [str(cohort.id)]
+    # 담당자 관리 권한은 직위에 없다
     assert (await client.get(url, headers=manager)).status_code == 403
 
     deleted = await client.delete(f"{url}/{staff['id']}", headers=admin)
     assert deleted.status_code == 204
     assert (await client.get(url, headers=admin)).json() == []
-    assert (await client.get("/api/v1/me", headers=manager)).json()["roles"] == []
+    access = (await client.get("/api/v1/me/staff-access", headers=manager)).json()
+    assert access["permissions"] == []  # 담당이 없으면 기수 권한이 미치는 곳이 없다
 
 
 async def test_bootcamp_staff_and_errors(client: AsyncClient, admin: dict[str, str]) -> None:

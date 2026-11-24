@@ -4,8 +4,9 @@
 1. 신청을 어드민이 조정한 항목으로 승인
 2. 직원(`employees`) 생성 또는 부서·팀·직위·고용 형태 갱신
 3. 담당자(`bootcamp_staffs`·`cohort_staffs`) 추가 (이미 있으면 건너뜀)
-4. 담당에 맞는 역할(`user_roles`) 부여: 매니저 → COHORT_MANAGER, 조교 → COHORT_ASSISTANT
-5. 회원 승인, 감사 로그
+4. 회원 승인, 감사 로그
+
+권한은 직위가, 데이터 범위는 직위의 데이터 범위와 담당자 행이 정한다(A87). 역할을 따로 주지 않는다.
 """
 
 import uuid
@@ -17,7 +18,6 @@ from app.contexts.identity.domain.entities import User
 from app.contexts.organization.application.registration_service import (
     RegistrationChoiceValidator,
 )
-from app.contexts.organization.application.staff_roles import StaffRoleGranter, role_scope
 from app.contexts.organization.domain.entities import BootcampStaff, CohortStaff, Employee
 from app.contexts.organization.domain.enums import (
     EmployeeRegistrationStatus,
@@ -71,7 +71,6 @@ class StaffRegistrationReviewService:
         cohort_staffs: CohortStaffRepository,
         validator: RegistrationChoiceValidator,
         users: StaffUserApprover,
-        roles: StaffRoleGranter,
         audit: AuditRecorder,
         uow: UnitOfWork,
         clock: Clock,
@@ -82,7 +81,6 @@ class StaffRegistrationReviewService:
         self._cohort_staffs = cohort_staffs
         self._validator = validator
         self._users = users
-        self._roles = roles
         self._audit = audit
         self._uow = uow
         self._clock = clock
@@ -134,15 +132,6 @@ class StaffRegistrationReviewService:
 
             employee = await self._upsert_employee(registration)
             await self._add_staff_assignments(employee, registration.assignments)
-            for assignment in registration.assignments:
-                await self._roles.grant(
-                    registration.user_id,
-                    *role_scope(
-                        assignment.role,
-                        bootcamp_id=assignment.bootcamp_id,
-                        cohort_id=assignment.cohort_id,
-                    ),
-                )
             await self._users.approve(registration.user_id)
             await self._audit.record(
                 actor_user_id=actor_id,

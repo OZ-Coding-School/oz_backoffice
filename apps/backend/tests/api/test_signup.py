@@ -203,11 +203,8 @@ async def test_student_in_requested_cohort_is_auto_approved(
     app: FastAPI, client: AsyncClient, senders: tuple[InMemoryMailSender, InMemorySmsSender]
 ) -> None:
     from app.contexts.academy.infrastructure.repositories import TortoiseStudentRepository
-    from app.contexts.access.infrastructure.models import UserRoleModel
     from tests.factories.academy import make_student
-    from tests.factories.staff_review import seed_roles
 
-    await seed_roles()
     cohort = await create_cohort()
     student = make_student(cohort_id=cohort.id, name="김수강", phone_number="01012345678")
     await TortoiseStudentRepository().add(student)
@@ -220,10 +217,6 @@ async def test_student_in_requested_cohort_is_auto_approved(
     claimed = await TortoiseStudentRepository().get(student.id)
     assert claimed is not None
     assert str(claimed.user_id) == result["user_id"]
-    roles = await UserRoleModel.filter(user_id=result["user_id"]).prefetch_related("role")
-    assert [(r.role.code, r.scope_type, str(r.scope_id)) for r in roles] == [
-        ("STUDENT", "COHORT", str(cohort.id))
-    ]
     signup = await MemberSignupModel.get(id=result["signup_id"])
     assert signup.match_result == "MATCHED"
     assert app.state.mail_dispatcher.dispatched[0].subject.endswith("가입이 승인되었습니다")

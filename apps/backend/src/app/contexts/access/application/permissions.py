@@ -1,9 +1,12 @@
-"""권한 판정 (plan §2.3, decisions D4·M31·A84).
+"""권한 판정 (decisions D4·A86·A87).
 
-- 역할 → 권한 매핑은 DB `role_permissions`를 따른다(A84). 사용자 역할을 읽을 때 함께 읽는다.
-  최고 관리자는 항상 모든 권한이다.
-- 범위: GLOBAL은 전체, BOOTCAMP는 그 과정과 소속 기수 전부, COHORT는 그 기수만.
-- 사용자 역할은 요청당 한 번만 읽는다 (PermissionChecker 인스턴스가 요청 단위로 캐시한다).
+- 운영진의 권한은 직위의 권한 묶음이다(직위 = 역할).
+  최고 관리자(회원 필드)는 모든 권한·모든 데이터다.
+- 데이터 범위는 기수에 속한 엔터티(`cohort_bound`)에만 적용한다. 직위의 데이터 범위가 '전체'면
+  모든 기수, '담당만'이면 담당자로 배정된 과정(소속 기수 전부)·기수만이다.
+  그 밖의 엔터티는 권한만 있으면 된다.
+- 대상 종류: GLOBAL(모든 데이터가 필요), ANY(권한만 있으면), BOOTCAMP·COHORT(그 과정·기수).
+- 권한은 요청당 한 번만 읽는다 (PermissionChecker 인스턴스가 요청 단위로 캐시한다).
 """
 
 import uuid
@@ -11,10 +14,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Protocol
 
-from app.contexts.access.application.roles import RoleQueries
-from app.contexts.access.domain.catalog import PERMISSIONS
-from app.contexts.access.domain.entities import RoleGrant
-from app.contexts.access.domain.enums import RoleScopeType
+from app.contexts.access.domain.catalog import PERMISSIONS, PERMISSIONS_BY_CODE
 from app.shared.errors import PermissionDeniedError
 
 
@@ -71,59 +71,66 @@ def ensure_known_permission(code: str) -> None:
         raise ValueError(f"정의되지 않은 권한 코드입니다: {code}")
 
 
+@dataclass(frozen=True, slots=True)
+class StaffGrant:
+    """한 회원의 권한과 데이터 범위 (A87)."""
+
+    permissions: frozenset[str] = frozenset()
+    all_data: bool = False
+    bootcamp_ids: frozenset[uuid.UUID] = frozenset()
+    cohort_ids: frozenset[uuid.UUID] = frozenset()
+
+
+NO_GRANT = StaffGrant()
+
+
+class GrantSource(Protocol):
+    """회원 → 권한·데이터 범위 (`StaffGrantSource`가 구현)."""
+
+    async def grant_of(self, user_id: uuid.UUID) -> StaffGrant: ...
+
+
 class PermissionChecker:
-    def __init__(self, roles: RoleQueries, cohorts: CohortDirectory) -> None:
-        self._roles = roles
+    def __init__(self, grants: GrantSource, cohorts: CohortDirectory) -> None:
+        self._source = grants
         self._cohorts = cohorts
-        self._grants: dict[uuid.UUID, list[RoleGrant]] = {}
+        self._grants: dict[uuid.UUID, StaffGrant] = {}
 
     async def has(self, user_id: uuid.UUID, code: str, target: PermissionTarget) -> bool:
         ensure_known_permission(code)
-        grants = [g for g in await self._grants_of(user_id) if code in g.permissions]
-        if not grants:
+        grant = await self._grant_of(user_id)
+        if code not in grant.permissions:
             return False
-        if target.kind is TargetKind.ANY or any(
-            g.scope_type is RoleScopeType.GLOBAL for g in grants
-        ):
+        if not PERMISSIONS_BY_CODE[code].cohort_bound or grant.all_data:
             return True
-        if target.kind is TargetKind.GLOBAL:
+        if target.kind is TargetKind.ANY:
+            return True
+        if target.kind is TargetKind.GLOBAL or target.id is None:
             return False
         if target.kind is TargetKind.BOOTCAMP:
-            return any(
-                g.scope_type is RoleScopeType.BOOTCAMP and g.scope_id == target.id for g in grants
-            )
-        # COHORT: 그 기수 권한, 또는 기수가 속한 과정의 권한
-        if any(g.scope_type is RoleScopeType.COHORT and g.scope_id == target.id for g in grants):
+            return target.id in grant.bootcamp_ids
+        # COHORT: 담당 기수, 또는 기수가 속한 담당 과정
+        if target.id in grant.cohort_ids:
             return True
-        bootcamp_scopes = {g.scope_id for g in grants if g.scope_type is RoleScopeType.BOOTCAMP}
-        if not bootcamp_scopes or target.id is None:
+        if not grant.bootcamp_ids:
             return False
-        return await self._cohorts.bootcamp_id_of(target.id) in bootcamp_scopes
+        return await self._cohorts.bootcamp_id_of(target.id) in grant.bootcamp_ids
 
     async def scope_of(self, user_id: uuid.UUID, code: str) -> PermissionScope:
         """목록을 담당 범위로 거를 때 쓴다 (예: 승인 대기 목록)."""
         ensure_known_permission(code)
-        grants = [g for g in await self._grants_of(user_id) if code in g.permissions]
-        if any(g.scope_type is RoleScopeType.GLOBAL for g in grants):
+        grant = await self._grant_of(user_id)
+        if code not in grant.permissions:
+            return PermissionScope()
+        if not PERMISSIONS_BY_CODE[code].cohort_bound or grant.all_data:
             return PermissionScope(is_global=True)
-        return PermissionScope(
-            bootcamp_ids=frozenset(
-                g.scope_id
-                for g in grants
-                if g.scope_type is RoleScopeType.BOOTCAMP and g.scope_id is not None
-            ),
-            cohort_ids=frozenset(
-                g.scope_id
-                for g in grants
-                if g.scope_type is RoleScopeType.COHORT and g.scope_id is not None
-            ),
-        )
+        return PermissionScope(bootcamp_ids=grant.bootcamp_ids, cohort_ids=grant.cohort_ids)
 
     async def require(self, user_id: uuid.UUID, code: str, target: PermissionTarget) -> None:
         if not await self.has(user_id, code, target):
             raise PermissionDeniedError("이 작업을 할 권한이 없습니다.", code="permission_denied")
 
-    async def _grants_of(self, user_id: uuid.UUID) -> list[RoleGrant]:
+    async def _grant_of(self, user_id: uuid.UUID) -> StaffGrant:
         if user_id not in self._grants:
-            self._grants[user_id] = await self._roles.list_for_user(user_id)
+            self._grants[user_id] = await self._source.grant_of(user_id)
         return self._grants[user_id]

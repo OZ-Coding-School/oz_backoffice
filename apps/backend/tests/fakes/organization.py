@@ -102,6 +102,7 @@ class InMemoryBootcampTeamRepository:
 class InMemoryEmployeePositionRepository:
     def __init__(self, *positions: EmployeePosition) -> None:
         self.items = {p.id: p for p in positions}
+        self.permissions: dict[uuid.UUID, frozenset[str]] = {}
 
     async def add(self, position: EmployeePosition) -> None:
         self.items[position.id] = position
@@ -120,6 +121,15 @@ class InMemoryEmployeePositionRepository:
 
     async def list_all(self) -> list[EmployeePosition]:
         return sorted(self.items.values(), key=lambda p: (p.priority, p.name))
+
+    async def permissions_of(self, position_id: uuid.UUID) -> frozenset[str]:
+        return self.permissions.get(position_id, frozenset())
+
+    async def permissions_by_position(self) -> dict[uuid.UUID, frozenset[str]]:
+        return dict(self.permissions)
+
+    async def replace_permissions(self, position_id: uuid.UUID, codes: frozenset[str]) -> None:
+        self.permissions[position_id] = codes
 
 
 class InMemoryEmployeeRegistrationRepository:

@@ -37,6 +37,7 @@ class UserModel(models.Model):
     is_active = fields.BooleanField(default=False)
     last_login_at = fields.DatetimeField(null=True)
     deleted_at = fields.DatetimeField(null=True)
+    is_super_admin = fields.BooleanField(default=False)  # A87
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
 

@@ -6,7 +6,6 @@ import pytest
 from fakeredis import FakeAsyncRedis
 
 from app.contexts.academy.application.student_claims import ClaimOutcome
-from app.contexts.access.domain.enums import RoleScopeType
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.educator.application.mentor_onboarding import MentorMatch
 from app.contexts.educator.domain.enums import DisplayNamePreference
@@ -84,21 +83,6 @@ class FakeLinker:
         )
 
 
-class FakeRoles:
-    def __init__(self) -> None:
-        self.granted: list[tuple[uuid.UUID, str, RoleScopeType, uuid.UUID | None]] = []
-
-    async def grant(
-        self,
-        user_id: uuid.UUID,
-        role_code: str,
-        scope_type: RoleScopeType,
-        scope_id: uuid.UUID | None = None,
-    ) -> bool:
-        self.granted.append((user_id, role_code, scope_type, scope_id))
-        return True
-
-
 class FailingMail:
     async def send(self, message: MailMessage) -> None:
         raise MailDeliveryError("실패")
@@ -116,7 +100,6 @@ class Harness:
         self.challenges = RedisChallengeStore(redis)
         self.claims = FakeClaimer()
         self.linker = FakeLinker()
-        self.roles = FakeRoles()
         self.dispatcher = InMemoryMailDispatcher()
         self.service = SignupService(
             users=self.users,
@@ -130,7 +113,7 @@ class Harness:
             sessions=RedisSignupSessionStore(redis),
             hasher=FakeHasher(),
             cohorts=FakeCohorts(self.cohort_id),
-            matcher=SignupMatcher(students=self.claims, mentors=self.linker, roles=self.roles),
+            matcher=SignupMatcher(students=self.claims, mentors=self.linker),
             mail=self.mail,
             mail_dispatcher=self.dispatcher,
             sms=self.sms,
@@ -335,7 +318,6 @@ async def test_unmatched_student_stays_pending(
         MemberSignupStatus.PENDING,
         expected,
     )
-    assert h.roles.granted == []
     assert h.dispatcher.dispatched == []
     assert h.audit_logs.logs[-1].after == {
         "signup_type": "STUDENT",
@@ -354,7 +336,6 @@ async def test_matched_student_is_approved_with_role_and_mail(h: Harness) -> Non
         MemberSignupStatus.APPROVED,
         SignupMatchResult.MATCHED,
     )
-    assert h.roles.granted == [(result.user.id, "STUDENT", RoleScopeType.COHORT, h.cohort_id)]
     mail = h.dispatcher.dispatched[0]  # 커밋 후 워커로 보낸다
     assert (mail.to, mail.subject) == (EMAIL, "[오즈코딩스쿨] 가입이 승인되었습니다")
     assert "http://localhost:5173/login" in mail.text
@@ -367,7 +348,6 @@ async def test_matched_mentor_is_approved_without_role(h: Harness) -> None:
     )
     assert result.user.approval_status is UserApprovalStatus.APPROVED
     assert result.user.account_type is AccountType.MENTOR  # 가입 유형대로 (A65)
-    assert h.roles.granted == []  # MENTOR 역할은 배정(P8)에서 (A17)
     assert len(h.dispatcher.dispatched) == 1
 
 

@@ -11,6 +11,7 @@ from typing import Annotated, Any, Protocol, cast
 from fastapi import APIRouter, Depends, Query, Request, Response, status
 from pydantic import BaseModel, Field
 
+from app.contexts.access.domain.catalog import PERMISSIONS
 from app.contexts.access.presentation.dependencies import (
     require_permission,
 )
@@ -21,15 +22,20 @@ from app.contexts.organization.application.org_service import (
     EmployeeChanges,
     OrganizationAdminService,
     PositionChanges,
+    PositionView,
     TeamChanges,
 )
 from app.contexts.organization.domain.entities import (
     Department,
     Employee,
-    EmployeePosition,
     Team,
 )
-from app.contexts.organization.domain.enums import AssignmentScope, EmploymentType, StaffRole
+from app.contexts.organization.domain.enums import (
+    AssignmentScope,
+    DataScope,
+    EmploymentType,
+    StaffRole,
+)
 from app.contexts.organization.infrastructure.repositories import (
     TortoiseBootcampStaffRepository,
     TortoiseCohortStaffRepository,
@@ -47,6 +53,7 @@ DepartmentReader = Annotated[User, Depends(require_permission("org.department.re
 DepartmentManager = Annotated[User, Depends(require_permission("org.department.manage"))]
 PositionReader = Annotated[User, Depends(require_permission("org.position.read"))]
 PositionManager = Annotated[User, Depends(require_permission("org.position.manage"))]
+PermissionManager = Annotated[User, Depends(require_permission("access.role.manage"))]
 EmployeeReader = Annotated[User, Depends(require_permission("org.employee.read"))]
 EmployeeManager = Annotated[User, Depends(require_permission("org.employee.manage"))]
 ServiceDep = Annotated[OrganizationAdminService, Depends(get_organization_admin_service)]
@@ -121,10 +128,24 @@ class PositionResponse(BaseModel):
     name: str
     priority: int
     assignment_scope: AssignmentScope | None
+    data_scope: DataScope = Field(
+        description="ASSIGNED: 담당 과정·기수만, ALL: 모든 과정·기수 (A87)"
+    )
+    permissions: list[str] = Field(description="권한 코드 (권한 정의 순서)")
+    employee_count: int
 
     @classmethod
-    def of(cls, p: EmployeePosition) -> "PositionResponse":
-        return cls(id=p.id, name=p.name, priority=p.priority, assignment_scope=p.assignment_scope)
+    def of(cls, view: PositionView) -> "PositionResponse":
+        p = view.position
+        return cls(
+            id=p.id,
+            name=p.name,
+            priority=p.priority,
+            assignment_scope=p.assignment_scope,
+            data_scope=p.data_scope,
+            permissions=[c for c in PERMISSIONS if c in view.permissions],
+            employee_count=view.employee_count,
+        )
 
 
 class PositionCreateRequest(BaseModel):
@@ -134,12 +155,18 @@ class PositionCreateRequest(BaseModel):
         default=None,
         description="COURSE: 팀의 과정 여러 개, COHORT: 팀 과정의 기수 하나, null: 담당 없음",
     )
+    data_scope: DataScope = DataScope.ASSIGNED
 
 
 class PositionUpdateRequest(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=20)
     priority: int | None = Field(default=None, ge=0, le=32767)
     assignment_scope: AssignmentScope | None = None
+    data_scope: DataScope | None = None
+
+
+class PositionPermissionsRequest(BaseModel):
+    permissions: list[str]
 
 
 class EmployeeAssignmentResponse(BaseModel):
@@ -349,7 +376,7 @@ async def set_bootcamp_team(
 # ---------------------------------------------------------------- 직위
 @router.get("/positions", response_model=list[PositionResponse])
 async def list_positions(_: PositionReader, service: ServiceDep) -> list[PositionResponse]:
-    """직위 목록 (우선순위가 높은 직급부터)."""
+    """직위 목록 (우선순위가 높은 직급부터). 직위가 곧 역할이라 권한 묶음·직원 수를 함께 준다."""
     return [PositionResponse.of(p) for p in await service.list_positions()]
 
 
@@ -361,19 +388,35 @@ async def create_position(
         name=body.name,
         priority=body.priority,
         assignment_scope=body.assignment_scope,
+        data_scope=body.data_scope,
         actor_id=admin.id,
     )
-    return PositionResponse.of(position)
+    return PositionResponse.of(await service.get_position(position.id))
 
 
 @router.patch("/positions/{position_id}", response_model=PositionResponse)
 async def update_position(
     position_id: uuid.UUID, body: PositionUpdateRequest, admin: PositionManager, service: ServiceDep
 ) -> PositionResponse:
-    position = await service.update_position(
+    await service.update_position(
         position_id, PositionChanges(**_sent(body, ("assignment_scope",))), actor_id=admin.id
     )
-    return PositionResponse.of(position)
+    return PositionResponse.of(await service.get_position(position_id))
+
+
+@router.put("/positions/{position_id}/permissions", response_model=PositionResponse)
+async def replace_position_permissions(
+    position_id: uuid.UUID,
+    body: PositionPermissionsRequest,
+    admin: PermissionManager,
+    service: ServiceDep,
+) -> PositionResponse:
+    """직위의 권한 묶음 교체 (A87). 조회 없이 관리·동기화·취소·마감만 있으면 422
+    `permission_requires_read`, 없는 코드는 422 `permission_not_found`."""
+    view = await service.replace_position_permissions(
+        position_id, body.permissions, actor_id=admin.id
+    )
+    return PositionResponse.of(view)
 
 
 @router.delete("/positions/{position_id}", status_code=status.HTTP_204_NO_CONTENT)

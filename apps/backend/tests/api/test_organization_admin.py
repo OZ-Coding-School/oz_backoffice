@@ -211,12 +211,8 @@ async def test_employees_search_team_and_assignments(
     client: AsyncClient, settings: Settings, admin: dict[str, str]
 ) -> None:
     """직원 목록: 이름·이메일 검색, 팀 필터, 담당 (A83). 팀리드는 조회만."""
-    from app.contexts.access.application.roles import RoleAssignmentService
-    from app.contexts.access.domain.catalog import TEAM_LEAD
-    from app.contexts.access.domain.enums import RoleScopeType
-    from app.contexts.access.infrastructure.repositories import TortoiseUserRoleRepository
+    from tests.factories.access import TEAM_LEAD, give_role
     from tests.factories.identity import make_user
-    from tests.factories.staff_review import seed_roles
 
     users = TortoiseUserRepository()
     kim = make_user(name="김운영", email="kim.manager@nextrunners.co.kr")
@@ -262,14 +258,10 @@ async def test_employees_search_team_and_assignments(
     await client.patch(f"{url}/{manager.id}", json={"team_id": str(team.id)}, headers=admin)
     in_team = (await client.get(url, params={"team_id": str(team.id)}, headers=admin)).json()
     assert [e["id"] for e in in_team["items"]] == [str(manager.id)]
-
-    await seed_roles()
     lead = make_user(email="lead@nextrunners.co.kr")
     lead.approve(now=datetime.now(UTC))
     await users.add(lead)
-    await RoleAssignmentService(TortoiseUserRoleRepository()).grant(
-        lead.id, TEAM_LEAD, RoleScopeType.GLOBAL, None
-    )
+    await give_role(lead.id, TEAM_LEAD)
     viewer = bearer(settings, lead)
     assert (await client.get(url, headers=viewer)).status_code == 200
     assert (await client.get(f"{url}/{manager.id}", headers=viewer)).status_code == 200

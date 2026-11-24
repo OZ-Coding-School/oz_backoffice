@@ -1050,7 +1050,7 @@
           "me"
         ],
         "summary": "Me",
-        "description": "승인 전에도 호출할 수 있다 (승인 상태 확인용, plan §2.2). 만료되지 않은 역할을 함께 준다.",
+        "description": "승인 전에도 호출할 수 있다 (승인 상태 확인용, plan §2.2).",
         "operationId": "me_api_v1_me_get",
         "responses": {
           "200": {
@@ -1743,227 +1743,25 @@
         }
       }
     },
-    "/api/v1/admin/users/{user_id}/roles": {
+    "/api/v1/admin/permissions": {
       "get": {
         "tags": [
-          "admin-user-roles"
+          "admin-permissions"
         ],
-        "summary": "List User Roles",
-        "description": "회원의 모든 역할 (만료된 것 포함).",
-        "operationId": "list_user_roles_api_v1_admin_users__user_id__roles_get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "user_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "User Id"
-            }
-          }
-        ],
+        "summary": "List Permissions",
+        "description": "권한 정의 (정의 순서).",
+        "operationId": "list_permissions_api_v1_admin_permissions_get",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/UserRoleResponse"
+                    "$ref": "#/components/schemas/PermissionDefinitionResponse"
                   },
-                  "title": "Response List User Roles Api V1 Admin Users  User Id  Roles Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "admin-user-roles"
-        ],
-        "summary": "Grant User Role",
-        "description": "직접 관리 역할(SUPER_ADMIN·TEAM_LEAD)을 부여한다.\n\n다른 역할은 422 role_managed_by_assignment.",
-        "operationId": "grant_user_role_api_v1_admin_users__user_id__roles_post",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "user_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "User Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/GrantRoleRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserRoleResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/users/{user_id}/roles/{user_role_id}": {
-      "delete": {
-        "tags": [
-          "admin-user-roles"
-        ],
-        "summary": "Revoke User Role",
-        "description": "직접 관리 역할을 회수한다. 마지막 최고 관리자는 409 last_super_admin.",
-        "operationId": "revoke_user_role_api_v1_admin_users__user_id__roles__user_role_id__delete",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "user_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "User Id"
-            }
-          },
-          {
-            "name": "user_role_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "User Role Id"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/roles": {
-      "get": {
-        "tags": [
-          "admin-roles"
-        ],
-        "summary": "Role Catalog",
-        "operationId": "role_catalog_api_v1_admin_roles_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RoleCatalogResponse"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      },
-      "post": {
-        "tags": [
-          "admin-roles"
-        ],
-        "summary": "Create Role",
-        "description": "새 역할 (권한 없음). 코드·이름 중복은 409 role_code_taken·role_name_taken.",
-        "operationId": "create_role_api_v1_admin_roles_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateRoleRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RoleDefinitionResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "type": "array",
+                  "title": "Response List Permissions Api V1 Admin Permissions Get"
                 }
               }
             }
@@ -1976,110 +1774,13 @@
         ]
       }
     },
-    "/api/v1/admin/roles/{code}": {
-      "patch": {
-        "tags": [
-          "admin-roles"
-        ],
-        "summary": "Update Role",
-        "operationId": "update_role_api_v1_admin_roles__code__patch",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "code",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Code"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateRoleRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RoleDefinitionResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "admin-roles"
-        ],
-        "summary": "Delete Role",
-        "description": "기본 역할은 422 builtin_role, 보유자가 있으면 409 role_in_use.",
-        "operationId": "delete_role_api_v1_admin_roles__code__delete",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "code",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Code"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/roles/{code}/permissions": {
+    "/api/v1/admin/users/{user_id}/super-admin": {
       "put": {
         "tags": [
-          "admin-roles"
+          "admin-super-admin"
         ],
-        "summary": "Replace Role Permissions",
-        "description": "권한 묶음 교체. 최고 관리자는 422 role_permissions_locked,\n과정·기수 범위 역할에 전체 전용 권한은 422 global_only_permission,\n조회 없이 관리·동기화·취소·마감만 있으면 422 permission_requires_read (A86).",
-        "operationId": "replace_role_permissions_api_v1_admin_roles__code__permissions_put",
+        "summary": "Set Super Admin",
+        "operationId": "set_super_admin_api_v1_admin_users__user_id__super_admin_put",
         "security": [
           {
             "HTTPBearer": []
@@ -2087,12 +1788,13 @@
         ],
         "parameters": [
           {
-            "name": "code",
+            "name": "user_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Code"
+              "format": "uuid",
+              "title": "User Id"
             }
           }
         ],
@@ -2101,7 +1803,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ReplacePermissionsRequest"
+                "$ref": "#/components/schemas/SuperAdminRequest"
               }
             }
           }
@@ -2112,7 +1814,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RoleDefinitionResponse"
+                  "$ref": "#/components/schemas/SuperAdminResponse"
                 }
               }
             }
@@ -2587,7 +2289,7 @@
           "admin-organization"
         ],
         "summary": "List Positions",
-        "description": "직위 목록 (우선순위가 높은 직급부터).",
+        "description": "직위 목록 (우선순위가 높은 직급부터). 직위가 곧 역할이라 권한 묶음·직원 수를 함께 준다.",
         "operationId": "list_positions_api_v1_admin_positions_get",
         "responses": {
           "200": {
@@ -2740,6 +2442,65 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/positions/{position_id}/permissions": {
+      "put": {
+        "tags": [
+          "admin-organization"
+        ],
+        "summary": "Replace Position Permissions",
+        "description": "직위의 권한 묶음 교체 (A87). 조회 없이 관리·동기화·취소·마감만 있으면 422\n`permission_requires_read`, 없는 코드는 422 `permission_not_found`.",
+        "operationId": "replace_position_permissions_api_v1_admin_positions__position_id__permissions_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "position_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Position Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PositionPermissionsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PositionResponse"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -15072,39 +14833,14 @@
         "title": "ContractUpdate",
         "description": "보낸 필드만 바꾼다. 확정된 계약은 manager_employee_id만 바꿀 수 있다."
       },
-      "CreateRoleRequest": {
-        "properties": {
-          "code": {
-            "type": "string",
-            "title": "Code",
-            "description": "영문 대문자로 시작, 대문자·숫자·밑줄 2~50자"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "scope_kind": {
-            "$ref": "#/components/schemas/RoleScopeKind"
-          }
-        },
-        "type": "object",
-        "required": [
-          "code",
-          "name",
-          "scope_kind"
+      "DataScope": {
+        "type": "string",
+        "enum": [
+          "ASSIGNED",
+          "ALL"
         ],
-        "title": "CreateRoleRequest"
+        "title": "DataScope",
+        "description": "직위의 데이터 범위 (A87): 기수에 속한 엔터티에 미치는 범위."
       },
       "DayNightSeType": {
         "type": "string",
@@ -15707,31 +15443,6 @@
           "skipped"
         ],
         "title": "GrantResponse"
-      },
-      "GrantRoleRequest": {
-        "properties": {
-          "role": {
-            "type": "string",
-            "title": "Role"
-          },
-          "expires_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Expires At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "role"
-        ],
-        "title": "GrantRoleRequest"
       },
       "GrantTarget": {
         "type": "string",
@@ -16583,12 +16294,10 @@
             ],
             "title": "Approved At"
           },
-          "roles": {
-            "items": {
-              "$ref": "#/components/schemas/RoleGrantResponse"
-            },
-            "type": "array",
-            "title": "Roles"
+          "is_super_admin": {
+            "type": "boolean",
+            "title": "Is Super Admin",
+            "description": "최고 관리자 (모든 권한, A87)"
           }
         },
         "type": "object",
@@ -16600,7 +16309,7 @@
           "phone_number",
           "approval_status",
           "approved_at",
-          "roles"
+          "is_super_admin"
         ],
         "title": "MeResponse"
       },
@@ -18037,7 +17746,7 @@
           "area": {
             "type": "string",
             "title": "Area",
-            "description": "화면 묶음: 조직·학사·회원·권한·강사·멘토·멘토링"
+            "description": "화면 묶음: 조직·학사·회원 관리·강사·멘토·멘토링"
           },
           "entity": {
             "type": "string",
@@ -18053,10 +17762,10 @@
             "type": "string",
             "title": "Description"
           },
-          "global_only": {
+          "cohort_bound": {
             "type": "boolean",
-            "title": "Global Only",
-            "description": "전체 범위 역할에만 켤 수 있음"
+            "title": "Cohort Bound",
+            "description": "기수에 속한 엔터티 — 직위의 데이터 범위가 적용된다"
           },
           "requires": {
             "anyOf": [
@@ -18078,7 +17787,7 @@
           "entity",
           "action",
           "description",
-          "global_only",
+          "cohort_bound",
           "requires"
         ],
         "title": "PermissionDefinitionResponse"
@@ -18192,6 +17901,10 @@
               }
             ],
             "description": "COURSE: 팀의 과정 여러 개, COHORT: 팀 과정의 기수 하나, null: 담당 없음"
+          },
+          "data_scope": {
+            "$ref": "#/components/schemas/DataScope",
+            "default": "ASSIGNED"
           }
         },
         "type": "object",
@@ -18232,6 +17945,22 @@
         ],
         "title": "PositionOption"
       },
+      "PositionPermissionsRequest": {
+        "properties": {
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Permissions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "permissions"
+        ],
+        "title": "PositionPermissionsRequest"
+      },
       "PositionResponse": {
         "properties": {
           "id": {
@@ -18256,6 +17985,22 @@
                 "type": "null"
               }
             ]
+          },
+          "data_scope": {
+            "$ref": "#/components/schemas/DataScope",
+            "description": "ASSIGNED: 담당 과정·기수만, ALL: 모든 과정·기수 (A87)"
+          },
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Permissions",
+            "description": "권한 코드 (권한 정의 순서)"
+          },
+          "employee_count": {
+            "type": "integer",
+            "title": "Employee Count"
           }
         },
         "type": "object",
@@ -18263,7 +18008,10 @@
           "id",
           "name",
           "priority",
-          "assignment_scope"
+          "assignment_scope",
+          "data_scope",
+          "permissions",
+          "employee_count"
         ],
         "title": "PositionResponse"
       },
@@ -18299,6 +18047,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/AssignmentScope"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "data_scope": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DataScope"
               },
               {
                 "type": "null"
@@ -18557,22 +18315,6 @@
           "reason"
         ],
         "title": "RejectStaffRegistrationRequest"
-      },
-      "ReplacePermissionsRequest": {
-        "properties": {
-          "permissions": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Permissions"
-          }
-        },
-        "type": "object",
-        "required": [
-          "permissions"
-        ],
-        "title": "ReplacePermissionsRequest"
       },
       "RequestBalanceResponse": {
         "properties": {
@@ -19120,154 +18862,6 @@
           "signup_type"
         ],
         "title": "ResubmitRequest"
-      },
-      "RoleCatalogResponse": {
-        "properties": {
-          "permissions": {
-            "items": {
-              "$ref": "#/components/schemas/PermissionDefinitionResponse"
-            },
-            "type": "array",
-            "title": "Permissions"
-          },
-          "roles": {
-            "items": {
-              "$ref": "#/components/schemas/RoleDefinitionResponse"
-            },
-            "type": "array",
-            "title": "Roles",
-            "description": "기본 역할 → 새 역할(만든 순서)"
-          }
-        },
-        "type": "object",
-        "required": [
-          "permissions",
-          "roles"
-        ],
-        "title": "RoleCatalogResponse"
-      },
-      "RoleDefinitionResponse": {
-        "properties": {
-          "code": {
-            "type": "string",
-            "title": "Code"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "scope_kind": {
-            "$ref": "#/components/schemas/RoleScopeKind",
-            "description": "GLOBAL = 전체, SCOPED = 과정·기수"
-          },
-          "builtin": {
-            "type": "boolean",
-            "title": "Builtin",
-            "description": "기본 역할 (지울 수 없음)"
-          },
-          "permissions_editable": {
-            "type": "boolean",
-            "title": "Permissions Editable",
-            "description": "false면 최고 관리자 (항상 모든 권한)"
-          },
-          "permissions": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Permissions",
-            "description": "권한 코드, 권한 정의 순서"
-          },
-          "holder_count": {
-            "type": "integer",
-            "title": "Holder Count",
-            "description": "부여받은 회원 수 (만료 포함)"
-          }
-        },
-        "type": "object",
-        "required": [
-          "code",
-          "name",
-          "description",
-          "scope_kind",
-          "builtin",
-          "permissions_editable",
-          "permissions",
-          "holder_count"
-        ],
-        "title": "RoleDefinitionResponse"
-      },
-      "RoleGrantResponse": {
-        "properties": {
-          "role": {
-            "type": "string",
-            "title": "Role"
-          },
-          "scope_type": {
-            "$ref": "#/components/schemas/RoleScopeType"
-          },
-          "scope_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Scope Id"
-          },
-          "expires_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Expires At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "role",
-          "scope_type",
-          "scope_id",
-          "expires_at"
-        ],
-        "title": "RoleGrantResponse"
-      },
-      "RoleScopeKind": {
-        "type": "string",
-        "enum": [
-          "GLOBAL",
-          "SCOPED"
-        ],
-        "title": "RoleScopeKind",
-        "description": "역할을 줄 수 있는 범위 (A84). GLOBAL = 전체, SCOPED = 과정·기수."
-      },
-      "RoleScopeType": {
-        "type": "string",
-        "enum": [
-          "GLOBAL",
-          "BOOTCAMP",
-          "COHORT"
-        ],
-        "title": "RoleScopeType"
       },
       "RosterStudentResponse": {
         "properties": {
@@ -20700,6 +20294,22 @@
       },
       "StaffAccessResponse": {
         "properties": {
+          "is_super_admin": {
+            "type": "boolean",
+            "title": "Is Super Admin",
+            "description": "최고 관리자 (모든 권한·모든 데이터, A87)"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StaffPositionResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "직위 (= 역할). 직원이 아니면 없음"
+          },
           "permissions": {
             "items": {
               "$ref": "#/components/schemas/PermissionScopeResponse"
@@ -20719,6 +20329,8 @@
         },
         "type": "object",
         "required": [
+          "is_super_admin",
+          "position",
           "permissions",
           "cohorts"
         ],
@@ -20840,6 +20452,31 @@
           "created_at"
         ],
         "title": "StaffMemberResponse"
+      },
+      "StaffPositionResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "all_data": {
+            "type": "boolean",
+            "title": "All Data",
+            "description": "데이터 범위가 전체인지 (아니면 담당 과정·기수만)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "all_data"
+        ],
+        "title": "StaffPositionResponse"
       },
       "StaffRegistrationOptionsResponse": {
         "properties": {
@@ -21405,6 +21042,38 @@
         ],
         "title": "StudentTeamResponse",
         "description": "수강생이 보는 내 팀 (멘토 실명·가입 여부 제외)."
+      },
+      "SuperAdminRequest": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "title": "SuperAdminRequest"
+      },
+      "SuperAdminResponse": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "is_super_admin": {
+            "type": "boolean",
+            "title": "Is Super Admin"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "is_super_admin"
+        ],
+        "title": "SuperAdminResponse"
       },
       "TeamChangeResponse": {
         "properties": {
@@ -22177,30 +21846,6 @@
         ],
         "title": "UnrecordedResponse"
       },
-      "UpdateRoleRequest": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          }
-        },
-        "type": "object",
-        "required": [
-          "name"
-        ],
-        "title": "UpdateRoleRequest"
-      },
       "UploadRequest": {
         "properties": {
           "file_name": {
@@ -22263,69 +21908,6 @@
           "REJECTED"
         ],
         "title": "UserApprovalStatus"
-      },
-      "UserRoleResponse": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Id"
-          },
-          "role": {
-            "type": "string",
-            "title": "Role"
-          },
-          "scope_type": {
-            "$ref": "#/components/schemas/RoleScopeType"
-          },
-          "scope_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Scope Id"
-          },
-          "expires_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Expires At"
-          },
-          "is_effective": {
-            "type": "boolean",
-            "title": "Is Effective"
-          },
-          "managed_by": {
-            "type": "string",
-            "enum": [
-              "direct",
-              "assignment"
-            ],
-            "title": "Managed By"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "role",
-          "scope_type",
-          "scope_id",
-          "expires_at",
-          "is_effective",
-          "managed_by"
-        ],
-        "title": "UserRoleResponse"
       },
       "ValidationError": {
         "properties": {

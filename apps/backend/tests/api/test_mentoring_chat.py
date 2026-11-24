@@ -12,10 +12,6 @@ from httpx import AsyncClient
 
 from app.cli import create_super_admin
 from app.contexts.academy.infrastructure.repositories import TortoiseStudentRepository
-from app.contexts.access.application.roles import RoleAssignmentService
-from app.contexts.access.domain.catalog import COHORT_ASSISTANT
-from app.contexts.access.domain.enums import RoleScopeType
-from app.contexts.access.infrastructure.repositories import TortoiseUserRoleRepository
 from app.contexts.educator.domain.enums import DisplayNamePreference
 from app.contexts.identity.domain.entities import User
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
@@ -31,8 +27,9 @@ from app.core.clock import SystemClock
 from app.core.config import Settings
 from app.core.security import JWTService
 from tests.factories.academy import create_cohort, make_student
+from tests.factories.access import ASSISTANT, give_role
 from tests.factories.educator import create_mentor, create_user
-from tests.factories.staff_review import create_applicant, seed_roles
+from tests.factories.staff_review import create_applicant
 
 pytestmark = pytest.mark.api
 
@@ -238,14 +235,10 @@ async def test_team_chat_and_staff_view(client: AsyncClient, settings: Settings)
     assert one.json()["unread_count"] == 0
     messages = (await client.get(f"{admin_path}/{thread_id}/messages", headers=admin)).json()
     assert [m["body"] for m in messages["items"]] == ["팀 질문"]
-
-    await seed_roles()
     assistant_user = await create_applicant()
     assistant_user.approve(now=datetime.now(UTC))
     await TortoiseUserRepository().save(assistant_user)
-    await RoleAssignmentService(TortoiseUserRoleRepository()).grant(
-        assistant_user.id, COHORT_ASSISTANT, RoleScopeType.COHORT, ctx["cohort"].id
-    )
+    await give_role(assistant_user.id, ASSISTANT, cohort_id=ctx["cohort"].id)
     assistant = bearer(settings, assistant_user)
     assert (await client.get(admin_path, headers=assistant)).status_code == 200
     other_cohort = await create_cohort()

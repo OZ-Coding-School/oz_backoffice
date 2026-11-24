@@ -27,7 +27,6 @@ from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.educator.domain.enums import DisplayNamePreference
 from app.contexts.identity.application.signup import MailDispatcher
 from app.contexts.identity.application.signup_matching import (
-    RoleGranter,
     SignupMatcher,
 )
 from app.contexts.identity.application.signup_review import (
@@ -79,7 +78,6 @@ def get_review_service(
         permissions=checker,
         students=cast("StudentSelector", state.student_claims),
         mentors=cast("MentorApprover", state.mentor_onboarding),
-        roles=cast("RoleGranter", state.role_assignments),
         dispatcher=cast("MailDispatcher", state.mail_dispatcher),
         audit=cast("AuditRecorder", state.audit_recorder),
         uow=UnitOfWork(),

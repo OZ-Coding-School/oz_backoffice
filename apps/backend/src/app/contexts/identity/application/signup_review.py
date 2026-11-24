@@ -20,8 +20,6 @@ from typing import Protocol
 
 from app.contexts.academy.application.student_claims import ClaimCandidate
 from app.contexts.access.application.permissions import PermissionScope, PermissionTarget
-from app.contexts.access.domain.catalog import STUDENT
-from app.contexts.access.domain.enums import RoleScopeType
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.educator.application.mentor_onboarding import ContractCandidate, MentorMatch
 from app.contexts.educator.domain.enums import DisplayNamePreference
@@ -31,7 +29,7 @@ from app.contexts.identity.application.signup import (
     settle_auto_match,
 )
 from app.contexts.identity.application.signup_mails import approval_mail, rejection_mail
-from app.contexts.identity.application.signup_matching import RoleGranter, SignupMatcher
+from app.contexts.identity.application.signup_matching import SignupMatcher
 from app.contexts.identity.domain.entities import User
 from app.contexts.identity.domain.enums import (
     MemberSignupStatus,
@@ -160,7 +158,6 @@ class SignupReviewService:
         permissions: PermissionGate,
         students: StudentSelector,
         mentors: MentorApprover,
-        roles: RoleGranter,
         dispatcher: MailDispatcher,
         audit: AuditRecorder,
         uow: UnitOfWork,
@@ -173,7 +170,6 @@ class SignupReviewService:
         self._permissions = permissions
         self._students = students
         self._mentors = mentors
-        self._roles = roles
         self._dispatcher = dispatcher
         self._audit = audit
         self._uow = uow
@@ -276,7 +272,6 @@ class SignupReviewService:
             cohort_id = await self._students.cohort_of_claimable(student_id)
             await self._require_cohort(actor_id, cohort_id, APPROVE)
             await self._students.claim_selected(student_id, user_id=user.id)
-            await self._roles.grant(user.id, STUDENT, RoleScopeType.COHORT, cohort_id)
             await self._approve(
                 actor_id,
                 user,

@@ -33,6 +33,7 @@ _USER_FIELDS = (
     "is_active",
     "last_login_at",
     "deleted_at",
+    "is_super_admin",
 )
 
 
@@ -46,6 +47,15 @@ def _apply(model: UserModel, user: User) -> None:
 
 
 class TortoiseUserRepository:
+    async def lock_super_admin_ids(self) -> list[uuid.UUID]:
+        """최고 관리자 행을 잠가 읽는다 (마지막 1명 보호, UoW 안에서)."""
+        ids = (
+            await UserModel.filter(is_super_admin=True, deleted_at__isnull=True)
+            .select_for_update()
+            .values_list("id", flat=True)
+        )
+        return [uuid.UUID(str(i)) for i in ids]
+
     async def add(self, user: User) -> None:
         model = UserModel(id=user.id)
         _apply(model, user)

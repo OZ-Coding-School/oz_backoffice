@@ -1,6 +1,7 @@
 """organization 컨텍스트 Tortoise 모델 (단일 app `models`).
 
-DBML: departments, teams, team_bootcamps, employee_positions, employees, bootcamp_staffs,
+DBML: departments, teams, team_bootcamps, employee_positions, position_permissions, employees,
+bootcamp_staffs,
 cohort_staffs, employee_registrations, employee_registration_assignments
 부서는 상위 없이 이름이 유일하고, 팀은 한 부서에 속한다 (A62).
 """
@@ -11,6 +12,7 @@ from tortoise import fields, models
 
 from app.contexts.organization.domain.enums import (
     AssignmentScope,
+    DataScope,
     EmployeeRegistrationStatus,
     EmploymentType,
     StaffRole,
@@ -66,11 +68,26 @@ class EmployeePositionModel(models.Model):
     name = fields.CharField(max_length=20, unique=True)
     priority = fields.SmallIntField()
     assignment_scope = fields.CharEnumField(AssignmentScope, max_length=20, null=True)
+    data_scope = fields.CharEnumField(DataScope, max_length=20, default=DataScope.ASSIGNED)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
 
     class Meta:
         table = "employee_positions"
+
+
+class PositionPermissionModel(models.Model):
+    """직위의 권한 묶음 (A87). 권한 코드는 access/domain/catalog.py가 정의한다."""
+
+    id = fields.UUIDField(primary_key=True, default=new_id)
+    position: fields.ForeignKeyRelation[EmployeePositionModel] = fields.ForeignKeyField(
+        "models.EmployeePositionModel", related_name="permissions", on_delete=fields.CASCADE
+    )
+    permission_code = fields.CharField(max_length=100)
+
+    class Meta:
+        table = "position_permissions"
+        unique_together = (("position", "permission_code"),)
 
 
 class EmployeeModel(models.Model):
