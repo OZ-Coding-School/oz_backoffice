@@ -30,7 +30,7 @@ function statusOf(tab: RegistrationTab): RegistrationStatus {
   return REGISTRATION_TABS.find((t) => t.value === tab)?.status ?? "PENDING";
 }
 
-/** 운영진 가입 신청 (role.assign, A12). 20개씩 이어 붙인다 */
+/** 운영진 가입 신청 (staff.registration, A12·A86). 20개씩 이어 붙인다 */
 export function registrationsQuery(tab: RegistrationTab) {
   return infiniteQueryOptions({
     queryKey: registrationKeys.list(tab),

@@ -44,7 +44,7 @@ function orgLine(options: StaffOptions, e: Employee): string {
   return `${department} · ${team} · ${position}`;
 }
 
-/** 소속 수정 (org.manage, F62): 부서 → 팀 → 직위·고용 형태. 담당은 담당자 탭에서 바꾼다 */
+/** 소속 수정 (org.employee.manage, F62): 부서 → 팀 → 직위·고용 형태. 담당은 담당자 탭에서 바꾼다 */
 export function EditEmployeeDialog({
   employee,
   options,
@@ -110,7 +110,7 @@ export function EditEmployeeDialog({
   );
 }
 
-/** 담당자 추가 (staff.assign, F62·A83): 직원을 찾아 하나 고르고 역할을 고른다. 이미 담당 중이면 막는다 */
+/** 담당자 추가 (staff.assignment.manage, F62·A83): 직원을 찾아 하나 고르고 역할을 고른다. 이미 담당 중이면 막는다 */
 export function AddStaffDialog({
   target,
   targetName,

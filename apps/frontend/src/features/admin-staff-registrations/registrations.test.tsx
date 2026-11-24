@@ -50,7 +50,10 @@ const OPTIONS: StaffOptions = {
 };
 
 const ACCESS: StaffAccess = {
-  permissions: [{ code: "role.assign", is_global: true, bootcamp_ids: [], cohort_ids: [] }],
+  permissions: [
+    { code: "staff.registration.read", is_global: true, bootcamp_ids: [], cohort_ids: [] },
+    { code: "staff.registration.manage", is_global: true, bootcamp_ids: [], cohort_ids: [] },
+  ],
   cohorts: [
     {
       id: "c12",
@@ -151,7 +154,7 @@ describe("운영진 승인 (FE-15b)", () => {
       "aria-current",
       "page",
     );
-    expect(within(menu).queryByRole("link", { name: /가입 승인/ })).not.toBeInTheDocument(); // user.approve 없음
+    expect(within(menu).queryByRole("link", { name: /가입 승인/ })).not.toBeInTheDocument(); // 회원 가입 승인 권한 없음
     const tabs = screen.getByRole("navigation", { name: "처리 상태" });
     expect(await within(tabs).findByRole("link", { name: "대기 2" })).toHaveAttribute("aria-current", "page");
     const manager = await screen.findByRole("row", { name: /김운영/ });

@@ -23,7 +23,7 @@ const C12: StaffCohort = {
 };
 
 const MANAGER_ACCESS: StaffAccess = {
-  permissions: [{ code: "user.approve", is_global: false, bootcamp_ids: [], cohort_ids: ["c12"] }],
+  permissions: [{ code: "member.approval.read", is_global: false, bootcamp_ids: [], cohort_ids: ["c12"] }],
   cohorts: [C12],
 };
 
@@ -41,8 +41,8 @@ const STAFF = makeMe({
 
 describe("운영진 메뉴·역할 (F17·F58)", () => {
   it("권한으로 메뉴를 거르고 메뉴가 없는 모듈은 뺀다", () => {
-    expect(hasPermission(MANAGER_ACCESS, "user.approve")).toBe(true);
-    expect(hasPermission(MANAGER_ACCESS, "org.manage")).toBe(false);
+    expect(hasPermission(MANAGER_ACCESS, "member.approval.read")).toBe(true);
+    expect(hasPermission(MANAGER_ACCESS, "org.department.manage")).toBe(false);
     const modules = staffModules({ permissions: [] });
     expect(modules.map((m) => m.key)).toEqual(["home"]);
     expect(currentStaffNav(modules, "/admin")?.item.label).toBe("홈");

@@ -11,7 +11,7 @@ const STAFF = {
   roles: [{ role: "COHORT_MANAGER", scope_type: "COHORT", scope_id: "c12", expires_at: null }],
 };
 const ACCESS = {
-  permissions: [{ code: "user.approve", is_global: false, bootcamp_ids: [], cohort_ids: ["c12"] }],
+  permissions: [{ code: "member.approval.read", is_global: false, bootcamp_ids: [], cohort_ids: ["c12"] }],
   cohorts: [
     {
       id: "c12",

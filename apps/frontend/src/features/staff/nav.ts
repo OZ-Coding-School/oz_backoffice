@@ -47,24 +47,24 @@ const MODULES: StaffModule[] = [
         to: "/admin/members/approvals",
         label: "가입 승인",
         icon: UserCheck,
-        // 수강생은 user.approve, 멘토는 contract.manage (A33)
-        permissions: ["user.approve", "contract.manage"],
+        // 수강생은 회원 가입 승인, 멘토는 계약 권한 (A33·A86)
+        permissions: ["member.approval.read", "educator.contract.read"],
         badge: "approvals",
       },
       {
         to: "/admin/members/staff-registrations",
         label: "운영진 승인",
         icon: UserCog,
-        // 운영진 가입 승인은 role.assign (A12·A17)
-        permissions: ["role.assign"],
+        // 운영진 가입 승인 (A12·A86)
+        permissions: ["staff.registration.read"],
         badge: "staffRegistrations",
       },
       {
         to: "/admin/members/staff",
         label: "직원·담당자",
         icon: Users,
-        // 직원 조회는 org.manage 또는 staff.assign (A83)
-        permissions: ["org.manage", "staff.assign"],
+        // 직원 조회 또는 담당자 조회 (A83·A86)
+        permissions: ["org.employee.read", "staff.assignment.read"],
       },
     ],
   },

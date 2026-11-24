@@ -98,7 +98,9 @@ const MEMBER: StaffMember = {
   created_at: "2026-11-18T01:00:00Z",
 };
 
-function mockStaff(codes = ["org.manage", "staff.assign"]) {
+function mockStaff(
+  codes = ["org.employee.read", "org.employee.manage", "staff.assignment.read", "staff.assignment.manage"],
+) {
   const calls = { q: [] as (string | null)[], patch: [] as unknown[], add: [] as unknown[], remove: [] as string[] };
   server.use(
     http.get(apiUrl("/api/v1/me/staff-access"), () => HttpResponse.json(access(codes))),
@@ -184,17 +186,26 @@ describe("직원·담당자 (FE-15c)", () => {
     await waitFor(() => expect(calls.remove).toEqual(["cs1"]));
   });
 
-  it("팀리드(staff.assign)는 직원 탭을 읽기만, org.manage만 있으면 담당자 탭이 없다", async () => {
-    mockStaff(["staff.assign"]);
+  it("팀리드(직원 조회)는 직원 탭을 읽기만, 직원 권한만 있으면 담당자 탭이 없다", async () => {
+    mockStaff(["org.employee.read", "staff.assignment.read", "staff.assignment.manage"]);
     const { unmount } = await renderRoute("/admin/members/staff");
     await screen.findByRole("row", { name: /김운영/ });
     expect(screen.queryByRole("button", { name: "김운영 수정" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "담당자" })).toBeInTheDocument();
     unmount();
 
-    mockStaff(["org.manage"]);
+    mockStaff(["org.employee.read", "org.employee.manage"]);
     await renderRoute("/admin/members/staff?tab=staff");
     await screen.findByRole("row", { name: /김운영/ });
     expect(screen.queryByRole("link", { name: "담당자" })).not.toBeInTheDocument();
+  });
+
+  it("담당자 조회만 있으면 담당자 탭에서 추가·해제가 없다 (A86)", async () => {
+    mockStaff(["staff.assignment.read"]);
+    await renderRoute("/admin/members/staff?tab=staff&bootcamp=b1&cohort=c12");
+    await screen.findByRole("table", { name: /담당자/ });
+    expect(screen.queryByRole("button", { name: "담당자 추가" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /해제/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "직원" })).not.toBeInTheDocument();
   });
 });
