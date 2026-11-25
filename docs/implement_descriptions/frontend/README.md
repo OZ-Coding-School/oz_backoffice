@@ -43,3 +43,4 @@
 | 39 | [회원 관리 > 전체 회원 (FE-15i)](39_member_users.md) | 완료 (#147) |
 | 40 | [설정 > 공휴일 (FE-16)](40_settings_holidays.md) | 완료 (#149) |
 | 41 | [학사 > 과정·기수 (FE-17a)](41_academy_bootcamps.md) | 완료 (#152) |
+| 42 | [학사 > HRD 과정 (FE-17b)](42_academy_hrd.md) | PR 진행 중 |
