@@ -4,6 +4,7 @@ PATCH는 보낸 필드만 바꾼다(null을 보내면 그 값을 비운다). 소
 """
 
 import uuid
+from collections import Counter
 from datetime import date
 from typing import Annotated, Any, Literal, cast
 
@@ -12,7 +13,12 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.contexts.academy.application.academy_admin import AcademyAdminService
 from app.contexts.academy.application.cohort_summary import CohortSummary, CohortSummaryReader
-from app.contexts.academy.domain.entities import Bootcamp, Cohort
+from app.contexts.academy.domain.entities import (
+    Bootcamp,
+    Cohort,
+    HrdNetBootcamp,
+    HrdNetBootcampCohort,
+)
 from app.contexts.academy.domain.enums import (
     CohortStatus,
     DayNightSeType,
@@ -20,6 +26,8 @@ from app.contexts.academy.domain.enums import (
     WeekendSeType,
 )
 from app.contexts.academy.infrastructure.models import (
+    BootcampModel,
+    CohortModel,
     HrdNetBootcampCohortModel,
     HrdNetBootcampModel,
 )
@@ -108,8 +116,18 @@ class HrdBootcampUpdate(BaseModel):
     total_train_days: NonNegative | None = None
 
 
+class HrdLinkedBootcamp(BaseModel):
+    id: uuid.UUID
+    name: str
+    code: str
+
+
 class HrdBootcampResponse(HrdBootcampFields, _FromEntity):
     id: uuid.UUID
+    bootcamps: list[HrdLinkedBootcamp] = Field(
+        default_factory=list, description="이 HRD 과정을 대표로 둔 운영과정 (A98)"
+    )
+    cohort_count: int = Field(default=0, description="회차 수 (A98)")
 
 
 class HrdCohortFields(BaseModel):
@@ -126,9 +144,76 @@ class HrdCohortUpdate(BaseModel):
     self_pay_amount: NonNegative | None = None
 
 
+class HrdLinkedCohort(BaseModel):
+    id: uuid.UUID
+    bootcamp_id: uuid.UUID
+    bootcamp_name: str
+    cohort_number: int
+
+
 class HrdCohortResponse(HrdCohortFields, _FromEntity):
     id: uuid.UUID
     hrd_net_bootcamp_id: uuid.UUID
+    linked_cohorts: list[HrdLinkedCohort] = Field(
+        default_factory=list, description="이 회차에 연결된 기수 (D6·A98)"
+    )
+
+
+async def _hrd_bootcamps_out(items: list[HrdNetBootcamp]) -> list[HrdBootcampResponse]:
+    """대표로 둔 운영과정·회차 수를 붙인다 (A98)."""
+    ids = [b.id for b in items]
+    bootcamps = (
+        await BootcampModel.filter(hrd_net_bootcamp_id__in=ids).order_by("name") if ids else []
+    )
+    owners = (
+        await HrdNetBootcampCohortModel.filter(hrd_net_bootcamp_id__in=ids).values_list(
+            "hrd_net_bootcamp_id", flat=True
+        )
+        if ids
+        else []
+    )
+    counts = Counter(uuid.UUID(str(owner)) for owner in owners)
+    out = []
+    for b in items:
+        linked = [
+            HrdLinkedBootcamp(id=row.id, name=row.name, code=row.code)
+            for row in bootcamps
+            if row.hrd_net_bootcamp_id == b.id  # type: ignore[attr-defined]
+        ]
+        out.append(
+            HrdBootcampResponse.model_validate(b).model_copy(
+                update={"bootcamps": linked, "cohort_count": counts.get(b.id, 0)}
+            )
+        )
+    return out
+
+
+async def _hrd_cohorts_out(items: list[HrdNetBootcampCohort]) -> list[HrdCohortResponse]:
+    """연결된 기수를 붙인다 (A98)."""
+    ids = [c.id for c in items]
+    rows = (
+        await CohortModel.filter(hrd_net_cohort_id__in=ids)
+        .prefetch_related("bootcamp")
+        .order_by("cohort_number")
+        if ids
+        else []
+    )
+    out = []
+    for c in items:
+        linked = [
+            HrdLinkedCohort(
+                id=row.id,
+                bootcamp_id=row.bootcamp.id,
+                bootcamp_name=row.bootcamp.name,
+                cohort_number=row.cohort_number,
+            )
+            for row in rows
+            if row.hrd_net_cohort_id == c.id  # type: ignore[attr-defined]
+        ]
+        out.append(
+            HrdCohortResponse.model_validate(c).model_copy(update={"linked_cohorts": linked})
+        )
+    return out
 
 
 class BootcampCreate(BaseModel):
@@ -237,7 +322,7 @@ def _not_null(changes: dict[str, Any], *fields: str) -> dict[str, Any]:
 # ---------------------------------------------------------------- HRD 과정
 @router.get("/hrd-bootcamps", response_model=list[HrdBootcampResponse])
 async def list_hrd_bootcamps(_: HrdReader, service: ServiceDep) -> list[HrdBootcampResponse]:
-    return [HrdBootcampResponse.model_validate(b) for b in await service.list_hrd_bootcamps()]
+    return await _hrd_bootcamps_out(list(await service.list_hrd_bootcamps()))
 
 
 @router.post(
@@ -247,14 +332,14 @@ async def create_hrd_bootcamp(
     body: HrdBootcampFields, admin: HrdManager, service: ServiceDep
 ) -> HrdBootcampResponse:
     created = await service.create_hrd_bootcamp(body.model_dump(), actor_id=admin.id)
-    return HrdBootcampResponse.model_validate(created)
+    return (await _hrd_bootcamps_out([created]))[0]
 
 
 @router.get("/hrd-bootcamps/{hrd_bootcamp_id}", response_model=HrdBootcampResponse)
 async def get_hrd_bootcamp(
     hrd_bootcamp_id: uuid.UUID, _: HrdReader, service: ServiceDep
 ) -> HrdBootcampResponse:
-    return HrdBootcampResponse.model_validate(await service.get_hrd_bootcamp(hrd_bootcamp_id))
+    return (await _hrd_bootcamps_out([await service.get_hrd_bootcamp(hrd_bootcamp_id)]))[0]
 
 
 @router.patch("/hrd-bootcamps/{hrd_bootcamp_id}", response_model=HrdBootcampResponse)
@@ -263,7 +348,7 @@ async def update_hrd_bootcamp(
 ) -> HrdBootcampResponse:
     changes = _not_null(_sent(body), "name", "weekend_se", "day_night_se")
     updated = await service.update_hrd_bootcamp(hrd_bootcamp_id, changes, actor_id=admin.id)
-    return HrdBootcampResponse.model_validate(updated)
+    return (await _hrd_bootcamps_out([updated]))[0]
 
 
 @router.delete("/hrd-bootcamps/{hrd_bootcamp_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -280,9 +365,7 @@ async def delete_hrd_bootcamp(
 async def list_hrd_cohorts(
     hrd_bootcamp_id: uuid.UUID, _: HrdReader, service: ServiceDep
 ) -> list[HrdCohortResponse]:
-    return [
-        HrdCohortResponse.model_validate(c) for c in await service.list_hrd_cohorts(hrd_bootcamp_id)
-    ]
+    return await _hrd_cohorts_out(list(await service.list_hrd_cohorts(hrd_bootcamp_id)))
 
 
 @router.post(
@@ -294,7 +377,7 @@ async def create_hrd_cohort(
     hrd_bootcamp_id: uuid.UUID, body: HrdCohortFields, admin: HrdManager, service: ServiceDep
 ) -> HrdCohortResponse:
     created = await service.create_hrd_cohort(hrd_bootcamp_id, body.model_dump(), actor_id=admin.id)
-    return HrdCohortResponse.model_validate(created)
+    return (await _hrd_cohorts_out([created]))[0]
 
 
 @router.patch("/hrd-cohorts/{hrd_cohort_id}", response_model=HrdCohortResponse)
@@ -303,7 +386,7 @@ async def update_hrd_cohort(
 ) -> HrdCohortResponse:
     changes = _not_null(_sent(body), "cohort_number")
     updated = await service.update_hrd_cohort(hrd_cohort_id, changes, actor_id=admin.id)
-    return HrdCohortResponse.model_validate(updated)
+    return (await _hrd_cohorts_out([updated]))[0]
 
 
 @router.delete("/hrd-cohorts/{hrd_cohort_id}", status_code=status.HTTP_204_NO_CONTENT)

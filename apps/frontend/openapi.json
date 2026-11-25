@@ -16705,6 +16705,20 @@
             "type": "string",
             "format": "uuid",
             "title": "Id"
+          },
+          "bootcamps": {
+            "items": {
+              "$ref": "#/components/schemas/HrdLinkedBootcamp"
+            },
+            "type": "array",
+            "title": "Bootcamps",
+            "description": "이 HRD 과정을 대표로 둔 운영과정 (A98)"
+          },
+          "cohort_count": {
+            "type": "integer",
+            "title": "Cohort Count",
+            "description": "회차 수 (A98)",
+            "default": 0
           }
         },
         "type": "object",
@@ -16963,6 +16977,14 @@
             "type": "string",
             "format": "uuid",
             "title": "Hrd Net Bootcamp Id"
+          },
+          "linked_cohorts": {
+            "items": {
+              "$ref": "#/components/schemas/HrdLinkedCohort"
+            },
+            "type": "array",
+            "title": "Linked Cohorts",
+            "description": "이 회차에 연결된 기수 (D6·A98)"
           }
         },
         "type": "object",
@@ -17027,6 +17049,60 @@
         },
         "type": "object",
         "title": "HrdCohortUpdate"
+      },
+      "HrdLinkedBootcamp": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "code"
+        ],
+        "title": "HrdLinkedBootcamp"
+      },
+      "HrdLinkedCohort": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "bootcamp_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Bootcamp Id"
+          },
+          "bootcamp_name": {
+            "type": "string",
+            "title": "Bootcamp Name"
+          },
+          "cohort_number": {
+            "type": "integer",
+            "title": "Cohort Number"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "bootcamp_id",
+          "bootcamp_name",
+          "cohort_number"
+        ],
+        "title": "HrdLinkedCohort"
       },
       "ImageUploadRequest": {
         "properties": {
