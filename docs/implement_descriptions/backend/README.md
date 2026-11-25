@@ -91,4 +91,4 @@
 | 87 | [직위 = 역할, 최고 관리자 필드, 데이터 범위 (BE-3g)](87_positions_as_roles.md) | 완료 (#135) |
 | 88 | [담당 역할 칸 제거·직원 수정에서 담당 지정 (BE-3h)](88_staff_assignments_without_role.md) | 완료 (#136) |
 | 89 | [직원 목록 전체·최고 관리자 함께 수정 (BE-3i)](89_employee_list_all.md) | 완료 (#139) |
-| 90 | [직원 응답에 직위 데이터 범위 (BE-3j)](90_employee_data_scope.md) | PR 진행 중 |
+| 90 | [직원 응답에 직위 데이터 범위 (BE-3j)](90_employee_data_scope.md) | 완료 (#140) |
