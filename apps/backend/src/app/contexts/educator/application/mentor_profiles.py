@@ -109,6 +109,12 @@ class MentorProfileService:
         counts = await self._contracts.count_by_mentors([m.id for m in mentors])
         return [MentorSummary(m, counts.get(m.id, 0)) for m in mentors], total
 
+    async def summary(self, mentor_id: uuid.UUID) -> MentorSummary:
+        """멘토 하나의 목록 항목 (A102). 없으면 404 mentor_not_found"""
+        mentor = await self.get(mentor_id)
+        counts = await self._contracts.count_by_mentors([mentor.id])
+        return MentorSummary(mentor, counts.get(mentor.id, 0))
+
     # ------------------------------------------------------------------ 변경
     async def update(
         self, mentor_id: uuid.UUID, changes: dict[str, Any], *, actor_id: uuid.UUID

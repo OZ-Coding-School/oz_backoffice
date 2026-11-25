@@ -1647,6 +1647,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/mentors/{mentor_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Mentor
+         * @description 멘토 하나 (A102): 목록 항목과 같은 응답. 상세 화면 머리·계정 칸
+         */
+        get: operations["get_mentor_api_v1_admin_mentors__mentor_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/mentors/{mentor_id}/profile": {
         parameters: {
             query?: never;
@@ -11580,6 +11600,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_MentorListItem_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_mentor_api_v1_admin_mentors__mentor_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mentor_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MentorListItem"];
                 };
             };
             /** @description Validation Error */

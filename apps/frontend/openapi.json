@@ -5483,6 +5483,55 @@
         }
       }
     },
+    "/api/v1/admin/mentors/{mentor_id}": {
+      "get": {
+        "tags": [
+          "admin-mentors"
+        ],
+        "summary": "Get Mentor",
+        "description": "멘토 하나 (A102): 목록 항목과 같은 응답. 상세 화면 머리·계정 칸",
+        "operationId": "get_mentor_api_v1_admin_mentors__mentor_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "mentor_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Mentor Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MentorListItem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/mentors/{mentor_id}/profile": {
       "get": {
         "tags": [
