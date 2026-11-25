@@ -38,4 +38,4 @@
 | 34 | [조직 설정 > 권한 (FE-15d)](34_org_permissions.md) | 완료 (#137) |
 | 35 | [회원 관리·가입 승인 통합 (FE-15e)](35_member_approvals_merge.md) | 완료 (#138) |
 | 36 | [조직 설정 > 직원 (FE-15f)](36_org_employees.md) | 완료 (#141) |
-| 37 | [조직 설정 > 부서와 영향 목록 (FE-15g)](37_org_departments.md) | PR 진행 중 |
+| 37 | [조직 설정 > 부서와 영향 목록 (FE-15g)](37_org_departments.md) | PR 진행 중 (#144) |
