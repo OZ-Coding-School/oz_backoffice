@@ -211,3 +211,35 @@ async def test_mentor_sees_own_assignments(
     stranger = await _approved(await create_user())
     missing = await client.get("/api/v1/me/mentor-assignments", headers=bearer(settings, stranger))
     assert missing.json()["error"]["code"] == "mentor_profile_not_found"
+
+
+async def test_admin_lists_assignments_of_mentor(
+    client: AsyncClient, admin: dict[str, str]
+) -> None:
+    """멘토 단위 배정 조회 (A101): 비활성 포함, 활성 먼저."""
+    old, now = await create_cohort(cohort_number=11), await create_cohort(cohort_number=12)
+    mentor = await _mentor()
+    ended = (
+        await client.post(
+            f"{API}/cohorts/{old.id}/mentor-assignments", json=_body(mentor), headers=admin
+        )
+    ).json()
+    await client.delete(f"{API}/cohorts/{old.id}/mentor-assignments/{ended['id']}", headers=admin)
+    active = (
+        await client.post(
+            f"{API}/cohorts/{now.id}/mentor-assignments", json=_body(mentor), headers=admin
+        )
+    ).json()
+
+    listed = await client.get(f"{API}/mentors/{mentor.id}/mentor-assignments", headers=admin)
+    assert listed.status_code == 200
+    assert [(a["id"], a["cohort_number"], a["is_active"]) for a in listed.json()] == [
+        (active["id"], 12, True),
+        (ended["id"], 11, False),
+    ]
+    assert listed.json()[1]["deactivation_reason"] == "MANUAL"
+
+    missing = await client.get(
+        f"{API}/mentors/{active['cohort_id']}/mentor-assignments", headers=admin
+    )
+    assert (missing.status_code, missing.json()["error"]["code"]) == (404, "mentor_not_found")

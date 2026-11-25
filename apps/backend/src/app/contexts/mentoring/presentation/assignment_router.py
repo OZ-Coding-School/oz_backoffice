@@ -53,6 +53,7 @@ CohortReader = Annotated[
 MentorManager = Annotated[
     User, Depends(require_permission("educator.mentor.manage", any_scope=True))
 ]
+MentorReader = Annotated[User, Depends(require_permission("educator.mentor.read", any_scope=True))]
 AssignmentPayUnit = Literal[PayUnit.HOURLY, PayUnit.PER_SESSION]
 
 
@@ -394,6 +395,25 @@ async def reactivate_mentor_assignments(
 
 
 # ---------------------------------------------------------------- 멘토 본인
+@admin_router.get(
+    "/mentors/{mentor_id}/mentor-assignments", response_model=list[MyAssignmentResponse]
+)
+async def list_mentor_assignments(
+    mentor_id: uuid.UUID, _: MentorReader, service: ServiceDep, labels: LabelsDep
+) -> list[MyAssignmentResponse]:
+    """한 멘토의 배정 전체 (비활성 포함, 활성 먼저·최근 시작부터, A101). 없는 멘토는 404."""
+    assignments = await service.list_by_mentor(mentor_id)
+    found = await labels.of([a.cohort_id for a in assignments])
+    return [
+        MyAssignmentResponse(
+            **_fields(a),
+            bootcamp_name=found.get(a.cohort_id, ("", 0))[0],
+            cohort_number=found.get(a.cohort_id, ("", 0))[1],
+        )
+        for a in assignments
+    ]
+
+
 @me_router.get("", response_model=list[MyAssignmentResponse])
 async def list_my_assignments(
     user: ApprovedUser, service: ServiceDep, labels: LabelsDep, include_inactive: bool = False
