@@ -4432,6 +4432,65 @@
         }
       }
     },
+    "/api/v1/admin/cohorts/{cohort_id}/rosters/{student_id}": {
+      "get": {
+        "tags": [
+          "admin-rosters"
+        ],
+        "summary": "Get Cohort Roster Student",
+        "description": "기수 수강생 상세와 다른 기수 수강 이력 (A99). 그 기수의 수강생이 아니면 404.",
+        "operationId": "get_cohort_roster_student_api_v1_admin_cohorts__cohort_id__rosters__student_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cohort_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Cohort Id"
+            }
+          },
+          {
+            "name": "student_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Student Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RosterStudentDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/rosters/unmapped": {
       "get": {
         "tags": [
@@ -18728,6 +18787,59 @@
         "title": "OrgImpactResponse",
         "description": "지우거나 바꿀 때 영향받는 대상 (A93). 종류마다 없으면 빈 목록."
       },
+      "OtherEnrollmentResponse": {
+        "properties": {
+          "student_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Student Id"
+          },
+          "cohort_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Cohort Id"
+          },
+          "bootcamp_name": {
+            "type": "string",
+            "title": "Bootcamp Name"
+          },
+          "cohort_number": {
+            "type": "integer",
+            "title": "Cohort Number"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EnrollmentStatus"
+          },
+          "enrolled_at": {
+            "type": "string",
+            "format": "date",
+            "title": "Enrolled At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "student_id",
+          "cohort_id",
+          "bootcamp_name",
+          "cohort_number",
+          "status",
+          "enrolled_at",
+          "ended_at"
+        ],
+        "title": "OtherEnrollmentResponse"
+      },
       "Page_AccountResponse_": {
         "properties": {
           "items": {
@@ -20265,6 +20377,140 @@
           "signup_type"
         ],
         "title": "ResubmitRequest"
+      },
+      "RosterStudentDetailResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "airtable_record_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Airtable Record Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "phone_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone Number"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EnrollmentStatus"
+          },
+          "hrd_net_status": {
+            "$ref": "#/components/schemas/StudentStatus"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
+          "is_removed_in_source": {
+            "type": "boolean",
+            "title": "Is Removed In Source"
+          },
+          "enrolled_at": {
+            "type": "string",
+            "format": "date",
+            "title": "Enrolled At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "end_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Reason"
+          },
+          "synced_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Synced At"
+          },
+          "other_enrollments": {
+            "items": {
+              "$ref": "#/components/schemas/OtherEnrollmentResponse"
+            },
+            "type": "array",
+            "title": "Other Enrollments",
+            "description": "같은 사람의 다른 기수 등록, 최근 기수부터 (A99)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "airtable_record_id",
+          "name",
+          "phone_number",
+          "email",
+          "status",
+          "hrd_net_status",
+          "user_id",
+          "is_removed_in_source",
+          "enrolled_at",
+          "ended_at",
+          "end_reason",
+          "synced_at",
+          "other_enrollments"
+        ],
+        "title": "RosterStudentDetailResponse"
       },
       "RosterStudentResponse": {
         "properties": {

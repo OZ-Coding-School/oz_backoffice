@@ -11,7 +11,7 @@ from datetime import date, datetime
 from typing import Annotated, Any, cast
 
 from fastapi import APIRouter, Depends, Query, Request, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from redis.asyncio import Redis
 
 from app.contexts.academy.application.roster_queries import RosterQueries
@@ -25,6 +25,7 @@ from app.contexts.academy.domain.enums import (
     StudentStatus,
 )
 from app.contexts.academy.infrastructure.repositories import (
+    TortoiseBootcampRepository,
     TortoiseCohortRepository,
     TortoiseRosterSyncRunRepository,
     TortoiseStudentRepository,
@@ -158,6 +159,22 @@ class RosterStudentResponse(BaseModel):
         )
 
 
+class OtherEnrollmentResponse(BaseModel):
+    student_id: uuid.UUID
+    cohort_id: uuid.UUID
+    bootcamp_name: str
+    cohort_number: int
+    status: EnrollmentStatus
+    enrolled_at: date
+    ended_at: date | None
+
+
+class RosterStudentDetailResponse(RosterStudentResponse):
+    other_enrollments: list[OtherEnrollmentResponse] = Field(
+        description="같은 사람의 다른 기수 등록, 최근 기수부터 (A99)"
+    )
+
+
 class UnmappedRecordsResponse(BaseModel):
     run_id: uuid.UUID | None
     finished_at: datetime | None
@@ -281,6 +298,40 @@ async def list_cohort_rosters(
         cohort_id, claimed=claimed, include_removed=include_removed
     )
     return [RosterStudentResponse.of(s) for s in students]
+
+
+@router.get("/cohorts/{cohort_id}/rosters/{student_id}", response_model=RosterStudentDetailResponse)
+async def get_cohort_roster_student(
+    cohort_id: uuid.UUID,
+    student_id: uuid.UUID,
+    _: Annotated[User, Depends(require_permission(READ, cohort_param="cohort_id"))],
+    queries: QueriesDep,
+) -> RosterStudentDetailResponse:
+    """기수 수강생 상세와 다른 기수 수강 이력 (A99). 그 기수의 수강생이 아니면 404."""
+    student, others = await queries.cohort_student(cohort_id, student_id)
+    cohorts = {
+        c.id: c for c in await TortoiseCohortRepository().list_by_ids({o.cohort_id for o in others})
+    }
+    bootcamps = {b.id: b.name for b in await TortoiseBootcampRepository().list_all()}
+    history = []
+    for o in others:
+        cohort = cohorts.get(o.cohort_id)
+        if cohort is None:
+            continue
+        history.append(
+            OtherEnrollmentResponse(
+                student_id=o.id,
+                cohort_id=o.cohort_id,
+                bootcamp_name=bootcamps.get(cohort.bootcamp_id, "—"),
+                cohort_number=cohort.cohort_number,
+                status=o.status,
+                enrolled_at=o.enrolled_at,
+                ended_at=o.ended_at,
+            )
+        )
+    return RosterStudentDetailResponse(
+        **RosterStudentResponse.of(student).model_dump(), other_enrollments=history
+    )
 
 
 @router.get("/rosters/unmapped", response_model=UnmappedRecordsResponse)

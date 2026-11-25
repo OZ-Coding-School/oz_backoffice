@@ -45,3 +45,12 @@ class RosterQueries:
         return await self._students.list_by_cohort(
             cohort_id, claimed=claimed, include_removed=include_removed
         )
+
+    async def cohort_student(
+        self, cohort_id: uuid.UUID, student_id: uuid.UUID
+    ) -> tuple[Student, list[Student]]:
+        """그 기수의 수강생과 같은 사람의 다른 기수 등록 (A99)."""
+        student = await self._students.get(student_id)
+        if student is None or student.cohort_id != cohort_id:
+            raise NotFoundError("수강생을 찾을 수 없습니다.", code="student_not_found")
+        return student, await self._students.list_same_person(student)

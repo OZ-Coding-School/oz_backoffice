@@ -248,6 +248,16 @@ class TortoiseStudentRepository(TortoiseRepository[Student, StudentModel]):
         found = await rows.filter(cond).order_by("name", "id").limit(limit)
         return [self.to_entity(row) for row in found]
 
+    async def list_same_person(self, student: Student) -> list[Student]:
+        if student.user_id is not None:
+            query = StudentModel.filter(user_id=student.user_id)
+        elif student.phone_number:
+            query = StudentModel.filter(name=student.name, phone_number=student.phone_number)
+        else:
+            return []
+        rows = await query.exclude(id=student.id).order_by("-enrolled_at", "id")
+        return [self.to_entity(row) for row in rows]
+
     async def find_claimable_by_name_and_phone(self, name: str, phone_number: str) -> list[Student]:
         rows = await StudentModel.filter(
             name=name,

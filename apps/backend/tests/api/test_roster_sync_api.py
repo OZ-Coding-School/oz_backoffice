@@ -209,3 +209,34 @@ async def test_cohort_roster_and_unmapped(
         str(run.id),
         "recX",
     )
+
+
+async def test_cohort_student_detail_with_history(
+    client: AsyncClient, admin: dict[str, str], settings: Settings
+) -> None:
+    """같은 사람: 가입했으면 같은 회원, 아니면 이름 + 휴대폰 (A99)."""
+    old, now = await create_cohort(cohort_number=11), await create_cohort(cohort_number=12)
+    students = TortoiseStudentRepository()
+    joined = await create_applicant()
+    past = make_student(cohort_id=old.id, name="가입자", user_id=joined.id)
+    current = make_student(cohort_id=now.id, name="가입자", user_id=joined.id)
+    walk_old = make_student(cohort_id=old.id, name="미가입자", phone_number="01055556666")
+    walk_now = make_student(cohort_id=now.id, name="미가입자", phone_number="01055556666")
+    stranger = make_student(cohort_id=old.id, name="미가입자", phone_number="01099998888")
+    for s in (past, current, walk_old, walk_now, stranger):
+        await students.add(s)
+
+    url = f"{API}/cohorts/{now.id}/rosters"
+    detail = (await client.get(f"{url}/{current.id}", headers=admin)).json()
+    assert detail["name"] == "가입자"
+    assert [(h["student_id"], h["cohort_number"]) for h in detail["other_enrollments"]] == [
+        (str(past.id), 11)
+    ]
+    walk = (await client.get(f"{url}/{walk_now.id}", headers=admin)).json()
+    assert [h["student_id"] for h in walk["other_enrollments"]] == [str(walk_old.id)]
+
+    # 다른 기수의 수강생이면 404, 담당이 아닌 기수는 403
+    missing = await client.get(f"{url}/{past.id}", headers=admin)
+    assert (missing.status_code, missing.json()["error"]["code"]) == (404, "student_not_found")
+    assistant = await _assistant(settings, old)
+    assert (await client.get(f"{url}/{current.id}", headers=assistant)).status_code == 403

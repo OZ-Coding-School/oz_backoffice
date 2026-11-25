@@ -1349,6 +1349,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/cohorts/{cohort_id}/rosters/{student_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Cohort Roster Student
+         * @description 기수 수강생 상세와 다른 기수 수강 이력 (A99). 그 기수의 수강생이 아니면 404.
+         */
+        get: operations["get_cohort_roster_student_api_v1_admin_cohorts__cohort_id__rosters__student_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/rosters/unmapped": {
         parameters: {
             query?: never;
@@ -5994,6 +6014,31 @@ export interface components {
              */
             bootcamps?: components["schemas"]["ImpactBootcamp"][];
         };
+        /** OtherEnrollmentResponse */
+        OtherEnrollmentResponse: {
+            /**
+             * Student Id
+             * Format: uuid
+             */
+            student_id: string;
+            /**
+             * Cohort Id
+             * Format: uuid
+             */
+            cohort_id: string;
+            /** Bootcamp Name */
+            bootcamp_name: string;
+            /** Cohort Number */
+            cohort_number: number;
+            status: components["schemas"]["EnrollmentStatus"];
+            /**
+             * Enrolled At
+             * Format: date
+             */
+            enrolled_at: string;
+            /** Ended At */
+            ended_at: string | null;
+        };
         /** Page[AccountResponse] */
         Page_AccountResponse_: {
             /** Items */
@@ -6549,6 +6594,44 @@ export interface components {
             /** Nickname */
             nickname?: string | null;
             display_name_preference?: components["schemas"]["DisplayNamePreference"] | null;
+        };
+        /** RosterStudentDetailResponse */
+        RosterStudentDetailResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Airtable Record Id */
+            airtable_record_id: string | null;
+            /** Name */
+            name: string;
+            /** Phone Number */
+            phone_number: string | null;
+            /** Email */
+            email: string | null;
+            status: components["schemas"]["EnrollmentStatus"];
+            hrd_net_status: components["schemas"]["StudentStatus"];
+            /** User Id */
+            user_id: string | null;
+            /** Is Removed In Source */
+            is_removed_in_source: boolean;
+            /**
+             * Enrolled At
+             * Format: date
+             */
+            enrolled_at: string;
+            /** Ended At */
+            ended_at: string | null;
+            /** End Reason */
+            end_reason: string | null;
+            /** Synced At */
+            synced_at: string | null;
+            /**
+             * Other Enrollments
+             * @description 같은 사람의 다른 기수 등록, 최근 기수부터 (A99)
+             */
+            other_enrollments: components["schemas"]["OtherEnrollmentResponse"][];
         };
         /** RosterStudentResponse */
         RosterStudentResponse: {
@@ -10787,6 +10870,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RosterStudentResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_cohort_roster_student_api_v1_admin_cohorts__cohort_id__rosters__student_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cohort_id: string;
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RosterStudentDetailResponse"];
                 };
             };
             /** @description Validation Error */
