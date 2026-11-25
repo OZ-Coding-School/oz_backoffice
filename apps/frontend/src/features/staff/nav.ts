@@ -55,10 +55,16 @@ const MODULES: StaffModule[] = [
   {
     key: "academy",
     label: "학사",
-    description: "과정·기수 · HRD 과정",
+    description: "수강생·과정·기수·HRD 과정",
     icon: GraduationCap,
-    // F73·F74: 과정·기수 / HRD 과정 / 수강생 (만든 메뉴만)
+    // F73·F76: 수강생 / 과정·기수 / HRD 과정
     items: [
+      {
+        to: "/admin/academy/students",
+        label: "수강생",
+        icon: Users,
+        permissions: ["academy.roster.read"],
+      },
       {
         to: "/admin/academy/bootcamps",
         label: "과정·기수",
@@ -73,6 +79,7 @@ const MODULES: StaffModule[] = [
       },
     ],
   },
+
   {
     key: "members",
     label: "회원",

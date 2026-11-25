@@ -155,3 +155,74 @@ test("학사 > HRD 과정: 회차 패널에서 자부담금 수정 (FE-17b)", as
   expect(body).toEqual({ self_pay_amount: 900000 });
   await expect(sheet).toContainText("900,000원");
 });
+
+test("학사 > 수강생: 목록에서 상세 멘토링 탭까지 (FE-17c)", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const GA = {
+    id: "s1",
+    airtable_record_id: "rec1",
+    name: "가수강",
+    phone_number: "01012341234",
+    email: "ga@example.com",
+    status: "ENROLLED",
+    hrd_net_status: "TRAINING",
+    user_id: "u1",
+    is_removed_in_source: false,
+    enrolled_at: "2026-06-02",
+    ended_at: null,
+    end_reason: null,
+    synced_at: "2026-11-24T18:00:00Z",
+  };
+  await page.route("**/api/v1/auth/refresh", (route) =>
+    route.fulfill({ json: { access_token: "t", expires_at: new Date(Date.now() + 900_000).toISOString() } }),
+  );
+  await page.route("**/api/v1/me", (route) => route.fulfill({ json: ADMIN }));
+  await page.route("**/api/v1/me/staff-access", (route) =>
+    route.fulfill({
+      json: {
+        ...ACCESS,
+        permissions: ["academy.roster.read"].map((code) => ({
+          code,
+          is_global: true,
+          bootcamp_ids: [],
+          cohort_ids: [],
+        })),
+        cohorts: [
+          {
+            id: "c12",
+            bootcamp_id: "b1",
+            bootcamp_name: "백엔드 부트캠프",
+            cohort_number: 12,
+            start_date: "2026-06-02",
+            end_date: "2026-11-30",
+            status: "ONGOING",
+          },
+        ],
+      },
+    }),
+  );
+  await page.route("**/api/v1/admin/cohorts/c12/rosters", (route) => route.fulfill({ json: [GA] }));
+  await page.route("**/api/v1/admin/cohorts/c12/students/s1", (route) =>
+    route.fulfill({
+      json: {
+        ...GA,
+        member: { user_id: "u1", email: "ga@example.com", approved_at: "2026-11-03T01:00:00Z" },
+        mentoring: {
+          team_id: null,
+          team_label: null,
+          account: null,
+          pending_request_count: 0,
+          upcoming_session_count: 0,
+          completed_session_count: 0,
+        },
+      },
+    }),
+  );
+
+  await page.goto("/admin");
+  await page.getByRole("navigation", { name: "모듈" }).getByRole("link", { name: "학사" }).click();
+  await page.getByRole("link", { name: "가수강" }).click();
+  await expect(page.getByRole("heading", { name: "가수강" })).toBeVisible();
+  await page.getByRole("navigation", { name: "수강생 상세" }).getByRole("link", { name: "멘토링" }).click();
+  await expect(page.getByRole("region", { name: "멘토링 요약" })).toContainText("지급 전");
+});
