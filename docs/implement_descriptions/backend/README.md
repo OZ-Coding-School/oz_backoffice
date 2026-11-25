@@ -100,4 +100,4 @@
 | 96 | [과정·기수 응답에 HRD 값 (BE-3p)](96_academy_hrd_fields.md) | 완료 (#151) |
 | 97 | [HRD 연결 정보 (BE-3q)](97_hrd_links.md) | 완료 (#153) |
 | 98 | [수강생 상세 API (BE-3r)](98_student_detail.md) | 완료 (#156) |
-| 99 | [멘토 목록 보완 (BE-3s)](99_mentor_list_fields.md) | PR 진행 중 |
+| 99 | [멘토 목록 보완 (BE-3s)](99_mentor_list_fields.md) | 완료 (#159) |
