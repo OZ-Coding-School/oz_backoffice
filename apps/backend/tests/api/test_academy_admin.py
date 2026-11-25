@@ -74,6 +74,16 @@ async def test_hierarchy_crud(client: AsyncClient, admin: dict[str, str]) -> Non
     )
     assert cohort["status"] == "PLANNED"
     assert (cohort["hrd_net_id"], cohort["hrd_cohort_number"]) == ("AIG1", 1)  # A97
+    hrd_list = (await client.get(f"{API}/hrd-bootcamps", headers=admin)).json()  # A98
+    assert [(h["cohort_count"], [b["code"] for b in h["bootcamps"]]) for h in hrd_list] == [
+        (1, ["AH"])
+    ]
+    hrd_cohorts = (
+        await client.get(f"{API}/hrd-bootcamps/{hrd['id']}/cohorts", headers=admin)
+    ).json()
+    assert [(c["bootcamp_name"], c["cohort_number"]) for c in hrd_cohorts[0]["linked_cohorts"]] == [
+        ("백엔드", 3)
+    ]
 
     patched = await client.patch(
         f"{API}/cohorts/{cohort['id']}",

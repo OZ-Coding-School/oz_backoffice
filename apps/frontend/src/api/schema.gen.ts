@@ -5165,6 +5165,17 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * Bootcamps
+             * @description 이 HRD 과정을 대표로 둔 운영과정 (A98)
+             */
+            bootcamps?: components["schemas"]["HrdLinkedBootcamp"][];
+            /**
+             * Cohort Count
+             * @description 회차 수 (A98)
+             * @default 0
+             */
+            cohort_count: number;
         };
         /** HrdBootcampUpdate */
         HrdBootcampUpdate: {
@@ -5221,6 +5232,11 @@ export interface components {
              * Format: uuid
              */
             hrd_net_bootcamp_id: string;
+            /**
+             * Linked Cohorts
+             * @description 이 회차에 연결된 기수 (D6·A98)
+             */
+            linked_cohorts?: components["schemas"]["HrdLinkedCohort"][];
         };
         /** HrdCohortUpdate */
         HrdCohortUpdate: {
@@ -5232,6 +5248,35 @@ export interface components {
             train_end_date?: string | null;
             /** Self Pay Amount */
             self_pay_amount?: number | null;
+        };
+        /** HrdLinkedBootcamp */
+        HrdLinkedBootcamp: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Code */
+            code: string;
+        };
+        /** HrdLinkedCohort */
+        HrdLinkedCohort: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Bootcamp Id
+             * Format: uuid
+             */
+            bootcamp_id: string;
+            /** Bootcamp Name */
+            bootcamp_name: string;
+            /** Cohort Number */
+            cohort_number: number;
         };
         /** ImageUploadRequest */
         ImageUploadRequest: {
