@@ -42,6 +42,7 @@ import { Route as MemberMentoringSessionsSessionIdRouteImport } from './routes/_
 import { Route as StaffAdminMembersApprovalsRouteImport } from './routes/_staff/admin/members/approvals'
 import { Route as StaffAdminMembersStaffRouteImport } from './routes/_staff/admin/members/staff'
 import { Route as StaffAdminMembersStaffRegistrationsRouteImport } from './routes/_staff/admin/members/staff-registrations'
+import { Route as StaffAdminOrgPermissionsRouteImport } from './routes/_staff/admin/org/permissions'
 import { Route as MemberMentoringRequestsRequestIdChangeRouteImport } from './routes/_member/mentoring/requests/$requestId_.change'
 
 const AuthRoute = AuthRouteImport.update({
@@ -222,6 +223,12 @@ const StaffAdminMembersStaffRegistrationsRoute =
     path: '/admin/members/staff-registrations',
     getParentRoute: () => StaffRoute,
   } as any)
+const StaffAdminOrgPermissionsRoute =
+  StaffAdminOrgPermissionsRouteImport.update({
+    id: '/admin/org/permissions',
+    path: '/admin/org/permissions',
+    getParentRoute: () => StaffRoute,
+  } as any)
 const MemberMentoringRequestsRequestIdChangeRoute =
   MemberMentoringRequestsRequestIdChangeRouteImport.update({
     id: '/mentoring/requests/$requestId_/change',
@@ -252,6 +259,7 @@ export interface FileRoutesByFullPath {
   '/admin/members/approvals': typeof StaffAdminMembersApprovalsRoute
   '/admin/members/staff': typeof StaffAdminMembersStaffRoute
   '/admin/members/staff-registrations': typeof StaffAdminMembersStaffRegistrationsRoute
+  '/admin/org/permissions': typeof StaffAdminOrgPermissionsRoute
   '/mentor/requests/': typeof MemberMentorRequestsIndexRoute
   '/mentor/schedule/': typeof MemberMentorScheduleIndexRoute
   '/mentor/sessions/': typeof MemberMentorSessionsIndexRoute
@@ -284,6 +292,7 @@ export interface FileRoutesByTo {
   '/admin/members/approvals': typeof StaffAdminMembersApprovalsRoute
   '/admin/members/staff': typeof StaffAdminMembersStaffRoute
   '/admin/members/staff-registrations': typeof StaffAdminMembersStaffRegistrationsRoute
+  '/admin/org/permissions': typeof StaffAdminOrgPermissionsRoute
   '/mentor/requests': typeof MemberMentorRequestsIndexRoute
   '/mentor/schedule': typeof MemberMentorScheduleIndexRoute
   '/mentor/sessions': typeof MemberMentorSessionsIndexRoute
@@ -321,6 +330,7 @@ export interface FileRoutesById {
   '/_staff/admin/members/approvals': typeof StaffAdminMembersApprovalsRoute
   '/_staff/admin/members/staff': typeof StaffAdminMembersStaffRoute
   '/_staff/admin/members/staff-registrations': typeof StaffAdminMembersStaffRegistrationsRoute
+  '/_staff/admin/org/permissions': typeof StaffAdminOrgPermissionsRoute
   '/_member/mentor/requests/': typeof MemberMentorRequestsIndexRoute
   '/_member/mentor/schedule/': typeof MemberMentorScheduleIndexRoute
   '/_member/mentor/sessions/': typeof MemberMentorSessionsIndexRoute
@@ -355,6 +365,7 @@ export interface FileRouteTypes {
     | '/admin/members/approvals'
     | '/admin/members/staff'
     | '/admin/members/staff-registrations'
+    | '/admin/org/permissions'
     | '/mentor/requests/'
     | '/mentor/schedule/'
     | '/mentor/sessions/'
@@ -387,6 +398,7 @@ export interface FileRouteTypes {
     | '/admin/members/approvals'
     | '/admin/members/staff'
     | '/admin/members/staff-registrations'
+    | '/admin/org/permissions'
     | '/mentor/requests'
     | '/mentor/schedule'
     | '/mentor/sessions'
@@ -423,6 +435,7 @@ export interface FileRouteTypes {
     | '/_staff/admin/members/approvals'
     | '/_staff/admin/members/staff'
     | '/_staff/admin/members/staff-registrations'
+    | '/_staff/admin/org/permissions'
     | '/_member/mentor/requests/'
     | '/_member/mentor/schedule/'
     | '/_member/mentor/sessions/'
@@ -674,6 +687,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StaffAdminMembersStaffRegistrationsRouteImport
       parentRoute: typeof StaffRoute
     }
+    '/_staff/admin/org/permissions': {
+      id: '/_staff/admin/org/permissions'
+      path: '/admin/org/permissions'
+      fullPath: '/admin/org/permissions'
+      preLoaderRoute: typeof StaffAdminOrgPermissionsRouteImport
+      parentRoute: typeof StaffRoute
+    }
     '/_member/mentoring/requests/$requestId_/change': {
       id: '/_member/mentoring/requests/$requestId_/change'
       path: '/mentoring/requests/$requestId/change'
@@ -754,6 +774,7 @@ interface StaffRouteChildren {
   StaffAdminMembersApprovalsRoute: typeof StaffAdminMembersApprovalsRoute
   StaffAdminMembersStaffRoute: typeof StaffAdminMembersStaffRoute
   StaffAdminMembersStaffRegistrationsRoute: typeof StaffAdminMembersStaffRegistrationsRoute
+  StaffAdminOrgPermissionsRoute: typeof StaffAdminOrgPermissionsRoute
 }
 
 const StaffRouteChildren: StaffRouteChildren = {
@@ -762,6 +783,7 @@ const StaffRouteChildren: StaffRouteChildren = {
   StaffAdminMembersStaffRoute: StaffAdminMembersStaffRoute,
   StaffAdminMembersStaffRegistrationsRoute:
     StaffAdminMembersStaffRegistrationsRoute,
+  StaffAdminOrgPermissionsRoute: StaffAdminOrgPermissionsRoute,
 }
 
 const StaffRouteWithChildren = StaffRoute._addFileChildren(StaffRouteChildren)
