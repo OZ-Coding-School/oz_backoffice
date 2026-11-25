@@ -6,6 +6,7 @@ from fastapi import Depends, Request
 
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.identity.application.auth_service import UserQueries
+from app.contexts.organization.application.impact import OrgImpactQueries
 from app.contexts.organization.application.org_service import (
     BootcampLookup,
     OrganizationAdminService,
@@ -118,4 +119,16 @@ def get_organization_admin_service(request: Request) -> OrganizationAdminService
         bootcamp_staffs=TortoiseBootcampStaffRepository(),
         cohort_staffs=TortoiseCohortStaffRepository(),
         staff_targets=cast("StaffTargetCatalog", request.app.state.academy_catalog),
+    )
+
+
+def get_org_impact_queries() -> OrgImpactQueries:
+    """부서·팀·직위 영향 조회 (A93)."""
+    return OrgImpactQueries(
+        departments=TortoiseDepartmentRepository(),
+        teams=TortoiseTeamRepository(),
+        bootcamp_teams=TortoiseBootcampTeamRepository(),
+        positions=TortoiseEmployeePositionRepository(),
+        employees=TortoiseEmployeeRepository(),
+        registrations=TortoiseEmployeeRegistrationRepository(),
     )

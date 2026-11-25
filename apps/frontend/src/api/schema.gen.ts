@@ -734,6 +734,26 @@ export interface paths {
         patch: operations["update_department_api_v1_admin_departments__department_id__patch"];
         trace?: never;
     };
+    "/api/v1/admin/departments/{department_id}/impact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Department Impact
+         * @description 부서를 지울 때 영향받는 직원·운영진 가입 신청·팀 (A93). 하나라도 있으면 지울 수 없다.
+         */
+        get: operations["department_impact_api_v1_admin_departments__department_id__impact_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/teams": {
         parameters: {
             query?: never;
@@ -779,6 +799,26 @@ export interface paths {
          * @description 부서를 바꾸면 팀이 다른 부서로 옮겨 간다 (담당 과정은 그대로).
          */
         patch: operations["update_team_api_v1_admin_teams__team_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/teams/{team_id}/impact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Team Impact
+         * @description 팀을 지우거나 다른 부서로 옮길 때 영향받는 직원·운영진 가입 신청·담당 과정 (A93).
+         */
+        get: operations["team_impact_api_v1_admin_teams__team_id__impact_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/admin/bootcamps/{bootcamp_id}/team": {
@@ -857,6 +897,26 @@ export interface paths {
          *     `permission_requires_read`, 없는 코드는 422 `permission_not_found`.
          */
         put: operations["replace_position_permissions_api_v1_admin_positions__position_id__permissions_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/positions/{position_id}/impact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Position Impact
+         * @description 직위를 지우거나 권한·담당 방식·데이터 범위를 바꿀 때 영향받는 직원·운영진 가입 신청 (A93).
+         */
+        get: operations["position_impact_api_v1_admin_positions__position_id__impact_get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -4928,6 +4988,64 @@ export interface components {
              */
             content_type: "image/png" | "image/jpeg" | "image/webp";
         };
+        /** ImpactBootcamp */
+        ImpactBootcamp: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+        };
+        /** ImpactEmployee */
+        ImpactEmployee: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Name */
+            name: string;
+            /** Email */
+            email: string;
+            /** Department Name */
+            department_name: string;
+            /** Team Name */
+            team_name: string | null;
+            /** Position Name */
+            position_name: string;
+        };
+        /** ImpactRegistration */
+        ImpactRegistration: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Applicant Name */
+            applicant_name: string;
+            /** Applicant Email */
+            applicant_email: string;
+            status: components["schemas"]["EmployeeRegistrationStatus"];
+        };
+        /** ImpactTeam */
+        ImpactTeam: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Employee Count */
+            employee_count: number;
+        };
         /** IntervalResponse */
         IntervalResponse: {
             /**
@@ -5432,6 +5550,29 @@ export interface components {
             body: string | null;
             /** Updated At */
             updated_at: string | null;
+        };
+        /**
+         * OrgImpactResponse
+         * @description 지우거나 바꿀 때 영향받는 대상 (A93). 종류마다 없으면 빈 목록.
+         */
+        OrgImpactResponse: {
+            /** Employees */
+            employees: components["schemas"]["ImpactEmployee"][];
+            /**
+             * Registrations
+             * @description 운영진 가입 신청 (상태 무관)
+             */
+            registrations: components["schemas"]["ImpactRegistration"][];
+            /**
+             * Teams
+             * @description 부서의 팀
+             */
+            teams?: components["schemas"]["ImpactTeam"][];
+            /**
+             * Bootcamps
+             * @description 팀의 담당 과정
+             */
+            bootcamps?: components["schemas"]["ImpactBootcamp"][];
         };
         /** Page[AccountResponse] */
         Page_AccountResponse_: {
@@ -8794,6 +8935,37 @@ export interface operations {
             };
         };
     };
+    department_impact_api_v1_admin_departments__department_id__impact_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                department_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgImpactResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_teams_api_v1_admin_teams_get: {
         parameters: {
             query?: never;
@@ -8901,6 +9073,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["app__contexts__organization__presentation__org_router__TeamResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    team_impact_api_v1_admin_teams__team_id__impact_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgImpactResponse"];
                 };
             };
             /** @description Validation Error */
@@ -9088,6 +9291,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PositionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    position_impact_api_v1_admin_positions__position_id__impact_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                position_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgImpactResponse"];
                 };
             };
             /** @description Validation Error */

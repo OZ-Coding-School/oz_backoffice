@@ -156,6 +156,21 @@ class InMemoryEmployeeRegistrationRepository:
         matched = sorted((r for r in self.items.values() if r.status is status), key=lambda r: r.id)
         return [replace(r) for r in matched[offset : offset + limit]], len(matched)
 
+    async def list_referencing(
+        self,
+        *,
+        department_id: uuid.UUID | None = None,
+        team_id: uuid.UUID | None = None,
+        position_id: uuid.UUID | None = None,
+    ) -> list[EmployeeRegistration]:
+        return [
+            replace(r)
+            for r in sorted(self.items.values(), key=lambda r: r.id)
+            if (department_id is None or r.department_id == department_id)
+            and (team_id is None or r.team_id == team_id)
+            and (position_id is None or r.position_id == position_id)
+        ]
+
 
 class InMemoryCohortStaffRepository:
     def __init__(self, *staffs: CohortStaff) -> None:
