@@ -13460,6 +13460,19 @@
             "title": "Student Id",
             "description": "수강생 승인: 연결할 명단"
           },
+          "mentor_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mentor Id",
+            "description": "멘토 승인: 계정을 연결할 가입 전 멘토 (A105). 없으면 새 멘토"
+          },
           "contract_ids": {
             "items": {
               "type": "string",
@@ -13468,7 +13481,7 @@
             "type": "array",
             "maxItems": 50,
             "title": "Contract Ids",
-            "description": "멘토 승인: 연결할 계약 (0건 이상)"
+            "description": "멘토 승인: 함께 연결할 예전 미연결 계약 (0건 이상)"
           }
         },
         "type": "object",
@@ -14753,14 +14766,23 @@
             },
             "type": "array",
             "title": "Contracts",
-            "description": "멘토 신청: 연결할 계약 후보"
+            "description": "멘토 신청: 연결할 예전 미연결 계약 후보 (A104 이전 계약)"
+          },
+          "mentors": {
+            "items": {
+              "$ref": "#/components/schemas/PendingMentorCandidateResponse"
+            },
+            "type": "array",
+            "title": "Mentors",
+            "description": "멘토 신청: 계정을 연결할 가입 전 멘토 후보 (A105)"
           }
         },
         "type": "object",
         "required": [
           "signup_type",
           "students",
-          "contracts"
+          "contracts",
+          "mentors"
         ],
         "title": "CandidatesResponse"
       },
@@ -19575,6 +19597,53 @@
           "LUMP_SUM"
         ],
         "title": "PayUnit"
+      },
+      "PendingMentorCandidateResponse": {
+        "properties": {
+          "mentor_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Mentor Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "가입 전 연락처 이름"
+          },
+          "phone_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone Number"
+          },
+          "contract_count": {
+            "type": "integer",
+            "title": "Contract Count"
+          },
+          "name_match": {
+            "type": "boolean",
+            "title": "Name Match"
+          },
+          "phone_match": {
+            "type": "boolean",
+            "title": "Phone Match"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mentor_id",
+          "name",
+          "phone_number",
+          "contract_count",
+          "name_match",
+          "phone_match"
+        ],
+        "title": "PendingMentorCandidateResponse"
       },
       "PermissionDefinitionResponse": {
         "properties": {

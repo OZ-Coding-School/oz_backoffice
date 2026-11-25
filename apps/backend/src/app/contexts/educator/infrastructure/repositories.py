@@ -179,6 +179,22 @@ class TortoiseMentorRepository(TortoiseRepository[Mentor, MentorModel]):
         ).order_by("created_at", "id")
         return [self.to_entity(row) for row in rows]
 
+    async def search_pending(
+        self, *, name: str, phone: str | None, query: str | None, limit: int
+    ) -> list[Mentor]:
+        rows = MentorModel.filter(user_id__isnull=True)
+        if query:
+            cond = Q(contact_name__icontains=query)
+            digits = re.sub(r"\D", "", query)
+            if len(digits) >= 3:
+                cond |= Q(contact_phone__contains=digits)
+        else:
+            cond = Q(contact_name=name)
+            if phone:
+                cond |= Q(contact_phone=phone)
+        found = await rows.filter(cond).order_by("contact_name", "id").limit(limit)
+        return [self.to_entity(row) for row in found]
+
     async def list_page(
         self,
         *,

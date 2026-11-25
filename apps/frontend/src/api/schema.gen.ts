@@ -3822,8 +3822,13 @@ export interface components {
              */
             student_id?: string | null;
             /**
+             * Mentor Id
+             * @description 멘토 승인: 계정을 연결할 가입 전 멘토 (A105). 없으면 새 멘토
+             */
+            mentor_id?: string | null;
+            /**
              * Contract Ids
-             * @description 멘토 승인: 연결할 계약 (0건 이상)
+             * @description 멘토 승인: 함께 연결할 예전 미연결 계약 (0건 이상)
              */
             contract_ids?: string[];
         };
@@ -4370,9 +4375,14 @@ export interface components {
             students: components["schemas"]["StudentCandidateResponse"][];
             /**
              * Contracts
-             * @description 멘토 신청: 연결할 계약 후보
+             * @description 멘토 신청: 연결할 예전 미연결 계약 후보 (A104 이전 계약)
              */
             contracts: components["schemas"]["ContractCandidateResponse"][];
+            /**
+             * Mentors
+             * @description 멘토 신청: 계정을 연결할 가입 전 멘토 후보 (A105)
+             */
+            mentors: components["schemas"]["PendingMentorCandidateResponse"][];
         };
         /**
          * ChangeBody
@@ -6312,6 +6322,27 @@ export interface components {
          * @enum {string}
          */
         PayUnit: "HOURLY" | "PER_SESSION" | "MONTHLY" | "LUMP_SUM";
+        /** PendingMentorCandidateResponse */
+        PendingMentorCandidateResponse: {
+            /**
+             * Mentor Id
+             * Format: uuid
+             */
+            mentor_id: string;
+            /**
+             * Name
+             * @description 가입 전 연락처 이름
+             */
+            name: string;
+            /** Phone Number */
+            phone_number: string | null;
+            /** Contract Count */
+            contract_count: number;
+            /** Name Match */
+            name_match: boolean;
+            /** Phone Match */
+            phone_match: boolean;
+        };
         /** PermissionDefinitionResponse */
         PermissionDefinitionResponse: {
             /** Code */

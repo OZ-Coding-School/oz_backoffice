@@ -2,7 +2,8 @@
 
 운영진 (`user.approve`, 담당 범위는 서비스에서 판정):
 GET  /admin/approvals                          → 승인 대기 목록 (수강생: 담당 기수, 멘토: 계약 권한)
-POST /admin/approvals/{user_id}/approve        → 수강생은 student_id, 멘토는 contract_ids(0건 이상)
+POST /admin/approvals/{user_id}/approve        → 수강생은 student_id,
+    멘토는 mentor_id(가입 전 멘토, A105)·contract_ids(0건 이상)
 POST /admin/approvals/{user_id}/reject         → 사유 필수
 
 신청자 본인:
@@ -190,16 +191,35 @@ class ContractCandidateResponse(BaseModel):
     phone_match: bool
 
 
+class PendingMentorCandidateResponse(BaseModel):
+    mentor_id: uuid.UUID
+    name: str = Field(description="가입 전 연락처 이름")
+    phone_number: str | None
+    contract_count: int
+    name_match: bool
+    phone_match: bool
+
+
 class CandidatesResponse(BaseModel):
     signup_type: MemberSignupType
     students: list[StudentCandidateResponse] = Field(description="수강생 신청: 연결할 명단 후보")
-    contracts: list[ContractCandidateResponse] = Field(description="멘토 신청: 연결할 계약 후보")
+    contracts: list[ContractCandidateResponse] = Field(
+        description="멘토 신청: 연결할 예전 미연결 계약 후보 (A104 이전 계약)"
+    )
+    mentors: list[PendingMentorCandidateResponse] = Field(
+        description="멘토 신청: 계정을 연결할 가입 전 멘토 후보 (A105)"
+    )
 
 
 class ApproveRequest(BaseModel):
     student_id: uuid.UUID | None = Field(default=None, description="수강생 승인: 연결할 명단")
+    mentor_id: uuid.UUID | None = Field(
+        default=None, description="멘토 승인: 계정을 연결할 가입 전 멘토 (A105). 없으면 새 멘토"
+    )
     contract_ids: list[uuid.UUID] = Field(
-        default_factory=list, max_length=50, description="멘토 승인: 연결할 계약 (0건 이상)"
+        default_factory=list,
+        max_length=50,
+        description="멘토 승인: 함께 연결할 예전 미연결 계약 (0건 이상)",
     )
 
 
@@ -295,6 +315,17 @@ async def candidates(
             )
             for c in found.contracts
         ],
+        mentors=[
+            PendingMentorCandidateResponse(
+                mentor_id=m.candidate.mentor_id,
+                name=m.candidate.name,
+                phone_number=m.candidate.phone_number,
+                contract_count=m.candidate.contract_count,
+                name_match=m.name_match,
+                phone_match=m.phone_match,
+            )
+            for m in found.mentors
+        ],
     )
 
 
@@ -306,7 +337,7 @@ async def approve(
         view = await review.approve_student(user_id, student_id=body.student_id, actor_id=user.id)
     else:
         view = await review.approve_mentor(
-            user_id, contract_ids=body.contract_ids, actor_id=user.id
+            user_id, contract_ids=body.contract_ids, mentor_id=body.mentor_id, actor_id=user.id
         )
     return ApplicantResponse.of(view)
 

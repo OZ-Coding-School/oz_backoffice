@@ -3,8 +3,8 @@
 - 수강생: 신청한 기수 안에서 이름 + 휴대폰이 같고 수강 중·원천 존재·미가입인 명단이 정확히 1건이면
   그 명단을 회원에 연결하고 STUDENT 역할(그 기수 범위)을 준다 → MATCHED.
   0건 → NO_MATCH, 2건 이상(같은 기수에 중복 명단) → AMBIGUOUS.
-- 멘토: 이름 + 휴대폰이 같은 유형 MENTOR·미연결 계약이 1건 이상이면(계약 상태 무관) 멘토 프로필을
-  만들고 모두 연결한다 → MATCHED. 없으면 NO_MATCH. MENTOR 역할은 멘토 배정(P8)에서 준다(A17).
+- 멘토(A105): 연락처 이름 + 휴대폰이 같은 가입 전 멘토(A104)가 정확히 하나면 계정을 연결한다
+  → MATCHED. 둘 이상이면 AMBIGUOUS, 없으면 NO_MATCH(운영진 승인 대기).
 다른 컨텍스트 서비스는 가입 서비스의 트랜잭션 안에서 실행된다.
 """
 
@@ -79,4 +79,8 @@ class SignupMatcher:
             nickname=signup.nickname,
             display_name_preference=signup.display_name_preference or DisplayNamePreference.NAME,
         )
-        return SignupMatchResult.MATCHED if match.contract_ids else SignupMatchResult.NO_MATCH
+        if match.mentor_id is not None:
+            return SignupMatchResult.MATCHED
+        return (
+            SignupMatchResult.AMBIGUOUS if match.candidate_count > 1 else SignupMatchResult.NO_MATCH
+        )

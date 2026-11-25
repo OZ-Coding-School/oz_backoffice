@@ -15,13 +15,17 @@
 
 import uuid
 from collections.abc import Collection
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol
 
 from app.contexts.academy.application.student_claims import ClaimCandidate
 from app.contexts.access.application.permissions import PermissionScope, PermissionTarget
 from app.contexts.audit.application.recorder import AuditRecorder
-from app.contexts.educator.application.mentor_onboarding import ContractCandidate, MentorMatch
+from app.contexts.educator.application.mentor_onboarding import (
+    ContractCandidate,
+    MentorMatch,
+    PendingMentorCandidate,
+)
 from app.contexts.educator.domain.enums import DisplayNamePreference
 from app.contexts.identity.application.signup import (
     MailDispatcher,
@@ -83,6 +87,10 @@ class MentorApprover(Protocol):
         self, *, name: str, phone_number: str | None, query: str | None, limit: int
     ) -> list[ContractCandidate]: ...
 
+    async def candidate_mentors(
+        self, *, name: str, phone_number: str | None, query: str | None, limit: int
+    ) -> list[PendingMentorCandidate]: ...
+
     async def approve(
         self,
         *,
@@ -90,6 +98,7 @@ class MentorApprover(Protocol):
         nickname: str | None,
         display_name_preference: DisplayNamePreference,
         contract_ids: list[uuid.UUID],
+        mentor_id: uuid.UUID | None = None,
     ) -> MentorMatch: ...
 
 
@@ -129,10 +138,18 @@ class MentorContractCandidate:
 
 
 @dataclass(frozen=True, slots=True)
+class PendingMentorMatch:
+    candidate: PendingMentorCandidate
+    name_match: bool
+    phone_match: bool
+
+
+@dataclass(frozen=True, slots=True)
 class SignupCandidates:
     signup_type: MemberSignupType
     students: list[StudentCandidate]
     contracts: list[MentorContractCandidate]
+    mentors: list[PendingMentorMatch] = field(default_factory=list)
 
 
 def _digits(value: str | None) -> str:
@@ -261,7 +278,18 @@ class SignupReviewService:
             )
         ]
         contracts.sort(key=lambda c: (-(c.name_match + c.phone_match), c.candidate.contractor_name))
-        return SignupCandidates(signup.signup_type, [], contracts)
+        mentors = [
+            PendingMentorMatch(
+                candidate=m,
+                name_match=m.name == user.name,
+                phone_match=bool(phone) and _digits(m.phone_number) == phone,
+            )
+            for m in await self._mentors.candidate_mentors(
+                name=user.name, phone_number=phone or None, query=query, limit=CANDIDATE_LIMIT
+            )
+        ]
+        mentors.sort(key=lambda m: (-(m.name_match + m.phone_match), m.candidate.name))
+        return SignupCandidates(signup.signup_type, [], contracts, mentors)
 
     async def approve_student(
         self, user_id: uuid.UUID, *, student_id: uuid.UUID, actor_id: uuid.UUID
@@ -281,7 +309,12 @@ class SignupReviewService:
         return SignupView(signup, user)
 
     async def approve_mentor(
-        self, user_id: uuid.UUID, *, contract_ids: list[uuid.UUID], actor_id: uuid.UUID
+        self,
+        user_id: uuid.UUID,
+        *,
+        contract_ids: list[uuid.UUID],
+        actor_id: uuid.UUID,
+        mentor_id: uuid.UUID | None = None,
     ) -> SignupView:
         async with self._uow:
             user, signup = await self._pending(user_id, MemberSignupType.MENTOR)
@@ -292,6 +325,7 @@ class SignupReviewService:
                 display_name_preference=signup.display_name_preference
                 or DisplayNamePreference.NAME,
                 contract_ids=contract_ids,
+                mentor_id=mentor_id,
             )
             await self._approve(
                 actor_id,
