@@ -17,7 +17,8 @@
 | `features/admin-employees/groups.ts` | 부서 › 팀 묶기(이름순, '팀 없음'은 맨 아래), 이름·이메일 검색 |
 | `features/admin-employees/form.ts` | 수정 폼 스키마(운영진 신청 폼 + 최고 관리자), 바뀐 항목 중 고칠 수 있는 것만 보내는 본문 |
 | `features/admin-employees/components/employees-page.tsx` | 목록: 검색·직원 수·모두 펼치기/접기, 부서 머리(접기), 팀 머리, 행(이름·이메일·최고 관리자 배지·직위·고용 형태·담당 요약). 행 전체가 패널 링크 |
-| `features/admin-employees/components/employee-sheet.tsx` | 패널: 조회(소속 / 직위·권한 / 담당 과정·담당 기수 / 최고 관리자 섹션)와 같은 구성의 편집 모드, 항목별 권한, 최고 관리자 스위치, 저장 안 한 변경 확인 창 |
+| `features/admin-employees/components/employee-sheet.tsx` | 패널: 조회(소속 / 직위·권한(직위·데이터 범위·최고 관리자) / 담당 과정·담당 기수 목록)와 같은 구성의 편집 모드, 항목별 권한, 최고 관리자 스위치, 설명 `?`, 저장 안 한 변경 확인 창 |
+| `components/ui/help-tip.tsx` | 라벨 옆 `?` 설명(마우스 올림·누름 고정·키보드) |
 | `routes/_staff/admin/org/employees.tsx` | `/admin/org/employees?employee=` |
 | `features/staff/nav.ts` | 조직 설정에 '직원'(권한 앞), 회원 관리의 '직원·담당자' 삭제 |
 | 삭제 | `features/admin-staff`, `routes/_staff/admin/members/staff.tsx`, `e2e/admin-staff.spec.ts` (담당자 탭 포함) |
@@ -30,7 +31,9 @@
 - 목록은 전체 폭, 행을 누르면 오른쪽 슬라이드 패널(두 칸 고정 배치가 아님).
 - 섹션은 테두리 상자 + 회색 머리글, '라벨 | 값' 줄. 수정은 같은 패널에서 조회와 같은 구성으로 값 자리만 입력 칸.
 - 직위·권한은 직위 / 데이터 범위 두 줄. 담당 방식 배지·권한 보기 링크는 넣지 않음(담당 섹션 이름으로 드러남).
-- 최고 관리자는 수정 폼 안의 스위치(최고 관리자에게만). 화면 확인 때 '지정 여부 | [스위치] 지정됨' 한 줄 + 아래 설명으로 다듬었다(조회도 같은 줄).
+- 최고 관리자는 수정 폼 안의 스위치(최고 관리자에게만). 화면 확인 때 따로 섹션을 두지 않고 직위·권한 섹션의 줄로 옮겼다('최고 관리자 | [스위치] 지정됨').
+- 설명 문장은 라벨 옆 `?` 아이콘(`components/ui/help-tip.tsx`, radix Popover: 마우스를 올리면 보이고 누르면 고정)으로 바꿨다. Figma에 `Icon/circle-help`를 추가했다.
+- 담당은 칩 나열 대신 한 줄에 하나인 목록(수정은 줄마다 빼기).
 - 슬라이드 패널 공통 규칙을 F68로 기록했다(다른 Figma 화면에는 슬라이드 패널이 없어 앞으로 적용).
 - 위쪽 도구는 검색 + 모두 펼치기·접기만.
 - Figma: 조직 모듈 화면(권한·직원)을 'Admin - 조직 관리' 페이지로 옮기고, 회원 페이지 이름을 'Admin - 회원 관리'로 바꿈.
