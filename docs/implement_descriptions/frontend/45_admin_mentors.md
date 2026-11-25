@@ -2,7 +2,7 @@
 
 - 상태: PR 진행 중
 - 관련 PR: #162
-- 관련 결정: `docs/decisions.md` F79 (A35·A36·A37·A100~A102)
+- 관련 결정: `docs/decisions.md` F79·F80 (A35·A36·A37·A100~A102)
 - 이전 기록: [44. 학사 > 수강생 > 명단 동기화 (FE-17d)](44_academy_roster_sync.md)
 
 ## 배경
@@ -17,7 +17,7 @@
 | `features/mentor-profile/api.ts` | S3 업로드 단계 `postPhoto`를 내보낸다 |
 | `features/apply/components/mentor-dialog.tsx`, `team-mentor-step.tsx` | 수강생에게 보이는 멘토 소개를 `<Markdown>`으로 |
 | `features/admin-mentors/api.ts` | 목록(20개씩), 단건(A102), 프로필, 배정(A101), 대리 저장(글 먼저·사진 다음), 신청 받기, 비활성화(미리보기·확인), 활성화, 배정 다시 켜기 |
-| `features/admin-mentors/components/mentors-page.tsx` | `/admin/educators/mentors?q=&status=`: 상태 선택·검색, 표(이름 · 표시 이름, 연락처(휴대폰 가림), 활성 배정 기수, 계약 수, 신청·상태 배지) |
+| `features/admin-mentors/components/mentors-page.tsx` | `/admin/educators/mentors?q=&status=`: 상태 선택·검색, 표를 칸마다 나눔(이름(닉네임) · 이메일 · 휴대폰(가림) · 계약 · 신청 받기 · 상태, F80) |
 | `features/admin-mentors/components/mentor-page.tsx` | `/admin/educators/mentors/{id}?tab=assignments`: 머리(이름·활성·신청 배지, 표시 이름·이메일, [비활성화]/[활성화]) + 탭. 배정 탭은 카드를 세로로(기수·배정 중/종료·기간·정산·종료 사유, 비활성은 흐리게) |
 | `features/admin-mentors/components/profile-tab.tsx`, `mentor-card-view.tsx` | 프로필 탭: 왼쪽 수강생에게 보이는 모습 + [프로필 수정], 오른쪽 계정·신청 받기. 수정은 같은 자리에서 왼쪽 폼 · 오른쪽 미리보기, 저장 전 떠나면 확인 |
 | `features/admin-mentors/components/activation-actions.tsx` | 비활성화: 미리보기로 함께 꺼질 배정·취소될 대기 신청을 보여 주고 확인. 활성화: 확인 후 다시 켤 배정을 고르는 창(기본 모두 선택, 건너뛰기 가능) |
@@ -30,6 +30,7 @@
 - 멘토 소개는 마크다운으로 작성·표시(멘토 내 프로필·수강생 멘토 소개 창 포함).
 - 배정은 카드를 세로로 나열(조회만, 추가·수정은 18c).
 - 머리의 [비활성화]/[활성화]와 확인 창(A35).
+- 목록은 항목을 점으로 이어 붙이지 않고 칸마다 나누고, 이름은 `이름(닉네임)`, 활성 배정 기수는 목록에서 뺌(화면 확인 중 변경, F80).
 - 계정 칸을 위해 멘토 단건 조회를 백엔드 보완(BE-3u, A102)으로 먼저 더함.
 - 수정·스위치·비활성화는 `educator.mentor.manage`가 있을 때만(없으면 버튼을 숨기고 스위치는 막음).
 

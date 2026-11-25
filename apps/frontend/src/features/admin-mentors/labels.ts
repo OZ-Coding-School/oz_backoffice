@@ -1,14 +1,6 @@
-import type { components } from "@/api/schema.gen";
 import { formatKst } from "@/lib/datetime";
 
 import type { MentorAssignment } from "./api";
-
-type Cohort = components["schemas"]["MentorCohortItem"];
-
-/** "백엔드 12기 · 데이터 분석 3기" */
-export function cohortsText(cohorts: readonly Cohort[]): string {
-  return cohorts.map((c) => `${c.bootcamp_name} ${c.cohort_number}기`).join(" · ");
-}
 
 const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
 

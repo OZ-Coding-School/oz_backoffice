@@ -15,7 +15,6 @@ import { useDebounced } from "@/lib/use-debounced";
 import { cn } from "@/lib/utils";
 
 import { mentorsQuery, type MentorItem } from "../api";
-import { cohortsText } from "../labels";
 
 export interface MentorsSearch {
   q?: string;
@@ -23,9 +22,9 @@ export interface MentorsSearch {
 }
 
 const ALL_STATUS = "all";
-const COLUMNS = "grid grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_minmax(0,1.6fr)_64px_168px] items-center gap-3";
+const COLUMNS = "grid grid-cols-[minmax(0,1.2fr)_minmax(0,1.6fr)_136px_72px_112px_80px] items-center gap-4";
 
-/** 강사·멘토 > 멘토 (F79): 검색·상태 + 표, 행을 누르면 상세 페이지 */
+/** 강사·멘토 > 멘토 (F79·F80): 검색·상태 + 표(항목마다 칸), 행을 누르면 상세 페이지 */
 export function MentorsPage({ search }: { search: MentorsSearch }) {
   const navigate = useNavigate();
   const list = useInfiniteQuery(mentorsQuery({ q: search.q, status: search.status }));
@@ -92,7 +91,7 @@ export function MentorsPage({ search }: { search: MentorsSearch }) {
         <div className="flex flex-col gap-3">
           <div role="table" aria-label="멘토" className="overflow-hidden rounded-xl border border-border bg-card">
             <div role="row" className={cn(COLUMNS, "bg-muted px-4 py-2.5 text-caption text-muted-foreground")}>
-              {["이름", "연락처", "활성 배정 기수", "계약", "신청 · 상태"].map((h) => (
+              {["이름(닉네임)", "이메일", "휴대폰", "계약", "신청 받기", "상태"].map((h) => (
                 <span key={h} role="columnheader">
                   {h}
                 </span>
@@ -103,7 +102,7 @@ export function MentorsPage({ search }: { search: MentorsSearch }) {
             ))}
           </div>
           <p className="text-caption text-muted-foreground">
-            이름 옆은 수강생에게 보이는 표시 이름이에요. 신청 받기가 꺼진 멘토는 새 신청을 받지 않아요.
+            괄호 안은 수강생에게 보이는 닉네임이에요. 신청 받기가 꺼진 멘토는 새 신청을 받지 않아요.
           </p>
         </div>
       )}
@@ -136,20 +135,22 @@ function MentorRow({ mentor: m }: { mentor: MentorItem }) {
           )}
         >
           {m.name}
-          {shown ? ` · ${shown}` : ""}
+          {shown ? `(${shown})` : ""}
         </Link>
       </span>
       <span role="cell" className="truncate text-body text-foreground">
-        {[m.email, maskPhone(m.phone_number)].filter(Boolean).join(" · ")}
+        {m.email}
       </span>
-      <span role="cell" className="truncate text-body text-muted-foreground">
-        {cohortsText(m.active_cohorts ?? []) || "—"}
+      <span role="cell" className="text-body text-foreground">
+        {maskPhone(m.phone_number) ?? "—"}
       </span>
-      <span role="cell" className="text-body text-muted-foreground">
+      <span role="cell" className="text-body text-foreground">
         {m.contract_count}건
       </span>
-      <span role="cell" className="flex items-center gap-1.5">
+      <span role="cell">
         <AcceptingBadge on={m.accepting_requests} />
+      </span>
+      <span role="cell">
         <ActiveBadge on={m.is_active} />
       </span>
     </div>

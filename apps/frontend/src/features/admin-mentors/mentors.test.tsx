@@ -165,14 +165,23 @@ describe("강사·멘토 > 멘토 (FE-18a)", () => {
     mockSignedIn(ADMIN);
   });
 
-  it("목록: 표시 이름·연락처(가림)·활성 배정 기수·계약·신청·상태", async () => {
+  it("목록: 이름(닉네임)·이메일·휴대폰(가림)·계약·신청 받기·상태를 칸마다", async () => {
     mockApi();
     await renderRoute("/admin/educators/mentors");
     const table = await screen.findByRole("table", { name: "멘토" });
     const rows = within(table).getAllByRole("row").slice(1);
-    expect(rows.map((r) => r.textContent)).toEqual([
-      "김멘토 · 멘토Km1@mentor.com · 010-****-1234백엔드 12기 · 데이터 분석 3기2건신청 받는 중활성",
-      "최멘토m2@mentor.com · 010-****-1234—0건신청 꺼짐비활성",
+    const cells = (row: HTMLElement) =>
+      within(row)
+        .getAllByRole("cell")
+        .map((c) => c.textContent);
+    expect(
+      within(table)
+        .getAllByRole("columnheader")
+        .map((h) => h.textContent),
+    ).toEqual(["이름(닉네임)", "이메일", "휴대폰", "계약", "신청 받기", "상태"]);
+    expect(rows.map(cells)).toEqual([
+      ["김멘토(멘토K)", "m1@mentor.com", "010-****-1234", "2건", "신청 받는 중", "활성"],
+      ["최멘토", "m2@mentor.com", "010-****-1234", "0건", "신청 꺼짐", "비활성"],
     ]);
     expect(screen.getByRole("link", { name: "멘토" })).toHaveAttribute("href", "/admin/educators/mentors");
   });

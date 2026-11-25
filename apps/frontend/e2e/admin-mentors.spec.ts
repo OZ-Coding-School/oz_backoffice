@@ -71,7 +71,7 @@ test("강사·멘토 > 멘토: 목록에서 상세로, 소개를 마크다운으
 
   await page.goto("/admin");
   await page.getByRole("navigation", { name: "모듈" }).getByRole("link", { name: "강사·멘토" }).click();
-  await page.getByRole("table", { name: "멘토" }).getByRole("link", { name: "김멘토 · 멘토K" }).click();
+  await page.getByRole("table", { name: "멘토" }).getByRole("link", { name: "김멘토(멘토K)" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "김멘토" })).toBeVisible();
   await page.getByRole("button", { name: "프로필 수정" }).click();
   const form = page.getByRole("form", { name: "프로필 수정" });
