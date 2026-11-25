@@ -1,7 +1,7 @@
 # 92. 부서·팀·직위 영향 조회 (BE-3l)
 
-- 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 상태: 완료 (2026-11-25 병합)
+- 관련 PR: #143
 - 관련 결정: `docs/decisions.md` A93
 - 이전 기록: [91. 부서·팀 직원 수 (BE-3k)](91_org_employee_counts.md)
 
@@ -29,6 +29,7 @@
 ## 검증
 - `ruff check`, `ruff format --check`, `mypy`, `mypy tests`, `lint-imports` 통과, `pytest` 894 passed (새 테스트: 팀·부서·직위 영향 목록, 없는 팀 404, 권한)
 - 프론트엔드: `lint`, `typecheck` 통과
+- GitHub Actions (PR #143): 백엔드·프론트엔드 검사와 E2E 통과
 
 ## 남은 작업
 - FE-15g 조직 설정 > 부서(삭제·이동 확인 창), 권한 화면 저장 확인 창, FE-15h 직위
