@@ -42,4 +42,4 @@
 | 38 | [조직 설정 > 직위와 패널 삭제 위치 (FE-15h)](38_org_positions.md) | 완료 (#145) |
 | 39 | [회원 관리 > 전체 회원 (FE-15i)](39_member_users.md) | 완료 (#147) |
 | 40 | [설정 > 공휴일 (FE-16)](40_settings_holidays.md) | 완료 (#149) |
-| 41 | [학사 > 과정·기수 (FE-17a)](41_academy_bootcamps.md) | PR 진행 중 |
+| 41 | [학사 > 과정·기수 (FE-17a)](41_academy_bootcamps.md) | 완료 (#152) |
