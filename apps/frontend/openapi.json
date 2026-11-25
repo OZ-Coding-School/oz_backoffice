@@ -2031,6 +2031,55 @@
         }
       }
     },
+    "/api/v1/admin/departments/{department_id}/impact": {
+      "get": {
+        "tags": [
+          "admin-organization"
+        ],
+        "summary": "Department Impact",
+        "description": "부서를 지울 때 영향받는 직원·운영진 가입 신청·팀 (A93). 하나라도 있으면 지울 수 없다.",
+        "operationId": "department_impact_api_v1_admin_departments__department_id__impact_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "department_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Department Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgImpactResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/teams": {
       "get": {
         "tags": [
@@ -2210,6 +2259,55 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/teams/{team_id}/impact": {
+      "get": {
+        "tags": [
+          "admin-organization"
+        ],
+        "summary": "Team Impact",
+        "description": "팀을 지우거나 다른 부서로 옮길 때 영향받는 직원·운영진 가입 신청·담당 과정 (A93).",
+        "operationId": "team_impact_api_v1_admin_teams__team_id__impact_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Team Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgImpactResponse"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -2498,6 +2596,55 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PositionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/positions/{position_id}/impact": {
+      "get": {
+        "tags": [
+          "admin-organization"
+        ],
+        "summary": "Position Impact",
+        "description": "직위를 지우거나 권한·담당 방식·데이터 범위를 바꿀 때 영향받는 직원·운영진 가입 신청 (A93).",
+        "operationId": "position_impact_api_v1_admin_positions__position_id__impact_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "position_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Position Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgImpactResponse"
                 }
               }
             }
@@ -16224,6 +16371,129 @@
         ],
         "title": "ImageUploadRequest"
       },
+      "ImpactBootcamp": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "ImpactBootcamp"
+      },
+      "ImpactEmployee": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "department_name": {
+            "type": "string",
+            "title": "Department Name"
+          },
+          "team_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Name"
+          },
+          "position_name": {
+            "type": "string",
+            "title": "Position Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "user_id",
+          "name",
+          "email",
+          "department_name",
+          "team_name",
+          "position_name"
+        ],
+        "title": "ImpactEmployee"
+      },
+      "ImpactRegistration": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "applicant_name": {
+            "type": "string",
+            "title": "Applicant Name"
+          },
+          "applicant_email": {
+            "type": "string",
+            "title": "Applicant Email"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EmployeeRegistrationStatus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "applicant_name",
+          "applicant_email",
+          "status"
+        ],
+        "title": "ImpactRegistration"
+      },
+      "ImpactTeam": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "employee_count": {
+            "type": "integer",
+            "title": "Employee Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "employee_count"
+        ],
+        "title": "ImpactTeam"
+      },
       "IntervalResponse": {
         "properties": {
           "starts_at": {
@@ -17322,6 +17592,48 @@
           "updated_at"
         ],
         "title": "NoteResponse"
+      },
+      "OrgImpactResponse": {
+        "properties": {
+          "employees": {
+            "items": {
+              "$ref": "#/components/schemas/ImpactEmployee"
+            },
+            "type": "array",
+            "title": "Employees"
+          },
+          "registrations": {
+            "items": {
+              "$ref": "#/components/schemas/ImpactRegistration"
+            },
+            "type": "array",
+            "title": "Registrations",
+            "description": "운영진 가입 신청 (상태 무관)"
+          },
+          "teams": {
+            "items": {
+              "$ref": "#/components/schemas/ImpactTeam"
+            },
+            "type": "array",
+            "title": "Teams",
+            "description": "부서의 팀"
+          },
+          "bootcamps": {
+            "items": {
+              "$ref": "#/components/schemas/ImpactBootcamp"
+            },
+            "type": "array",
+            "title": "Bootcamps",
+            "description": "팀의 담당 과정"
+          }
+        },
+        "type": "object",
+        "required": [
+          "employees",
+          "registrations"
+        ],
+        "title": "OrgImpactResponse",
+        "description": "지우거나 바꿀 때 영향받는 대상 (A93). 종류마다 없으면 빈 목록."
       },
       "Page_AccountResponse_": {
         "properties": {

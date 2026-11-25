@@ -24,6 +24,7 @@ from app.contexts.access.presentation.super_admin_router import (
 )
 from app.contexts.identity.application.auth_service import UserQueries
 from app.contexts.identity.domain.entities import User
+from app.contexts.organization.application.impact import OrgImpact, OrgImpactQueries
 from app.contexts.organization.application.org_service import (
     DepartmentChanges,
     EmployeeChanges,
@@ -40,6 +41,7 @@ from app.contexts.organization.domain.entities import (
 from app.contexts.organization.domain.enums import (
     AssignmentScope,
     DataScope,
+    EmployeeRegistrationStatus,
     EmploymentType,
 )
 from app.contexts.organization.infrastructure.repositories import (
@@ -48,6 +50,7 @@ from app.contexts.organization.infrastructure.repositories import (
     TortoiseEmployeePositionRepository,
 )
 from app.contexts.organization.presentation.dependencies import (
+    get_org_impact_queries,
     get_organization_admin_service,
     get_user_queries,
 )
@@ -78,6 +81,18 @@ async def require_employee_editor(user: ApprovedUser, checker: PermissionChecker
 
 
 EmployeeEditor = Annotated[User, Depends(require_employee_editor)]
+
+
+async def require_position_impact_reader(user: ApprovedUser, checker: PermissionCheckerDep) -> User:
+    """직위 영향 조회: 직위 관리(org.position.manage) 또는 권한 관리(access.role.manage) (A93)."""
+    for code in ("org.position.manage", "access.role.manage"):
+        if await checker.has(user.id, code, PermissionTarget.global_()):
+            return user
+    raise PermissionDeniedError("이 작업을 할 권한이 없습니다.", code="permission_denied")
+
+
+PositionImpactReader = Annotated[User, Depends(require_position_impact_reader)]
+ImpactDep = Annotated[OrgImpactQueries, Depends(get_org_impact_queries)]
 ServiceDep = Annotated[OrganizationAdminService, Depends(get_organization_admin_service)]
 UsersDep = Annotated[UserQueries, Depends(get_user_queries)]
 
@@ -224,6 +239,43 @@ class EmployeeResponse(BaseModel):
     )
 
 
+class ImpactEmployee(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    name: str
+    email: str
+    department_name: str
+    team_name: str | None
+    position_name: str
+
+
+class ImpactRegistration(BaseModel):
+    id: uuid.UUID
+    applicant_name: str
+    applicant_email: str
+    status: EmployeeRegistrationStatus
+
+
+class ImpactTeam(BaseModel):
+    id: uuid.UUID
+    name: str
+    employee_count: int
+
+
+class ImpactBootcamp(BaseModel):
+    id: uuid.UUID
+    name: str
+
+
+class OrgImpactResponse(BaseModel):
+    """지우거나 바꿀 때 영향받는 대상 (A93). 종류마다 없으면 빈 목록."""
+
+    employees: list[ImpactEmployee]
+    registrations: list[ImpactRegistration] = Field(description="운영진 가입 신청 (상태 무관)")
+    teams: list[ImpactTeam] = Field(default_factory=list, description="부서의 팀")
+    bootcamps: list[ImpactBootcamp] = Field(default_factory=list, description="팀의 담당 과정")
+
+
 class EmployeeUpdateRequest(BaseModel):
     department_id: uuid.UUID | None = None
     team_id: uuid.UUID | None = None
@@ -317,6 +369,56 @@ async def _employees(
     return responses
 
 
+async def _impact(
+    impact: OrgImpact, service: OrganizationAdminService, users: UserQueries, academy: AcademyNames
+) -> OrgImpactResponse:
+    departments = {d.id: d.name for d in await service.list_departments()}
+    teams = {t.id: t.name for t, _ in await service.list_teams()}
+    positions = {v.position.id: v.position.name for v in await service.list_positions()}
+    found = await users.get_many(
+        [e.user_id for e in impact.employees] + [r.user_id for r in impact.registrations]
+    )
+    _by_department, by_team = await service.employee_counts()
+    bootcamps = await academy.bootcamp_names(impact.bootcamp_ids)
+
+    def who(user_id: uuid.UUID) -> tuple[str, str]:
+        user = found.get(user_id)
+        return (user.name, user.email) if user else ("—", "—")
+
+    employees = []
+    for e in impact.employees:
+        name, email = who(e.user_id)
+        employees.append(
+            ImpactEmployee(
+                id=e.id,
+                user_id=e.user_id,
+                name=name,
+                email=email,
+                department_name=departments.get(e.department_id, "—"),
+                team_name=teams.get(e.team_id) if e.team_id else None,
+                position_name=positions.get(e.position_id, "—"),
+            )
+        )
+    registrations = []
+    for r in impact.registrations:
+        name, email = who(r.user_id)
+        registrations.append(
+            ImpactRegistration(id=r.id, applicant_name=name, applicant_email=email, status=r.status)
+        )
+    return OrgImpactResponse(
+        employees=sorted(employees, key=lambda e: e.name),
+        registrations=registrations,
+        teams=[
+            ImpactTeam(id=t.id, name=t.name, employee_count=by_team.get(t.id, 0))
+            for t in sorted(impact.teams, key=lambda t: t.name)
+        ],
+        bootcamps=sorted(
+            (ImpactBootcamp(id=b, name=bootcamps.get(b, "—")) for b in impact.bootcamp_ids),
+            key=lambda b: b.name,
+        ),
+    )
+
+
 # ---------------------------------------------------------------- 부서
 @router.get("/departments", response_model=list[DepartmentResponse])
 async def list_departments(_: DepartmentReader, service: ServiceDep) -> list[DepartmentResponse]:
@@ -353,6 +455,19 @@ async def update_department(
     )
     by_department, _by_team = await service.employee_counts()
     return DepartmentResponse.of(department, by_department.get(department.id, 0))
+
+
+@router.get("/departments/{department_id}/impact", response_model=OrgImpactResponse)
+async def department_impact(
+    department_id: uuid.UUID,
+    _: DepartmentManager,
+    impact: ImpactDep,
+    service: ServiceDep,
+    users: UsersDep,
+    academy: AcademyDep,
+) -> OrgImpactResponse:
+    """부서를 지울 때 영향받는 직원·운영진 가입 신청·팀 (A93). 하나라도 있으면 지울 수 없다."""
+    return await _impact(await impact.of_department(department_id), service, users, academy)
 
 
 @router.delete("/departments/{department_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -396,6 +511,19 @@ async def update_team(
     ids = next((ids for t, ids in await service.list_teams() if t.id == team.id), [])
     _by_department, by_team = await service.employee_counts()
     return TeamResponse.of(team, ids, by_team.get(team.id, 0))
+
+
+@router.get("/teams/{team_id}/impact", response_model=OrgImpactResponse)
+async def team_impact(
+    team_id: uuid.UUID,
+    _: DepartmentManager,
+    impact: ImpactDep,
+    service: ServiceDep,
+    users: UsersDep,
+    academy: AcademyDep,
+) -> OrgImpactResponse:
+    """팀을 지우거나 다른 부서로 옮길 때 영향받는 직원·운영진 가입 신청·담당 과정 (A93)."""
+    return await _impact(await impact.of_team(team_id), service, users, academy)
 
 
 @router.delete("/teams/{team_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -469,6 +597,19 @@ async def replace_position_permissions(
         position_id, body.permissions, actor_id=admin.id
     )
     return PositionResponse.of(view)
+
+
+@router.get("/positions/{position_id}/impact", response_model=OrgImpactResponse)
+async def position_impact(
+    position_id: uuid.UUID,
+    _: PositionImpactReader,
+    impact: ImpactDep,
+    service: ServiceDep,
+    users: UsersDep,
+    academy: AcademyDep,
+) -> OrgImpactResponse:
+    """직위를 지우거나 권한·담당 방식·데이터 범위를 바꿀 때 영향받는 직원·운영진 가입 신청 (A93)."""
+    return await _impact(await impact.of_position(position_id), service, users, academy)
 
 
 @router.delete("/positions/{position_id}", status_code=status.HTTP_204_NO_CONTENT)

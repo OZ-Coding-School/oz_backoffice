@@ -161,6 +161,7 @@ class TortoiseEmployeeRepository(TortoiseRepository[Employee, EmployeeModel]):
         *,
         department_id: uuid.UUID | None = None,
         team_id: uuid.UUID | None = None,
+        position_id: uuid.UUID | None = None,
         query: str | None = None,
     ) -> list[Employee]:
         rows_query = EmployeeModel.all()
@@ -168,6 +169,8 @@ class TortoiseEmployeeRepository(TortoiseRepository[Employee, EmployeeModel]):
             rows_query = rows_query.filter(department_id=department_id)
         if team_id is not None:
             rows_query = rows_query.filter(team_id=team_id)
+        if position_id is not None:
+            rows_query = rows_query.filter(position_id=position_id)
         if query:
             rows_query = rows_query.filter(
                 Q(user__name__icontains=query) | Q(user__email__icontains=query)
@@ -321,6 +324,23 @@ class TortoiseEmployeeRegistrationRepository(
             .prefetch_related("assignments")
         )
         return [self._to_aggregate(row) for row in rows], await query.count()
+
+    async def list_referencing(
+        self,
+        *,
+        department_id: uuid.UUID | None = None,
+        team_id: uuid.UUID | None = None,
+        position_id: uuid.UUID | None = None,
+    ) -> list[EmployeeRegistration]:
+        query = EmployeeRegistrationModel.all()
+        if department_id is not None:
+            query = query.filter(department_id=department_id)
+        if team_id is not None:
+            query = query.filter(team_id=team_id)
+        if position_id is not None:
+            query = query.filter(position_id=position_id)
+        rows = await query.order_by("created_at", "id").prefetch_related("assignments")
+        return [self._to_aggregate(row) for row in rows]
 
     def _to_aggregate(self, row: EmployeeRegistrationModel) -> EmployeeRegistration:
         registration = self.to_entity(row)

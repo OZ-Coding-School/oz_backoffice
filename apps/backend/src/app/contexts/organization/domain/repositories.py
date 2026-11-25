@@ -90,6 +90,7 @@ class EmployeeRepository(Protocol):
         *,
         department_id: uuid.UUID | None = None,
         team_id: uuid.UUID | None = None,
+        position_id: uuid.UUID | None = None,
         query: str | None = None,
     ) -> list[Employee]:
         """페이지 없이 전체 (A90). query는 회원 이름·이메일에 들어간 것 (A83)."""
@@ -130,4 +131,14 @@ class EmployeeRegistrationRepository(Protocol):
         self, status: EmployeeRegistrationStatus, *, limit: int, offset: int
     ) -> tuple[list[EmployeeRegistration], int]:
         """상태별 목록(오래된 신청부터)과 전체 건수."""
+        ...
+
+    async def list_referencing(
+        self,
+        *,
+        department_id: uuid.UUID | None = None,
+        team_id: uuid.UUID | None = None,
+        position_id: uuid.UUID | None = None,
+    ) -> list[EmployeeRegistration]:
+        """그 부서·팀·직위를 쓰는 신청 (상태 무관, 오래된 순, A93)."""
         ...
