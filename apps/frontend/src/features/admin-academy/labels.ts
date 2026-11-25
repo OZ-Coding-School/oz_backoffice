@@ -27,3 +27,23 @@ export function hrdLabel(hrdNetId: string | null | undefined, cohortNumber?: num
 export function hoursLabel(hours: { start: string; end: string } | null | undefined): string {
   return hours ? `${hours.start}~${hours.end}` : "운영 안 함";
 }
+
+export const TRAIN_TYPE_LABELS: Record<string, string> = { KDT: "KDT", KDC: "KDC" };
+export const WEEKEND_LABELS: Record<string, string> = { WEEKDAY: "평일", WEEKEND: "주말", HYBRID: "평일·주말" };
+export const DAY_NIGHT_LABELS: Record<string, string> = { DAY: "주간", NIGHT: "야간", HYBRID: "주야간" };
+
+/** 금액 '11,200,000원' (없으면 '—') */
+export function won(value: number | null | undefined): string {
+  return value === null || value === undefined ? "—" : `${value.toLocaleString("ko-KR")}원`;
+}
+
+/** 숫자 + 단위 (없으면 '—') */
+export function amount(value: number | null | undefined, unit: string): string {
+  return value === null || value === undefined ? "—" : `${value.toLocaleString("ko-KR")}${unit}`;
+}
+
+/** 기간 'YYYY.MM.DD ~ YYYY.MM.DD' (한쪽이 없으면 그쪽을 비움) */
+export function optionalPeriod(start: string | null | undefined, end: string | null | undefined): string {
+  if (!start && !end) return "—";
+  return `${start ? start.replaceAll("-", ".") : ""} ~ ${end ? end.replaceAll("-", ".") : ""}`.trim();
+}
