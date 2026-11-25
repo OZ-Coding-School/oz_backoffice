@@ -765,6 +765,289 @@
         ]
       }
     },
+    "/api/v1/admin/users": {
+      "get": {
+        "tags": [
+          "admin-members"
+        ],
+        "summary": "List Members",
+        "description": "승인된 계정(탈퇴 제외), 승인 최신순 (A94).",
+        "operationId": "list_members_api_v1_admin_users_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/AccountType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Account Type"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "이름·이메일·휴대폰",
+              "title": "Q"
+            },
+            "description": "이름·이메일·휴대폰"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "active",
+                    "inactive"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/users/{user_id}": {
+      "get": {
+        "tags": [
+          "admin-members"
+        ],
+        "summary": "Get Member",
+        "description": "계정 정보 + 종류별 연결 정보 + 비활성화·활성화 이력 (A94).",
+        "operationId": "get_member_api_v1_admin_users__user_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/users/{user_id}/deactivate": {
+      "post": {
+        "tags": [
+          "admin-members"
+        ],
+        "summary": "Deactivate Member",
+        "description": "로그인을 막고 refresh 토큰을 모두 폐기한다. 자기 자신·마지막 최고 관리자는 409.",
+        "operationId": "deactivate_member_api_v1_admin_users__user_id__deactivate_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeactivateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/users/{user_id}/activate": {
+      "post": {
+        "tags": [
+          "admin-members"
+        ],
+        "summary": "Activate Member",
+        "operationId": "activate_member_api_v1_admin_users__user_id__activate_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "User Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/approvals": {
       "get": {
         "tags": [
@@ -11787,6 +12070,24 @@
         "title": "AccountType",
         "description": "계정 종류 (decisions A61·A65). 한 계정은 수강생·멘토·운영진 중 하나다.\n\n수강생·멘토는 이메일 가입 유형으로 정하고, 승인 전 재신청에서만 바뀐다.\n운영진은 회사 Google 로그인·CLI 최고 관리자로 만든다."
       },
+      "ActivateRequest": {
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "title": "ActivateRequest"
+      },
       "AdjustRequest": {
         "properties": {
           "minutes": {
@@ -13275,6 +13576,29 @@
           "updated_at"
         ],
         "title": "AssignmentDeactivateResponse"
+      },
+      "AssignmentLink": {
+        "properties": {
+          "bootcamp_name": {
+            "type": "string",
+            "title": "Bootcamp Name"
+          },
+          "cohort_number": {
+            "type": "integer",
+            "title": "Cohort Number"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bootcamp_name",
+          "cohort_number",
+          "active"
+        ],
+        "title": "AssignmentLink"
       },
       "AssignmentPayload": {
         "properties": {
@@ -14970,6 +15294,21 @@
         ],
         "title": "DayNightSeType"
       },
+      "DeactivateRequest": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 300,
+            "minLength": 1,
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "DeactivateRequest"
+      },
       "DepartmentCreateRequest": {
         "properties": {
           "name": {
@@ -15418,6 +15757,30 @@
           "DAILY"
         ],
         "title": "EmploymentType"
+      },
+      "EnrollmentLink": {
+        "properties": {
+          "bootcamp_name": {
+            "type": "string",
+            "title": "Bootcamp Name"
+          },
+          "cohort_number": {
+            "type": "integer",
+            "title": "Cohort Number"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "수강 상태 (ENROLLED·COMPLETED·DROPPED·EARLY_EMPLOYED·TRANSFERRED)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bootcamp_name",
+          "cohort_number",
+          "status"
+        ],
+        "title": "EnrollmentLink"
       },
       "EnrollmentResponse": {
         "properties": {
@@ -16625,6 +16988,348 @@
           "student_id"
         ],
         "title": "MemberAdd"
+      },
+      "MemberCounts": {
+        "properties": {
+          "ALL": {
+            "type": "integer",
+            "title": "All"
+          },
+          "STUDENT": {
+            "type": "integer",
+            "title": "Student"
+          },
+          "MENTOR": {
+            "type": "integer",
+            "title": "Mentor"
+          },
+          "STAFF": {
+            "type": "integer",
+            "title": "Staff"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ALL",
+          "STUDENT",
+          "MENTOR",
+          "STAFF"
+        ],
+        "title": "MemberCounts"
+      },
+      "MemberDetailResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "phone_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone Number"
+          },
+          "account_type": {
+            "$ref": "#/components/schemas/AccountType"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "is_super_admin": {
+            "type": "boolean",
+            "title": "Is Super Admin"
+          },
+          "approved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          },
+          "last_login_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Login At"
+          },
+          "enrollments": {
+            "items": {
+              "$ref": "#/components/schemas/EnrollmentLink"
+            },
+            "type": "array",
+            "title": "Enrollments",
+            "description": "수강생: 수강 기수 (최근 시작순)"
+          },
+          "assignments": {
+            "items": {
+              "$ref": "#/components/schemas/AssignmentLink"
+            },
+            "type": "array",
+            "title": "Assignments",
+            "description": "멘토: 배정 기수 (활성 먼저)"
+          },
+          "contract_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contract Count",
+            "description": "멘토: 계약 수"
+          },
+          "department_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Name",
+            "description": "운영진: 부서"
+          },
+          "team_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Name",
+            "description": "운영진: 팀"
+          },
+          "position_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position Name",
+            "description": "운영진: 직위"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/MemberEventResponse"
+            },
+            "type": "array",
+            "title": "History",
+            "description": "비활성화·활성화 이력 (최신순)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "email",
+          "phone_number",
+          "account_type",
+          "is_active",
+          "is_super_admin",
+          "approved_at",
+          "last_login_at",
+          "enrollments",
+          "assignments",
+          "contract_count",
+          "department_name",
+          "team_name",
+          "position_name",
+          "history"
+        ],
+        "title": "MemberDetailResponse"
+      },
+      "MemberEventResponse": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "DEACTIVATE",
+              "ACTIVATE"
+            ],
+            "title": "Action"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "actor_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Name"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action",
+          "reason",
+          "actor_name",
+          "at"
+        ],
+        "title": "MemberEventResponse"
+      },
+      "MemberPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MemberResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/MemberCounts",
+            "description": "종류별 수 (검색·상태 필터를 따름, 종류 필터는 무시)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset",
+          "counts"
+        ],
+        "title": "MemberPage"
+      },
+      "MemberResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "phone_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone Number"
+          },
+          "account_type": {
+            "$ref": "#/components/schemas/AccountType"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "is_super_admin": {
+            "type": "boolean",
+            "title": "Is Super Admin"
+          },
+          "approved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          },
+          "last_login_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Login At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "email",
+          "phone_number",
+          "account_type",
+          "is_active",
+          "is_super_admin",
+          "approved_at",
+          "last_login_at"
+        ],
+        "title": "MemberResponse"
       },
       "MemberSignupResponse": {
         "properties": {

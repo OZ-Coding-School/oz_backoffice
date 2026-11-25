@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from tortoise.contrib.fastapi import RegisterTortoise
 
 from app.api import health, v1
+from app.composition.member_links import MemberLinksComposer
 from app.contexts.academy.application.catalog import AcademyCatalog
 from app.contexts.academy.application.student_claims import StudentClaims
 from app.contexts.academy.application.student_queries import StudentQueries
@@ -18,6 +19,7 @@ from app.contexts.academy.infrastructure.repositories import (
     TortoiseStudentRepository,
 )
 from app.contexts.access.application.grant_source import StaffGrantSource
+from app.contexts.audit.application.queries import AuditQueries
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.audit.infrastructure.repositories import TortoiseAuditLogRepository
 from app.contexts.educator.application.mentor_onboarding import MentorOnboarding
@@ -115,6 +117,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.mentor_queries = MentorQueries(TortoiseMentorRepository())
     # 신청 가능 시간 조회(A37): 그 기수 수강 중인지 확인
     app.state.student_queries = StudentQueries(TortoiseStudentRepository())
+    # 전체 회원(A94): 종류별 연결 정보와 비활성화 이력
+    app.state.member_links = MemberLinksComposer()
+    app.state.audit_queries = AuditQueries(TortoiseAuditLogRepository())
 
     app.add_middleware(
         CORSMiddleware,

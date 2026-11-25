@@ -4,7 +4,7 @@ import uuid
 from dataclasses import replace
 
 from app.contexts.identity.domain.entities import OAuthAccount, User
-from app.contexts.identity.domain.enums import SocialLoginProvider
+from app.contexts.identity.domain.enums import AccountType, SocialLoginProvider
 from app.contexts.identity.domain.repositories import PendingSignupFilter
 from app.contexts.identity.domain.signup import MemberSignup
 from app.integrations.google.oauth import GoogleIdentity
@@ -18,6 +18,37 @@ class InMemoryUserRepository:
 
     async def lock_super_admin_ids(self) -> list[uuid.UUID]:
         return [u.id for u in self.users.values() if u.is_super_admin and u.deleted_at is None]
+
+    def _approved(self, query: str | None, active: bool | None) -> list[User]:
+        q = (query or "").lower()
+        return [
+            u
+            for u in self.users.values()
+            if u.is_approved
+            and u.deleted_at is None
+            and (active is None or u.is_active == active)
+            and (not q or q in u.name.lower() or q in u.email.lower())
+        ]
+
+    async def search_approved(
+        self,
+        *,
+        account_type: AccountType | None,
+        query: str | None,
+        active: bool | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[User], int]:
+        found = [u for u in self._approved(query, active) if account_type in (None, u.account_type)]
+        return [replace(u) for u in found[offset : offset + limit]], len(found)
+
+    async def count_approved_by_type(
+        self, *, query: str | None, active: bool | None
+    ) -> dict[AccountType, int]:
+        counts = {t: 0 for t in AccountType}
+        for u in self._approved(query, active):
+            counts[u.account_type] += 1
+        return counts
 
     async def add(self, user: User) -> None:
         self.users[user.id] = replace(user)

@@ -341,6 +341,83 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Members
+         * @description 승인된 계정(탈퇴 제외), 승인 최신순 (A94).
+         */
+        get: operations["list_members_api_v1_admin_users_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Member
+         * @description 계정 정보 + 종류별 연결 정보 + 비활성화·활성화 이력 (A94).
+         */
+        get: operations["get_member_api_v1_admin_users__user_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{user_id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Deactivate Member
+         * @description 로그인을 막고 refresh 토큰을 모두 폐기한다. 자기 자신·마지막 최고 관리자는 409.
+         */
+        post: operations["deactivate_member_api_v1_admin_users__user_id__deactivate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{user_id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Activate Member */
+        post: operations["activate_member_api_v1_admin_users__user_id__activate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/approvals": {
         parameters: {
             query?: never;
@@ -3234,6 +3311,11 @@ export interface components {
          * @enum {string}
          */
         AccountType: "STUDENT" | "MENTOR" | "STAFF";
+        /** ActivateRequest */
+        ActivateRequest: {
+            /** Reason */
+            reason?: string | null;
+        };
         /** AdjustRequest */
         AdjustRequest: {
             /**
@@ -3825,6 +3907,15 @@ export interface components {
              * @default 0
              */
             canceled_pending_requests: number;
+        };
+        /** AssignmentLink */
+        AssignmentLink: {
+            /** Bootcamp Name */
+            bootcamp_name: string;
+            /** Cohort Number */
+            cohort_number: number;
+            /** Active */
+            active: boolean;
         };
         /**
          * AssignmentPayload
@@ -4511,6 +4602,11 @@ export interface components {
          * @enum {string}
          */
         DayNightSeType: "DAY" | "NIGHT" | "HYBRID";
+        /** DeactivateRequest */
+        DeactivateRequest: {
+            /** Reason */
+            reason: string;
+        };
         /** DepartmentCreateRequest */
         DepartmentCreateRequest: {
             /** Name */
@@ -4678,6 +4774,18 @@ export interface components {
          * @enum {string}
          */
         EmploymentType: "REGULAR" | "CONTRACT" | "INTERN" | "PART_TIME_JOB" | "FREELANCER" | "DAILY";
+        /** EnrollmentLink */
+        EnrollmentLink: {
+            /** Bootcamp Name */
+            bootcamp_name: string;
+            /** Cohort Number */
+            cohort_number: number;
+            /**
+             * Status
+             * @description 수강 상태 (ENROLLED·COMPLETED·DROPPED·EARLY_EMPLOYED·TRANSFERRED)
+             */
+            status: string;
+        };
         /** EnrollmentResponse */
         EnrollmentResponse: {
             /**
@@ -5106,6 +5214,128 @@ export interface components {
              * Format: uuid
              */
             student_id: string;
+        };
+        /** MemberCounts */
+        MemberCounts: {
+            /** All */
+            ALL: number;
+            /** Student */
+            STUDENT: number;
+            /** Mentor */
+            MENTOR: number;
+            /** Staff */
+            STAFF: number;
+        };
+        /** MemberDetailResponse */
+        MemberDetailResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Email */
+            email: string;
+            /** Phone Number */
+            phone_number: string | null;
+            account_type: components["schemas"]["AccountType"];
+            /** Is Active */
+            is_active: boolean;
+            /** Is Super Admin */
+            is_super_admin: boolean;
+            /** Approved At */
+            approved_at: string | null;
+            /** Last Login At */
+            last_login_at: string | null;
+            /**
+             * Enrollments
+             * @description 수강생: 수강 기수 (최근 시작순)
+             */
+            enrollments: components["schemas"]["EnrollmentLink"][];
+            /**
+             * Assignments
+             * @description 멘토: 배정 기수 (활성 먼저)
+             */
+            assignments: components["schemas"]["AssignmentLink"][];
+            /**
+             * Contract Count
+             * @description 멘토: 계약 수
+             */
+            contract_count: number | null;
+            /**
+             * Department Name
+             * @description 운영진: 부서
+             */
+            department_name: string | null;
+            /**
+             * Team Name
+             * @description 운영진: 팀
+             */
+            team_name: string | null;
+            /**
+             * Position Name
+             * @description 운영진: 직위
+             */
+            position_name: string | null;
+            /**
+             * History
+             * @description 비활성화·활성화 이력 (최신순)
+             */
+            history: components["schemas"]["MemberEventResponse"][];
+        };
+        /** MemberEventResponse */
+        MemberEventResponse: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "DEACTIVATE" | "ACTIVATE";
+            /** Reason */
+            reason: string | null;
+            /** Actor Name */
+            actor_name: string | null;
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+        };
+        /** MemberPage */
+        MemberPage: {
+            /** Items */
+            items: components["schemas"]["MemberResponse"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /** @description 종류별 수 (검색·상태 필터를 따름, 종류 필터는 무시) */
+            counts: components["schemas"]["MemberCounts"];
+        };
+        /** MemberResponse */
+        MemberResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Email */
+            email: string;
+            /** Phone Number */
+            phone_number: string | null;
+            account_type: components["schemas"]["AccountType"];
+            /** Is Active */
+            is_active: boolean;
+            /** Is Super Admin */
+            is_super_admin: boolean;
+            /** Approved At */
+            approved_at: string | null;
+            /** Last Login At */
+            last_login_at: string | null;
         };
         /** MemberSignupResponse */
         MemberSignupResponse: {
@@ -8173,6 +8403,143 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApplicantResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_members_api_v1_admin_users_get: {
+        parameters: {
+            query?: {
+                account_type?: components["schemas"]["AccountType"] | null;
+                /** @description 이름·이메일·휴대폰 */
+                q?: string | null;
+                status?: ("active" | "inactive") | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_member_api_v1_admin_users__user_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberDetailResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deactivate_member_api_v1_admin_users__user_id__deactivate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeactivateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberDetailResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    activate_member_api_v1_admin_users__user_id__activate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActivateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberDetailResponse"];
                 };
             };
             /** @description Validation Error */

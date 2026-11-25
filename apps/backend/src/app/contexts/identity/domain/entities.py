@@ -123,6 +123,14 @@ class User(AggregateRoot):
     def deactivate(self) -> None:
         self.is_active = False
 
+    def activate(self) -> None:
+        """비활성화한 승인 계정을 되살린다 (A94)."""
+        if not self.is_approved or self.deleted_at is not None:
+            raise BusinessRuleViolation(
+                "승인된 계정만 활성화할 수 있습니다.", code="user_not_approved"
+            )
+        self.is_active = True
+
 
 @dataclass(kw_only=True, eq=False)
 class OAuthAccount(Entity):
