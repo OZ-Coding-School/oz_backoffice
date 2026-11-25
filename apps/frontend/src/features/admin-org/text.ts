@@ -11,3 +11,10 @@ export function eul(word: string): string {
   if (code < 0 || code > 11171) return `${word}을(를)`;
   return `${word}${code % 28 ? "을" : "를"}`;
 }
+
+/** 주격 조사: 받침이 있으면 '이', 없으면 '가' */
+export function iGa(word: string): string {
+  const code = (word.trim().at(-1) ?? "").charCodeAt(0) - 0xac00;
+  if (code < 0 || code > 11171) return `${word}이(가)`;
+  return `${word}${code % 28 ? "이" : "가"}`;
+}

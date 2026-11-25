@@ -217,8 +217,7 @@ describe("조직 설정 > 부서 (FE-15g)", () => {
     await renderRoute("/admin/org/departments?team=t1");
     const sheet = await screen.findByRole("dialog", { name: "교육 1팀" });
     const user = userEvent.setup();
-    await user.click(within(sheet).getByRole("button", { name: "수정" }));
-    await user.click(within(sheet).getByRole("button", { name: "팀 삭제" }));
+    await user.click(within(sheet).getByRole("button", { name: "삭제" }));
     const dialog = await screen.findByRole("dialog", { name: "교육 1팀을 삭제할까요?" });
     await within(dialog).findByRole("button", { name: /운영진 가입 신청/ });
     const remove = within(dialog).getByRole("button", { name: "삭제" });
@@ -237,8 +236,7 @@ describe("조직 설정 > 부서 (FE-15g)", () => {
     const sheet = await screen.findByRole("dialog", { name: "교육운영본부" });
     expect(within(sheet).getByRole("region", { name: "규칙" })).toHaveTextContent("매주 월요일 공유");
     const user = userEvent.setup();
-    await user.click(within(sheet).getByRole("button", { name: "수정" }));
-    await user.click(within(sheet).getByRole("button", { name: "부서 삭제" }));
+    await user.click(within(sheet).getByRole("button", { name: "삭제" }));
     const dialog = await screen.findByRole("dialog", { name: "교육운영본부를 지울 수 없어요" });
     await user.click(await within(dialog).findByRole("button", { name: /팀\s*1개/ }));
     expect(within(dialog).getByRole("list", { name: "팀" })).toHaveTextContent("교육 1팀");
@@ -267,6 +265,7 @@ describe("조직 설정 > 부서 (FE-15g)", () => {
     await renderRoute("/admin/org/departments?department=d2");
     const sheet = await screen.findByRole("dialog", { name: "경영지원본부" });
     expect(within(sheet).queryByRole("button", { name: "수정" })).not.toBeInTheDocument();
+    expect(within(sheet).queryByRole("button", { name: "삭제" })).not.toBeInTheDocument();
     expect(within(sheet).getByText("정한 규칙이 없어요.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "부서 추가", hidden: true })).not.toBeInTheDocument();
   });
