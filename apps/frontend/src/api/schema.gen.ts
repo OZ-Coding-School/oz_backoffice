@@ -1947,6 +1947,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/mentors/{mentor_id}/mentor-assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Mentor Assignments
+         * @description 한 멘토의 배정 전체 (비활성 포함, 활성 먼저·최근 시작부터, A101). 없는 멘토는 404.
+         */
+        get: operations["list_mentor_assignments_api_v1_admin_mentors__mentor_id__mentor_assignments_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/mentor-assignments": {
         parameters: {
             query?: never;
@@ -12304,6 +12324,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BulkReactivateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_mentor_assignments_api_v1_admin_mentors__mentor_id__mentor_assignments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mentor_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyAssignmentResponse"][];
                 };
             };
             /** @description Validation Error */

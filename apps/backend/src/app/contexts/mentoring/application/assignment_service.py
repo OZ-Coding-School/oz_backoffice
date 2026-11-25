@@ -137,6 +137,12 @@ class CohortMentorService:
             raise NotFoundError("멘토 프로필이 없습니다.", code="mentor_profile_not_found")
         return await self._assignments.list_by_mentor(mentor.id, include_inactive=include_inactive)
 
+    async def list_by_mentor(self, mentor_id: uuid.UUID) -> list[CohortMentor]:
+        """한 멘토의 배정 전체 (비활성 포함, 활성 먼저·최근 시작부터, A101)."""
+        if await self._mentors.get(mentor_id) is None:
+            raise NotFoundError("멘토를 찾을 수 없습니다.", code="mentor_not_found")
+        return await self._assignments.list_by_mentor(mentor_id, include_inactive=True)
+
     # ------------------------------------------------------------------ 변경
     async def create(
         self, cohort_id: uuid.UUID, values: dict[str, Any], *, actor_id: uuid.UUID

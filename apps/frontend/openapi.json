@@ -6711,6 +6711,59 @@
         }
       }
     },
+    "/api/v1/admin/mentors/{mentor_id}/mentor-assignments": {
+      "get": {
+        "tags": [
+          "admin-mentor-assignments"
+        ],
+        "summary": "List Mentor Assignments",
+        "description": "한 멘토의 배정 전체 (비활성 포함, 활성 먼저·최근 시작부터, A101). 없는 멘토는 404.",
+        "operationId": "list_mentor_assignments_api_v1_admin_mentors__mentor_id__mentor_assignments_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "mentor_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Mentor Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MyAssignmentResponse"
+                  },
+                  "title": "Response List Mentor Assignments Api V1 Admin Mentors  Mentor Id  Mentor Assignments Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/me/mentor-assignments": {
       "get": {
         "tags": [
