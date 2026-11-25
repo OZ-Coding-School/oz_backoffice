@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   UserCheck,
   UserRound,
+  UserRoundCog,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -80,6 +81,21 @@ const MODULES: StaffModule[] = [
     ],
   },
 
+  {
+    key: "educators",
+    label: "강사·멘토",
+    description: "멘토",
+    icon: UserRoundCog,
+    // F79: 멘토 (계약·기수 배정은 18b·18c에서 더한다)
+    items: [
+      {
+        to: "/admin/educators/mentors",
+        label: "멘토",
+        icon: UserRound,
+        permissions: ["educator.mentor.read"],
+      },
+    ],
+  },
   {
     key: "members",
     label: "회원",

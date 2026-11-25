@@ -124,9 +124,9 @@ export function MentorAvatar({
   size = "lg",
 }: {
   mentor: Pick<MentorCard, "display_name" | "profile_image_url">;
-  size?: "md" | "lg";
+  size?: "md" | "lg" | "xl";
 }) {
-  const box = size === "lg" ? "size-10" : "size-8";
+  const box = size === "xl" ? "size-18 text-h2" : size === "lg" ? "size-10" : "size-8";
   return mentor.profile_image_url ? (
     <img
       src={mentor.profile_image_url}
