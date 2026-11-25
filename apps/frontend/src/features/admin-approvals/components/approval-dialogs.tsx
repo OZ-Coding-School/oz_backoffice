@@ -7,7 +7,6 @@ import { ApiError } from "@/api/errors";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -18,7 +17,7 @@ import { useDebounced } from "@/lib/use-debounced";
 import { cn } from "@/lib/utils";
 
 import { candidatesQuery, useApprove, useReject, type Applicant, type StudentCandidate } from "../api";
-import { contractStatusLabel, enrollmentLabel, matchTag, requestedCohort, studentCandidateCohort } from "../labels";
+import { enrollmentLabel, matchTag, requestedCohort, studentCandidateCohort } from "../labels";
 
 export const REJECT_REASON_MAX = 300;
 
@@ -26,6 +25,7 @@ const ERRORS: Record<string, string> = {
   student_already_claimed: "이미 다른 회원과 연결된 명단이에요. 다른 명단을 골라 주세요.",
   student_removed_in_source: "원천(Airtable)에서 삭제된 명단이에요.",
   contract_not_linkable: "연결할 수 없는 계약이 있어요. 목록을 다시 불러 주세요.",
+  mentor_already_registered: "이미 가입한 멘토예요. 목록을 다시 불러 주세요.",
   signup_not_found: "이미 처리된 신청이에요.",
   permission_denied: "이 신청을 처리할 권한이 없어요.",
 };
@@ -189,20 +189,23 @@ export function ApproveStudentDialog({ applicant, onClose }: { applicant: Applic
   );
 }
 
-/** 멘토 승인 (A33·A82): 미연결 멘토 계약을 0개 이상 골라 연결한다 */
+/**
+ * 멘토 승인 (A105·F84): 가입 전 멘토 하나를 고르면 그 멘토에 계정을 연결하고(계약·프로필이 이어진다),
+ * 고르지 않으면 새 멘토로 승인한다.
+ */
 export function ApproveMentorDialog({ applicant, onClose }: { applicant: Applicant; onClose: () => void }) {
   const [q, setQ] = useState("");
   const query = useDebounced(q.trim());
   const found = useQuery({ ...candidatesQuery(applicant.user_id, query), placeholderData: keepPreviousData });
-  const [selected, setSelected] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string | null>(null);
   const approve = useApprove(applicant.user_id);
   const [error, setError] = useState<string | null>(null);
-  const contracts = found.data?.contracts ?? [];
+  const mentors = found.data?.mentors ?? [];
 
   const submit = async () => {
     setError(null);
     try {
-      await approve.mutateAsync({ contract_ids: selected });
+      await approve.mutateAsync(selected ? { mentor_id: selected } : {});
       toast.success(`${applicant.name}님 가입을 승인했어요`);
       onClose();
     } catch (e) {
@@ -213,7 +216,7 @@ export function ApproveMentorDialog({ applicant, onClose }: { applicant: Applica
   return (
     <Shell
       title={`가입 승인 · ${applicant.name}`}
-      description="연결할 멘토 계약을 고르세요. 고르지 않아도 승인할 수 있어요."
+      description="가입 전 멘토가 이 사람이면 고르세요. 고르지 않으면 새 멘토로 승인해요."
       onClose={onClose}
       footer={
         <>
@@ -221,7 +224,7 @@ export function ApproveMentorDialog({ applicant, onClose }: { applicant: Applica
             취소
           </Button>
           <Button disabled={approve.isPending} onClick={() => void submit()}>
-            {selected.length ? `계약 ${selected.length}개 연결하고 승인` : "계약 없이 승인"}
+            {selected ? "이 멘토에 연결하고 승인" : "새 멘토로 승인"}
           </Button>
         </>
       }
@@ -232,45 +235,40 @@ export function ApproveMentorDialog({ applicant, onClose }: { applicant: Applica
         <div className="flex justify-center py-6">
           <Spinner />
         </div>
-      ) : contracts.length === 0 ? (
+      ) : mentors.length === 0 ? (
         <p className="rounded-lg border border-dashed border-border py-6 text-center text-body text-muted-foreground">
-          {query ? "찾는 계약이 없어요." : "이름이나 휴대폰이 같은 미연결 계약이 없어요."}
+          {query ? "찾는 가입 전 멘토가 없어요." : "이름이나 휴대폰이 같은 가입 전 멘토가 없어요."}
         </p>
       ) : (
-        <ul aria-label="연결할 계약" className="flex max-h-72 flex-col overflow-y-auto rounded-lg border border-border">
-          {contracts.map((c) => {
-            const checked = selected.includes(c.contract_id);
-            return (
-              <li key={c.contract_id}>
-                <label className={cn(ROW, "cursor-pointer", checked && "bg-accent/50")}>
-                  <Checkbox
-                    checked={checked}
-                    aria-label={`${c.title} 연결`}
-                    onCheckedChange={(on) =>
-                      setSelected((prev) => (on ? [...prev, c.contract_id] : prev.filter((id) => id !== c.contract_id)))
-                    }
-                  />
-                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="text-body-strong text-foreground">
-                      {c.contractor_name} · {maskPhone(c.contractor_phone) ?? "—"}
-                    </span>
-                    <span className="text-caption text-muted-foreground">
-                      {[
-                        c.title,
-                        `${c.start_date.replaceAll("-", ".")} ~ ${c.end_date.replaceAll("-", ".")}`,
-                        matchTag(c),
-                      ].join(" · ")}
-                    </span>
-                  </span>
-                  <Badge variant={c.status === "ACTIVE" ? "success" : "secondary"}>
-                    {contractStatusLabel(c.status)}
-                  </Badge>
-                </label>
-              </li>
-            );
-          })}
-        </ul>
+        <RadioGroup
+          value={selected ?? ""}
+          onValueChange={(v) => setSelected(v || null)}
+          aria-label="연결할 가입 전 멘토"
+          className="flex max-h-72 flex-col gap-0 overflow-y-auto rounded-lg border border-border"
+        >
+          {mentors.map((m) => (
+            <div key={m.mentor_id} className={cn(ROW, selected === m.mentor_id && "bg-accent/50")}>
+              <RadioGroupItem value={m.mentor_id} aria-label={`${m.name} 연결`}>
+                {""}
+              </RadioGroupItem>
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="text-body-strong text-foreground">
+                  {m.name} · {maskPhone(m.phone_number) ?? "—"}
+                </span>
+                <span className="text-caption text-muted-foreground">
+                  {[`계약 ${m.contract_count}건`, matchTag(m)].join(" · ")}
+                </span>
+              </span>
+              <Badge variant="warning">가입 전</Badge>
+            </div>
+          ))}
+        </RadioGroup>
       )}
+      {selected ? (
+        <Button variant="ghost" size="sm" className="self-start" onClick={() => setSelected(null)}>
+          고른 멘토 빼기
+        </Button>
+      ) : null}
       {error ? <Alert variant="error" title={error} /> : null}
     </Shell>
   );

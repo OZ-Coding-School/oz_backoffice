@@ -110,7 +110,16 @@ function mockApprovals({ students = [applicant()], mentors = [MENTOR_APPLICANT] 
           ? {
               signup_type: "MENTOR",
               students: [],
-              mentors: [],
+              mentors: [
+                {
+                  mentor_id: "pm1",
+                  name: "김멘토",
+                  phone_number: "01077778888",
+                  contract_count: 2,
+                  name_match: true,
+                  phone_match: true,
+                },
+              ],
               contracts: [
                 {
                   contract_id: "ct1",
@@ -157,7 +166,7 @@ describe("가입 승인 표시 (A31·A82)", () => {
   it("자동 매칭·일치 태그", () => {
     expect(matchLabel(applicant()).label).toBe("명단 없음");
     expect(matchLabel(applicant({ match: "AMBIGUOUS" })).label).toBe("후보 여러 명");
-    expect(matchLabel(MENTOR_APPLICANT).label).toBe("계약 없음");
+    expect(matchLabel(MENTOR_APPLICANT).label).toBe("가입 전 멘토 없음");
     expect(matchTag({ name_match: true, phone_match: true })).toBe("이름·휴대폰 일치");
     expect(matchTag({ name_match: true, phone_match: false })).toBe("휴대폰 다름");
     expect(matchTag({ name_match: false, phone_match: true })).toBe("이름 다름");
@@ -227,16 +236,18 @@ describe("회원 가입 승인 (FE-15a)", () => {
     expect(await screen.findByText("가수강님 가입을 승인했어요")).toBeInTheDocument();
   });
 
-  it("멘토 승인: 계약을 고르거나 고르지 않고 승인한다", async () => {
+  it("멘토 승인: 가입 전 멘토를 고르면 그 멘토에 연결, 고르지 않으면 새 멘토 (A105)", async () => {
     const calls = mockApprovals();
     await renderRoute("/admin/members/approvals?tab=mentor");
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "김멘토 승인" }));
     const dialog = await screen.findByRole("dialog", { name: "가입 승인 · 김멘토" });
-    expect(within(dialog).getByRole("button", { name: "계약 없이 승인" })).toBeEnabled();
-    await user.click(await within(dialog).findByRole("checkbox", { name: "2026 멘토 계약 연결" }));
-    await user.click(within(dialog).getByRole("button", { name: "계약 1개 연결하고 승인" }));
-    await waitFor(() => expect(calls.approve.at(-1)).toEqual({ user: "u2", contract_ids: ["ct1"] }));
+    expect(within(dialog).getByRole("button", { name: "새 멘토로 승인" })).toBeEnabled();
+    const list = await within(dialog).findByRole("radiogroup", { name: "연결할 가입 전 멘토" });
+    expect(list).toHaveTextContent("김멘토 · 010-****-8888계약 2건 · 이름·휴대폰 일치가입 전");
+    await user.click(within(list).getByRole("radio", { name: "김멘토 연결" }));
+    await user.click(within(dialog).getByRole("button", { name: "이 멘토에 연결하고 승인" }));
+    await waitFor(() => expect(calls.approve.at(-1)).toEqual({ user: "u2", mentor_id: "pm1" }));
   });
 
   it("반려는 사유가 있어야 한다", async () => {
