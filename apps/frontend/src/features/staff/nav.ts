@@ -1,4 +1,4 @@
-import { LayoutGrid, ShieldCheck, UserCheck, UserCog, Users, type LucideIcon } from "lucide-react";
+import { Building2, KeyRound, LayoutGrid, ShieldCheck, UserCheck, UserCog, Users, type LucideIcon } from "lucide-react";
 
 import { hasPermission, type StaffAccess } from "./api";
 
@@ -65,6 +65,22 @@ const MODULES: StaffModule[] = [
         icon: Users,
         // 직원 조회 또는 담당자 조회 (A83·A86)
         permissions: ["org.employee.read", "staff.assignment.read"],
+      },
+    ],
+  },
+  {
+    key: "org",
+    label: "조직",
+    title: "조직 설정",
+    description: "부서·직위·직원·권한",
+    icon: Building2,
+    // F64·F65: 부서·직위·직원 메뉴는 만들 때 더한다
+    items: [
+      {
+        to: "/admin/org/permissions",
+        label: "권한",
+        icon: KeyRound,
+        permissions: ["access.role.read"],
       },
     ],
   },
