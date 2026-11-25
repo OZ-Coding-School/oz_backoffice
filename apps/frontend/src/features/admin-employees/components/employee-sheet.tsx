@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
+import { HelpTip } from "@/components/ui/help-tip";
 import { Switch } from "@/components/ui/switch";
 import { withAllCohorts } from "@/features/admin-staff-registrations/api";
 import { EMPLOYMENT_TYPE_LABELS } from "@/features/auth/messages";
@@ -25,7 +26,11 @@ import { employeeFormSchema as schema, payload, type Editable, type EmployeeForm
 import { NO_TEAM_LABEL } from "../groups";
 
 const SCOPE_TITLES = { COURSE: "담당 과정", COHORT: "담당 기수" } as const;
-const SUPER_ADMIN_HELP = "최고 관리자는 직위와 상관없이 모든 권한과 모든 데이터를 볼 수 있어요.";
+const SUPER_ADMIN_HELP = "직위와 상관없이 모든 권한과 모든 데이터를 볼 수 있어요. 최고 관리자만 바꿀 수 있어요.";
+const DATA_SCOPE_HELP =
+  "직위에 따라 정해져요. '담당 과정·기수만'이면 담당한 과정·기수의 데이터만, '모든 과정·기수'면 전체를 볼 수 있어요.";
+const POSITION_HELP =
+  "직위를 바꾸면 권한·데이터 범위·담당 방식이 바뀌어요. 담당 방식이 달라지면 담당을 다시 골라야 해요.";
 const superAdminLabel = (on: boolean) => (on ? "지정됨" : "지정 안 됨");
 
 /** 직원 상세·수정 슬라이드 패널 (F67). 수정은 같은 패널에서 조회와 같은 섹션·줄 구성으로 한다 */
@@ -102,17 +107,30 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-/** '라벨 | 값' 한 줄 */
-function Row({ label, children, htmlFor }: { label: string; children: ReactNode; htmlFor?: string }) {
+/** '라벨 | 값' 한 줄. 설명은 라벨 옆 `?`로 (F68) */
+function Row({
+  label,
+  children,
+  htmlFor,
+  help,
+}: {
+  label: string;
+  children: ReactNode;
+  htmlFor?: string;
+  help?: string;
+}) {
   return (
-    <div className="grid grid-cols-[88px_minmax(0,1fr)] items-center gap-3">
-      {htmlFor ? (
-        <label htmlFor={htmlFor} className="text-body text-muted-foreground">
-          {label}
-        </label>
-      ) : (
-        <span className="text-body text-muted-foreground">{label}</span>
-      )}
+    <div className="grid grid-cols-[96px_minmax(0,1fr)] items-center gap-3">
+      <span className="flex items-center gap-1">
+        {htmlFor ? (
+          <label htmlFor={htmlFor} className="text-body text-muted-foreground">
+            {label}
+          </label>
+        ) : (
+          <span className="text-body text-muted-foreground">{label}</span>
+        )}
+        {help ? <HelpTip label={label}>{help}</HelpTip> : null}
+      </span>
       <div className="min-w-0 text-body-strong text-foreground">{children}</div>
     </div>
   );
@@ -139,28 +157,59 @@ function EmployeeView({ employee, options }: { employee: Employee; options: Staf
       </Section>
       <Section title="직위·권한">
         <Row label="직위">{n.position}</Row>
-        <Row label="데이터 범위">{DATA_SCOPE_LABELS[employee.data_scope]}</Row>
+        <Row label="데이터 범위" help={DATA_SCOPE_HELP}>
+          {DATA_SCOPE_LABELS[employee.data_scope]}
+        </Row>
+        <Row label="최고 관리자" help={SUPER_ADMIN_HELP}>
+          {superAdminLabel(employee.is_super_admin)}
+        </Row>
       </Section>
       {scope ? (
         <Section title={SCOPE_TITLES[scope]}>
           {assignments.length ? (
-            <ul aria-label={SCOPE_TITLES[scope]} className="flex flex-wrap gap-1.5">
-              {assignments.map((a) => (
-                <li key={a.staff_id}>
-                  <Badge variant="secondary">{assignmentName(a)}</Badge>
-                </li>
-              ))}
-            </ul>
+            <AssignmentList
+              label={SCOPE_TITLES[scope]}
+              items={assignments.map((a) => ({ id: a.staff_id, name: assignmentName(a) }))}
+            />
           ) : (
             <p className="text-body text-muted-foreground">담당이 없어요.</p>
           )}
         </Section>
       ) : null}
-      <Section title="최고 관리자">
-        <Row label="지정 여부">{superAdminLabel(employee.is_super_admin)}</Row>
-        <p className="text-caption text-muted-foreground">{SUPER_ADMIN_HELP}</p>
-      </Section>
     </>
+  );
+}
+
+/** 담당 목록: 한 줄에 하나 (F67). 수정이면 줄마다 빼기 */
+function AssignmentList({
+  label,
+  items,
+  onRemove,
+}: {
+  label: string;
+  items: { id: string; name: string }[];
+  onRemove?: (id: string) => void;
+}) {
+  return (
+    <ul aria-label={label} className="divide-y divide-border overflow-hidden rounded-md border border-border">
+      {items.map((item) => (
+        <li key={item.id} className="flex min-h-10 items-center gap-2 py-1.5 pr-1.5 pl-3">
+          <span className="min-w-0 flex-1 truncate text-body text-foreground">{item.name}</span>
+          {onRemove ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label={`${item.name} 빼기`}
+              className="px-2"
+              onClick={() => onRemove(item.id)}
+            >
+              <X />
+            </Button>
+          ) : null}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -338,24 +387,37 @@ function FormSections({
             name="position_id"
             label="직위"
             id={`${id}-position`}
+            help={POSITION_HELP}
             items={options.positions.map((p) => ({ value: p.id, label: p.name }))}
             onChange={clearAssignments}
           />
         ) : (
           <Row label="직위">{n.position}</Row>
         )}
-        <Row label="데이터 범위">
+        <Row label="데이터 범위" help={DATA_SCOPE_HELP}>
           {positionId === employee.position_id ? (
             DATA_SCOPE_LABELS[employee.data_scope]
           ) : (
             <span className="text-body text-muted-foreground">저장하면 바뀐 직위의 범위를 따라요</span>
           )}
         </Row>
-        {editable.org ? (
-          <p className="text-caption text-muted-foreground">
-            데이터 범위는 직위에 따라 정해져요. 직위를 바꾸면 담당 방식이 달라져 담당을 다시 골라야 할 수 있어요.
-          </p>
-        ) : null}
+        {editable.superAdmin ? (
+          <Row label="최고 관리자" htmlFor={`${id}-super`} help={SUPER_ADMIN_HELP}>
+            <span className="flex h-9 items-center gap-2.5">
+              <Switch
+                id={`${id}-super`}
+                aria-label="최고 관리자"
+                checked={superAdmin}
+                onCheckedChange={(on) => form.setValue("is_super_admin", on, { shouldDirty: true })}
+              />
+              <span aria-hidden>{superAdminLabel(superAdmin)}</span>
+            </span>
+          </Row>
+        ) : (
+          <Row label="최고 관리자" help={SUPER_ADMIN_HELP}>
+            {superAdminLabel(employee.is_super_admin)}
+          </Row>
+        )}
       </Section>
       {scope === "COURSE" ? (
         <Section title={SCOPE_TITLES.COURSE}>
@@ -403,27 +465,6 @@ function FormSections({
           )}
         </Section>
       ) : null}
-      <Section title="최고 관리자">
-        {editable.superAdmin ? (
-          <Row label="지정 여부" htmlFor={`${id}-super`}>
-            <span className="flex h-9 items-center gap-2.5">
-              <Switch
-                id={`${id}-super`}
-                aria-label="최고 관리자"
-                checked={superAdmin}
-                onCheckedChange={(on) => form.setValue("is_super_admin", on, { shouldDirty: true })}
-              />
-              <span aria-hidden>{superAdminLabel(superAdmin)}</span>
-            </span>
-          </Row>
-        ) : (
-          <Row label="지정 여부">{superAdminLabel(employee.is_super_admin)}</Row>
-        )}
-        <p className="text-caption text-muted-foreground">
-          {SUPER_ADMIN_HELP}
-          {editable.superAdmin ? null : " 최고 관리자만 바꿀 수 있어요."}
-        </p>
-      </Section>
     </>
   );
 }
@@ -440,6 +481,7 @@ function SelectRow({
   error,
   disabled,
   onChange,
+  help,
 }: {
   form: UseFormReturn<Values>;
   name: SelectName;
@@ -450,9 +492,10 @@ function SelectRow({
   error?: string | undefined;
   disabled?: boolean;
   onChange?: () => void;
+  help?: string;
 }) {
   return (
-    <Row label={label} htmlFor={id}>
+    <Row label={label} htmlFor={id} {...(help ? { help } : {})}>
       <Controller
         control={form.control}
         name={name}
@@ -499,13 +542,7 @@ function CourseField({
   if (!editable) {
     const items = employee.assignments ?? [];
     return items.length ? (
-      <ul aria-label="담당 과정" className="flex flex-wrap gap-1.5">
-        {items.map((a) => (
-          <li key={a.staff_id}>
-            <Badge variant="secondary">{assignmentName(a)}</Badge>
-          </li>
-        ))}
-      </ul>
+      <AssignmentList label="담당 과정" items={items.map((a) => ({ id: a.staff_id, name: assignmentName(a) }))} />
     ) : (
       <p className="text-body text-muted-foreground">담당이 없어요.</p>
     );
@@ -527,24 +564,11 @@ function CourseField({
         return (
           <>
             {chosen.length ? (
-              <ul aria-label="담당 과정" className="flex flex-wrap gap-1.5">
-                {chosen.map((b) => (
-                  <li
-                    key={b.id}
-                    className="inline-flex items-center gap-1 rounded-full bg-muted py-0.5 pr-1 pl-2.5 text-caption-strong text-foreground"
-                  >
-                    {b.name}
-                    <button
-                      type="button"
-                      aria-label={`${b.name} 빼기`}
-                      className="inline-flex size-5 items-center justify-center rounded-full hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                      onClick={() => field.onChange(field.value.filter((id) => id !== b.id))}
-                    >
-                      <X aria-hidden className="size-3.5" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <AssignmentList
+                label="담당 과정"
+                items={chosen}
+                onRemove={(id) => field.onChange(field.value.filter((v) => v !== id))}
+              />
             ) : (
               <p className="text-body text-muted-foreground">담당이 없어요.</p>
             )}

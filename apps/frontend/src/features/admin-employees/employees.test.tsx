@@ -136,7 +136,11 @@ describe("조직 설정 > 직원 (FE-15f)", () => {
     expect(within(sheet).getByRole("region", { name: "소속" })).toHaveTextContent("교육운영본부");
     expect(within(sheet).getByRole("region", { name: "직위·권한" })).toHaveTextContent("담당 과정·기수만");
     expect(within(sheet).getByRole("list", { name: "담당 과정" })).toHaveTextContent("백엔드 부트캠프");
-    expect(within(sheet).getByRole("region", { name: "최고 관리자" })).toHaveTextContent("지정 안 됨");
+    expect(within(sheet).getByRole("region", { name: "직위·권한" })).toHaveTextContent("최고 관리자지정 안 됨");
+    // 설명은 ? 아이콘을 누르면 보인다 (F68)
+    await user.click(within(sheet).getByRole("button", { name: "최고 관리자 설명" }));
+    expect(await screen.findByText(/직위와 상관없이 모든 권한과 모든 데이터/)).toBeInTheDocument();
+    await user.keyboard("{Escape}");
 
     await user.click(within(sheet).getByRole("button", { name: "닫기" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
