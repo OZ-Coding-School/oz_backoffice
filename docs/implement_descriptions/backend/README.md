@@ -95,3 +95,4 @@
 | 91 | [부서·팀 직원 수 (BE-3k)](91_org_employee_counts.md) | 완료 (#142) |
 | 92 | [부서·팀·직위 영향 조회 (BE-3l)](92_org_impact.md) | 완료 (#143) |
 | 93 | [전체 회원 API (BE-3m)](93_member_users.md) | 완료 (#146) |
+| 94 | [법정공휴일 동기화 (BE-3n)](94_public_holiday_sync.md) | PR 진행 중 |
