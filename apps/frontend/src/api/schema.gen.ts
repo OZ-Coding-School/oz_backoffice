@@ -1461,6 +1461,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/contracts/manager-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Contract Manager Candidates
+         * @description 계약 담당 직원 후보 (A103): 직원 이름·이메일 검색, 같은 이름 → 이름으로 시작 → 나머지
+         *     순으로 20개. 검색어가 없으면 나를 맨 앞에 둔다.
+         */
+        get: operations["contract_manager_candidates_api_v1_admin_contracts_manager_candidates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/contracts/{contract_id}": {
         parameters: {
             query?: never;
@@ -4731,10 +4752,17 @@ export interface components {
              * Format: uuid
              */
             manager_employee_id: string;
+            /**
+             * Manager Name
+             * @description 담당 직원 이름 (A103)
+             */
+            manager_name: string | null;
             /** Mentor Id */
             mentor_id: string | null;
             /** Instructor Id */
             instructor_id: string | null;
+            /** @description 연결된 멘토·강사 프로필 이름 (A103) */
+            linked_profile: components["schemas"]["LinkedProfileResponse"] | null;
             contract_file: components["schemas"]["ContractFileResponse"] | null;
             /** Created At */
             created_at: string | null;
@@ -5417,6 +5445,19 @@ export interface components {
              */
             ends_at: string;
         };
+        /** LinkedProfileResponse */
+        LinkedProfileResponse: {
+            /**
+             * Name
+             * @description 실명
+             */
+            name: string;
+            /**
+             * Display Name
+             * @description 수강생에게 보이는 이름
+             */
+            display_name: string;
+        };
         /** LivenessResponse */
         LivenessResponse: {
             /**
@@ -5432,6 +5473,29 @@ export interface components {
             email: string;
             /** Password */
             password: string;
+        };
+        /** ManagerCandidateResponse */
+        ManagerCandidateResponse: {
+            /**
+             * Employee Id
+             * Format: uuid
+             */
+            employee_id: string;
+            /** Name */
+            name: string;
+            /** Email */
+            email: string;
+            /** Department Name */
+            department_name: string;
+            /** Team Name */
+            team_name: string | null;
+            /** Position Name */
+            position_name: string;
+            /**
+             * Is Me
+             * @description 요청한 본인
+             */
+            is_me: boolean;
         };
         /** MeResponse */
         MeResponse: {
@@ -11125,6 +11189,8 @@ export interface operations {
                 educator_type?: components["schemas"]["EducatorType"] | null;
                 /** @description 계약자 이름·제목·휴대폰 */
                 q?: string | null;
+                /** @description 연결된 멘토 (A103) */
+                mentor_id?: string | null;
                 limit?: number;
                 offset?: number;
             };
@@ -11174,6 +11240,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ContractResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    contract_manager_candidates_api_v1_admin_contracts_manager_candidates_get: {
+        parameters: {
+            query?: {
+                /** @description 직원 이름·이메일 */
+                q?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagerCandidateResponse"][];
                 };
             };
             /** @description Validation Error */

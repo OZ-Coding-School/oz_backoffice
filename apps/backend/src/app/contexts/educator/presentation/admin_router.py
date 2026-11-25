@@ -3,6 +3,7 @@
 - 계약서 업로드: POST /contract-files/uploads → 브라우저가 S3로 직접 업로드
   → POST /contract-files/uploads/{upload_id}/confirm
 - 계약: 목록·생성·조회·수정(DRAFT만, 확정 후 담당 직원만)·삭제(DRAFT만)·확정·해지·계약서 URL
+- 응답에 담당 직원 이름·연결된 프로필 이름, 목록 `mentor_id` 필터, 담당 직원 후보 (A103)
 """
 
 import uuid
@@ -15,6 +16,11 @@ from pydantic import BaseModel, Field
 from app.contexts.access.presentation.dependencies import require_permission
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.educator.application.contract_files import ContractFileUploadService
+from app.contexts.educator.application.contract_people import (
+    ContractPeople,
+    ContractPeopleReader,
+    LinkedPerson,
+)
 from app.contexts.educator.application.contracts import ContractService, ContractView
 from app.contexts.educator.application.ports import EmployeeDirectory
 from app.contexts.educator.application.uploads import DirectUploads
@@ -81,6 +87,13 @@ def get_upload_service(
 
 
 ContractsDep = Annotated[ContractService, Depends(get_contract_service)]
+
+
+def get_contract_people(request: Request) -> ContractPeopleReader:
+    return cast("ContractPeopleReader", request.app.state.contract_people)
+
+
+PeopleDep = Annotated[ContractPeopleReader, Depends(get_contract_people)]
 UploadsDep = Annotated[ContractFileUploadService, Depends(get_upload_service)]
 
 
@@ -143,6 +156,15 @@ class ContractUpdate(BaseModel):
 _NULLABLE = frozenset({"contractor_email", "contract_file_id"})
 
 
+class LinkedProfileResponse(BaseModel):
+    name: str = Field(description="실명")
+    display_name: str = Field(description="수강생에게 보이는 이름")
+
+    @classmethod
+    def of(cls, person: LinkedPerson | None) -> "LinkedProfileResponse | None":
+        return cls(name=person.name, display_name=person.display_name) if person else None
+
+
 class ContractResponse(BaseModel):
     id: uuid.UUID
     educator_type: EducatorType
@@ -154,15 +176,26 @@ class ContractResponse(BaseModel):
     start_date: date
     end_date: date
     manager_employee_id: uuid.UUID
+    manager_name: str | None = Field(description="담당 직원 이름 (A103)")
     mentor_id: uuid.UUID | None
     instructor_id: uuid.UUID | None
+    linked_profile: LinkedProfileResponse | None = Field(
+        description="연결된 멘토·강사 프로필 이름 (A103)"
+    )
     contract_file: ContractFileResponse | None
     created_at: datetime | None
     updated_at: datetime | None
 
     @classmethod
-    def of(cls, view: ContractView) -> "ContractResponse":
+    def of(cls, view: ContractView, people: ContractPeople) -> "ContractResponse":
         c = view.contract
+        linked = (
+            people.mentors.get(c.mentor_id)
+            if c.mentor_id
+            else people.instructors.get(c.instructor_id)
+            if c.instructor_id
+            else None
+        )
         return cls(
             id=c.id,
             educator_type=c.educator_type,
@@ -174,8 +207,10 @@ class ContractResponse(BaseModel):
             start_date=c.start_date,
             end_date=c.end_date,
             manager_employee_id=c.manager_employee_id,
+            manager_name=people.managers.get(c.manager_employee_id),
             mentor_id=c.mentor_id,
             instructor_id=c.instructor_id,
+            linked_profile=LinkedProfileResponse.of(linked),
             contract_file=ContractFileResponse.of(view.file) if view.file else None,
             created_at=c.created_at,
             updated_at=c.updated_at,
@@ -187,6 +222,20 @@ class ContractLink(BaseModel):
 
     mentor_id: uuid.UUID | None = None
     instructor_id: uuid.UUID | None = None
+
+
+class ManagerCandidateResponse(BaseModel):
+    employee_id: uuid.UUID
+    name: str
+    email: str
+    department_name: str
+    team_name: str | None
+    position_name: str
+    is_me: bool = Field(description="요청한 본인")
+
+
+async def _one(view: ContractView, people: ContractPeopleReader) -> ContractResponse:
+    return ContractResponse.of(view, await people.people([view.contract]))
 
 
 class FileUrlResponse(BaseModel):
@@ -229,9 +278,11 @@ async def confirm_contract_upload(
 async def list_contracts(
     _: Reader,
     contracts: ContractsDep,
+    people: PeopleDep,
     status_: Annotated[list[ContractStatus] | None, Query(alias="status")] = None,
     educator_type: EducatorType | None = None,
     q: Annotated[str | None, Query(max_length=50, description="계약자 이름·제목·휴대폰")] = None,
+    mentor_id: Annotated[uuid.UUID | None, Query(description="연결된 멘토 (A103)")] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> Page[ContractResponse]:
@@ -239,35 +290,68 @@ async def list_contracts(
         statuses=frozenset(status_ or ()),
         educator_type=educator_type,
         query=q.strip() if q and q.strip() else None,
+        mentor_id=mentor_id,
     )
     views, total = await contracts.list_contracts(contract_filter, limit=limit, offset=offset)
+    found = await people.people([v.contract for v in views])
     return Page(
-        items=[ContractResponse.of(v) for v in views], total=total, limit=limit, offset=offset
+        items=[ContractResponse.of(v, found) for v in views],
+        total=total,
+        limit=limit,
+        offset=offset,
     )
+
+
+@router.get("/contracts/manager-candidates", response_model=list[ManagerCandidateResponse])
+async def contract_manager_candidates(
+    user: Manager,
+    people: PeopleDep,
+    q: Annotated[str | None, Query(max_length=50, description="직원 이름·이메일")] = None,
+) -> list[ManagerCandidateResponse]:
+    """계약 담당 직원 후보 (A103): 직원 이름·이메일 검색, 같은 이름 → 이름으로 시작 → 나머지
+    순으로 20개. 검색어가 없으면 나를 맨 앞에 둔다."""
+    term = q.strip() if q and q.strip() else None
+    found = await people.manager_candidates(query=term, limit=20, me=user.id)
+    return [
+        ManagerCandidateResponse(
+            employee_id=c.employee_id,
+            name=c.name,
+            email=c.email,
+            department_name=c.department_name,
+            team_name=c.team_name,
+            position_name=c.position_name,
+            is_me=c.is_me,
+        )
+        for c in found
+    ]
 
 
 @router.post("/contracts", response_model=ContractResponse, status_code=status.HTTP_201_CREATED)
 async def create_contract(
-    body: ContractFields, user: Manager, contracts: ContractsDep
+    body: ContractFields, user: Manager, contracts: ContractsDep, people: PeopleDep
 ) -> ContractResponse:
-    return ContractResponse.of(await contracts.create(body.model_dump(), actor_id=user.id))
+    return await _one(await contracts.create(body.model_dump(), actor_id=user.id), people)
 
 
 @router.get("/contracts/{contract_id}", response_model=ContractResponse)
 async def get_contract(
-    contract_id: uuid.UUID, _: Reader, contracts: ContractsDep
+    contract_id: uuid.UUID, _: Reader, contracts: ContractsDep, people: PeopleDep
 ) -> ContractResponse:
-    return ContractResponse.of(await contracts.get(contract_id))
+    return await _one(await contracts.get(contract_id), people)
 
 
 @router.patch("/contracts/{contract_id}", response_model=ContractResponse)
 async def update_contract(
-    contract_id: uuid.UUID, body: ContractUpdate, user: Manager, contracts: ContractsDep
+    contract_id: uuid.UUID,
+    body: ContractUpdate,
+    user: Manager,
+    contracts: ContractsDep,
+    people: PeopleDep,
 ) -> ContractResponse:
     changes = body.model_dump(exclude_unset=True)
     # null은 비울 수 있는 필드에만 의미가 있다. 그 밖의 필드에 null을 보내면 바꾸지 않는다
     changes = {k: v for k, v in changes.items() if v is not None or k in _NULLABLE}
-    return ContractResponse.of(await contracts.update(contract_id, changes, actor_id=user.id))
+    return await _one(await contracts.update(contract_id, changes, actor_id=user.id), people)
 
 
 @router.delete("/contracts/{contract_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -280,23 +364,27 @@ async def delete_contract(
 
 @router.post("/contracts/{contract_id}/confirm", response_model=ContractResponse)
 async def confirm_contract(
-    contract_id: uuid.UUID, user: Manager, contracts: ContractsDep
+    contract_id: uuid.UUID, user: Manager, contracts: ContractsDep, people: PeopleDep
 ) -> ContractResponse:
     """DRAFT → ACTIVE (계약서 필요). 종료일이 이미 지났으면 ENDED로 확정한다."""
-    return ContractResponse.of(await contracts.confirm(contract_id, actor_id=user.id))
+    return await _one(await contracts.confirm(contract_id, actor_id=user.id), people)
 
 
 @router.post("/contracts/{contract_id}/terminate", response_model=ContractResponse)
 async def terminate_contract(
-    contract_id: uuid.UUID, user: Manager, contracts: ContractsDep
+    contract_id: uuid.UUID, user: Manager, contracts: ContractsDep, people: PeopleDep
 ) -> ContractResponse:
     """ACTIVE → TERMINATED (중도 해지)."""
-    return ContractResponse.of(await contracts.terminate(contract_id, actor_id=user.id))
+    return await _one(await contracts.terminate(contract_id, actor_id=user.id), people)
 
 
 @router.post("/contracts/{contract_id}/link", response_model=ContractResponse)
 async def link_contract(
-    contract_id: uuid.UUID, body: ContractLink, user: Manager, contracts: ContractsDep
+    contract_id: uuid.UUID,
+    body: ContractLink,
+    user: Manager,
+    contracts: ContractsDep,
+    people: PeopleDep,
 ) -> ContractResponse:
     """가입한 멘토·강사 프로필에 수동 연결·변경 (계약 상태와 무관, A27)."""
     if (body.mentor_id is None) == (body.instructor_id is None):
@@ -306,14 +394,14 @@ async def link_contract(
     view = await contracts.link(
         contract_id, mentor_id=body.mentor_id, instructor_id=body.instructor_id, actor_id=user.id
     )
-    return ContractResponse.of(view)
+    return await _one(view, people)
 
 
 @router.delete("/contracts/{contract_id}/link", response_model=ContractResponse)
 async def unlink_contract(
-    contract_id: uuid.UUID, user: Manager, contracts: ContractsDep
+    contract_id: uuid.UUID, user: Manager, contracts: ContractsDep, people: PeopleDep
 ) -> ContractResponse:
-    return ContractResponse.of(await contracts.link(contract_id, actor_id=user.id))
+    return await _one(await contracts.link(contract_id, actor_id=user.id), people)
 
 
 @router.get("/contracts/{contract_id}/file-url", response_model=FileUrlResponse)

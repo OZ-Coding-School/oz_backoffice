@@ -10,6 +10,7 @@ from tortoise.contrib.fastapi import RegisterTortoise
 
 from app.api import health, v1
 from app.composition.cohort_summary import CohortSummaryComposer
+from app.composition.contract_people import ContractPeopleComposer
 from app.composition.member_links import MemberLinksComposer
 from app.composition.mentor_cohorts import MentorCohortComposer
 from app.composition.student_detail import StudentDetailComposer
@@ -124,6 +125,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.member_links = MemberLinksComposer()
     app.state.cohort_summary = CohortSummaryComposer()
     app.state.mentor_cohorts = MentorCohortComposer()
+    app.state.contract_people = ContractPeopleComposer()
     app.state.student_detail = StudentDetailComposer(app.state.student_queries)
     app.state.audit_queries = AuditQueries(TortoiseAuditLogRepository())
 
