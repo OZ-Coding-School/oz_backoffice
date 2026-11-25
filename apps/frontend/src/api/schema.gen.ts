@@ -4222,6 +4222,16 @@ export interface components {
             is_active: boolean;
             /** Airtable Cohort Prefix */
             airtable_cohort_prefix: string | null;
+            /**
+             * Hrd Net Id
+             * @description HRD 훈련과정 ID (A97)
+             */
+            hrd_net_id?: string | null;
+            /**
+             * Hrd Bootcamp Name
+             * @description HRD 과정 이름 (A97)
+             */
+            hrd_bootcamp_name?: string | null;
         };
         /** BootcampTeamRequest */
         BootcampTeamRequest: {
@@ -4424,6 +4434,16 @@ export interface components {
             status: components["schemas"]["CohortStatus"];
             /** Discord Guild Id */
             discord_guild_id: string | null;
+            /**
+             * Hrd Net Id
+             * @description 연결된 HRD 회차의 훈련과정 ID (A97)
+             */
+            hrd_net_id?: string | null;
+            /**
+             * Hrd Cohort Number
+             * @description HRD 회차 번호 (A97)
+             */
+            hrd_cohort_number?: number | null;
         };
         /**
          * CohortStatus
