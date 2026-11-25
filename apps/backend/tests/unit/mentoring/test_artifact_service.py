@@ -244,7 +244,7 @@ async def test_view_and_stream_permissions(h: Harness) -> None:
     assert student_user is not None
     items = await h.service.list_for_user(student_user, session.id)
     assert len(items) == 2
-    assert len(await h.service.list_for_user(h.mentor.user_id, session.id)) == 2
+    assert len(await h.service.list_for_user(h.mentor.account_id, session.id)) == 2
     assert len(await h.service.list_for_cohort(h.cohort_id, session.id)) == 2
     with pytest.raises(NotFoundError):
         await h.service.list_for_user(new_id(), session.id)  # 참여자가 아님
@@ -271,7 +271,7 @@ async def test_link_check_and_markdown(h: Harness) -> None:
     assert (await h.service.viewable_for_user(student_user, session.id, video.id)).id == video.id
     with pytest.raises(NotFoundError):
         await h.service.viewable_for_user(new_id(), session.id, video.id)  # 참여자가 아님
-    artifact, markdown = await h.service.markdown_for_user(h.mentor.user_id, session.id, memo.id)
+    artifact, markdown = await h.service.markdown_for_user(h.mentor.account_id, session.id, memo.id)
     assert (artifact.id, markdown) == (memo.id, "## s1")
     with pytest.raises(NotFoundError):
         await h.service.markdown_for_user(student_user, session.id, video.id)  # 영상은 없음

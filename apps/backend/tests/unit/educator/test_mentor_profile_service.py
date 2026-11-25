@@ -49,11 +49,11 @@ class Harness:
 
     async def upload_image(self, body: bytes = PNG, content_type: str = "image/png") -> Mentor:
         ticket = await self.service.request_image_upload(
-            self.mentor.id, content_type, actor_id=self.mentor.user_id
+            self.mentor.id, content_type, actor_id=self.mentor.account_id
         )
         self.storage.upload(ticket.fields["key"], body, content_type)
         return await self.service.confirm_image(
-            self.mentor.id, ticket.upload_id, actor_id=self.mentor.user_id
+            self.mentor.id, ticket.upload_id, actor_id=self.mentor.account_id
         )
 
 
@@ -87,7 +87,7 @@ async def test_image_upload_replaces_and_deletes_previous(h: Harness) -> None:
     assert second.profile_image_key.endswith(".jpg")
     assert h.storage.deleted == [first_key]  # 이전 사진은 커밋 후 지운다
 
-    cleared = await h.service.delete_image(h.mentor.id, actor_id=h.mentor.user_id)
+    cleared = await h.service.delete_image(h.mentor.id, actor_id=h.mentor.account_id)
     assert cleared.profile_image_key is None
     assert h.storage.deleted == [first_key, second.profile_image_key]
     assert [log.action for log in h.audit_logs.logs] == [
@@ -116,23 +116,25 @@ async def test_invalid_image_is_rejected_and_deleted(
 
 async def test_upload_rules(h: Harness) -> None:
     with pytest.raises(BusinessRuleViolation) as unsupported:
-        await h.service.request_image_upload(h.mentor.id, "image/gif", actor_id=h.mentor.user_id)
+        await h.service.request_image_upload(h.mentor.id, "image/gif", actor_id=h.mentor.account_id)
     assert unsupported.value.code == "unsupported_file_type"
     with pytest.raises(NotFoundError) as missing:
-        await h.service.request_image_upload(new_id(), "image/png", actor_id=h.mentor.user_id)
+        await h.service.request_image_upload(new_id(), "image/png", actor_id=h.mentor.account_id)
     assert missing.value.code == "mentor_not_found"
 
     # 다른 멘토의 사진 업로드 ID로는 확정할 수 없다 (용도에 멘토 ID 포함)
     other = Mentor(user_id=new_id())
     await h.mentors.save(other)
-    ticket = await h.service.request_image_upload(other.id, "image/png", actor_id=h.mentor.user_id)
+    ticket = await h.service.request_image_upload(
+        other.id, "image/png", actor_id=h.mentor.account_id
+    )
     h.storage.upload(ticket.fields["key"], PNG, "image/png")
     with pytest.raises(NotFoundError):
-        await h.service.confirm_image(h.mentor.id, ticket.upload_id, actor_id=h.mentor.user_id)
+        await h.service.confirm_image(h.mentor.id, ticket.upload_id, actor_id=h.mentor.account_id)
 
 
 async def test_get_by_user(h: Harness) -> None:
-    assert (await h.service.get_by_user(h.mentor.user_id)).id == h.mentor.id
+    assert (await h.service.get_by_user(h.mentor.account_id)).id == h.mentor.id
     with pytest.raises(NotFoundError) as exc:
         await h.service.get_by_user(new_id())
     assert exc.value.code == "mentor_profile_not_found"

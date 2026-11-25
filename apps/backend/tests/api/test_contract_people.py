@@ -47,16 +47,13 @@ async def test_names_and_mentor_filter(
     )
     instructor = await create_instructor(await create_user(name="박강사"))
 
-    created = await client.post(f"{API}/contracts", json=_body(me), headers=admin)
-    assert created.status_code == 201, created.text
-    assert (created.json()["manager_name"], created.json()["linked_profile"]) == ("김관리", None)
-
-    linked = await client.post(
-        f"{API}/contracts/{created.json()['id']}/link",
-        json={"mentor_id": str(mentor.id)},
-        headers=admin,
+    created = await client.post(
+        f"{API}/contracts", json=_body(me, mentor_id=str(mentor.id)), headers=admin
     )
-    assert linked.json()["linked_profile"] == {"name": "김멘토", "display_name": "멘토K"}
+    assert created.status_code == 201, created.text
+    assert created.json()["manager_name"] == "김관리"
+
+    assert created.json()["linked_profile"] == {"name": "김멘토", "display_name": "멘토K"}
 
     other = await client.post(
         f"{API}/contracts",

@@ -72,9 +72,10 @@ class MentorProfileResponse(MentorCard):
 
 
 async def _display_names(mentors: list[Mentor], users: UserQueries) -> dict[uuid.UUID, str]:
-    found = await users.get_many([m.user_id for m in mentors])
+    found = await users.get_many([m.account_id for m in mentors])
     return {
-        m.id: m.display_name(user.name if (user := found.get(m.user_id)) else "") for m in mentors
+        m.id: m.display_name(user.name if (user := found.get(m.account_id)) else "")
+        for m in mentors
     }
 
 

@@ -179,7 +179,7 @@ async def test_expire_ended_is_idempotent(h: Harness) -> None:
 
 async def test_list_mine_requires_mentor_profile(h: Harness) -> None:
     await h.assign()
-    assert len(await h.service.list_mine(h.mentor.user_id, include_inactive=False)) == 1
+    assert len(await h.service.list_mine(h.mentor.account_id, include_inactive=False)) == 1
     with pytest.raises(NotFoundError) as missing:
         await h.service.list_mine(new_id(), include_inactive=False)
     assert missing.value.code == "mentor_profile_not_found"

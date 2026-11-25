@@ -170,18 +170,18 @@ async def test_student_starts_direct_chat_and_mentor_replies(h: Harness) -> None
     assert mine[0].last_message is not None
     assert mine[0].last_message.id == again.id
 
-    theirs, _ = await h.service.list_threads(h.mentor.user_id, limit=20, offset=0)
+    theirs, _ = await h.service.list_threads(h.mentor.account_id, limit=20, offset=0)
     assert [(v.thread.id, v.unread_count) for v in theirs] == [(thread_id, 2)]
     h.tick()
-    reply = await h.service.send(h.mentor.user_id, thread_id, "답변입니다")
-    assert (await h.service.get_thread(h.mentor.user_id, thread_id)).unread_count == 0
+    reply = await h.service.send(h.mentor.account_id, thread_id, "답변입니다")
+    assert (await h.service.get_thread(h.mentor.account_id, thread_id)).unread_count == 0
     assert (await h.service.get_thread(h.student_user, thread_id)).unread_count == 1
     assert h.store.threads[thread_id].last_message_at == reply.created_at
 
     # 멘토가 수강생을 골라 먼저 시작해도 같은 방
     h.tick()
     by_mentor = await h.service.start(
-        h.mentor.user_id, ChatTarget(student_id=h.student.id), "확인했나요?"
+        h.mentor.account_id, ChatTarget(student_id=h.student.id), "확인했나요?"
     )
     assert by_mentor.thread_id == thread_id
 
@@ -191,8 +191,8 @@ async def test_start_rejects_targets_without_request_history(h: Harness) -> None
         (h.student_user, h.to_mentor()),  # 배정은 있지만 신청 이력이 없다
         (h.student_user, ChatTarget(cohort_id=new_id(), mentor_id=h.mentor.id)),  # 다른 기수
         (h.student_user, ChatTarget(student_id=h.student.id)),  # 멘토가 아님
-        (h.mentor.user_id, ChatTarget(student_id=h.student.id)),  # 멘토 쪽도 같은 기준
-        (h.mentor.user_id, ChatTarget(student_id=new_id())),  # 없는 수강생
+        (h.mentor.account_id, ChatTarget(student_id=h.student.id)),  # 멘토 쪽도 같은 기준
+        (h.mentor.account_id, ChatTarget(student_id=new_id())),  # 없는 수강생
         (h.student_user, ChatTarget(team_id=new_id())),  # 없는 팀
     ]:
         with pytest.raises(NotFoundError) as error:
@@ -223,7 +223,7 @@ async def test_team_chat_members_and_mentor_change(h: Harness) -> None:
     first = await h.service.start(h.student_user, ChatTarget(team_id=team.id), "팀 질문")
     assert other.user_id is not None
     assert outsider.user_id is not None
-    for user in (other.user_id, h.mentor.user_id):
+    for user in (other.user_id, h.mentor.account_id):
         views, _ = await h.service.list_threads(user, limit=20, offset=0)
         assert [(v.thread.id, v.unread_count) for v in views] == [(first.thread_id, 1)]
     assert await h.service.list_threads(outsider.user_id, limit=20, offset=0) == ([], 0)
@@ -236,13 +236,16 @@ async def test_team_chat_members_and_mentor_change(h: Harness) -> None:
     team.assign_mentor(h.other_mentor.id)
     await h.teams.save(team)
     assert [
-        v.thread.id for v in (await h.service.list_threads(h.mentor.user_id, limit=20, offset=0))[0]
+        v.thread.id
+        for v in (await h.service.list_threads(h.mentor.account_id, limit=20, offset=0))[0]
     ] == [first.thread_id]
     with pytest.raises(NotFoundError):
-        await h.service.start(h.other_mentor.user_id, ChatTarget(team_id=team.id), "새 멘토")
+        await h.service.start(h.other_mentor.account_id, ChatTarget(team_id=team.id), "새 멘토")
     await h.applied(team=team, mentor=h.other_mentor)
     h.tick()
-    second = await h.service.start(h.other_mentor.user_id, ChatTarget(team_id=team.id), "새 멘토")
+    second = await h.service.start(
+        h.other_mentor.account_id, ChatTarget(team_id=team.id), "새 멘토"
+    )
     assert second.thread_id != first.thread_id
     views, _ = await h.service.list_threads(h.student_user, limit=20, offset=0)
     assert {v.thread.id for v in views} == {first.thread_id, second.thread_id}
@@ -260,10 +263,10 @@ async def test_threads_stay_after_enrollment_or_assignment_ends(h: Harness) -> N
     h.student.end(EnrollmentStatus.COMPLETED, on=date(2026, 11, 15))
     h.assignment.deactivate(CohortMentorDeactivationReason.MANUAL, now=NOW)
     await h.assignments.save(h.assignment)
-    for user in (h.student_user, h.mentor.user_id):
+    for user in (h.student_user, h.mentor.account_id):
         assert (await h.service.list_threads(user, limit=20, offset=0))[1] == 1
     h.tick()
-    assert (await h.service.send(h.mentor.user_id, sent.thread_id, "답변")).body == "답변"
+    assert (await h.service.send(h.mentor.account_id, sent.thread_id, "답변")).body == "답변"
     staff, total = await h.service.list_by_cohort(h.cohort_id, mentor_id=None, limit=20, offset=0)
     assert total == 1
     assert staff[0].unread_count == 0
@@ -277,27 +280,27 @@ async def test_messages_cursor_delete_and_read(h: Harness) -> None:
         h.tick()
         sent.append(await h.service.start(h.student_user, h.to_mentor(), f"메시지 {i}"))
     thread_id = sent[0].thread_id
-    page = await h.service.list_messages(h.mentor.user_id, thread_id, before=None, limit=2)
+    page = await h.service.list_messages(h.mentor.account_id, thread_id, before=None, limit=2)
     assert [m.body for m in page] == ["메시지 4", "메시지 3"]
-    older = await h.service.list_messages(h.mentor.user_id, thread_id, before=page[-1].id)
+    older = await h.service.list_messages(h.mentor.account_id, thread_id, before=page[-1].id)
     assert [m.body for m in older] == ["메시지 2", "메시지 1", "메시지 0"]
 
     with pytest.raises(PermissionDeniedError):
-        await h.service.delete_message(h.mentor.user_id, thread_id, sent[4].id)
+        await h.service.delete_message(h.mentor.account_id, thread_id, sent[4].id)
     deleted = await h.service.delete_message(h.student_user, thread_id, sent[4].id)
     assert deleted.is_deleted
-    stored = await h.service.list_messages(h.mentor.user_id, thread_id, before=None, limit=1)
+    stored = await h.service.list_messages(h.mentor.account_id, thread_id, before=None, limit=1)
     assert stored[0].id == sent[4].id
     assert stored[0].body is None
-    assert (await h.service.get_thread(h.mentor.user_id, thread_id)).unread_count == 4
+    assert (await h.service.get_thread(h.mentor.account_id, thread_id)).unread_count == 4
 
-    view = await h.service.mark_read(h.mentor.user_id, thread_id, sent[2].id)
+    view = await h.service.mark_read(h.mentor.account_id, thread_id, sent[2].id)
     assert view.unread_count == 1
-    view = await h.service.mark_read(h.mentor.user_id, thread_id, sent[0].id)  # 뒤로 가지 않음
+    view = await h.service.mark_read(h.mentor.account_id, thread_id, sent[0].id)  # 뒤로 가지 않음
     assert view.unread_count == 1
     other = await h.service.start(h.student_user, h.to_mentor(h.other_mentor), "다른 방")
     for call in (
-        h.service.mark_read(h.mentor.user_id, thread_id, other.id),
+        h.service.mark_read(h.mentor.account_id, thread_id, other.id),
         h.service.delete_message(h.student_user, thread_id, other.id),
     ):
         with pytest.raises(NotFoundError) as error:
@@ -339,7 +342,7 @@ async def test_events_go_to_participants_after_commit(h: Harness) -> None:
     await h.applied(team=team)
     assert other.user_id is not None
     sent = await h.service.start(h.student_user, ChatTarget(team_id=team.id), "팀 질문")
-    everyone = {h.student_user, other.user_id, h.mentor.user_id}
+    everyone = {h.student_user, other.user_id, h.mentor.account_id}
     assert h.events.sent == [
         (everyone, ChatEvent(ChatEventKind.MESSAGE, sent.thread_id, sent.id)),
     ]
@@ -356,7 +359,7 @@ async def test_events_go_to_participants_after_commit(h: Harness) -> None:
     # 알림이 실패해도 보내기는 성공 (이미 커밋됨)
     h.events.fail = True
     h.tick()
-    kept = await h.service.send(h.mentor.user_id, sent.thread_id, "답변")
+    kept = await h.service.send(h.mentor.account_id, sent.thread_id, "답변")
     assert kept.id in h.store.messages
 
 
@@ -371,13 +374,13 @@ async def test_post_notice_creates_thread_and_notifies(h: Harness) -> None:
     assert notice.is_system
     assert h.events.sent == [
         (
-            {h.student_user, h.mentor.user_id},
+            {h.student_user, h.mentor.account_id},
             ChatEvent(ChatEventKind.MESSAGE, notice.thread_id, notice.id),
         )
     ]
     view = await h.service.get_thread(h.student_user, notice.thread_id)
     assert view.unread_count == 1  # 안내도 안 읽음에 들어간다
-    assert (await h.service.get_message(h.mentor.user_id, notice.thread_id, notice.id)).body == (
+    assert (await h.service.get_message(h.mentor.account_id, notice.thread_id, notice.id)).body == (
         "[멘토링 신청] 주제"
     )
 

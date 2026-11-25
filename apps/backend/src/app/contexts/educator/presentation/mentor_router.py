@@ -88,7 +88,7 @@ class ImageUploadRequest(BaseModel):
 
 class MentorProfileResponse(BaseModel):
     id: uuid.UUID
-    user_id: uuid.UUID
+    user_id: uuid.UUID | None
     name: str = Field(description="실명 (회원 이름)")
     display_name: str = Field(description="수강생에게 보이는 이름 (표시 이름 선택 반영)")
     nickname: str | None
@@ -108,15 +108,16 @@ class MentorCohortItem(BaseModel):
 
 class MentorListItem(BaseModel):
     id: uuid.UUID
-    user_id: uuid.UUID
-    name: str
-    email: str
+    user_id: uuid.UUID | None = Field(description="가입 전 멘토(A104)는 null")
+    name: str = Field(description="실명 (가입 전이면 계약자 이름)")
+    email: str | None = Field(description="가입 전 멘토는 null")
     phone_number: str | None
     display_name: str
     is_active: bool
     contract_count: int
     created_at: datetime | None
     accepting_requests: bool = Field(description="신청 받기 (A37)")
+    is_registered: bool = Field(description="가입한 멘토인지 (A104)")
     active_cohorts: list[MentorCohortItem] = Field(
         default_factory=list, description="활성 배정 기수, 최근 배정부터 (A100)"
     )
@@ -129,8 +130,8 @@ def display_name(mentor: Mentor, real_name: str) -> str:
 async def _profile(
     mentor: Mentor, profiles: MentorProfileService, users: UserQueries
 ) -> MentorProfileResponse:
-    user = await users.get(mentor.user_id)
-    name = user.name if user else ""
+    user = await users.get(mentor.user_id) if mentor.user_id else None
+    name = user.name if user else (mentor.contact_name or "")
     return MentorProfileResponse(
         id=mentor.id,
         user_id=mentor.user_id,
@@ -205,26 +206,27 @@ async def delete_my_image(
 async def _list_items(
     request: Request, summaries: list[MentorSummary], users: UsersDep
 ) -> list[MentorListItem]:
-    found = await users.get_many([s.mentor.user_id for s in summaries])
+    found = await users.get_many([s.mentor.user_id for s in summaries if s.mentor.user_id])
     reader = cast("MentorCohortReader", request.app.state.mentor_cohorts)
     cohorts = await reader.active_cohorts([s.mentor.id for s in summaries])
     items = []
     for summary in summaries:
         mentor = summary.mentor
-        user = found.get(mentor.user_id)
-        name = user.name if user else ""
+        user = found.get(mentor.user_id) if mentor.user_id else None
+        name = user.name if user else (mentor.contact_name or "")
         items.append(
             MentorListItem(
                 id=mentor.id,
                 user_id=mentor.user_id,
                 name=name,
-                email=user.email if user else "",
-                phone_number=user.phone_number if user else None,
+                email=user.email if user else None,
+                phone_number=user.phone_number if user else mentor.contact_phone,
                 display_name=display_name(mentor, name),
                 is_active=mentor.is_active,
                 contract_count=summary.contract_count,
                 created_at=mentor.created_at,
                 accepting_requests=mentor.accepting_requests,
+                is_registered=mentor.is_registered,
                 active_cohorts=[
                     MentorCohortItem(
                         cohort_id=c.cohort_id,
@@ -246,12 +248,21 @@ async def list_mentors(
     users: UsersDep,
     q: Annotated[str | None, Query(max_length=50, description="이름·이메일·휴대폰·닉네임")] = None,
     is_active: bool | None = None,
+    status: Annotated[
+        Literal["active", "inactive", "pending"] | None,
+        Query(description="활성 · 비활성(가입한 멘토) · 가입 전 (A104). is_active보다 먼저"),
+    ] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> Page[MentorListItem]:
+    registered: bool | None = None
+    if status is not None:
+        registered = status != "pending"
+        is_active = True if status == "active" else False if status == "inactive" else None
     summaries, total = await profiles.list_mentors(
         query=q.strip() if q and q.strip() else None,
         is_active=is_active,
+        registered=registered,
         limit=limit,
         offset=offset,
     )

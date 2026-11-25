@@ -12,6 +12,7 @@ from app.contexts.educator.application.contract_people import (
     ManagerCandidate,
 )
 from app.contexts.educator.domain.entities import EducatorContract
+from app.contexts.educator.domain.profiles import Mentor
 from app.contexts.educator.infrastructure.repositories import (
     TortoiseInstructorRepository,
     TortoiseMentorRepository,
@@ -23,6 +24,12 @@ from app.contexts.organization.infrastructure.repositories import (
     TortoiseEmployeeRepository,
     TortoiseTeamRepository,
 )
+
+
+def _person(mentor: Mentor, name: str | None) -> LinkedPerson:
+    """가입 전 멘토(A104)는 연락처 이름"""
+    real = name or ""
+    return LinkedPerson(real, mentor.display_name(real))
 
 
 class ContractPeopleComposer:
@@ -38,16 +45,15 @@ class ContractPeopleComposer:
         )
         user_ids = (
             {e.user_id for e in employees}
-            | {m.user_id for m in mentors.values()}
+            | {m.user_id for m in mentors.values() if m.user_id}
             | set(instructors.values())
         )
         names = {u.id: u.name for u in await TortoiseUserRepository().list_by_ids(list(user_ids))}
         return ContractPeople(
             managers={e.id: names[e.user_id] for e in employees if e.user_id in names},
             mentors={
-                m.id: LinkedPerson(names[m.user_id], m.display_name(names[m.user_id]))
+                m.id: _person(m, names.get(m.user_id) if m.user_id else m.contact_name)
                 for m in mentors.values()
-                if m.user_id in names
             },
             instructors={
                 i: LinkedPerson(names[u], names[u]) for i, u in instructors.items() if u in names

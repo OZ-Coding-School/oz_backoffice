@@ -101,10 +101,16 @@ class MentorProfileService:
         return await self._storage.presign_get(mentor.profile_image_key)
 
     async def list_mentors(
-        self, *, query: str | None, is_active: bool | None, limit: int, offset: int
+        self,
+        *,
+        query: str | None,
+        is_active: bool | None,
+        limit: int,
+        offset: int,
+        registered: bool | None = None,
     ) -> tuple[list[MentorSummary], int]:
         mentors, total = await self._mentors.list_page(
-            query=query, is_active=is_active, limit=limit, offset=offset
+            query=query, is_active=is_active, limit=limit, offset=offset, registered=registered
         )
         counts = await self._contracts.count_by_mentors([m.id for m in mentors])
         return [MentorSummary(m, counts.get(m.id, 0)) for m in mentors], total

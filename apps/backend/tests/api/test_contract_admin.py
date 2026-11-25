@@ -191,5 +191,6 @@ async def test_link_and_unlink(client: AsyncClient, admin: dict[str, str]) -> No
     )
     assert both.json()["error"]["code"] == "invalid_contract_link"
 
+    # 멘토 계약은 연결을 해제할 수 없다 (A104)
     unlinked = await client.delete(path, headers=admin)
-    assert unlinked.json()["mentor_id"] is None
+    assert unlinked.json()["error"]["code"] == "mentor_contract_unlink_forbidden"

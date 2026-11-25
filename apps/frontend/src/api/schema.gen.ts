@@ -4695,6 +4695,11 @@ export interface components {
             manager_employee_id: string;
             /** Contract File Id */
             contract_file_id?: string | null;
+            /**
+             * Mentor Id
+             * @description 멘토 계약이 속할 멘토 (A104). 없으면 이름·휴대폰이 같은 멘토, 그것도 없으면 가입 전 멘토를 만든다
+             */
+            mentor_id?: string | null;
         };
         /** ContractFileResponse */
         ContractFileResponse: {
@@ -5856,13 +5861,19 @@ export interface components {
             id: string;
             /**
              * User Id
-             * Format: uuid
+             * @description 가입 전 멘토(A104)는 null
              */
-            user_id: string;
-            /** Name */
+            user_id: string | null;
+            /**
+             * Name
+             * @description 실명 (가입 전이면 계약자 이름)
+             */
             name: string;
-            /** Email */
-            email: string;
+            /**
+             * Email
+             * @description 가입 전 멘토는 null
+             */
+            email: string | null;
             /** Phone Number */
             phone_number: string | null;
             /** Display Name */
@@ -5878,6 +5889,11 @@ export interface components {
              * @description 신청 받기 (A37)
              */
             accepting_requests: boolean;
+            /**
+             * Is Registered
+             * @description 가입한 멘토인지 (A104)
+             */
+            is_registered: boolean;
             /**
              * Active Cohorts
              * @description 활성 배정 기수, 최근 배정부터 (A100)
@@ -8120,11 +8136,8 @@ export interface components {
              * Format: uuid
              */
             id: string;
-            /**
-             * User Id
-             * Format: uuid
-             */
-            user_id: string;
+            /** User Id */
+            user_id: string | null;
             /**
              * Name
              * @description 실명 (회원 이름)
@@ -11682,6 +11695,8 @@ export interface operations {
                 /** @description 이름·이메일·휴대폰·닉네임 */
                 q?: string | null;
                 is_active?: boolean | null;
+                /** @description 활성 · 비활성(가입한 멘토) · 가입 전 (A104). is_active보다 먼저 */
+                status?: ("active" | "inactive" | "pending") | null;
                 limit?: number;
                 offset?: number;
             };

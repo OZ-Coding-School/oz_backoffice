@@ -180,7 +180,7 @@ async def test_permissions_timing_and_edit(h: Harness) -> None:
         await h.submit(session, duration=60, user=new_id())
     with pytest.raises(NotFoundError):
         await h.service.submit(
-            h.mentor.user_id, new_id(), RecordInput(MentoringSessionStatus.NO_SHOW, None)
+            h.mentor.account_id, new_id(), RecordInput(MentoringSessionStatus.NO_SHOW, None)
         )
     h.clock.set(START - timedelta(minutes=1))
     with pytest.raises(BusinessRuleViolation) as early:
@@ -189,19 +189,19 @@ async def test_permissions_timing_and_edit(h: Harness) -> None:
 
     h.clock.set(START + timedelta(hours=1))
     await h.submit(session, duration=60)
-    edited = await h.service.edit(h.mentor.user_id, session.id, topic=None, summary="고친 요약")
+    edited = await h.service.edit(h.mentor.account_id, session.id, topic=None, summary="고친 요약")
     assert edited.body == "고친 요약"
     h.clock.set(START + timedelta(days=8, hours=1))
     with pytest.raises(BusinessRuleViolation) as late:
-        await h.service.edit(h.mentor.user_id, session.id, topic="t", summary=None)
+        await h.service.edit(h.mentor.account_id, session.id, topic="t", summary=None)
     assert late.value.code == "record_edit_expired"
 
 
 async def test_notes_and_unrecorded(h: Harness) -> None:
     session = await h.session()
-    assert await h.service.my_note(h.mentor.user_id, session.id) is None
-    note = await h.service.write_note(h.mentor.user_id, session.id, "다음엔 테스트")
-    again = await h.service.write_note(h.mentor.user_id, session.id, "고친 메모")
+    assert await h.service.my_note(h.mentor.account_id, session.id) is None
+    note = await h.service.write_note(h.mentor.account_id, session.id, "다음엔 테스트")
+    again = await h.service.write_note(h.mentor.account_id, session.id, "고친 메모")
     assert (again.id, again.body) == (note.id, "고친 메모")
     with pytest.raises(PermissionDeniedError):
         await h.service.write_note(new_id(), session.id, "남의 메모")

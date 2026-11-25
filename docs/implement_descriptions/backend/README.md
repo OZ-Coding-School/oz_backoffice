@@ -104,3 +104,4 @@
 | 100 | [멘토 단위 배정 조회 (BE-3t)](100_mentor_assignments.md) | 완료 (#160) |
 | 101 | [멘토 단건 조회 (BE-3u)](101_mentor_detail.md) | 완료 (#161) |
 | 102 | [계약 화면 보완 (BE-3v)](102_contract_people.md) | 완료 (#163) |
+| 103 | [가입 전 멘토와 멘토 계약 (BE-3w)](103_pending_mentors.md) | PR 진행 중 |

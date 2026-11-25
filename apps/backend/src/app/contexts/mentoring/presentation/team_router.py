@@ -178,10 +178,10 @@ class Presenter:
 
     async def _mentor_names(self, teams: list[MentoringTeam]) -> dict[uuid.UUID, MentorSummary]:
         mentors = await self._mentors.get_many(list({t.mentor_id for t in teams}))
-        users = await self._users.get_many([m.user_id for m in mentors.values()])
+        users = await self._users.get_many([m.account_id for m in mentors.values()])
         result = {}
         for mentor in mentors.values():
-            user = users.get(mentor.user_id)
+            user = users.get(mentor.account_id)
             name = user.name if user else ""
             result[mentor.id] = MentorSummary(
                 mentor_id=mentor.id, name=name, display_name=mentor.display_name(name)

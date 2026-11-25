@@ -44,13 +44,15 @@ class CohortSummaryComposer:
             e.id: e for e in await TortoiseEmployeeRepository().list_by_ids(list(employee_ids))
         }
         positions = {p.id: p.name for p in await TortoiseEmployeePositionRepository().list_all()}
-        user_ids = [m.user_id for m in mentors.values()] + [e.user_id for e in employees.values()]
+        user_ids = [m.account_id for m in mentors.values()] + [
+            e.user_id for e in employees.values()
+        ]
         names = {u.id: u.name for u in await TortoiseUserRepository().list_by_ids(user_ids)}
 
         mentor_rows = [
             CohortSummaryMentor(
                 mentor_id=a.mentor_id,
-                name=names.get(mentors[a.mentor_id].user_id, "—"),
+                name=names.get(mentors[a.mentor_id].account_id, "—"),
                 start_date=a.start_date,
             )
             for a in assignments

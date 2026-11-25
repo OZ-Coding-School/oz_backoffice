@@ -42,7 +42,7 @@ async def test_search_by_user_fields_and_nickname() -> None:
 
 async def test_round_trip_and_counts() -> None:
     mentor = await create_mentor(nickname="오즈")
-    loaded = await mentors.get_by_user(mentor.user_id)
+    loaded = await mentors.get_by_user(mentor.account_id)
     assert loaded is not None
     assert (loaded.id, loaded.nickname, loaded.created_at is not None) == (mentor.id, "오즈", True)
 

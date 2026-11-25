@@ -112,10 +112,32 @@ class InMemoryMentorRepository:
     async def save(self, mentor: Mentor) -> None:
         self.items[mentor.id] = dataclasses.replace(mentor)
 
+    async def delete(self, mentor_id: uuid.UUID) -> None:
+        self.items.pop(mentor_id, None)
+
+    async def find_same_person(self, name: str, phone: str) -> list[Mentor]:
+        """가입 전 멘토만 연락처로 찾는다 (회원 정보는 인메모리에 없다)"""
+        return [
+            m
+            for m in self.items.values()
+            if m.user_id is None and (m.contact_name, m.contact_phone) == (name, phone)
+        ]
+
     async def list_page(
-        self, *, query: str | None, is_active: bool | None, limit: int, offset: int
+        self,
+        *,
+        query: str | None,
+        is_active: bool | None,
+        limit: int,
+        offset: int,
+        registered: bool | None = None,
     ) -> tuple[list[Mentor], int]:
-        matched = [m for m in self.items.values() if is_active is None or m.is_active == is_active]
+        matched = [
+            m
+            for m in self.items.values()
+            if (is_active is None or m.is_active == is_active)
+            and (registered is None or m.is_registered == registered)
+        ]
         return matched[offset : offset + limit], len(matched)
 
 

@@ -18,9 +18,12 @@ from app.shared.ids import new_id
 
 class MentorModel(models.Model):
     id = fields.UUIDField(primary_key=True, default=new_id)
-    user: fields.OneToOneRelation[Any] = fields.OneToOneField(
-        "models.UserModel", related_name=False, on_delete=fields.RESTRICT
+    # 가입 전 멘토(A104)는 계정 없이 연락처만 둔다 (check_mentor_account_or_contact)
+    user: fields.OneToOneNullableRelation[Any] = fields.OneToOneField(
+        "models.UserModel", related_name=False, null=True, on_delete=fields.RESTRICT
     )
+    contact_name = fields.CharField(max_length=50, null=True)
+    contact_phone = fields.CharField(max_length=11, null=True)
     nickname = fields.CharField(max_length=30, null=True)
     display_name_preference = fields.CharEnumField(
         DisplayNamePreference, max_length=10, default=DisplayNamePreference.NAME
@@ -36,6 +39,7 @@ class MentorModel(models.Model):
 
     class Meta:
         table = "mentors"
+        indexes = (("contact_name", "contact_phone"),)
 
 
 class InstructorModel(models.Model):

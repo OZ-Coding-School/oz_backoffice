@@ -136,6 +136,11 @@ class ContractFields(BaseModel):
     end_date: date
     manager_employee_id: uuid.UUID
     contract_file_id: uuid.UUID | None = None
+    mentor_id: uuid.UUID | None = Field(
+        default=None,
+        description="멘토 계약이 속할 멘토 (A104). 없으면 이름·휴대폰이 같은 멘토, 그것도 없으면"
+        " 가입 전 멘토를 만든다",
+    )
 
 
 class ContractUpdate(BaseModel):
@@ -330,7 +335,9 @@ async def contract_manager_candidates(
 async def create_contract(
     body: ContractFields, user: Manager, contracts: ContractsDep, people: PeopleDep
 ) -> ContractResponse:
-    return await _one(await contracts.create(body.model_dump(), actor_id=user.id), people)
+    values = body.model_dump(exclude={"mentor_id"})
+    view = await contracts.create(values, actor_id=user.id, mentor_id=body.mentor_id)
+    return await _one(view, people)
 
 
 @router.get("/contracts/{contract_id}", response_model=ContractResponse)

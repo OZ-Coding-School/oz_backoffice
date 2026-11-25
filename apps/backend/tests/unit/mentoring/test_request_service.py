@@ -319,7 +319,7 @@ async def test_get_for_user(h: Harness) -> None:
     outsider = h.students.add(h.cohort_id)
 
     assert (await h.service.get_for_user(h.student.user_id, one.id)).id == one.id  # type: ignore[arg-type]
-    assert (await h.service.get_for_user(h.mentor.user_id, one.id)).id == one.id
+    assert (await h.service.get_for_user(h.mentor.account_id, one.id)).id == one.id
     assert (await h.service.get_for_user(mate.user_id, team_request.id)).id == team_request.id  # type: ignore[arg-type]
     for user, request_id in (
         (mate.user_id, one.id),  # 다른 사람의 1:1
@@ -366,7 +366,7 @@ async def test_mentor_list(h: Harness) -> None:
     await h.fund(student_id=h.student.id)
     await h.create()
     found = await h.service.list_for_mentor(
-        h.mentor.user_id, statuses=[MentoringRequestStatus.PENDING], limit=10, offset=0
+        h.mentor.account_id, statuses=[MentoringRequestStatus.PENDING], limit=10, offset=0
     )
     assert (found.total, len(found.items)) == (1, 1)
     with pytest.raises(NotFoundError):
@@ -392,7 +392,7 @@ async def test_lists_filter_many_statuses_and_count_all(h: Harness) -> None:
     every = await h.service.list_mine(h.student.user_id, statuses=None, limit=10, offset=0)  # type: ignore[arg-type]
     assert {r.id for r in every.items} == {canceled.id, pending.id}
     received = await h.service.list_for_mentor(
-        h.mentor.user_id, statuses=[MentoringRequestStatus.PENDING], limit=10, offset=0
+        h.mentor.account_id, statuses=[MentoringRequestStatus.PENDING], limit=10, offset=0
     )
     assert ([r.id for r in received.items], received.counts) == ([pending.id], expected)
     nobody = await h.service.list_mine(new_id(), statuses=None, limit=10, offset=0)
@@ -414,7 +414,7 @@ async def test_cancel_after_approval(h: Harness) -> None:
     assert late.value.code == "cancel_deadline_passed"
 
     h.clock.set(T - timedelta(hours=24))
-    canceled = await h.service.cancel(h.mentor.user_id, request.id, "멘토 사정")  # 멘토도 가능
+    canceled = await h.service.cancel(h.mentor.account_id, request.id, "멘토 사정")  # 멘토도 가능
     assert canceled.status is MentoringRequestStatus.CANCELED
     assert canceled.canceled_by is MentoringCancelActor.MENTOR
     assert h.sessions.items[session.id].status is MentoringSessionStatus.CANCELED
@@ -464,7 +464,7 @@ async def test_change(h: Harness) -> None:
     assert user is not None
     data = ChangeInput(topic="새 주제", detail="새 내용", desired_times=[T], duration=30)
     with pytest.raises(PermissionDeniedError):
-        await h.service.change(h.mentor.user_id, request.id, data)  # 멘토는 변경 불가
+        await h.service.change(h.mentor.account_id, request.id, data)  # 멘토는 변경 불가
 
     changed = await h.service.change(user, request.id, data)  # 기존 세션 시각도 다시 고를 수 있다
     assert (changed.replaced_request_id, changed.mentor_id, changed.status) == (

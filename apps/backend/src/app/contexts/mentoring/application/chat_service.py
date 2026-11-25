@@ -347,7 +347,7 @@ class ChatService:
         if not scope.open(thread):
             return []
         mentor = await self._mentors.get(thread.mentor_id)
-        users = [mentor.user_id] if mentor else []
+        users = [mentor.account_id] if mentor else []
         if thread.team_id is not None:
             members = await self._students.get_many(scope.teams[thread.team_id].member_ids)
             users += [s.user_id for s in members.values() if s.user_id]

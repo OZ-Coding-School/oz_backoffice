@@ -201,7 +201,7 @@ async def test_accepting_switch_and_view(h: Harness) -> None:
 
 
 async def test_mentor_lookup(h: Harness) -> None:
-    assert await h.service.mentor_of_user(h.mentor.user_id) == h.mentor.id
+    assert await h.service.mentor_of_user(h.mentor.account_id) == h.mentor.id
     with pytest.raises(NotFoundError) as missing:
         await h.service.mentor_of_user(new_id())
     assert missing.value.code == "mentor_profile_not_found"

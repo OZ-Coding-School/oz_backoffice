@@ -32,6 +32,7 @@ const KIM = {
   contract_count: 2,
   created_at: "2026-11-03T01:00:00Z",
   accepting_requests: true,
+  is_registered: true,
   active_cohorts: [{ cohort_id: "c12", bootcamp_name: "백엔드", cohort_number: 12 }],
 };
 const PROFILE = {

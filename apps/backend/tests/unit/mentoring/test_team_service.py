@@ -213,7 +213,7 @@ async def test_my_teams(h: Harness) -> None:
     mine = await h.service.mine(user_id)
     assert [t.member_ids for t in mine.as_student] == [[student.id]]
     assert mine.as_mentor == []
-    as_mentor = await h.service.mine(h.mentor.user_id)
+    as_mentor = await h.service.mine(h.mentor.account_id)
     assert len(as_mentor.as_mentor) == 1
     students = await h.service.students_of(as_mentor.as_mentor)
     assert list(students) == [student.id]
