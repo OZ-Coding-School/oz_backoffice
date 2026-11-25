@@ -140,7 +140,7 @@ describe("운영진 승인 선택지 (F61)", () => {
   });
 });
 
-describe("운영진 승인 (FE-15b)", () => {
+describe("가입 승인 > 운영진 탭 (FE-15b·FE-15e)", () => {
   beforeEach(() => {
     resetAuth();
     mockSignedIn(ADMIN);
@@ -148,14 +148,17 @@ describe("운영진 승인 (FE-15b)", () => {
 
   it("메뉴·탭·표: 부서·팀·직위·담당 이름을 보여 준다", async () => {
     mockRegistrations();
-    await renderRoute("/admin/members/staff-registrations");
-    expect(await screen.findByRole("heading", { name: "운영진 승인", level: 1 })).toBeInTheDocument();
+    await renderRoute("/admin/members/approvals?tab=staff");
+    expect(await screen.findByRole("heading", { name: "가입 승인", level: 1 })).toBeInTheDocument();
     const menu = screen.getByRole("navigation", { name: "메뉴" });
-    expect(await within(menu).findByRole("link", { name: /운영진 승인\s*대기\s*2/ })).toHaveAttribute(
+    // 운영진 승인은 가입 승인의 운영진 탭이다 (F66). 배지는 대기 합
+    expect(await within(menu).findByRole("link", { name: /가입 승인\s*대기\s*2/ })).toHaveAttribute(
       "aria-current",
       "page",
     );
-    expect(within(menu).queryByRole("link", { name: /가입 승인/ })).not.toBeInTheDocument(); // 회원 가입 승인 권한 없음
+    const types = screen.getByRole("navigation", { name: "가입 유형" });
+    expect(within(types).getByRole("link", { name: "운영진 2" })).toHaveAttribute("aria-current", "page");
+    expect(within(types).queryByRole("link", { name: /수강생/ })).not.toBeInTheDocument(); // 회원 가입 승인 권한 없음
     const tabs = screen.getByRole("navigation", { name: "처리 상태" });
     expect(await within(tabs).findByRole("link", { name: "대기 2" })).toHaveAttribute("aria-current", "page");
     const manager = await screen.findByRole("row", { name: /김운영/ });
@@ -169,7 +172,7 @@ describe("운영진 승인 (FE-15b)", () => {
 
   it("검토: 고친 값으로 승인한다 — 다른 팀 과정은 스위치를 켜야 보인다", async () => {
     const calls = mockRegistrations();
-    await renderRoute("/admin/members/staff-registrations");
+    await renderRoute("/admin/members/approvals?tab=staff");
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "김운영 검토" }));
     const dialog = await screen.findByRole("dialog", { name: "운영진 승인 · 김운영" });
@@ -198,7 +201,7 @@ describe("운영진 승인 (FE-15b)", () => {
 
   it("반려: 같은 창에서 사유를 적는다", async () => {
     const calls = mockRegistrations();
-    await renderRoute("/admin/members/staff-registrations");
+    await renderRoute("/admin/members/approvals?tab=staff");
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "김운영 검토" }));
     await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "반려" }));
@@ -214,7 +217,7 @@ describe("운영진 승인 (FE-15b)", () => {
     mockRegistrations({
       rejected: [registration({ status: "REJECTED", reviewed_at: "2026-11-19T01:00:00Z", reject_reason: "소속 확인" })],
     });
-    await renderRoute("/admin/members/staff-registrations?status=rejected");
+    await renderRoute("/admin/members/approvals?tab=staff&status=rejected");
     const row = await screen.findByRole("row", { name: /김운영/ });
     expect(row).toHaveTextContent("11/19");
     expect(row).toHaveTextContent("소속 확인");

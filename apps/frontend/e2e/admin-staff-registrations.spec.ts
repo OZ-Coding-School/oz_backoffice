@@ -41,7 +41,7 @@ const REG = {
   applicant: { id: "u1", email: "manager@nextrunners.co.kr", name: "김운영", approval_status: "PENDING" },
 };
 
-test("운영진 승인: 메뉴 → 검토 → 승인 (FE-15b)", async ({ page }) => {
+test("가입 승인 > 운영진 탭: 메뉴 → 검토 → 승인 (FE-15b·FE-15e)", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   let approved = false;
   await page.route("**/api/v1/auth/refresh", (route) =>
@@ -62,7 +62,10 @@ test("운영진 승인: 메뉴 → 검토 → 승인 (FE-15b)", async ({ page })
 
   await page.goto("/admin");
   await page.getByRole("navigation", { name: "모듈" }).getByRole("link", { name: "회원" }).click();
-  await expect(page.getByRole("heading", { name: "운영진 승인", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "가입 승인", level: 1 })).toBeVisible();
+  await expect(
+    page.getByRole("navigation", { name: "가입 유형" }).getByRole("link", { name: "운영진 1" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "김운영 검토" }).click();
   await page.getByRole("dialog", { name: "운영진 승인 · 김운영" }).getByRole("button", { name: "승인" }).click();
   await expect(page.getByText("김운영님을 운영진으로 승인했어요")).toBeVisible();
