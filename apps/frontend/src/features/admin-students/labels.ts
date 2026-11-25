@@ -6,17 +6,17 @@ type Tone = NonNullable<BadgeProps["variant"]>;
 
 /** 수강 상태 배지와 묶음 머리 배경 (F77) */
 export const ENROLLMENT: Record<EnrollmentStatus, { label: string; badge: Tone; tint: string }> = {
-  ENROLLED: { label: "수강 중", badge: "info", tint: "bg-info-subtle" },
-  COMPLETED: { label: "수료", badge: "success", tint: "bg-success-subtle" },
-  DROPPED: { label: "중도 포기", badge: "destructive", tint: "bg-destructive-subtle" },
-  EARLY_EMPLOYED: { label: "조기 취업", badge: "success", tint: "bg-success-subtle" },
-  TRANSFERRED: { label: "기수 이동", badge: "warning", tint: "bg-warning-subtle" },
+  ENROLLED: { label: "수강 중", badge: "info", tint: "bg-info/20" },
+  COMPLETED: { label: "수료", badge: "success", tint: "bg-success/20" },
+  DROPPED: { label: "중도 포기", badge: "destructive", tint: "bg-destructive/20" },
+  EARLY_EMPLOYED: { label: "조기 취업", badge: "success", tint: "bg-success/20" },
+  TRANSFERRED: { label: "기수 이동", badge: "warning", tint: "bg-warning/25" },
 };
 
 /** 가입 상태 묶음 (F77) */
 export const SIGNUP: Record<"signed" | "unsigned", { label: string; badge: Tone; tint: string }> = {
-  signed: { label: "가입", badge: "default", tint: "bg-accent" },
-  unsigned: { label: "미가입", badge: "secondary", tint: "bg-muted" },
+  signed: { label: "가입", badge: "default", tint: "bg-primary/20" },
+  unsigned: { label: "미가입", badge: "secondary", tint: "bg-muted-foreground/20" },
 };
 
 export const ENROLLMENT_ORDER: EnrollmentStatus[] = [
