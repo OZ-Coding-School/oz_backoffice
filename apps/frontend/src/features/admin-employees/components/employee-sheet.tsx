@@ -1,18 +1,17 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useBlocker } from "@tanstack/react-router";
-import { X } from "lucide-react";
-import { useId, useMemo, useState, type ReactNode } from "react";
+import { useId, useMemo, useState } from "react";
 import { Controller, useForm, useWatch, type UseFormReturn } from "react-hook-form";
 import { toast } from "sonner";
 
 import { ApiError } from "@/api/errors";
+import { PanelHead, PanelList, PanelRow as Row, PanelSection as Section } from "@/components/panel";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
-import { HelpTip } from "@/components/ui/help-tip";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { withAllCohorts } from "@/features/admin-staff-registrations/api";
 import { EMPLOYMENT_TYPE_LABELS } from "@/features/auth/messages";
@@ -57,26 +56,24 @@ export function EmployeeSheet({
   return (
     <Sheet open onOpenChange={(open) => (open ? undefined : onClose())}>
       <SheetContent aria-describedby={undefined}>
-        <div className="flex items-start gap-3 border-b border-border py-5 pr-4 pl-6">
-          <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <SheetTitle className="text-h2 text-foreground">{name}</SheetTitle>
+        <PanelHead
+          title={name}
+          description={employee.user?.email ?? "—"}
+          badges={
+            <>
               {employee.is_super_admin ? <Badge variant="primary">최고 관리자</Badge> : null}
               {editing ? <Badge variant="info">수정 중</Badge> : null}
-            </div>
-            <SheetDescription className="truncate text-body text-muted-foreground">
-              {employee.user?.email ?? "—"}
-            </SheetDescription>
-          </div>
-          {canEdit && !editing ? (
-            <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-              수정
-            </Button>
-          ) : null}
-          <Button variant="ghost" size="sm" aria-label="닫기" className="px-2" onClick={onClose}>
-            <X />
-          </Button>
-        </div>
+            </>
+          }
+          actions={
+            canEdit && !editing ? (
+              <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+                수정
+              </Button>
+            ) : null
+          }
+          onClose={onClose}
+        />
         {editing ? (
           <EmployeeForm
             employee={employee}
@@ -92,47 +89,6 @@ export function EmployeeSheet({
         )}
       </SheetContent>
     </Sheet>
-  );
-}
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  const id = useId();
-  return (
-    <section aria-labelledby={id} className="shrink-0 overflow-hidden rounded-lg border border-border">
-      <h3 id={id} className="border-b border-border bg-muted px-3.5 py-2.5 text-body-strong text-foreground">
-        {title}
-      </h3>
-      <div className="flex flex-col gap-2.5 p-3.5">{children}</div>
-    </section>
-  );
-}
-
-/** '라벨 | 값' 한 줄. 설명은 라벨 옆 `?`로 (F68) */
-function Row({
-  label,
-  children,
-  htmlFor,
-  help,
-}: {
-  label: string;
-  children: ReactNode;
-  htmlFor?: string;
-  help?: string;
-}) {
-  return (
-    <div className="grid grid-cols-[96px_minmax(0,1fr)] items-center gap-3">
-      <span className="flex items-center gap-1">
-        {htmlFor ? (
-          <label htmlFor={htmlFor} className="text-body text-muted-foreground">
-            {label}
-          </label>
-        ) : (
-          <span className="text-body text-muted-foreground">{label}</span>
-        )}
-        {help ? <HelpTip label={label}>{help}</HelpTip> : null}
-      </span>
-      <div className="min-w-0 text-body-strong text-foreground">{children}</div>
-    </div>
   );
 }
 
@@ -167,7 +123,7 @@ function EmployeeView({ employee, options }: { employee: Employee; options: Staf
       {scope ? (
         <Section title={SCOPE_TITLES[scope]}>
           {assignments.length ? (
-            <AssignmentList
+            <PanelList
               label={SCOPE_TITLES[scope]}
               items={assignments.map((a) => ({ id: a.staff_id, name: assignmentName(a) }))}
             />
@@ -177,39 +133,6 @@ function EmployeeView({ employee, options }: { employee: Employee; options: Staf
         </Section>
       ) : null}
     </>
-  );
-}
-
-/** 담당 목록: 한 줄에 하나 (F67). 수정이면 줄마다 빼기 */
-function AssignmentList({
-  label,
-  items,
-  onRemove,
-}: {
-  label: string;
-  items: { id: string; name: string }[];
-  onRemove?: (id: string) => void;
-}) {
-  return (
-    <ul aria-label={label} className="divide-y divide-border overflow-hidden rounded-md border border-border">
-      {items.map((item) => (
-        <li key={item.id} className="flex min-h-10 items-center gap-2 py-1.5 pr-1.5 pl-3">
-          <span className="min-w-0 flex-1 truncate text-body text-foreground">{item.name}</span>
-          {onRemove ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              aria-label={`${item.name} 빼기`}
-              className="px-2"
-              onClick={() => onRemove(item.id)}
-            >
-              <X />
-            </Button>
-          ) : null}
-        </li>
-      ))}
-    </ul>
   );
 }
 
@@ -542,7 +465,7 @@ function CourseField({
   if (!editable) {
     const items = employee.assignments ?? [];
     return items.length ? (
-      <AssignmentList label="담당 과정" items={items.map((a) => ({ id: a.staff_id, name: assignmentName(a) }))} />
+      <PanelList label="담당 과정" items={items.map((a) => ({ id: a.staff_id, name: assignmentName(a) }))} />
     ) : (
       <p className="text-body text-muted-foreground">담당이 없어요.</p>
     );
@@ -564,7 +487,7 @@ function CourseField({
         return (
           <>
             {chosen.length ? (
-              <AssignmentList
+              <PanelList
                 label="담당 과정"
                 items={chosen}
                 onRemove={(id) => field.onChange(field.value.filter((v) => v !== id))}
