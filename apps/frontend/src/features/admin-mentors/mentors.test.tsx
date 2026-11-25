@@ -88,6 +88,7 @@ function assignment(id: string, extra: Partial<MentorAssignment> = {}): MentorAs
 const ASSIGNMENTS = [
   assignment("a1"),
   assignment("a2", {
+    cohort_id: "c-d3",
     bootcamp_name: "데이터 분석 부트캠프",
     cohort_number: 3,
     pay_unit: "PER_SESSION",
@@ -128,12 +129,44 @@ const CONTRACTS: Contract[] = [
   },
 ];
 
-function access(codes = ["educator.mentor.read", "educator.mentor.manage", "educator.contract.read"]): StaffAccess {
+const COHORTS = [
+  {
+    id: "c-a1",
+    bootcamp_id: "b1",
+    bootcamp_name: "백엔드 부트캠프",
+    cohort_number: 12,
+    start_date: "2026-06-02",
+    end_date: "2026-11-30",
+    status: "ONGOING",
+  },
+  {
+    id: "c-d3",
+    bootcamp_id: "b2",
+    bootcamp_name: "데이터 분석 부트캠프",
+    cohort_number: 3,
+    start_date: "2026-11-16",
+    end_date: "2027-04-30",
+    status: "PLANNED",
+  },
+  {
+    id: "c-d4",
+    bootcamp_id: "b2",
+    bootcamp_name: "데이터 분석 부트캠프",
+    cohort_number: 4,
+    start_date: "2027-05-01",
+    end_date: "2027-10-31",
+    status: "PLANNED",
+  },
+] as StaffAccess["cohorts"];
+
+function access(
+  codes = ["educator.mentor.read", "educator.mentor.manage", "educator.contract.read", "mentoring.assignment.manage"],
+): StaffAccess {
   return {
     is_super_admin: false,
     position: null,
     permissions: codes.map((code) => ({ code, is_global: true, bootcamp_ids: [], cohort_ids: [] })),
-    cohorts: [],
+    cohorts: COHORTS,
   };
 }
 
@@ -159,6 +192,49 @@ function mockApi({ codes, item = KIM }: { codes?: string[]; item?: MentorItem } 
     http.get(apiUrl("/api/v1/admin/mentors/{mentor_id}"), () => HttpResponse.json(item)),
     http.get(apiUrl("/api/v1/admin/mentors/{mentor_id}/profile"), () => HttpResponse.json(PROFILE)),
     http.get(apiUrl("/api/v1/admin/mentors/{mentor_id}/mentor-assignments"), () => HttpResponse.json(ASSIGNMENTS)),
+    http.post(apiUrl("/api/v1/admin/cohorts/{cohort_id}/mentor-assignments"), async ({ request, params }) => {
+      calls.push({ path: `create:${String(params.cohort_id)}`, body: await request.json() });
+      return HttpResponse.json(
+        { ...ASSIGNMENTS[0], id: "a9", mentor_id: "m1", mentor_name: "김멘토", mentor_display_name: "멘토K" },
+        { status: 201 },
+      );
+    }),
+    http.patch(
+      apiUrl("/api/v1/admin/cohorts/{cohort_id}/mentor-assignments/{assignment_id}"),
+      async ({ request, params }) => {
+        calls.push({ path: `update:${String(params.assignment_id)}`, body: await request.json() });
+        return HttpResponse.json({
+          ...ASSIGNMENTS[0],
+          mentor_id: "m1",
+          mentor_name: "김멘토",
+          mentor_display_name: "멘토K",
+        });
+      },
+    ),
+    http.delete(apiUrl("/api/v1/admin/cohorts/{cohort_id}/mentor-assignments/{assignment_id}"), ({ params }) => {
+      calls.push({ path: `end:${String(params.assignment_id)}`, body: null });
+      return HttpResponse.json({
+        ...ASSIGNMENTS[0],
+        is_active: false,
+        mentor_id: "m1",
+        mentor_name: "김멘토",
+        mentor_display_name: "멘토K",
+        canceled_pending_requests: 2,
+      });
+    }),
+    http.post(
+      apiUrl("/api/v1/admin/cohorts/{cohort_id}/mentor-assignments/{assignment_id}/reactivate"),
+      ({ params }) => {
+        calls.push({ path: `reactivate:${String(params.assignment_id)}`, body: null });
+        return HttpResponse.json({
+          ...ASSIGNMENTS[2],
+          is_active: true,
+          mentor_id: "m1",
+          mentor_name: "김멘토",
+          mentor_display_name: "멘토K",
+        });
+      },
+    ),
     http.get(apiUrl("/api/v1/admin/contracts"), ({ request }) => {
       calls.push({ path: "contracts", body: new URL(request.url).searchParams.get("mentor_id") });
       return HttpResponse.json({ items: CONTRACTS, total: CONTRACTS.length, limit: 100, offset: 0 });
@@ -365,5 +441,101 @@ describe("강사·멘토 > 멘토 (FE-18a)", () => {
       "이름박새멘토휴대폰010-****-0000가입가입 전",
     );
     expect(screen.getByRole("switch", { name: "신청 받기" })).toBeDisabled();
+  });
+
+  it("배정 패널: 기수·기간·정산 조건 조회, [수정]은 같은 구성에서 저장", async () => {
+    const calls = mockApi();
+    await renderRoute("/admin/educators/mentors/m1?tab=assignments&assignment=a1");
+    const sheet = await screen.findByRole("dialog", { name: "백엔드 부트캠프 12기" });
+    expect(await within(sheet).findByRole("region", { name: "기수" })).toHaveTextContent(
+      "과정백엔드 부트캠프기수12기기수 기간2026.06.02 ~ 2026.11.30기수 상태진행 중",
+    );
+    expect(within(sheet).getByRole("region", { name: "정산 조건" })).toHaveTextContent(
+      "실제 진행 시간단가 기준시간당단가30,000원노쇼 1건10,000원",
+    );
+    const user = userEvent.setup();
+    await user.click(within(sheet).getByRole("button", { name: "수정" }));
+    const form = await within(sheet).findByRole("form", { name: "배정 수정" });
+    expect(within(sheet).getByText("수정 중")).toBeInTheDocument();
+    await user.click(within(form).getByRole("radio", { name: "세션당" }));
+    const rate = within(form).getByLabelText("단가");
+    await user.clear(rate);
+    await user.type(rate, "50,000");
+    await user.click(within(form).getByRole("button", { name: "저장" }));
+    expect(await screen.findByText("백엔드 부트캠프 12기 배정을 저장했어요")).toBeInTheDocument();
+    expect(calls).toContainEqual({
+      path: "update:a1",
+      body: {
+        start_date: "2026-11-02",
+        end_date: null,
+        cost_settlement_policy: "ACTUAL_DURATION",
+        pay_unit: "PER_SESSION",
+        pay_rate: 50000,
+        no_show_pay_amount: 10000,
+      },
+    });
+  });
+
+  it("배정 종료는 확인 후, 종료된 배정은 [다시 켜기]", async () => {
+    const calls = mockApi();
+    await renderRoute("/admin/educators/mentors/m1?tab=assignments&assignment=a1");
+    const sheet = await screen.findByRole("dialog", { name: "백엔드 부트캠프 12기" });
+    const user = userEvent.setup();
+    await user.click(await within(sheet).findByRole("button", { name: "배정 종료" }));
+    const dialog = await screen.findByRole("dialog", { name: "백엔드 부트캠프 12기 배정을 종료할까요?" });
+    await user.click(within(dialog).getByRole("button", { name: "배정 종료" }));
+    expect(await screen.findByText("배정을 종료했어요. 대기 중인 신청 2건을 취소했어요")).toBeInTheDocument();
+    expect(calls).toContainEqual({ path: "end:a1", body: null });
+  });
+
+  it("종료된 배정: 종료 섹션과 [다시 켜기]", async () => {
+    const calls = mockApi();
+    await renderRoute("/admin/educators/mentors/m1?tab=assignments&assignment=a3");
+    const sheet = await screen.findByRole("dialog", { name: "백엔드 부트캠프 11기" });
+    expect(await within(sheet).findByRole("region", { name: "종료" })).toHaveTextContent("사유기간 만료로 종료");
+    await userEvent.setup().click(within(sheet).getByRole("button", { name: "다시 켜기" }));
+    expect(await screen.findByText("백엔드 부트캠프 11기 배정을 다시 켰어요")).toBeInTheDocument();
+    expect(calls).toContainEqual({ path: "reactivate:a3", body: null });
+  });
+
+  it("배정 추가: 과정 → 기수(이미 배정 중인 기수는 막힘) → 기간·정산 조건", async () => {
+    const calls = mockApi();
+    const { router } = await renderRoute("/admin/educators/mentors/m1?tab=assignments");
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "배정 추가" }));
+    const form = await screen.findByRole("form", { name: "배정 추가" });
+    expect(within(form).queryByRole("combobox", { name: "기수" })).not.toBeInTheDocument();
+    await user.click(within(form).getByRole("combobox", { name: "과정" }));
+    await user.click(await screen.findByRole("option", { name: "데이터 분석 부트캠프" }));
+    await user.click(within(form).getByRole("combobox", { name: "기수" }));
+    expect(await screen.findByRole("option", { name: "3기 · 2026.11.16 ~ 2027.04.30 · 배정 중" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    await user.click(screen.getByRole("option", { name: "4기 · 2027.05.01 ~ 2027.10.31" }));
+    await user.type(within(form).getByLabelText("시작일"), "2027-05-01");
+    await user.type(within(form).getByLabelText("단가"), "40000");
+    await user.click(within(form).getByRole("button", { name: "추가" }));
+    expect(await screen.findByText("데이터 분석 부트캠프 4기에 배정했어요")).toBeInTheDocument();
+    expect(calls).toContainEqual({
+      path: "create:c-d4",
+      body: {
+        mentor_id: "m1",
+        start_date: "2027-05-01",
+        end_date: null,
+        cost_settlement_policy: "ACTUAL_DURATION",
+        pay_unit: "HOURLY",
+        pay_rate: 40000,
+        no_show_pay_amount: 0,
+      },
+    });
+    await waitFor(() => expect(router.state.location.search).toEqual({ tab: "assignments", assignment: "a9" }));
+  });
+
+  it("가입 전 멘토나 배정 관리 권한이 없으면 [배정 추가]가 없다", async () => {
+    mockApi({ item: NEW });
+    await renderRoute("/admin/educators/mentors/m3?tab=assignments");
+    await screen.findByText(/배정 3건/);
+    expect(screen.queryByRole("button", { name: "배정 추가" })).not.toBeInTheDocument();
   });
 });
