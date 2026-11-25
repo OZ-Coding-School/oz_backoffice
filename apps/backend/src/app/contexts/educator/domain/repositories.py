@@ -60,10 +60,22 @@ class MentorRepository(Protocol):
         ...
 
     async def save(self, mentor: Mentor) -> None: ...
+    async def delete(self, mentor_id: uuid.UUID) -> None: ...
+    async def find_same_person(self, name: str, phone: str) -> list[Mentor]:
+        """이름·휴대폰이 같은 멘토: 가입한 멘토는 회원 정보, 가입 전 멘토는 연락처로 (A104)."""
+        ...
+
     async def list_page(
-        self, *, query: str | None, is_active: bool | None, limit: int, offset: int
+        self,
+        *,
+        query: str | None,
+        is_active: bool | None,
+        limit: int,
+        offset: int,
+        registered: bool | None = None,
     ) -> tuple[list[Mentor], int]:
-        """query: 회원 이름·이메일·휴대폰(숫자)·닉네임 부분 일치."""
+        """query: 회원 이름·이메일·휴대폰(숫자)·닉네임, 가입 전 연락처 부분 일치.
+        registered: True면 가입한 멘토, False면 가입 전 멘토만 (A104)."""
         ...
 
 

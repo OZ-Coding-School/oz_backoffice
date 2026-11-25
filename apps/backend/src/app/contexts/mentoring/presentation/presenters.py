@@ -66,11 +66,11 @@ class NameBook:
         team_ids = list({r.team_id for r in items if r.team_id})
         teams = {t.id: t for t in await self._teams.list_by_ids(team_ids)}
         mentors = await self._mentors.get_many(list({r.mentor_id for r in items}))
-        users = await self._users.get_many([m.user_id for m in mentors.values()])
+        users = await self._users.get_many([m.account_id for m in mentors.values()])
         result: dict[uuid.UUID, Names] = {}
         for r in items:
             mentor = mentors.get(r.mentor_id)
-            user = users.get(mentor.user_id) if mentor else None
+            user = users.get(mentor.account_id) if mentor else None
             real = user.name if user else ""
             student = students.get(r.requester_id)
             team = teams.get(r.team_id) if r.team_id else None

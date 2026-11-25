@@ -256,7 +256,9 @@ Table mentors {
   note: "멘토 정보 테이블"
 
   id uuid [pk, note: "default=uuid7 사용"]
-  user_id uuid [not null, unique, ref: - users.id]
+  user_id uuid [null, unique, ref: - users.id, note: "가입 전 멘토(A104)는 NULL. 가입하면 연결한다(A105)"]
+  contact_name varchar(50) [null, note: "가입 전 연락처: 이름 (계약을 만들 때 계약자 이름, 가입하면 비운다)"]
+  contact_phone varchar(11) [null, note: "가입 전 연락처: 휴대폰 숫자 11자리"]
   nickname varchar(30) [null, note: "닉네임 (빈 값은 NULL로 저장)"]
   display_name_preference DisplayNamePreference [not null, default: 'NAME', note: "수강생에게 보일 이름: 실명 또는 닉네임 (A22)"]
   headline varchar(100) [null, note: "한 줄 소개 (A22)"]
@@ -268,8 +270,14 @@ Table mentors {
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
 
+  indexes {
+    (contact_name, contact_phone)
+  }
+
   checks {
     `display_name_preference = 'NAME' OR nickname IS NOT NULL` [name: "check_mentor_display_nickname"]
+    `user_id IS NOT NULL OR (contact_name IS NOT NULL AND contact_phone IS NOT NULL)` [name: "check_mentor_account_or_contact"]
+    `user_id IS NOT NULL OR (is_active = false AND accepting_requests = false)` [name: "check_mentor_pending_inactive"]
   }
 }
 

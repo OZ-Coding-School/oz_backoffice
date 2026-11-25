@@ -25,6 +25,7 @@ function mentor(id: string, name: string, extra: Partial<MentorItem> = {}): Ment
     contract_count: 1,
     created_at: "2026-11-03T01:00:00Z",
     accepting_requests: true,
+    is_registered: true,
     active_cohorts: [],
     ...extra,
   };

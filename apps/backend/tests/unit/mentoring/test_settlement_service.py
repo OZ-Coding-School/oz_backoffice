@@ -180,12 +180,12 @@ async def test_mentor_sees_only_closed_own() -> None:
     h = Harness()
     await h.session(3)
     (settlement,) = (await h.service.aggregate(h.cohort_id, NOV, actor_id=new_id())).settlements
-    assert await h.service.list_for_mentor(h.mentor.user_id) == []  # 집계 중은 안 보인다
+    assert await h.service.list_for_mentor(h.mentor.account_id) == []  # 집계 중은 안 보인다
     with pytest.raises(NotFoundError):
-        await h.service.get_for_mentor(h.mentor.user_id, settlement.id)
+        await h.service.get_for_mentor(h.mentor.account_id, settlement.id)
     await h.service.close(h.cohort_id, settlement.id, confirm=True, actor_id=new_id())
-    assert [s.id for s in await h.service.list_for_mentor(h.mentor.user_id)] == [settlement.id]
-    detail = await h.service.get_for_mentor(h.mentor.user_id, settlement.id)
+    assert [s.id for s in await h.service.list_for_mentor(h.mentor.account_id)] == [settlement.id]
+    detail = await h.service.get_for_mentor(h.mentor.account_id, settlement.id)
     assert len(detail.items) == 1
     with pytest.raises(NotFoundError):
         await h.service.list_for_mentor(new_id())  # 멘토 프로필 없음

@@ -5,6 +5,9 @@
 - 계약서는 확정된 업로드(contract_files)만 붙일 수 있고, 다른 계약이 쓰는 파일은 붙일 수 없다.
   교체하거나 비우거나 계약을 지우면 이전 파일은 deleted_at만 채우고 객체는 남긴다(A25).
 - 확정(DRAFT → ACTIVE, 지난 계약은 ENDED), 해지(ACTIVE → TERMINATED), 기간 만료 자동 처리.
+- 멘토 계약은 항상 멘토에 속한다(A104): 만들 때 지정한 멘토, 없으면 이름·휴대폰이 같은 멘토
+  하나, 그것도 없으면 가입 전 멘토를 만든다. 연결 해제는 없고 다른 멘토로 옮길 수만 있다.
+  가입 전 멘토의 마지막 계약을 지우거나 옮기면 그 멘토도 지운다.
 모든 변경은 감사 로그를 남긴다. 기간 만료 자동 처리의 행위자는 시스템(None)이다.
 """
 
@@ -18,6 +21,8 @@ from typing import Any
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.educator.application.ports import EmployeeDirectory, FileStorage
 from app.contexts.educator.domain.entities import ContractFile, EducatorContract
+from app.contexts.educator.domain.enums import EducatorType
+from app.contexts.educator.domain.profiles import Mentor
 from app.contexts.educator.domain.repositories import (
     ContractFileRepository,
     ContractFilter,
@@ -27,7 +32,7 @@ from app.contexts.educator.domain.repositories import (
 )
 from app.core.clock import Clock
 from app.core.uow import UnitOfWork
-from app.shared.errors import ConflictError, NotFoundError
+from app.shared.errors import BusinessRuleViolation, ConflictError, NotFoundError
 from app.shared.time import business_date
 
 TARGET = "educator_contract"
@@ -110,11 +115,24 @@ class ContractService:
         return url, file
 
     # ------------------------------------------------------------------ 변경
-    async def create(self, values: dict[str, Any], *, actor_id: uuid.UUID) -> ContractView:
+    async def create(
+        self,
+        values: dict[str, Any],
+        *,
+        actor_id: uuid.UUID,
+        mentor_id: uuid.UUID | None = None,
+    ) -> ContractView:
         contract = EducatorContract(**values)
         async with self._uow:
             await self._ensure_employee(contract.manager_employee_id)
             file = await self._attachable_file(contract.contract_file_id)
+            if contract.educator_type is EducatorType.MENTOR:
+                mentor = await self._mentor_for(contract, mentor_id, actor_id=actor_id)
+                contract.link(mentor_id=mentor.id, instructor_id=None)
+            elif mentor_id is not None:
+                raise BusinessRuleViolation(
+                    "계약 유형과 연결할 프로필 종류가 다릅니다.", code="contract_type_mismatch"
+                )
             await self._contracts.add(contract)
             await self._record(actor_id, "create", contract)
         return ContractView(await self._get(contract.id), file)
@@ -125,6 +143,13 @@ class ContractService:
         async with self._uow:
             current = await self._get(contract_id)
             updated = current.revised(changes)
+            linked = current.mentor_id is not None or current.instructor_id is not None
+            if linked and updated.educator_type is not current.educator_type:
+                raise BusinessRuleViolation(
+                    "멘토·강사에 속한 계약은 유형을 바꿀 수 없습니다.",
+                    code="contract_type_mismatch",
+                )
+            await self._sync_pending_contact(updated)
             if updated.manager_employee_id != current.manager_employee_id:
                 await self._ensure_employee(updated.manager_employee_id)
             if updated.contract_file_id != current.contract_file_id:
@@ -160,6 +185,8 @@ class ContractService:
             await self._contracts.save(contract)
             action = "unlink" if mentor_id is None and instructor_id is None else "link"
             await self._record(actor_id, action, contract, before=before)
+            if before.mentor_id is not None and before.mentor_id != contract.mentor_id:
+                await self._drop_empty_pending(before.mentor_id, actor_id=actor_id)
         return await self.get(contract_id)
 
     async def delete(self, contract_id: uuid.UUID, *, actor_id: uuid.UUID) -> None:
@@ -175,6 +202,8 @@ class ContractService:
                 target_id=contract_id,
                 before=_snapshot(current),
             )
+            if current.mentor_id is not None:
+                await self._drop_empty_pending(current.mentor_id, actor_id=actor_id)
 
     async def expire_ended(self) -> int:
         """종료일이 지난 ACTIVE 계약을 ENDED로 바꾼다(매일 작업, 멱등). 바꾼 건수를 돌려준다."""
@@ -189,6 +218,61 @@ class ContractService:
         return len(contracts)
 
     # ------------------------------------------------------------------ 내부
+    async def _mentor_for(
+        self, contract: EducatorContract, mentor_id: uuid.UUID | None, *, actor_id: uuid.UUID
+    ) -> Mentor:
+        """계약이 속할 멘토 (A104): 지정한 멘토 → 같은 사람 하나 → 새 가입 전 멘토."""
+        if mentor_id is not None:
+            mentor = await self._mentors.get(mentor_id)
+            if mentor is None:
+                raise NotFoundError("멘토를 찾을 수 없습니다.", code="mentor_not_found")
+            return mentor
+        same = await self._mentors.find_same_person(
+            contract.contractor_name, contract.contractor_phone
+        )
+        if len(same) > 1:
+            raise ConflictError(
+                "이름과 휴대폰이 같은 멘토가 여럿이에요. 멘토 상세에서 계약을 추가해 주세요.",
+                code="ambiguous_mentor",
+            )
+        if same:
+            return same[0]
+        mentor = Mentor.pending(name=contract.contractor_name, phone=contract.contractor_phone)
+        await self._mentors.add(mentor)
+        await self._audit.record(
+            actor_user_id=actor_id,
+            action="educator.mentor.create_pending",
+            target_type="mentor",
+            target_id=mentor.id,
+            after={"contact_name": mentor.contact_name},
+        )
+        return mentor
+
+    async def _sync_pending_contact(self, contract: EducatorContract) -> None:
+        """가입 전 멘토의 연락처를 고친 계약자 정보에 맞춘다."""
+        if contract.mentor_id is None:
+            return
+        mentor = await self._mentors.get(contract.mentor_id)
+        if mentor is not None and not mentor.is_registered:
+            mentor.update_contact(name=contract.contractor_name, phone=contract.contractor_phone)
+            await self._mentors.save(mentor)
+
+    async def _drop_empty_pending(self, mentor_id: uuid.UUID, *, actor_id: uuid.UUID) -> None:
+        """계약이 하나도 남지 않은 가입 전 멘토는 지운다 (A104)."""
+        mentor = await self._mentors.get(mentor_id)
+        if mentor is None or mentor.is_registered:
+            return
+        if (await self._contracts.count_by_mentors([mentor_id])).get(mentor_id, 0) > 0:
+            return
+        await self._mentors.delete(mentor_id)
+        await self._audit.record(
+            actor_user_id=actor_id,
+            action="educator.mentor.delete_pending",
+            target_type="mentor",
+            target_id=mentor_id,
+            before={"contact_name": mentor.contact_name},
+        )
+
     async def _transition(
         self, contract_id: uuid.UUID, action: str, *, actor_id: uuid.UUID
     ) -> ContractView:

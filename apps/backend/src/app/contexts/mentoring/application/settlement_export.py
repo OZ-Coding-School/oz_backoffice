@@ -126,12 +126,12 @@ class SettlementExporter:
             )
         }
         mentors = await self._mentors.get_many(list({s.mentor_id for s in settlements}))
-        users = await self._users.get_many([m.user_id for m in mentors.values()])
+        users = await self._users.get_many([m.account_id for m in mentors.values()])
         labels = await self._cohorts.cohort_labels({s.cohort_id for s in settlements})
 
         def mentor_name(mentor_id: uuid.UUID) -> str:
             mentor = mentors.get(mentor_id)
-            user = users.get(mentor.user_id) if mentor else None
+            user = users.get(mentor.account_id) if mentor else None
             return user.name if user else ""
 
         rows: list[list[str]] = []

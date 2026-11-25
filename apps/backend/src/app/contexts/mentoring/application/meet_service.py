@@ -110,7 +110,7 @@ class MeetSpaceService:
         mentor = await self._mentors.get(mentor_id)
         if mentor is None:
             return None
-        user = (await self._users.get_many([mentor.user_id])).get(mentor.user_id)
+        user = (await self._users.get_many([mentor.account_id])).get(mentor.account_id)
         return user.email if user else None
 
     async def close_space(self, session_id: uuid.UUID) -> bool:

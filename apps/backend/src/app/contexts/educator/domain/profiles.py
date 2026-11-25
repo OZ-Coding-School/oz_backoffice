@@ -7,6 +7,8 @@
 - 운영진(mentor.manage)이 비활성화·재활성화한다. 비활성 멘토는 새 기수 배정을 받지 못한다(A35·A36).
 - 신청 받기(A37): 켜야 수강생이 신청할 수 있다(기본 꺼짐).
   비활성 멘토는 켤 수 없고, 비활성화하면 꺼진다.
+- 가입 전 멘토(A104): 계약을 먼저 만들면 회원 계정 없이 이름·휴대폰만 가진 비활성 멘토가
+  생긴다. 가입하면 계정을 연결한다(A105). 가입 전 멘토는 활성화·신청 받기를 할 수 없다.
 """
 
 import dataclasses
@@ -41,7 +43,10 @@ def _optional_text(value: str | None, *, limit: int, code: str, label: str) -> s
 
 @dataclass(kw_only=True, eq=False)
 class Mentor(AggregateRoot):
-    user_id: uuid.UUID
+    # 가입 전 멘토(A104)는 계정이 없고 연락처(contact_*)를 가진다
+    user_id: uuid.UUID | None
+    contact_name: str | None = None
+    contact_phone: str | None = None
     nickname: str | None = None
     display_name_preference: DisplayNamePreference = DisplayNamePreference.NAME
     headline: str | None = None
@@ -74,6 +79,37 @@ class Mentor(AggregateRoot):
                 "닉네임을 입력해야 닉네임으로 표시할 수 있습니다.", code="nickname_required"
             )
 
+    @classmethod
+    def pending(cls, *, name: str, phone: str) -> "Mentor":
+        """가입 전 멘토 (A104): 계정 없이 이름·휴대폰만, 비활성."""
+        return cls(user_id=None, contact_name=name, contact_phone=phone, is_active=False)
+
+    @property
+    def is_registered(self) -> bool:
+        return self.user_id is not None
+
+    @property
+    def account_id(self) -> uuid.UUID:
+        """가입한 멘토의 회원 id. 배정·신청·세션·채팅의 멘토는 모두 가입한 멘토다."""
+        if self.user_id is None:
+            raise BusinessRuleViolation("가입하지 않은 멘토입니다.", code="mentor_not_registered")
+        return self.user_id
+
+    def register(self, user_id: uuid.UUID, *, activate: bool) -> None:
+        """가입 전 멘토에 계정을 연결한다 (A105). 연락처는 회원 정보로 옮겨 가므로 비운다."""
+        if self.user_id is not None:
+            raise BusinessRuleViolation("이미 가입한 멘토입니다.", code="mentor_already_registered")
+        self.user_id = user_id
+        self.contact_name = None
+        self.contact_phone = None
+        self.is_active = activate
+
+    def update_contact(self, *, name: str, phone: str) -> None:
+        """가입 전 멘토의 연락처를 계약자 정보에 맞춘다 (가입한 멘토는 바꾸지 않는다)."""
+        if self.user_id is None:
+            self.contact_name = name
+            self.contact_phone = phone
+
     def with_profile(self, changes: dict[str, object]) -> "Mentor":
         """프로필 항목만 바꾼 새 멘토(생성과 같은 검증)."""
         if not set(changes) <= PROFILE_FIELDS:
@@ -102,6 +138,10 @@ class Mentor(AggregateRoot):
         self.accepting_requests = on
 
     def activate(self) -> None:
+        if self.user_id is None:
+            raise BusinessRuleViolation(
+                "가입하지 않은 멘토는 활성화할 수 없습니다.", code="mentor_not_registered"
+            )
         if self.is_active:
             raise BusinessRuleViolation("이미 활성화된 멘토입니다.", code="mentor_already_active")
         self.is_active = True

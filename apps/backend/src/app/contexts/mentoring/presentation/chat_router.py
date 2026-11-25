@@ -156,7 +156,7 @@ class ChatPresenter:
             }
         mentors = await self._mentors.get_many(list({t.mentor_id for t in threads.values()}))
         senders = await self._users.get_many([m.sender_id for m in items if m.sender_id])
-        mentor_users = await self._users.get_many([m.user_id for m in mentors.values()])
+        mentor_users = await self._users.get_many([m.account_id for m in mentors.values()])
         result = []
         for m in items:
             thread = threads.get(m.thread_id)
@@ -191,7 +191,7 @@ class ChatPresenter:
             for t in await self._teams.list_by_ids([t.team_id for t in threads if t.team_id])
         }
         mentors = await self._mentors.get_many(list({t.mentor_id for t in threads}))
-        users = await self._users.get_many([m.user_id for m in mentors.values()])
+        users = await self._users.get_many([m.account_id for m in mentors.values()])
         lasts = await self.messages(
             [v.last_message for v in views if v.last_message], {t.id: t for t in threads}
         )
@@ -200,7 +200,7 @@ class ChatPresenter:
         for v in views:
             t = v.thread
             mentor = mentors.get(t.mentor_id)
-            user = users.get(mentor.user_id) if mentor else None
+            user = users.get(mentor.account_id) if mentor else None
             real = user.name if user else ""
             student = students.get(t.student_id) if t.student_id else None
             team = teams.get(t.team_id) if t.team_id else None

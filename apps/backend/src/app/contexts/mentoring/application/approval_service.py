@@ -204,7 +204,7 @@ class MentoringApprovalService:
         )
 
     async def _mentor_label(self, mentor: Mentor) -> str:
-        user = (await self._users.get_many([mentor.user_id])).get(mentor.user_id)
+        user = (await self._users.get_many([mentor.account_id])).get(mentor.account_id)
         return mentor.display_name(user.name if user else "멘토")
 
     async def _lock(self, request_id: uuid.UUID) -> MentoringRequest:

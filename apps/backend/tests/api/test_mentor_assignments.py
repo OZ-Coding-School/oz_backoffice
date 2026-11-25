@@ -187,7 +187,7 @@ async def test_mentor_sees_own_assignments(
     created = (
         await client.post(path, json=_body(mentor, no_show_pay_amount=10000), headers=admin)
     ).json()
-    user = await TortoiseUserRepository().get(mentor.user_id)
+    user = await TortoiseUserRepository().get(mentor.account_id)
     assert user is not None
     me = bearer(settings, user)
 

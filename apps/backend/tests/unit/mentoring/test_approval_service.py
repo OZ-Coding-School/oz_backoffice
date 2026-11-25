@@ -171,7 +171,7 @@ class Harness:
         return request
 
     async def approve(self, request: MentoringRequest, at: datetime = T, **kw: Any) -> Any:
-        user = kw.get("user", self.mentor.user_id)
+        user = kw.get("user", self.mentor.account_id)
         return await self.service.approve(user, request.id, at)
 
 
@@ -204,7 +204,7 @@ async def test_approve_creates_session_and_uses_time(h: Harness) -> None:
 async def test_approve_rules(h: Harness) -> None:
     request = await h.pending()
     with pytest.raises(PermissionDeniedError) as other:
-        await h.approve(request, user=h.other_mentor.user_id)
+        await h.approve(request, user=h.other_mentor.account_id)
     assert other.value.code == "not_request_mentor"
     with pytest.raises(NotFoundError):
         await h.approve(request, user=new_id())  # 멘토 프로필 없음
@@ -230,7 +230,7 @@ async def test_mentor_and_participant_overlap(h: Harness) -> None:
     # 다른 멘토, 같은 수강생, 겹치는 시각 → 신청자 일정 겹침
     elsewhere = await h.pending(mentor=h.other_mentor, times=[T])
     with pytest.raises(ConflictError) as mine:
-        await h.service.approve(h.other_mentor.user_id, elsewhere.id, T)
+        await h.service.approve(h.other_mentor.account_id, elsewhere.id, T)
     assert mine.value.code == "participant_schedule_conflict"
     account = await h.account(student_id=h.student.id)
     assert h.accounts.items[account.id].held_minutes == 60  # 실패한 승인은 반영되지 않는다
@@ -247,7 +247,7 @@ async def test_team_overlap_checks_members_one_on_one(h: Harness) -> None:
     )
     await h.teams.add(team)
     solo = await h.pending(student=member, mentor=h.other_mentor, times=[T])
-    await h.service.approve(h.other_mentor.user_id, solo.id, T)
+    await h.service.approve(h.other_mentor.account_id, solo.id, T)
 
     team_request = await h.pending(student=h.student, team=team, times=[T, T + timedelta(hours=2)])
     with pytest.raises(ConflictError) as member_busy:  # 팀원의 1:1과 겹침
@@ -259,16 +259,16 @@ async def test_team_overlap_checks_members_one_on_one(h: Harness) -> None:
     # 1:1 신청은 소속 팀 세션과도 겹치면 안 된다
     later = await h.pending(mentor=h.other_mentor, times=[T + timedelta(hours=2)])
     with pytest.raises(ConflictError):
-        await h.service.approve(h.other_mentor.user_id, later.id, T + timedelta(hours=2))
+        await h.service.approve(h.other_mentor.account_id, later.id, T + timedelta(hours=2))
 
 
 async def test_reject_releases_hold(h: Harness) -> None:
     request = await h.pending()
     with pytest.raises(PermissionDeniedError):
-        await h.service.reject(h.other_mentor.user_id, request.id, "안 됨")
+        await h.service.reject(h.other_mentor.account_id, request.id, "안 됨")
     with pytest.raises(BusinessRuleViolation):
-        await h.service.reject(h.mentor.user_id, request.id, " ")
-    rejected = await h.service.reject(h.mentor.user_id, request.id, "일정이 맞지 않음")
+        await h.service.reject(h.mentor.account_id, request.id, " ")
+    rejected = await h.service.reject(h.mentor.account_id, request.id, "일정이 맞지 않음")
     assert (rejected.status, rejected.reject_reason) == (
         MentoringRequestStatus.REJECTED,
         "일정이 맞지 않음",
@@ -298,20 +298,22 @@ async def test_session_queries(h: Harness) -> None:
     assert (total, [s.id for s in mine]) == (1, [solo.id])
     theirs, _ = await h.queries.list_mine(member_user, SessionQuery())
     assert [s.id for s in theirs] == [team_session.id]
-    _, mentor_total = await h.queries.list_for_mentor(h.mentor.user_id, SessionQuery())
+    _, mentor_total = await h.queries.list_for_mentor(h.mentor.account_id, SessionQuery())
     assert mentor_total == 2
     with pytest.raises(NotFoundError):
         await h.queries.list_for_mentor(new_id(), SessionQuery())
     # 상태별 세션 수: 목록 필터와 무관 (A68)
     assert (await h.queries.counts_mine(member_user))[MentoringSessionStatus.SCHEDULED] == 1
-    mentor_counts = await h.queries.counts_for_mentor(h.mentor.user_id)
+    mentor_counts = await h.queries.counts_for_mentor(h.mentor.account_id)
     assert (mentor_counts[MentoringSessionStatus.SCHEDULED], sum(mentor_counts.values())) == (2, 2)
     with pytest.raises(NotFoundError):
         await h.queries.counts_for_mentor(new_id())
 
     assert (await h.queries.get_for_user(student_user, solo.id)).id == solo.id
-    assert (await h.queries.get_for_user(h.mentor.user_id, team_session.id)).id == team_session.id
-    for user, session_id in ((member_user, solo.id), (h.other_mentor.user_id, solo.id)):
+    assert (
+        await h.queries.get_for_user(h.mentor.account_id, team_session.id)
+    ).id == team_session.id
+    for user, session_id in ((member_user, solo.id), (h.other_mentor.account_id, solo.id)):
         with pytest.raises(NotFoundError):  # 참여자·담당 멘토가 아니면 숨긴다
             await h.queries.get_for_user(user, session_id)
     assert (await h.queries.get_for_cohort(h.cohort_id, solo.id)).id == solo.id

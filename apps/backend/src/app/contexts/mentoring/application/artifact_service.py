@@ -243,7 +243,7 @@ class ArtifactService:
             aliases[name_key(student.name)] = student.name
         mentor = await self._mentors.get(session.mentor_id)
         if mentor is not None:
-            user = (await self._users.get_many([mentor.user_id])).get(mentor.user_id)
+            user = (await self._users.get_many([mentor.account_id])).get(mentor.account_id)
             real = user.name if user else ""
             shown = mentor.display_name(real)
             for name in (real, mentor.nickname or ""):
@@ -304,7 +304,9 @@ class ArtifactService:
         )
         mentor = await self._mentors.get(session.mentor_id)
         user = (
-            (await self._users.get_many([mentor.user_id])).get(mentor.user_id) if mentor else None
+            (await self._users.get_many([mentor.account_id])).get(mentor.account_id)
+            if mentor
+            else None
         )
         month = session.starts_at.astimezone(KST).strftime("%Y-%m")
         return [

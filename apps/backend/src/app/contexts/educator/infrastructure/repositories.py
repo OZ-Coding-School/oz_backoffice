@@ -137,6 +137,8 @@ class TortoiseMentorRepository(TortoiseRepository[Mentor, MentorModel]):
     entity = Mentor
     fields = (
         "user_id",
+        "contact_name",
+        "contact_phone",
         "nickname",
         "display_name_preference",
         "headline",
@@ -167,12 +169,30 @@ class TortoiseMentorRepository(TortoiseRepository[Mentor, MentorModel]):
         row = await MentorModel.select_for_update().get_or_none(id=mentor_id)
         return self.to_entity(row) if row else None
 
+    async def delete(self, mentor_id: uuid.UUID) -> None:
+        await MentorModel.filter(id=mentor_id).delete()
+
+    async def find_same_person(self, name: str, phone: str) -> list[Mentor]:
+        rows = await MentorModel.filter(
+            Q(user__name=name, user__phone_number=phone)
+            | Q(user_id__isnull=True, contact_name=name, contact_phone=phone)
+        ).order_by("created_at", "id")
+        return [self.to_entity(row) for row in rows]
+
     async def list_page(
-        self, *, query: str | None, is_active: bool | None, limit: int, offset: int
+        self,
+        *,
+        query: str | None,
+        is_active: bool | None,
+        limit: int,
+        offset: int,
+        registered: bool | None = None,
     ) -> tuple[list[Mentor], int]:
         rows_query = MentorModel.all()
         if is_active is not None:
             rows_query = rows_query.filter(is_active=is_active)
+        if registered is not None:
+            rows_query = rows_query.filter(user_id__isnull=not registered)
         if query:
             # 회원 정보는 FK 관계(users)로 조인해 찾는다 (identity 코드는 import하지 않는다)
             term = query.strip()
@@ -180,10 +200,13 @@ class TortoiseMentorRepository(TortoiseRepository[Mentor, MentorModel]):
                 Q(nickname__icontains=term)
                 | Q(user__name__icontains=term)
                 | Q(user__email__icontains=term)
+                | Q(contact_name__icontains=term)
             )
             digits = "".join(ch for ch in term if ch.isdigit())
             if digits:
-                condition |= Q(user__phone_number__contains=digits)
+                condition |= Q(user__phone_number__contains=digits) | Q(
+                    contact_phone__contains=digits
+                )
             rows_query = rows_query.filter(condition)
         total = await rows_query.count()
         rows = await rows_query.order_by("-created_at", "-id").offset(offset).limit(limit)

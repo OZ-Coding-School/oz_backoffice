@@ -108,11 +108,11 @@ class Presenter:
 
     async def many(self, assignments: list[CohortMentor]) -> list["AssignmentResponse"]:
         mentors = await self._mentors.get_many(list({a.mentor_id for a in assignments}))
-        users = await self._users.get_many([m.user_id for m in mentors.values()])
+        users = await self._users.get_many([m.account_id for m in mentors.values()])
         items = []
         for a in assignments:
             mentor = mentors.get(a.mentor_id)
-            user = users.get(mentor.user_id) if mentor else None
+            user = users.get(mentor.account_id) if mentor else None
             name = user.name if user else ""
             items.append(
                 AssignmentResponse.of(a, name, mentor.display_name(name) if mentor else name)
