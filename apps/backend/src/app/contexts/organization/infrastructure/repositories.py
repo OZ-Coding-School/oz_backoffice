@@ -156,15 +156,13 @@ class TortoiseEmployeeRepository(TortoiseRepository[Employee, EmployeeModel]):
         row = await EmployeeModel.get_or_none(user_id=user_id)
         return self.to_entity(row) if row else None
 
-    async def list_page(
+    async def search(
         self,
         *,
-        department_id: uuid.UUID | None,
-        limit: int,
-        offset: int,
+        department_id: uuid.UUID | None = None,
         team_id: uuid.UUID | None = None,
         query: str | None = None,
-    ) -> tuple[list[Employee], int]:
+    ) -> list[Employee]:
         rows_query = EmployeeModel.all()
         if department_id is not None:
             rows_query = rows_query.filter(department_id=department_id)
@@ -174,8 +172,8 @@ class TortoiseEmployeeRepository(TortoiseRepository[Employee, EmployeeModel]):
             rows_query = rows_query.filter(
                 Q(user__name__icontains=query) | Q(user__email__icontains=query)
             )
-        rows = await rows_query.order_by("created_at", "id").offset(offset).limit(limit)
-        return [self.to_entity(row) for row in rows], await rows_query.count()
+        rows = await rows_query.order_by("created_at", "id")
+        return [self.to_entity(row) for row in rows]
 
     async def list_by_ids(self, employee_ids: list[uuid.UUID]) -> list[Employee]:
         if not employee_ids:

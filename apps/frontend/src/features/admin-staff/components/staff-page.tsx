@@ -1,11 +1,10 @@
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Plus, Search, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
-import { LoadMore } from "@/components/load-more";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -138,11 +137,11 @@ function FilterSelect({
 function EmployeesTab({ search, options, canEdit }: { search: StaffSearch; options: StaffOptions; canEdit: boolean }) {
   const navigate = useNavigate();
   const filter: EmployeeFilter = { q: search.q, departmentId: search.department, teamId: search.team };
-  const list = useInfiniteQuery(employeesQuery(filter));
+  const list = useQuery(employeesQuery(filter));
   const [q, setQ] = useState(search.q ?? "");
   const debounced = useDebounced(q.trim());
   const [editing, setEditing] = useState<Employee | null>(null);
-  const items = list.data?.pages.flatMap((p) => p.items) ?? [];
+  const items = list.data ?? [];
 
   // 검색어는 입력이 멈추면 주소에 반영한다
   useEffect(() => {
@@ -263,13 +262,6 @@ function EmployeesTab({ search, options, canEdit }: { search: StaffSearch; optio
           </table>
         </div>
       )}
-      {list.hasNextPage ? (
-        <LoadMore
-          loading={list.isFetchingNextPage}
-          label="다음 직원을 불러오는 중…"
-          onVisible={() => void list.fetchNextPage()}
-        />
-      ) : null}
       {editing ? <EditEmployeeDialog employee={editing} options={options} onClose={() => setEditing(null)} /> : null}
     </>
   );

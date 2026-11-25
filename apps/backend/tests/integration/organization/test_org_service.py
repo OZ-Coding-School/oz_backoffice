@@ -215,8 +215,8 @@ async def test_employee_transfer(actor: User) -> None:
         employee.position_id,
         EmploymentType.CONTRACT,
     )
-    page, total = await svc.list_employees(department_id=department.id, limit=10, offset=0)
-    assert (total, [e.id for e in page]) == (1, [employee.id])
+    found = await svc.list_employees(department_id=department.id)
+    assert [e.id for e in found] == [employee.id]
     direct = await svc.update_employee(
         employee.id, EmployeeChanges(team_id=None), actor_id=actor.id
     )

@@ -81,16 +81,14 @@ class EmployeeRepository(Protocol):
     async def list_by_ids(self, employee_ids: list[uuid.UUID]) -> list[Employee]: ...
     async def list_by_users(self, user_ids: list[uuid.UUID]) -> list[Employee]: ...
     async def count_by_position(self) -> dict[uuid.UUID, int]: ...
-    async def list_page(
+    async def search(
         self,
         *,
-        department_id: uuid.UUID | None,
-        limit: int,
-        offset: int,
+        department_id: uuid.UUID | None = None,
         team_id: uuid.UUID | None = None,
         query: str | None = None,
-    ) -> tuple[list[Employee], int]:
-        """query는 회원 이름·이메일에 들어간 것 (A83)."""
+    ) -> list[Employee]:
+        """페이지 없이 전체 (A90). query는 회원 이름·이메일에 들어간 것 (A83)."""
         ...
 
 

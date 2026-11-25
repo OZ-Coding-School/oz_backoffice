@@ -12,11 +12,15 @@ from fastapi import APIRouter, Depends, Query, Request, Response, status
 from pydantic import BaseModel, Field
 
 from app.contexts.access.application.permissions import PermissionTarget
+from app.contexts.access.application.super_admin import SuperAdminAdministration
 from app.contexts.access.domain.catalog import PERMISSIONS
 from app.contexts.access.presentation.dependencies import (
     ApprovedUser,
     PermissionCheckerDep,
     require_permission,
+)
+from app.contexts.access.presentation.super_admin_router import (
+    get_service as get_super_admin_service,
 )
 from app.contexts.identity.application.auth_service import UserQueries
 from app.contexts.identity.domain.entities import User
@@ -47,7 +51,7 @@ from app.contexts.organization.presentation.dependencies import (
     get_user_queries,
 )
 from app.contexts.organization.presentation.schemas import StaffUserSummary
-from app.core.pagination import Page
+from app.core.uow import UnitOfWork
 from app.shared.errors import PermissionDeniedError
 
 router = APIRouter(prefix="/admin", tags=["admin-organization"])
@@ -204,6 +208,7 @@ class EmployeeResponse(BaseModel):
     assignments: list[EmployeeAssignmentResponse] = Field(
         default_factory=list, description="담당 과정·기수 (A83)"
     )
+    is_super_admin: bool = Field(default=False, description="최고 관리자 (A87·A90)")
 
 
 class EmployeeUpdateRequest(BaseModel):
@@ -216,6 +221,10 @@ class EmployeeUpdateRequest(BaseModel):
     )
     cohort_ids: list[uuid.UUID] | None = Field(
         default=None, description="담당 기수 (보내면 통째로 교체, 직위가 기수 담당일 때 하나)"
+    )
+    is_super_admin: bool | None = Field(
+        default=None,
+        description="최고 관리자 켜기·끄기 (최고 관리자만, 마지막 1명은 끌 수 없음, A90)",
     )
 
 
@@ -287,6 +296,7 @@ async def _employees(
                 position_id=e.position_id,
                 employment_type=e.employment_type,
                 assignments=assignments.get(e.id, []),
+                is_super_admin=bool(user and user.is_super_admin),
             )
         )
     return responses
@@ -449,7 +459,7 @@ async def delete_position(
 
 
 # ---------------------------------------------------------------- 직원
-@router.get("/employees", response_model=Page[EmployeeResponse])
+@router.get("/employees", response_model=list[EmployeeResponse])
 async def list_employees(
     _: EmployeeReader,
     service: ServiceDep,
@@ -458,16 +468,11 @@ async def list_employees(
     department_id: uuid.UUID | None = None,
     team_id: uuid.UUID | None = None,
     q: Annotated[str | None, Query(max_length=50, description="이름·이메일")] = None,
-    limit: Annotated[int, Query(ge=1, le=100)] = 20,
-    offset: Annotated[int, Query(ge=0)] = 0,
-) -> Page[EmployeeResponse]:
-    """직원 목록 (담당자 배정 화면에서 직원을 고를 때도 쓴다). 담당을 함께 준다 (A83)."""
-    employees, total = await service.list_employees(
-        department_id=department_id, team_id=team_id, query=q, limit=limit, offset=offset
-    )
-    return Page(
-        items=await _employees(employees, users, academy), total=total, limit=limit, offset=offset
-    )
+) -> list[EmployeeResponse]:
+    """직원 전체, 페이지 없음 (A90). 담당자 배정 화면에서 직원을 고를 때도 쓴다. 담당을 함께
+    준다 (A83)."""
+    employees = await service.list_employees(department_id=department_id, team_id=team_id, query=q)
+    return await _employees(employees, users, academy)
 
 
 @router.get("/employees/{employee_id}", response_model=EmployeeResponse)
@@ -490,17 +495,31 @@ async def update_employee(
     service: ServiceDep,
     users: UsersDep,
     academy: AcademyDep,
+    super_admins: Annotated[SuperAdminAdministration, Depends(get_super_admin_service)],
 ) -> EmployeeResponse:
-    """소속·직위·고용 형태(org.employee.manage)와 담당(staff.assignment.manage, A89)을 한 번에
-    바꾼다. 담당은 직위의 담당 방식을 따른다(422 `invalid_staff_assignment`). 직원 생성은 가입
-    승인으로만 한다."""
+    """소속·직위·고용 형태(org.employee.manage), 담당(staff.assignment.manage, A89), 최고
+    관리자(최고 관리자만, A90)를 한 트랜잭션에서 바꾼다. 담당은 직위의 담당 방식을 따른다(422
+    `invalid_staff_assignment`). 마지막 최고 관리자는 끌 수 없다(409 `last_super_admin`). 직원
+    생성은 가입 승인으로만 한다."""
     sent = body.model_fields_set
     org_fields = {"department_id", "team_id", "position_id", "employment_type"}
     if sent & org_fields:
         await checker.require(admin.id, "org.employee.manage", PermissionTarget.global_())
     if sent & {"bootcamp_ids", "cohort_ids"}:
         await checker.require(admin.id, "staff.assignment.manage", PermissionTarget.global_())
-    employee = await service.update_employee(
-        employee_id, EmployeeChanges(**_sent(body, ("team_id",))), actor_id=admin.id
-    )
+    super_admin = body.is_super_admin if "is_super_admin" in sent else None
+    if super_admin is not None and not admin.is_super_admin:
+        raise PermissionDeniedError("최고 관리자만 할 수 있습니다.", code="super_admin_only")
+    changes = _sent(body, ("team_id",))
+    changes.pop("is_super_admin", None)
+    async with UnitOfWork():
+        employee = (
+            await service.update_employee(
+                employee_id, EmployeeChanges(**changes), actor_id=admin.id
+            )
+            if changes
+            else await service.get_employee(employee_id)
+        )
+        if super_admin is not None:
+            await super_admins.set(employee.user_id, super_admin, actor_id=admin.id)
     return (await _employees([employee], users, academy))[0]

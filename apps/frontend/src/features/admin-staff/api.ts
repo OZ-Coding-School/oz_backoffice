@@ -1,4 +1,4 @@
-import { infiniteQueryOptions, queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { api, unwrap } from "@/api/client";
 import type { components } from "@/api/schema.gen";
@@ -7,8 +7,6 @@ export type Employee = components["schemas"]["EmployeeResponse"];
 export type EmployeeAssignment = components["schemas"]["EmployeeAssignmentResponse"];
 export type StaffMember = components["schemas"]["StaffMemberResponse"];
 export type EmployeeUpdate = components["schemas"]["EmployeeUpdateRequest"];
-
-export const PAGE_SIZE = 20;
 
 /** 직원 탭 필터 (A83) */
 export interface EmployeeFilter {
@@ -28,18 +26,15 @@ export const staffKeys = {
   members: (t: StaffTarget) => ["admin-staff", "members", t.kind, t.id] as const,
 };
 
-/** 직원 목록 (담당 포함, A83). 20개씩 이어 붙인다 */
+/** 직원 목록 (담당 포함, A83). 페이지 없이 전체 (A90) */
 export function employeesQuery(f: EmployeeFilter) {
-  return infiniteQueryOptions({
+  return queryOptions({
     queryKey: staffKeys.employees(f),
-    initialPageParam: 0,
-    queryFn: ({ pageParam }) =>
+    queryFn: () =>
       unwrap(
         api.GET("/api/v1/admin/employees", {
           params: {
             query: {
-              limit: PAGE_SIZE,
-              offset: pageParam,
               ...(f.q ? { q: f.q } : {}),
               ...(f.departmentId ? { department_id: f.departmentId } : {}),
               ...(f.teamId ? { team_id: f.teamId } : {}),
@@ -47,7 +42,6 @@ export function employeesQuery(f: EmployeeFilter) {
           },
         }),
       ),
-    getNextPageParam: (last) => (last.offset + last.items.length < last.total ? last.offset + last.limit : undefined),
   });
 }
 
@@ -55,9 +49,8 @@ export function employeesQuery(f: EmployeeFilter) {
 export function employeeSearchQuery(q: string) {
   return queryOptions({
     queryKey: staffKeys.search(q),
-    queryFn: () =>
-      unwrap(api.GET("/api/v1/admin/employees", { params: { query: { limit: 20, offset: 0, ...(q ? { q } : {}) } } })),
-    select: (page) => page.items,
+    queryFn: () => unwrap(api.GET("/api/v1/admin/employees", { params: { query: q ? { q } : {} } })),
+    select: (employees) => employees.slice(0, 20),
   });
 }
 

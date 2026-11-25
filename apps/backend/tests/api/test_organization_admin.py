@@ -161,9 +161,9 @@ async def test_employees_list_and_transfer(client: AsyncClient, admin: dict[str,
         )
     ).json()
 
-    page = (await client.get("/api/v1/admin/employees", headers=admin)).json()
-    assert page["total"] == 1
-    assert page["items"][0]["user"]["id"] == str(employee.user_id)
+    (row,) = (await client.get("/api/v1/admin/employees", headers=admin)).json()
+    assert row["user"]["id"] == str(employee.user_id)
+    assert row["is_super_admin"] is False
 
     team = await create_team(uuid.UUID(department["id"]))
     moved = await client.patch(
@@ -188,7 +188,7 @@ async def test_employees_list_and_transfer(client: AsyncClient, admin: dict[str,
     filtered = await client.get(
         "/api/v1/admin/employees", params={"department_id": department["id"]}, headers=admin
     )
-    assert filtered.json()["total"] == 1
+    assert len(filtered.json()) == 1
     assert (
         await client.get(f"/api/v1/admin/employees/{new_id()}", headers=admin)
     ).status_code == 404
@@ -239,15 +239,15 @@ async def test_employees_search_team_and_assignments(
 
     url = "/api/v1/admin/employees"
     by_name = (await client.get(url, params={"q": "김운"}, headers=admin)).json()
-    assert [e["id"] for e in by_name["items"]] == [str(manager.id)]
-    (assignment,) = by_name["items"][0]["assignments"]
+    assert [e["id"] for e in by_name] == [str(manager.id)]
+    (assignment,) = by_name[0]["assignments"]
     assert (assignment["bootcamp_id"], assignment["cohort_id"]) == (
         str(cohort.bootcamp_id),
         None,
     )
     assert assignment["bootcamp_name"]
     by_email = (await client.get(url, params={"q": "lee@"}, headers=admin)).json()
-    (row,) = by_email["items"]
+    (row,) = by_email
     assert (row["assignments"][0]["cohort_id"], row["assignments"][0]["cohort_number"]) == (
         str(cohort.id),
         12,
@@ -256,7 +256,7 @@ async def test_employees_search_team_and_assignments(
     team = await create_team(manager.department_id)
     await client.patch(f"{url}/{manager.id}", json={"team_id": str(team.id)}, headers=admin)
     in_team = (await client.get(url, params={"team_id": str(team.id)}, headers=admin)).json()
-    assert [e["id"] for e in in_team["items"]] == [str(manager.id)]
+    assert [e["id"] for e in in_team] == [str(manager.id)]
     lead = make_user(email="lead@nextrunners.co.kr")
     lead.approve(now=datetime.now(UTC))
     await users.add(lead)
