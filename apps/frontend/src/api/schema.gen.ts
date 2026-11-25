@@ -1349,6 +1349,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/cohorts/{cohort_id}/students/{student_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Cohort Student
+         * @description 기본·수강 정보 + 가입 계정 + 멘토링 요약 (A99). 그 기수의 수강생이 아니면 404.
+         */
+        get: operations["get_cohort_student_api_v1_admin_cohorts__cohort_id__students__student_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/rosters/unmapped": {
         parameters: {
             query?: never;
@@ -7358,6 +7378,34 @@ export interface components {
             /** Student Id */
             student_id?: string | null;
         };
+        /** StudentAccountResponse */
+        StudentAccountResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Valid From
+             * Format: date
+             */
+            valid_from: string;
+            /**
+             * Valid Until
+             * Format: date
+             */
+            valid_until: string;
+            /** Is Expired */
+            is_expired: boolean;
+            /** Total Minutes */
+            total_minutes: number;
+            /** Held Minutes */
+            held_minutes: number;
+            /** Used Minutes */
+            used_minutes: number;
+            /** Remaining Minutes */
+            remaining_minutes: number;
+        };
         /** StudentCandidateResponse */
         StudentCandidateResponse: {
             /**
@@ -7389,6 +7437,78 @@ export interface components {
              * @description 신청 기수의 명단
              */
             same_cohort: boolean;
+        };
+        /** StudentDetailResponse */
+        StudentDetailResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Airtable Record Id */
+            airtable_record_id: string | null;
+            /** Name */
+            name: string;
+            /** Phone Number */
+            phone_number: string | null;
+            /** Email */
+            email: string | null;
+            status: components["schemas"]["EnrollmentStatus"];
+            hrd_net_status: components["schemas"]["StudentStatus"];
+            /** User Id */
+            user_id: string | null;
+            /** Is Removed In Source */
+            is_removed_in_source: boolean;
+            /**
+             * Enrolled At
+             * Format: date
+             */
+            enrolled_at: string;
+            /** Ended At */
+            ended_at: string | null;
+            /** End Reason */
+            end_reason: string | null;
+            /** Synced At */
+            synced_at: string | null;
+            /** @description 가입 계정 (미가입이면 null) */
+            member: components["schemas"]["StudentMemberResponse"] | null;
+            mentoring: components["schemas"]["StudentMentoringResponse"];
+        };
+        /** StudentMemberResponse */
+        StudentMemberResponse: {
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Email */
+            email: string;
+            /** Approved At */
+            approved_at: string | null;
+        };
+        /** StudentMentoringResponse */
+        StudentMentoringResponse: {
+            /** Team Id */
+            team_id: string | null;
+            /** Team Label */
+            team_label: string | null;
+            /** @description 1:1 시간 계좌 (지급 전이면 없음) */
+            account: components["schemas"]["StudentAccountResponse"] | null;
+            /**
+             * Pending Request Count
+             * @description 1:1 대기 신청 수
+             */
+            pending_request_count: number;
+            /**
+             * Upcoming Session Count
+             * @description 1:1 예정·진행 중 세션 수
+             */
+            upcoming_session_count: number;
+            /**
+             * Completed Session Count
+             * @description 1:1 완료 세션 수
+             */
+            completed_session_count: number;
         };
         /**
          * StudentStatus
@@ -10787,6 +10907,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RosterStudentResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_cohort_student_api_v1_admin_cohorts__cohort_id__students__student_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cohort_id: string;
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentDetailResponse"];
                 };
             };
             /** @description Validation Error */

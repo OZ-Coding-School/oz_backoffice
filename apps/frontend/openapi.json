@@ -4432,6 +4432,65 @@
         }
       }
     },
+    "/api/v1/admin/cohorts/{cohort_id}/students/{student_id}": {
+      "get": {
+        "tags": [
+          "admin-rosters"
+        ],
+        "summary": "Get Cohort Student",
+        "description": "기본·수강 정보 + 가입 계정 + 멘토링 요약 (A99). 그 기수의 수강생이 아니면 404.",
+        "operationId": "get_cohort_student_api_v1_admin_cohorts__cohort_id__students__student_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cohort_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Cohort Id"
+            }
+          },
+          {
+            "name": "student_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Student Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/rosters/unmapped": {
       "get": {
         "tags": [
@@ -22158,6 +22217,57 @@
         "title": "StartBody",
         "description": "상대 하나: 팀(`team_id`), 수강생→멘토(`cohort_id`·`mentor_id`), 멘토→수강생(`student_id`)."
       },
+      "StudentAccountResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "valid_from": {
+            "type": "string",
+            "format": "date",
+            "title": "Valid From"
+          },
+          "valid_until": {
+            "type": "string",
+            "format": "date",
+            "title": "Valid Until"
+          },
+          "is_expired": {
+            "type": "boolean",
+            "title": "Is Expired"
+          },
+          "total_minutes": {
+            "type": "integer",
+            "title": "Total Minutes"
+          },
+          "held_minutes": {
+            "type": "integer",
+            "title": "Held Minutes"
+          },
+          "used_minutes": {
+            "type": "integer",
+            "title": "Used Minutes"
+          },
+          "remaining_minutes": {
+            "type": "integer",
+            "title": "Remaining Minutes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "valid_from",
+          "valid_until",
+          "is_expired",
+          "total_minutes",
+          "held_minutes",
+          "used_minutes",
+          "remaining_minutes"
+        ],
+        "title": "StudentAccountResponse"
+      },
       "StudentCandidateResponse": {
         "properties": {
           "student_id": {
@@ -22239,6 +22349,242 @@
           "same_cohort"
         ],
         "title": "StudentCandidateResponse"
+      },
+      "StudentDetailResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "airtable_record_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Airtable Record Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "phone_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone Number"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EnrollmentStatus"
+          },
+          "hrd_net_status": {
+            "$ref": "#/components/schemas/StudentStatus"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
+          },
+          "is_removed_in_source": {
+            "type": "boolean",
+            "title": "Is Removed In Source"
+          },
+          "enrolled_at": {
+            "type": "string",
+            "format": "date",
+            "title": "Enrolled At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "end_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Reason"
+          },
+          "synced_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Synced At"
+          },
+          "member": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StudentMemberResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "가입 계정 (미가입이면 null)"
+          },
+          "mentoring": {
+            "$ref": "#/components/schemas/StudentMentoringResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "airtable_record_id",
+          "name",
+          "phone_number",
+          "email",
+          "status",
+          "hrd_net_status",
+          "user_id",
+          "is_removed_in_source",
+          "enrolled_at",
+          "ended_at",
+          "end_reason",
+          "synced_at",
+          "member",
+          "mentoring"
+        ],
+        "title": "StudentDetailResponse"
+      },
+      "StudentMemberResponse": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "approved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "email",
+          "approved_at"
+        ],
+        "title": "StudentMemberResponse"
+      },
+      "StudentMentoringResponse": {
+        "properties": {
+          "team_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Id"
+          },
+          "team_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Label"
+          },
+          "account": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StudentAccountResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "1:1 시간 계좌 (지급 전이면 없음)"
+          },
+          "pending_request_count": {
+            "type": "integer",
+            "title": "Pending Request Count",
+            "description": "1:1 대기 신청 수"
+          },
+          "upcoming_session_count": {
+            "type": "integer",
+            "title": "Upcoming Session Count",
+            "description": "1:1 예정·진행 중 세션 수"
+          },
+          "completed_session_count": {
+            "type": "integer",
+            "title": "Completed Session Count",
+            "description": "1:1 완료 세션 수"
+          }
+        },
+        "type": "object",
+        "required": [
+          "team_id",
+          "team_label",
+          "account",
+          "pending_request_count",
+          "upcoming_session_count",
+          "completed_session_count"
+        ],
+        "title": "StudentMentoringResponse"
       },
       "StudentStatus": {
         "type": "string",

@@ -103,3 +103,47 @@ async def test_lists_mentees_with_team_account_and_filters(
 
     assert (await client.get(url, headers=bearer(settings, student_user))).status_code == 403
     assert (await client.get(url)).status_code == 401
+
+
+async def test_student_detail_has_member_and_mentoring_summary(
+    client: AsyncClient, settings: Settings
+) -> None:
+    """수강생 상세 (A99): 기본·수강 + 가입 계정 + 멘토링 요약."""
+    admin = bearer(
+        settings, (await create_super_admin("boss@nextrunners.co.kr", settings=settings)).user
+    )
+    cohort, other = await create_cohort(), await create_cohort()
+    api = f"/api/v1/admin/cohorts/{cohort.id}"
+    member = await _approved("가수강")
+    repo = TortoiseStudentRepository()
+    joined = make_student(cohort_id=cohort.id, name="가수강", user_id=member.id)
+    walk_in = make_student(cohort_id=cohort.id, name="나수강")
+    for s in (joined, walk_in):
+        await repo.add(s)
+    granted = await client.post(
+        f"{api}/mentoring-balances/grants",
+        json={"target": "ALL_STUDENTS", "minutes": 120, "reason": "기본 지급"},
+        headers={**admin, "Idempotency-Key": str(new_id())},
+    )
+    assert granted.status_code == 200, granted.text
+
+    detail = await client.get(f"{api}/students/{joined.id}", headers=admin)
+    assert detail.status_code == 200, detail.text
+    body = detail.json()
+    assert (body["name"], body["status"]) == ("가수강", "ENROLLED")
+    assert body["member"]["user_id"] == str(member.id)
+    assert body["member"]["approved_at"] is not None
+    m = body["mentoring"]
+    assert m["account"]["remaining_minutes"] == 120
+    assert (m["team_label"], m["pending_request_count"], m["completed_session_count"]) == (
+        None,
+        0,
+        0,
+    )
+    plain = (await client.get(f"{api}/students/{walk_in.id}", headers=admin)).json()
+    assert plain["member"] is None
+
+    missing = await client.get(
+        f"/api/v1/admin/cohorts/{other.id}/students/{joined.id}", headers=admin
+    )
+    assert (missing.status_code, missing.json()["error"]["code"]) == (404, "student_not_found")

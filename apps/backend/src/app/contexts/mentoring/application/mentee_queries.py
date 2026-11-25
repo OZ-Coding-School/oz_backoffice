@@ -4,8 +4,9 @@
 묶어 보여 준다. 팀 신청·세션과 팀 계좌는 팀 관리에서 본다.
 """
 
+import builtins
 import uuid
-from collections.abc import Collection
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -74,9 +75,16 @@ class MenteeQueries:
         """명단은 이름순으로 자르고, 계좌·팀·건수는 그 페이지의 수강생만 묶어 읽는다."""
         students = await self._roster.in_cohort(cohort_id, statuses=statuses, name=name)
         page = students[offset : offset + limit]
+        return await self.summarize(page), len(students)
+
+    async def of_student(self, student: Student) -> MenteeSummary:
+        """한 수강생의 팀·1:1 계좌·건수 (수강생 상세 A99)."""
+        return (await self.summarize([student]))[0]
+
+    async def summarize(self, page: Sequence[Student]) -> builtins.list[MenteeSummary]:
         ids = [s.id for s in page]
         if not ids:
-            return [], len(students)
+            return []
         team_of = await self._teams.team_of_students(ids)
         teams = {t.id: t for t in await self._teams.list_by_ids(sorted(set(team_of.values())))}
         accounts = {
@@ -85,7 +93,7 @@ class MenteeQueries:
         }
         pending = await self._requests.count_pending_by_requesters(ids)
         sessions = await self._sessions.count_by_requesters(ids)
-        items = []
+        items: builtins.list[MenteeSummary] = []
         for s in page:
             by_status = sessions.get(s.id, {})
             team_id = team_of.get(s.id)
@@ -99,4 +107,4 @@ class MenteeQueries:
                     completed_sessions=by_status.get(MentoringSessionStatus.COMPLETED, 0),
                 )
             )
-        return items, len(students)
+        return items
