@@ -1,7 +1,7 @@
 # 48. 멘토 기수 배정 관리, 계약 패널 F68 정리 (FE-18c-1)
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 후 기록)
+- 관련 PR: #169
 - 관련 결정: `docs/decisions.md` F85 (A35·F68·F79·F83)
 - 이전 기록: [47. 가입 승인 멘토 탭 (FE-15a 보완)](47_approval_pending_mentors.md), [46. 행정 업무 > 계약 (FE-18b)](46_admin_contracts.md)
 
