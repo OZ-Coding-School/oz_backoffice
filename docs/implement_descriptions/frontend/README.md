@@ -39,4 +39,4 @@
 | 35 | [회원 관리·가입 승인 통합 (FE-15e)](35_member_approvals_merge.md) | 완료 (#138) |
 | 36 | [조직 설정 > 직원 (FE-15f)](36_org_employees.md) | 완료 (#141) |
 | 37 | [조직 설정 > 부서와 영향 목록 (FE-15g)](37_org_departments.md) | 완료 (#144) |
-| 38 | [조직 설정 > 직위와 패널 삭제 위치 (FE-15h)](38_org_positions.md) | PR 진행 중 (#145) |
+| 38 | [조직 설정 > 직위와 패널 삭제 위치 (FE-15h)](38_org_positions.md) | 완료 (#145) |
