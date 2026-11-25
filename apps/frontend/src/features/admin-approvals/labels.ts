@@ -6,10 +6,10 @@ import type { Applicant, ContractCandidate, StudentCandidate } from "./api";
 
 type Tone = NonNullable<BadgeProps["variant"]>;
 
-/** 자동 매칭 결과 (A31): 대기는 명단·계약이 없거나 여러 명일 때 */
+/** 자동 매칭 결과 (A31·A105): 대기는 명단·가입 전 멘토가 없거나 여러 명일 때 */
 export function matchLabel(a: Applicant): { label: string; badge: Tone } {
   if (a.signup.match_result === "AMBIGUOUS") return { label: "후보 여러 명", badge: "info" };
-  return { label: a.signup.signup_type === "MENTOR" ? "계약 없음" : "명단 없음", badge: "warning" };
+  return { label: a.signup.signup_type === "MENTOR" ? "가입 전 멘토 없음" : "명단 없음", badge: "warning" };
 }
 
 export function requestedCohort(a: Applicant): string {
@@ -24,17 +24,6 @@ export function appliedAt(a: Applicant): string {
 
 export function enrollmentLabel(status: string): string {
   return ENROLLMENT_STATUS_LABELS[status as keyof typeof ENROLLMENT_STATUS_LABELS] ?? status;
-}
-
-const CONTRACT_STATUS: Record<string, string> = {
-  DRAFT: "초안",
-  ACTIVE: "진행 중",
-  ENDED: "종료",
-  TERMINATED: "해지",
-};
-
-export function contractStatusLabel(status: string): string {
-  return CONTRACT_STATUS[status] ?? status;
 }
 
 /** 이름·휴대폰 일치 태그 (A82) */

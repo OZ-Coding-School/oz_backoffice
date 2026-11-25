@@ -92,7 +92,7 @@ function useInvalidate() {
 export function useApprove(userId: string) {
   const invalidate = useInvalidate();
   return useMutation({
-    mutationFn: (body: { student_id?: string; contract_ids?: string[] }) =>
+    mutationFn: (body: { student_id?: string; mentor_id?: string; contract_ids?: string[] }) =>
       unwrap(api.POST("/api/v1/admin/approvals/{user_id}/approve", { params: { path: { user_id: userId } }, body })),
     onSuccess: invalidate,
   });
