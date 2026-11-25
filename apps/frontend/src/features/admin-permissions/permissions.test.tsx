@@ -61,6 +61,27 @@ function mockApi({ codes = ["access.role.read", "access.role.manage"], fail = fa
     http.get(apiUrl("/api/v1/me/staff-access"), () => HttpResponse.json(access(codes))),
     http.get(apiUrl("/api/v1/admin/positions"), () => HttpResponse.json([MANAGER, LEAD])),
     http.get(apiUrl("/api/v1/admin/permissions"), () => HttpResponse.json(DEFS)),
+    http.get(apiUrl("/api/v1/admin/positions/{position_id}/impact"), () =>
+      HttpResponse.json({
+        employees: [
+          {
+            id: "e1",
+            user_id: "u1",
+            name: "김운영",
+            email: "manager@nextrunners.co.kr",
+            department_name: "교육운영본부",
+            team_name: "교육 1팀",
+            position_name: "운영 매니저",
+          },
+        ],
+        registrations: [
+          { id: "r1", applicant_name: "정신청", applicant_email: "jung@nextrunners.co.kr", status: "PENDING" },
+          { id: "r2", applicant_name: "반려됨", applicant_email: "no@nextrunners.co.kr", status: "REJECTED" },
+        ],
+        teams: [],
+        bootcamps: [],
+      }),
+    ),
     http.put(apiUrl("/api/v1/admin/positions/{position_id}/permissions"), async ({ params, request }) => {
       const body = (await request.json()) as { permissions: string[] };
       calls.push({ id: String(params.position_id), body });
@@ -117,7 +138,21 @@ describe("조직 설정 > 권한 (FE-15d)", () => {
 
     await user.click(within(section).getByRole("button", { name: "저장" }));
     const dialog = await screen.findByRole("dialog", { name: "운영 매니저 직위 권한 저장" });
-    expect(within(dialog).getByRole("list", { name: "바뀐 권한" })).toHaveTextContent("부서·팀 · 조회");
+    // 바뀐 권한은 추가·제거 상자, 처음에는 접혀 있다 (F69)
+    const addedGroup = within(dialog).getByRole("button", { name: /추가된 권한/ });
+    expect(addedGroup).toHaveAttribute("aria-expanded", "false");
+    await user.click(within(dialog).getByRole("button", { name: /제거된 권한/ }));
+    expect(within(dialog).getByRole("list", { name: "제거된 권한" })).toHaveTextContent("수강생 명단 · 조회");
+    await user.click(addedGroup);
+    expect(within(dialog).getByRole("list", { name: "추가된 권한" })).toHaveTextContent("부서·팀 · 조회");
+    // 영향받는 대상: 직원과 대기 중 신청만 (A93)
+    const employees = await within(dialog).findByRole("button", { name: /직원\s*1명/ });
+    await user.click(employees);
+    expect(within(dialog).getByRole("list", { name: "직원" })).toHaveTextContent("김운영");
+    await user.click(within(dialog).getByRole("button", { name: /운영진 가입 신청/ }));
+    const regs = within(dialog).getByRole("list", { name: "운영진 가입 신청" });
+    expect(regs).toHaveTextContent("정신청");
+    expect(regs).not.toHaveTextContent("반려됨");
     await user.click(within(dialog).getByRole("button", { name: "저장" }));
     await waitFor(() =>
       expect(calls).toEqual([{ id: "p1", body: { permissions: ["org.department.read", "org.department.manage"] } }]),

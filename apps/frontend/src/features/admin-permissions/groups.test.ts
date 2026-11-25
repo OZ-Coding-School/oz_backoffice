@@ -45,8 +45,8 @@ describe("권한 그룹 (A86)", () => {
     const before = new Set(["mentoring.chat.read", "org.department.read"]);
     const after = new Set(["mentoring.request.read", "org.department.read"]);
     expect(diff(before, after, DEFS)).toEqual([
-      { code: "mentoring.request.read", label: "신청·세션 · 조회", on: true },
-      { code: "mentoring.chat.read", label: "채팅 · 조회", on: false },
+      { code: "mentoring.request.read", label: "신청·세션 · 조회", area: "멘토링", on: true },
+      { code: "mentoring.chat.read", label: "채팅 · 조회", area: "멘토링", on: false },
     ]);
     expect(orderedCodes(after, DEFS)).toEqual(["org.department.read", "mentoring.request.read"]);
   });

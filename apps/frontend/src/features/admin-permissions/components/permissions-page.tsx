@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { ApiError } from "@/api/errors";
+import { CollapsibleGroup, GroupItem } from "@/components/collapsible-group";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
 import { Alert } from "@/components/ui/alert";
@@ -13,6 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
+import { impactQuery } from "@/features/admin-org/api";
+import { ImpactList } from "@/features/admin-org/components/impact-list";
 import { hasPermission, staffAccessQuery } from "@/features/staff/api";
 import { cn } from "@/lib/utils";
 
@@ -283,41 +286,15 @@ function PositionPermissions({
         </div>
       ) : null}
 
-      <Dialog open={confirming} onOpenChange={(open) => (open ? undefined : setConfirming(false))}>
-        <DialogContent className="flex max-w-120 flex-col gap-4 p-6">
-          <DialogTitle className="text-h2 text-foreground">{position.name} 직위 권한 저장</DialogTitle>
-          <DialogDescription className="text-body text-muted-foreground">
-            직원 {position.employee_count}명에게 바로 적용돼요.
-          </DialogDescription>
-          <ul aria-label="바뀐 권한" className="flex flex-col gap-2">
-            {changes.map((c) => (
-              <li key={c.code} className="flex items-center gap-2">
-                <span
-                  aria-hidden
-                  className={cn(
-                    "inline-flex size-5 items-center justify-center rounded-sm text-caption-strong",
-                    c.on ? "bg-success-subtle text-success-text" : "bg-destructive-subtle text-destructive-text",
-                  )}
-                >
-                  {c.on ? "+" : "−"}
-                </span>
-                <span className="text-body text-foreground">
-                  {c.label}
-                  <span className="sr-only">{c.on ? " 켬" : " 끔"}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setConfirming(false)}>
-              취소
-            </Button>
-            <Button disabled={save.isPending} onClick={() => void onSave()}>
-              저장
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {confirming ? (
+        <SaveDialog
+          position={position}
+          changes={changes}
+          pending={save.isPending}
+          onCancel={() => setConfirming(false)}
+          onSave={() => void onSave()}
+        />
+      ) : null}
 
       <Dialog open={blocker.status === "blocked"} onOpenChange={(open) => (open ? undefined : blocker.reset?.())}>
         <DialogContent className="flex max-w-110 flex-col gap-4 p-6">
@@ -336,6 +313,92 @@ function PositionPermissions({
         </DialogContent>
       </Dialog>
     </section>
+  );
+}
+
+/**
+ * 저장 확인 (F69): 위 '바뀐 권한'(추가·제거 상자), 아래 '영향받는 대상'(A93). 상자는 처음에 접어 둔다.
+ */
+function SaveDialog({
+  position,
+  changes,
+  pending,
+  onCancel,
+  onSave,
+}: {
+  position: Position;
+  changes: readonly PermissionChange[];
+  pending: boolean;
+  onCancel: () => void;
+  onSave: () => void;
+}) {
+  const impact = useQuery(impactQuery("position", position.id));
+  const added = changes.filter((c) => c.on);
+  const removed = changes.filter((c) => !c.on);
+  const affected = impact.data
+    ? impact.data.employees.length + impact.data.registrations.filter((r) => r.status === "PENDING").length
+    : 0;
+  const mark = (on: boolean) => (
+    <span
+      aria-hidden
+      className={cn(
+        "inline-flex size-5 items-center justify-center rounded-sm text-caption-strong",
+        on ? "bg-success-subtle text-success-text" : "bg-destructive-subtle text-destructive-text",
+      )}
+    >
+      {on ? "+" : "−"}
+    </span>
+  );
+  return (
+    <Dialog open onOpenChange={(open) => (open ? undefined : onCancel())}>
+      <DialogContent className="flex max-w-150 flex-col gap-5 p-6">
+        <div className="flex flex-col gap-1 pr-8">
+          <DialogTitle className="text-h2 text-foreground">{position.name} 직위 권한 저장</DialogTitle>
+          <DialogDescription className="text-body text-muted-foreground">
+            바뀐 권한을 확인하고 저장하세요.
+          </DialogDescription>
+        </div>
+        <section aria-labelledby="changed-title" className="flex flex-col gap-2">
+          <h3 id="changed-title" className="flex items-baseline gap-1.5 text-body-strong text-foreground">
+            바뀐 권한 <span className="text-caption text-muted-foreground">{changes.length}개</span>
+          </h3>
+          {added.length ? (
+            <CollapsibleGroup title="추가된 권한" count={`${added.length}개`} leading={mark(true)}>
+              {added.map((c) => (
+                <GroupItem key={c.code} main={c.label} sub={c.area} />
+              ))}
+            </CollapsibleGroup>
+          ) : null}
+          {removed.length ? (
+            <CollapsibleGroup title="제거된 권한" count={`${removed.length}개`} leading={mark(false)}>
+              {removed.map((c) => (
+                <GroupItem key={c.code} main={c.label} sub={c.area} />
+              ))}
+            </CollapsibleGroup>
+          ) : null}
+        </section>
+        <hr className="border-border" />
+        <section aria-labelledby="affected-title" className="flex flex-col gap-2">
+          <h3 id="affected-title" className="flex items-baseline gap-1.5 text-body-strong text-foreground">
+            영향받는 대상 <span className="text-caption text-muted-foreground">저장하면 바로 적용돼요</span>
+          </h3>
+          {impact.isError ? <Alert variant="error" title="영향받는 대상을 불러오지 못했어요." /> : null}
+          {impact.data && affected === 0 ? (
+            <p className="text-body text-muted-foreground">이 직위의 직원이 없어요.</p>
+          ) : (
+            <ImpactList impact={impact.data} pendingOnly registrationNote="승인되면 적용" />
+          )}
+        </section>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={onCancel}>
+            취소
+          </Button>
+          <Button disabled={pending} onClick={onSave}>
+            저장
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
