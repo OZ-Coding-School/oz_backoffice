@@ -1,6 +1,6 @@
 """멘토 프로필 API (실제 DB + S3 에뮬레이터 floci)."""
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 
 import httpx
@@ -10,8 +10,16 @@ from httpx import AsyncClient
 from app.cli import create_super_admin
 from app.contexts.identity.domain.entities import User
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
+from app.contexts.mentoring.domain.assignment import CohortMentor
+from app.contexts.mentoring.domain.enums import (
+    CohortMentorDeactivationReason,
+    MentoringSettlementPolicy,
+    PayUnit,
+)
+from app.contexts.mentoring.infrastructure.repositories import TortoiseCohortMentorRepository
 from app.core.config import Settings
 from app.core.security import JWTService
+from tests.factories.academy import create_cohort
 from tests.factories.educator import create_mentor, create_user
 
 pytestmark = pytest.mark.api
@@ -114,6 +122,29 @@ async def test_admin_lists_and_edits_mentors(client: AsyncClient, admin: dict[st
         "kim@mentor.com",
         0,
     )
+    assert (item["accepting_requests"], item["active_cohorts"]) == (False, [])
+
+    # 활성 배정 기수 (A100): 비활성 배정은 빠진다
+    cohort, old = await create_cohort(cohort_number=12), await create_cohort(cohort_number=11)
+    repo = TortoiseCohortMentorRepository()
+    for c, active in ((cohort, True), (old, False)):
+        assignment = CohortMentor(
+            cohort_id=c.id,
+            mentor_id=mentor.id,
+            start_date=date(2026, 11, 2),
+            cost_settlement_policy=MentoringSettlementPolicy.ACTUAL_DURATION,
+            pay_unit=PayUnit.HOURLY,
+            pay_rate=30000,
+        )
+        if not active:
+            assignment.deactivate(CohortMentorDeactivationReason.MANUAL, now=datetime.now(UTC))
+        await repo.add(assignment)
+    item = (await client.get("/api/v1/admin/mentors", params={"q": "김멘"}, headers=admin)).json()[
+        "items"
+    ][0]
+    assert [(c["cohort_id"], c["cohort_number"]) for c in item["active_cohorts"]] == [
+        (str(cohort.id), 12)
+    ]
 
     base = f"/api/v1/admin/mentors/{mentor.id}/profile"
     edited = await client.patch(base, json={"expertise": "백엔드"}, headers=admin)

@@ -11,6 +11,7 @@ from tortoise.contrib.fastapi import RegisterTortoise
 from app.api import health, v1
 from app.composition.cohort_summary import CohortSummaryComposer
 from app.composition.member_links import MemberLinksComposer
+from app.composition.mentor_cohorts import MentorCohortComposer
 from app.composition.student_detail import StudentDetailComposer
 from app.contexts.academy.application.catalog import AcademyCatalog
 from app.contexts.academy.application.student_claims import StudentClaims
@@ -122,6 +123,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # 전체 회원(A94): 종류별 연결 정보와 비활성화 이력
     app.state.member_links = MemberLinksComposer()
     app.state.cohort_summary = CohortSummaryComposer()
+    app.state.mentor_cohorts = MentorCohortComposer()
     app.state.student_detail = StudentDetailComposer(app.state.student_queries)
     app.state.audit_queries = AuditQueries(TortoiseAuditLogRepository())
 

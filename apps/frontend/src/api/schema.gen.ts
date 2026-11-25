@@ -5692,6 +5692,18 @@ export interface components {
              */
             profile_image_url: string | null;
         };
+        /** MentorCohortItem */
+        MentorCohortItem: {
+            /**
+             * Cohort Id
+             * Format: uuid
+             */
+            cohort_id: string;
+            /** Bootcamp Name */
+            bootcamp_name: string;
+            /** Cohort Number */
+            cohort_number: number;
+        };
         /** MentorDeactivateRequest */
         MentorDeactivateRequest: {
             /**
@@ -5757,6 +5769,16 @@ export interface components {
             contract_count: number;
             /** Created At */
             created_at: string | null;
+            /**
+             * Accepting Requests
+             * @description 신청 받기 (A37)
+             */
+            accepting_requests: boolean;
+            /**
+             * Active Cohorts
+             * @description 활성 배정 기수, 최근 배정부터 (A100)
+             */
+            active_cohorts?: components["schemas"]["MentorCohortItem"][];
         };
         /** MentorSessionListPage */
         MentorSessionListPage: {

@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 
 from app.contexts.access.presentation.dependencies import ApprovedUser, require_permission
 from app.contexts.audit.application.recorder import AuditRecorder
+from app.contexts.educator.application.mentor_cohorts import MentorCohortReader
 from app.contexts.educator.application.mentor_profiles import MentorProfileService
 from app.contexts.educator.application.uploads import DirectUploads
 from app.contexts.educator.domain.enums import DisplayNamePreference
@@ -99,6 +100,12 @@ class MentorProfileResponse(BaseModel):
     is_active: bool
 
 
+class MentorCohortItem(BaseModel):
+    cohort_id: uuid.UUID
+    bootcamp_name: str
+    cohort_number: int
+
+
 class MentorListItem(BaseModel):
     id: uuid.UUID
     user_id: uuid.UUID
@@ -109,6 +116,10 @@ class MentorListItem(BaseModel):
     is_active: bool
     contract_count: int
     created_at: datetime | None
+    accepting_requests: bool = Field(description="신청 받기 (A37)")
+    active_cohorts: list[MentorCohortItem] = Field(
+        default_factory=list, description="활성 배정 기수, 최근 배정부터 (A100)"
+    )
 
 
 def display_name(mentor: Mentor, real_name: str) -> str:
@@ -193,6 +204,7 @@ async def delete_my_image(
 # ---------------------------------------------------------------- 운영진
 @admin_router.get("", response_model=Page[MentorListItem])
 async def list_mentors(
+    request: Request,
     _: Reader,
     profiles: ProfilesDep,
     users: UsersDep,
@@ -208,6 +220,8 @@ async def list_mentors(
         offset=offset,
     )
     found = await users.get_many([s.mentor.user_id for s in summaries])
+    reader = cast("MentorCohortReader", request.app.state.mentor_cohorts)
+    cohorts = await reader.active_cohorts([s.mentor.id for s in summaries])
     items = []
     for summary in summaries:
         mentor = summary.mentor
@@ -224,6 +238,15 @@ async def list_mentors(
                 is_active=mentor.is_active,
                 contract_count=summary.contract_count,
                 created_at=mentor.created_at,
+                accepting_requests=mentor.accepting_requests,
+                active_cohorts=[
+                    MentorCohortItem(
+                        cohort_id=c.cohort_id,
+                        bootcamp_name=c.bootcamp_name,
+                        cohort_number=c.cohort_number,
+                    )
+                    for c in cohorts.get(mentor.id, [])
+                ],
             )
         )
     return Page(items=items, total=total, limit=limit, offset=offset)

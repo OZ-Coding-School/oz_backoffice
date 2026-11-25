@@ -267,6 +267,14 @@ class TortoiseCohortMentorRepository(TortoiseRepository[CohortMentor, CohortMent
         rows = await query.order_by("-is_active", "-start_date", "id")
         return [self.to_entity(row) for row in rows]
 
+    async def list_active_by_mentors(self, mentor_ids: list[uuid.UUID]) -> list[CohortMentor]:
+        if not mentor_ids:
+            return []
+        rows = await CohortMentorModel.filter(mentor_id__in=mentor_ids, is_active=True).order_by(
+            "-start_date", "id"
+        )
+        return [self.to_entity(row) for row in rows]
+
     async def list_expired(self, today: date) -> list[CohortMentor]:
         rows = await CohortMentorModel.filter(is_active=True, end_date__lt=today).order_by("id")
         return [self.to_entity(row) for row in rows]
