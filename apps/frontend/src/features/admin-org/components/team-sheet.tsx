@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { ApiError } from "@/api/errors";
-import { PanelHead, PanelList, PanelRow, PanelSection } from "@/components/panel";
+import { PanelActions, PanelHead, PanelList, PanelRow, PanelSection } from "@/components/panel";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -51,6 +51,7 @@ export function TeamSheet({
   onClose: () => void;
 }) {
   const [editing, setEditing] = useState(team === null);
+  const [deleting, setDeleting] = useState(false);
   const department = departments.find((d) => d.id === team?.department_id);
   const bootcampName = (id: string) => bootcamps.find((b) => b.id === id)?.name ?? "—";
   return (
@@ -62,9 +63,7 @@ export function TeamSheet({
           badges={editing && team ? <Badge variant="info">수정 중</Badge> : null}
           actions={
             canManage && !editing ? (
-              <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-                수정
-              </Button>
+              <PanelActions onEdit={() => setEditing(true)} onDelete={() => setDeleting(true)} />
             ) : null
           }
           onClose={onClose}
@@ -76,7 +75,6 @@ export function TeamSheet({
             teams={teams}
             bootcamps={bootcamps}
             onDone={() => (team ? setEditing(false) : onClose())}
-            onDeleted={onClose}
           />
         ) : team ? (
           <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-6">
@@ -101,6 +99,15 @@ export function TeamSheet({
             </PanelSection>
           </div>
         ) : null}
+        {deleting && team ? (
+          <DeleteTeamDialog
+            team={team}
+            teams={teams}
+            departments={departments}
+            onClose={() => setDeleting(false)}
+            onDeleted={onClose}
+          />
+        ) : null}
       </SheetContent>
     </Sheet>
   );
@@ -112,14 +119,12 @@ function TeamForm({
   teams,
   bootcamps,
   onDone,
-  onDeleted,
 }: {
   team: Team | null;
   departments: Department[];
   teams: Team[];
   bootcamps: Bootcamp[];
   onDone: () => void;
-  onDeleted: () => void;
 }) {
   const id = useId();
   const initialBootcamps = team?.bootcamp_ids ?? [];
@@ -135,7 +140,6 @@ function TeamForm({
   const save = useSaveTeam(team?.id ?? null);
   const [error, setError] = useState<string | null>(null);
   const [moving, setMoving] = useState<Values | null>(null);
-  const [deleting, setDeleting] = useState(false);
   const dirty = form.formState.isDirty;
   const blocker = useBlocker({
     shouldBlockFn: () => dirty && !save.isPending,
@@ -256,16 +260,6 @@ function TeamForm({
         {error ? <Alert variant="error" title={error} /> : null}
       </div>
       <div className="flex items-center gap-2 border-t border-border px-6 py-3">
-        {team ? (
-          <Button
-            type="button"
-            variant="ghost"
-            className="text-destructive-text hover:text-destructive-text"
-            onClick={() => setDeleting(true)}
-          >
-            팀 삭제
-          </Button>
-        ) : null}
         <div className="ml-auto flex gap-2">
           <Button type="button" variant="outline" onClick={onDone}>
             취소
@@ -282,15 +276,6 @@ function TeamForm({
           pending={save.isPending}
           onCancel={() => setMoving(null)}
           onConfirm={() => void persist(moving)}
-        />
-      ) : null}
-      {deleting && team ? (
-        <DeleteTeamDialog
-          team={team}
-          teams={teams}
-          departments={departments}
-          onClose={() => setDeleting(false)}
-          onDeleted={onDeleted}
         />
       ) : null}
       <DiscardDialog blocker={blocker} />

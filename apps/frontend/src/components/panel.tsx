@@ -116,3 +116,24 @@ export function PanelList({
     </ul>
   );
 }
+
+/** 조회 머리의 [수정] [삭제] (F68: 삭제는 수정 모드에 넣지 않는다) */
+export function PanelActions({ onEdit, onDelete }: { onEdit: () => void; onDelete?: () => void }) {
+  return (
+    <div className="flex gap-2">
+      <Button variant="outline" size="sm" onClick={onEdit}>
+        수정
+      </Button>
+      {onDelete ? (
+        <Button
+          variant="outline"
+          size="sm"
+          className="border-destructive-text text-destructive-text hover:bg-destructive-subtle hover:text-destructive-text"
+          onClick={onDelete}
+        >
+          삭제
+        </Button>
+      ) : null}
+    </div>
+  );
+}

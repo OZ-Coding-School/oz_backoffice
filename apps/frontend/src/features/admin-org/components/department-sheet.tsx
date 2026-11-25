@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { ApiError } from "@/api/errors";
-import { PanelHead, PanelList, PanelRow, PanelSection } from "@/components/panel";
+import { PanelActions, PanelHead, PanelList, PanelRow, PanelSection } from "@/components/panel";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,7 @@ export function DepartmentSheet({
   onClose: () => void;
 }) {
   const [editing, setEditing] = useState(department === null);
+  const [deleting, setDeleting] = useState(false);
   const title = department?.name ?? "새 부서";
   return (
     <Sheet open onOpenChange={(open) => (open ? undefined : onClose())}>
@@ -51,19 +52,13 @@ export function DepartmentSheet({
           badges={editing && department ? <Badge variant="info">수정 중</Badge> : null}
           actions={
             canManage && !editing ? (
-              <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-                수정
-              </Button>
+              <PanelActions onEdit={() => setEditing(true)} onDelete={() => setDeleting(true)} />
             ) : null
           }
           onClose={onClose}
         />
         {editing ? (
-          <DepartmentForm
-            department={department}
-            onDone={() => (department ? setEditing(false) : onClose())}
-            onDeleted={onClose}
-          />
+          <DepartmentForm department={department} onDone={() => (department ? setEditing(false) : onClose())} />
         ) : department ? (
           <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-6">
             <PanelSection title="기본 정보">
@@ -94,20 +89,15 @@ export function DepartmentSheet({
             </PanelSection>
           </div>
         ) : null}
+        {deleting && department ? (
+          <DeleteDepartmentDialog department={department} onClose={() => setDeleting(false)} onDeleted={onClose} />
+        ) : null}
       </SheetContent>
     </Sheet>
   );
 }
 
-function DepartmentForm({
-  department,
-  onDone,
-  onDeleted,
-}: {
-  department: Department | null;
-  onDone: () => void;
-  onDeleted: () => void;
-}) {
+function DepartmentForm({ department, onDone }: { department: Department | null; onDone: () => void }) {
   const id = useId();
   const form = useForm<Values>({
     resolver: zodResolver(schema),
@@ -119,7 +109,6 @@ function DepartmentForm({
   });
   const save = useSaveDepartment(department?.id ?? null);
   const [error, setError] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
   const dirty = form.formState.isDirty;
   const blocker = useBlocker({
     shouldBlockFn: () => dirty && !save.isPending,
@@ -178,16 +167,6 @@ function DepartmentForm({
         {error ? <Alert variant="error" title={error} /> : null}
       </div>
       <div className="flex items-center gap-2 border-t border-border px-6 py-3">
-        {department ? (
-          <Button
-            type="button"
-            variant="ghost"
-            className="text-destructive-text hover:text-destructive-text"
-            onClick={() => setDeleting(true)}
-          >
-            부서 삭제
-          </Button>
-        ) : null}
         <div className="ml-auto flex gap-2">
           <Button type="button" variant="outline" onClick={onDone}>
             취소
@@ -197,9 +176,6 @@ function DepartmentForm({
           </Button>
         </div>
       </div>
-      {deleting && department ? (
-        <DeleteDepartmentDialog department={department} onClose={() => setDeleting(false)} onDeleted={onDeleted} />
-      ) : null}
       <DiscardDialog blocker={blocker} />
     </form>
   );
