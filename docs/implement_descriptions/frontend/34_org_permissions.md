@@ -1,7 +1,7 @@
 # 34. 조직 설정 > 권한 (FE-15d)
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 중)
+- 관련 PR: #137
 - 관련 결정: `docs/decisions.md` F63·F64·F65 (A86·A87)
 - 이전 기록: [33. 직원·담당자 (FE-15c)](33_staff_and_employees.md)
 
