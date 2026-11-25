@@ -41,6 +41,7 @@ import { Route as MemberMentoringSessionsIndexRouteImport } from './routes/_memb
 import { Route as MemberMentoringSessionsSessionIdRouteImport } from './routes/_member/mentoring/sessions/$sessionId'
 import { Route as StaffAdminAcademyBootcampsRouteImport } from './routes/_staff/admin/academy/bootcamps'
 import { Route as StaffAdminAcademyHrdRouteImport } from './routes/_staff/admin/academy/hrd'
+import { Route as StaffAdminAdministrationContractsRouteImport } from './routes/_staff/admin/administration/contracts'
 import { Route as StaffAdminMembersApprovalsRouteImport } from './routes/_staff/admin/members/approvals'
 import { Route as StaffAdminMembersUsersRouteImport } from './routes/_staff/admin/members/users'
 import { Route as StaffAdminOrgDepartmentsRouteImport } from './routes/_staff/admin/org/departments'
@@ -226,6 +227,12 @@ const StaffAdminAcademyHrdRoute = StaffAdminAcademyHrdRouteImport.update({
   path: '/admin/academy/hrd',
   getParentRoute: () => StaffRoute,
 } as any)
+const StaffAdminAdministrationContractsRoute =
+  StaffAdminAdministrationContractsRouteImport.update({
+    id: '/admin/administration/contracts',
+    path: '/admin/administration/contracts',
+    getParentRoute: () => StaffRoute,
+  } as any)
 const StaffAdminMembersApprovalsRoute =
   StaffAdminMembersApprovalsRouteImport.update({
     id: '/admin/members/approvals',
@@ -318,6 +325,7 @@ export interface FileRoutesByFullPath {
   '/mentoring/sessions/$sessionId': typeof MemberMentoringSessionsSessionIdRoute
   '/admin/academy/bootcamps': typeof StaffAdminAcademyBootcampsRoute
   '/admin/academy/hrd': typeof StaffAdminAcademyHrdRoute
+  '/admin/administration/contracts': typeof StaffAdminAdministrationContractsRoute
   '/admin/members/approvals': typeof StaffAdminMembersApprovalsRoute
   '/admin/members/users': typeof StaffAdminMembersUsersRoute
   '/admin/org/departments': typeof StaffAdminOrgDepartmentsRoute
@@ -360,6 +368,7 @@ export interface FileRoutesByTo {
   '/mentoring/sessions/$sessionId': typeof MemberMentoringSessionsSessionIdRoute
   '/admin/academy/bootcamps': typeof StaffAdminAcademyBootcampsRoute
   '/admin/academy/hrd': typeof StaffAdminAcademyHrdRoute
+  '/admin/administration/contracts': typeof StaffAdminAdministrationContractsRoute
   '/admin/members/approvals': typeof StaffAdminMembersApprovalsRoute
   '/admin/members/users': typeof StaffAdminMembersUsersRoute
   '/admin/org/departments': typeof StaffAdminOrgDepartmentsRoute
@@ -407,6 +416,7 @@ export interface FileRoutesById {
   '/_member/mentoring/sessions/$sessionId': typeof MemberMentoringSessionsSessionIdRoute
   '/_staff/admin/academy/bootcamps': typeof StaffAdminAcademyBootcampsRoute
   '/_staff/admin/academy/hrd': typeof StaffAdminAcademyHrdRoute
+  '/_staff/admin/administration/contracts': typeof StaffAdminAdministrationContractsRoute
   '/_staff/admin/members/approvals': typeof StaffAdminMembersApprovalsRoute
   '/_staff/admin/members/users': typeof StaffAdminMembersUsersRoute
   '/_staff/admin/org/departments': typeof StaffAdminOrgDepartmentsRoute
@@ -451,6 +461,7 @@ export interface FileRouteTypes {
     | '/mentoring/sessions/$sessionId'
     | '/admin/academy/bootcamps'
     | '/admin/academy/hrd'
+    | '/admin/administration/contracts'
     | '/admin/members/approvals'
     | '/admin/members/users'
     | '/admin/org/departments'
@@ -493,6 +504,7 @@ export interface FileRouteTypes {
     | '/mentoring/sessions/$sessionId'
     | '/admin/academy/bootcamps'
     | '/admin/academy/hrd'
+    | '/admin/administration/contracts'
     | '/admin/members/approvals'
     | '/admin/members/users'
     | '/admin/org/departments'
@@ -539,6 +551,7 @@ export interface FileRouteTypes {
     | '/_member/mentoring/sessions/$sessionId'
     | '/_staff/admin/academy/bootcamps'
     | '/_staff/admin/academy/hrd'
+    | '/_staff/admin/administration/contracts'
     | '/_staff/admin/members/approvals'
     | '/_staff/admin/members/users'
     | '/_staff/admin/org/departments'
@@ -794,6 +807,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StaffAdminAcademyHrdRouteImport
       parentRoute: typeof StaffRoute
     }
+    '/_staff/admin/administration/contracts': {
+      id: '/_staff/admin/administration/contracts'
+      path: '/admin/administration/contracts'
+      fullPath: '/admin/administration/contracts'
+      preLoaderRoute: typeof StaffAdminAdministrationContractsRouteImport
+      parentRoute: typeof StaffRoute
+    }
     '/_staff/admin/members/approvals': {
       id: '/_staff/admin/members/approvals'
       path: '/admin/members/approvals'
@@ -950,6 +970,7 @@ interface StaffRouteChildren {
   StaffAdminIndexRoute: typeof StaffAdminIndexRoute
   StaffAdminAcademyBootcampsRoute: typeof StaffAdminAcademyBootcampsRoute
   StaffAdminAcademyHrdRoute: typeof StaffAdminAcademyHrdRoute
+  StaffAdminAdministrationContractsRoute: typeof StaffAdminAdministrationContractsRoute
   StaffAdminMembersApprovalsRoute: typeof StaffAdminMembersApprovalsRoute
   StaffAdminMembersUsersRoute: typeof StaffAdminMembersUsersRoute
   StaffAdminOrgDepartmentsRoute: typeof StaffAdminOrgDepartmentsRoute
@@ -967,6 +988,8 @@ const StaffRouteChildren: StaffRouteChildren = {
   StaffAdminIndexRoute: StaffAdminIndexRoute,
   StaffAdminAcademyBootcampsRoute: StaffAdminAcademyBootcampsRoute,
   StaffAdminAcademyHrdRoute: StaffAdminAcademyHrdRoute,
+  StaffAdminAdministrationContractsRoute:
+    StaffAdminAdministrationContractsRoute,
   StaffAdminMembersApprovalsRoute: StaffAdminMembersApprovalsRoute,
   StaffAdminMembersUsersRoute: StaffAdminMembersUsersRoute,
   StaffAdminOrgDepartmentsRoute: StaffAdminOrgDepartmentsRoute,

@@ -7,7 +7,8 @@ export const Route = createFileRoute("/_staff/admin/educators/mentors/")({
   validateSearch: (search: Record<string, unknown>): MentorsSearch => {
     const out: MentorsSearch = {};
     if (typeof search.q === "string" && search.q) out.q = search.q;
-    if (search.status === "active" || search.status === "inactive") out.status = search.status;
+    if (search.status === "active" || search.status === "inactive" || search.status === "pending")
+      out.status = search.status;
     return out;
   },
   component: function Mentors() {

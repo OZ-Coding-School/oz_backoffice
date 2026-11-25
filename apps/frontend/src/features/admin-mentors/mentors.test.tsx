@@ -9,6 +9,8 @@ import { apiUrl } from "@/mocks/api";
 import { server } from "@/mocks/node";
 import { renderRoute } from "@/test/render";
 
+import type { Contract } from "@/features/admin-contracts/api";
+
 import type { MentorAssignment, MentorItem } from "./api";
 
 const ADMIN = makeMe({ name: "김관리", account_type: "STAFF", is_super_admin: false });
@@ -40,6 +42,15 @@ const KIM = mentor("m1", "김멘토", {
   ],
 });
 const CHOI = mentor("m2", "최멘토", { is_active: false, accepting_requests: false, contract_count: 0 });
+const NEW = mentor("m3", "박새멘토", {
+  user_id: null,
+  email: null,
+  phone_number: "01055550000",
+  is_active: false,
+  accepting_requests: false,
+  is_registered: false,
+  created_at: "2026-11-24T01:00:00Z",
+});
 
 const PROFILE: MentorProfile = {
   id: "m1",
@@ -95,7 +106,29 @@ const ASSIGNMENTS = [
   }),
 ];
 
-function access(codes = ["educator.mentor.read", "educator.mentor.manage"]): StaffAccess {
+const CONTRACTS: Contract[] = [
+  {
+    id: "k1",
+    educator_type: "MENTOR",
+    status: "ACTIVE",
+    contractor_name: "김멘토",
+    contractor_phone: "01011111234",
+    contractor_email: null,
+    title: "2026 백엔드 멘토 계약",
+    start_date: "2026-11-01",
+    end_date: "2027-04-30",
+    manager_employee_id: "e1",
+    manager_name: "김관리",
+    mentor_id: "m1",
+    instructor_id: null,
+    linked_profile: { name: "김멘토", display_name: "멘토K" },
+    contract_file: { id: "f1", file_name: "멘토 계약서.pdf", file_size: 186_000, created_at: "2026-10-28T01:00:00Z" },
+    created_at: "2026-10-28T01:00:00Z",
+    updated_at: null,
+  },
+];
+
+function access(codes = ["educator.mentor.read", "educator.mentor.manage", "educator.contract.read"]): StaffAccess {
   return {
     is_super_admin: false,
     position: null,
@@ -114,9 +147,11 @@ function mockApi({ codes, item = KIM }: { codes?: string[]; item?: MentorItem } 
     http.get(apiUrl("/api/v1/me/staff-access"), () => HttpResponse.json(access(codes))),
     http.get(apiUrl("/api/v1/admin/mentors"), ({ request }) => {
       const url = new URL(request.url);
-      const items = [KIM, CHOI].filter(
+      const status = url.searchParams.get("status");
+      const items = [KIM, CHOI, NEW].filter(
         (m) =>
-          (url.searchParams.get("is_active") === null || String(m.is_active) === url.searchParams.get("is_active")) &&
+          (status === null ||
+            (status === "pending" ? !m.is_registered : m.is_registered && m.is_active === (status === "active"))) &&
           (!url.searchParams.get("q") || m.name.includes(url.searchParams.get("q") ?? "")),
       );
       return HttpResponse.json({ items, total: items.length, limit: 20, offset: 0 });
@@ -124,6 +159,10 @@ function mockApi({ codes, item = KIM }: { codes?: string[]; item?: MentorItem } 
     http.get(apiUrl("/api/v1/admin/mentors/{mentor_id}"), () => HttpResponse.json(item)),
     http.get(apiUrl("/api/v1/admin/mentors/{mentor_id}/profile"), () => HttpResponse.json(PROFILE)),
     http.get(apiUrl("/api/v1/admin/mentors/{mentor_id}/mentor-assignments"), () => HttpResponse.json(ASSIGNMENTS)),
+    http.get(apiUrl("/api/v1/admin/contracts"), ({ request }) => {
+      calls.push({ path: "contracts", body: new URL(request.url).searchParams.get("mentor_id") });
+      return HttpResponse.json({ items: CONTRACTS, total: CONTRACTS.length, limit: 100, offset: 0 });
+    }),
     http.patch(apiUrl("/api/v1/admin/mentors/{mentor_id}/profile"), async ({ request }) => {
       await record("profile", request.clone());
       return HttpResponse.json({ ...PROFILE, ...((await request.json()) as object) });
@@ -183,6 +222,7 @@ describe("강사·멘토 > 멘토 (FE-18a)", () => {
     expect(rows.map(cells)).toEqual([
       ["김멘토(멘토K)", "m1@mentor.com", "010-****-1234", "2건", "신청 받는 중", "활성"],
       ["최멘토", "m2@mentor.com", "010-****-1234", "0건", "신청 꺼짐", "비활성"],
+      ["박새멘토", "—", "010-****-0000", "1건", "신청 꺼짐", "가입 전"],
     ]);
     expect(screen.getByRole("link", { name: "멘토" })).toHaveAttribute("href", "/admin/educators/mentors");
   });
@@ -292,5 +332,38 @@ describe("강사·멘토 > 멘토 (FE-18a)", () => {
     await user.click(within(pick).getByRole("button", { name: "다시 켜기" }));
     expect(await screen.findByText("배정 1개를 다시 켰어요")).toBeInTheDocument();
     expect(calls).toContainEqual({ path: "reactivate", body: { assignment_ids: ["a1"] } });
+  });
+
+  it("계약 탭: 그 멘토의 계약 카드, 누르면 행정 업무 › 계약 패널로", async () => {
+    const calls = mockApi();
+    const { router } = await renderRoute("/admin/educators/mentors/m1?tab=contracts");
+    const list = await screen.findByRole("list", { name: "계약" });
+    expect(within(list).getByRole("listitem")).toHaveTextContent(
+      "2026 백엔드 멘토 계약진행 중기간2026.11.01 ~ 2027.04.30계약서멘토 계약서.pdf담당김관리",
+    );
+    expect(calls).toContainEqual({ path: "contracts", body: "m1" });
+    await userEvent.setup().click(within(list).getByRole("link", { name: "2026 백엔드 멘토 계약" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/admin/administration/contracts"));
+    expect(router.state.location.search).toEqual({ contract: "k1" });
+  });
+
+  it("계약 조회 권한이 없으면 계약 탭이 없다", async () => {
+    mockApi({ codes: ["educator.mentor.read"] });
+    await renderRoute("/admin/educators/mentors/m1");
+    await screen.findByRole("region", { name: "수강생에게 보이는 모습" });
+    expect(screen.queryByRole("link", { name: "계약" })).not.toBeInTheDocument();
+  });
+
+  it("가입 전 멘토: 활성화 버튼 없이 가입 전 배지, 계정 칸은 가입 전, 신청 받기는 막힘", async () => {
+    mockApi({ item: NEW });
+    await renderRoute("/admin/educators/mentors/m3");
+    expect(await screen.findByRole("heading", { level: 1, name: "박새멘토" })).toBeInTheDocument();
+    expect(screen.getByText("가입 전 · 계약을 먼저 만든 멘토예요")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "활성화" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "비활성화" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "계정" })).toHaveTextContent(
+      "이름박새멘토휴대폰010-****-0000가입가입 전",
+    );
+    expect(screen.getByRole("switch", { name: "신청 받기" })).toBeDisabled();
   });
 });

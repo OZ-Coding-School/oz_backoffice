@@ -11,17 +11,26 @@ import { assignmentPeriod } from "@/features/mentor-profile/labels";
 import { hasPermission, staffAccessQuery } from "@/features/staff/api";
 import { cn } from "@/lib/utils";
 
-import { mentorAssignmentsQuery, mentorQuery, type MentorAssignment, type MentorItem } from "../api";
+import { STATUS as CONTRACT_STATUS, period } from "@/features/admin-contracts/labels";
+
+import {
+  mentorAssignmentsQuery,
+  mentorContractsQuery,
+  mentorQuery,
+  type MentorAssignment,
+  type MentorItem,
+} from "../api";
 import { endText, payText } from "../labels";
 import { ActivationActions } from "./activation-actions";
-import { AcceptingBadge, ActiveBadge } from "./mentors-page";
+import { AcceptingBadge, StatusBadge } from "./mentors-page";
 import { ProfileTab } from "./profile-tab";
 
-export type MentorTab = "profile" | "assignments";
+export type MentorTab = "profile" | "assignments" | "contracts";
 
 const TABS: { value: MentorTab; label: string }[] = [
   { value: "profile", label: "프로필" },
   { value: "assignments", label: "배정" },
+  { value: "contracts", label: "계약" },
 ];
 
 /** 강사·멘토 > 멘토 상세 (F79): 머리 + 탭 프로필·배정 */
@@ -29,6 +38,10 @@ export function MentorPage({ mentorId, tab }: { mentorId: string; tab: MentorTab
   const mentor = useQuery(mentorQuery(mentorId));
   const access = useQuery(staffAccessQuery);
   const canManage = !!access.data && hasPermission(access.data, "educator.mentor.manage");
+  // 계약 탭은 계약 조회 권한이 있을 때만 (F83)
+  const tabs = TABS.filter(
+    (t) => t.value !== "contracts" || (!!access.data && hasPermission(access.data, "educator.contract.read")),
+  );
   const m = mentor.data;
   return (
     <div className="flex flex-col gap-5">
@@ -50,7 +63,7 @@ export function MentorPage({ mentorId, tab }: { mentorId: string; tab: MentorTab
           <Head mentor={m} actions={canManage ? <ActivationActions mentor={m} /> : null} />
           <nav aria-label="멘토 상세">
             <ul className="flex gap-1 border-b border-border">
-              {TABS.map((t) => (
+              {tabs.map((t) => (
                 <li key={t.value}>
                   <Link
                     to="/admin/educators/mentors/$mentorId"
@@ -70,7 +83,13 @@ export function MentorPage({ mentorId, tab }: { mentorId: string; tab: MentorTab
               ))}
             </ul>
           </nav>
-          {tab === "profile" ? <ProfileTab mentor={m} canManage={canManage} /> : <AssignmentsTab mentorId={mentorId} />}
+          {tab === "profile" ? (
+            <ProfileTab mentor={m} canManage={canManage} />
+          ) : tab === "contracts" ? (
+            <ContractsTab mentorId={mentorId} />
+          ) : (
+            <AssignmentsTab mentorId={mentorId} />
+          )}
         </>
       )}
     </div>
@@ -84,11 +103,13 @@ function Head({ mentor: m, actions }: { mentor: MentorItem; actions: ReactNode }
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <div className="flex items-center gap-2">
           <h1 className="text-h1 text-foreground">{m.name}</h1>
-          <ActiveBadge on={m.is_active} />
-          <AcceptingBadge on={m.accepting_requests} />
+          <StatusBadge mentor={m} />
+          {m.is_registered ? <AcceptingBadge on={m.accepting_requests} /> : null}
         </div>
         <p className="truncate text-body text-muted-foreground">
-          {[m.display_name !== m.name ? m.display_name : null, m.email].filter(Boolean).join(" · ")}
+          {m.is_registered
+            ? [m.display_name !== m.name ? m.display_name : null, m.email].filter(Boolean).join(" · ")
+            : "가입 전 · 계약을 먼저 만든 멘토예요"}
         </p>
       </div>
       {actions}
@@ -149,5 +170,65 @@ function AssignmentCard({ assignment: a }: { assignment: MentorAssignment }) {
         ) : null}
       </dl>
     </li>
+  );
+}
+
+/** 계약 탭 (F83): 조회만, 누르면 행정 업무 › 계약의 그 패널 */
+function ContractsTab({ mentorId }: { mentorId: string }) {
+  const list = useQuery(mentorContractsQuery(mentorId));
+  if (list.isPending)
+    return (
+      <div className="flex justify-center py-10">
+        <Spinner />
+      </div>
+    );
+  if (list.isError) return <ErrorState onRetry={() => void list.refetch()} />;
+  const items = list.data.items;
+  if (items.length === 0)
+    return (
+      <p className="rounded-xl border border-border bg-card p-6 text-body text-muted-foreground">
+        이 멘토의 계약이 없어요. 계약은 행정 업무 › 계약에서 추가해요.
+      </p>
+    );
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-body text-muted-foreground">
+        계약 {items.length}건 · 최근 등록부터. 추가·변경은 행정 업무 › 계약에서 해요.
+      </p>
+      <ul aria-label="계약" className="flex flex-col gap-3">
+        {items.map((c) => {
+          const status = CONTRACT_STATUS[c.status];
+          const closed = c.status === "ENDED" || c.status === "TERMINATED";
+          return (
+            <li key={c.id}>
+              <Link
+                to="/admin/administration/contracts"
+                search={{ contract: c.id }}
+                aria-label={c.title}
+                className={cn(
+                  "flex flex-col gap-2.5 rounded-xl border border-border p-5 outline-none hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring",
+                  closed ? "bg-muted/60 [&_dd]:text-muted-foreground" : "bg-card",
+                )}
+              >
+                <span className="flex items-center gap-2">
+                  <span className={cn("text-h3", closed ? "text-muted-foreground" : "text-foreground")}>{c.title}</span>
+                  <Badge variant={status.badge}>{status.label}</Badge>
+                </span>
+                <dl className="grid grid-cols-[56px_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-body">
+                  <dt className="text-muted-foreground">기간</dt>
+                  <dd className="text-foreground">{period(c)}</dd>
+                  <dt className="text-muted-foreground">계약서</dt>
+                  <dd className="truncate text-foreground">
+                    {c.contract_file ? c.contract_file.file_name : "없음 · 확정하려면 계약서가 필요해요"}
+                  </dd>
+                  <dt className="text-muted-foreground">담당</dt>
+                  <dd className="text-foreground">{c.manager_name ?? "—"}</dd>
+                </dl>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }

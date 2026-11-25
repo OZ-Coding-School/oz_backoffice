@@ -58,20 +58,41 @@ export function ProfileTab({ mentor, canManage }: { mentor: MentorItem; canManag
           <h2 id="account-title" className="text-h3 text-foreground">
             계정
           </h2>
-          <dl className="grid grid-cols-[56px_minmax(0,1fr)] gap-x-4 gap-y-2.5 text-body">
-            <dt className="text-muted-foreground">실명</dt>
-            <dd className="text-foreground">{mentor.name}</dd>
-            <dt className="text-muted-foreground">이메일</dt>
-            <dd className="break-all text-foreground">{mentor.email}</dd>
-            <dt className="text-muted-foreground">휴대폰</dt>
-            <dd className="text-foreground">{maskPhone(mentor.phone_number) ?? "—"}</dd>
-            <dt className="text-muted-foreground">가입</dt>
-            <dd className="text-foreground">
-              {mentor.created_at ? `${formatKst(mentor.created_at, "yyyy.MM.dd")} 승인` : "—"}
-            </dd>
-          </dl>
+          {mentor.is_registered ? (
+            <dl className="grid grid-cols-[56px_minmax(0,1fr)] gap-x-4 gap-y-2.5 text-body">
+              <dt className="text-muted-foreground">실명</dt>
+              <dd className="text-foreground">{mentor.name}</dd>
+              <dt className="text-muted-foreground">이메일</dt>
+              <dd className="break-all text-foreground">{mentor.email ?? "—"}</dd>
+              <dt className="text-muted-foreground">휴대폰</dt>
+              <dd className="text-foreground">{maskPhone(mentor.phone_number) ?? "—"}</dd>
+              <dt className="text-muted-foreground">가입</dt>
+              <dd className="text-foreground">
+                {mentor.created_at ? `${formatKst(mentor.created_at, "yyyy.MM.dd")} 승인` : "—"}
+              </dd>
+            </dl>
+          ) : (
+            <>
+              <dl className="grid grid-cols-[56px_minmax(0,1fr)] gap-x-4 gap-y-2.5 text-body">
+                <dt className="text-muted-foreground">이름</dt>
+                <dd className="text-foreground">{mentor.name}</dd>
+                <dt className="text-muted-foreground">휴대폰</dt>
+                <dd className="text-foreground">{maskPhone(mentor.phone_number) ?? "—"}</dd>
+                <dt className="text-muted-foreground">가입</dt>
+                <dd className="text-foreground">가입 전</dd>
+              </dl>
+              <p className="text-caption text-muted-foreground">
+                계약의 이름·휴대폰으로 멘토 가입을 하면 이 멘토에 계정이 연결돼요.
+              </p>
+            </>
+          )}
         </section>
-        <AcceptingCard accepting={mentor.accepting_requests} setter={accepting} readOnly={!canManage} />
+        <AcceptingCard
+          accepting={mentor.accepting_requests}
+          setter={accepting}
+          readOnly={!canManage || !mentor.is_registered}
+          {...(mentor.is_registered ? {} : { description: "가입하고 활성화된 뒤에 켤 수 있어요." })}
+        />
       </div>
     </div>
   );
