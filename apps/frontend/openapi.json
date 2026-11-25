@@ -4065,6 +4065,55 @@
         }
       }
     },
+    "/api/v1/admin/cohorts/{cohort_id}/summary": {
+      "get": {
+        "tags": [
+          "admin-academy"
+        ],
+        "summary": "Get Cohort Summary",
+        "description": "수강생 상태별 인원·활성 배정 멘토·담당자(기수·과정 담당) (A96).",
+        "operationId": "get_cohort_summary_api_v1_admin_cohorts__cohort_id__summary_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cohort_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Cohort Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CohortSummaryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/rosters/sync": {
       "post": {
         "tags": [
@@ -14710,6 +14759,128 @@
           "ARCHIVED"
         ],
         "title": "CohortStatus"
+      },
+      "CohortStudentCountsResponse": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "linked": {
+            "type": "integer",
+            "title": "Linked",
+            "description": "가입해 회원과 연결된 수강생"
+          },
+          "by_status": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By Status",
+            "description": "수강 상태(EnrollmentStatus)별 수"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "linked",
+          "by_status"
+        ],
+        "title": "CohortStudentCountsResponse"
+      },
+      "CohortSummaryMentorResponse": {
+        "properties": {
+          "mentor_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Mentor Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Start Date"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mentor_id",
+          "name",
+          "start_date"
+        ],
+        "title": "CohortSummaryMentorResponse"
+      },
+      "CohortSummaryResponse": {
+        "properties": {
+          "students": {
+            "$ref": "#/components/schemas/CohortStudentCountsResponse"
+          },
+          "mentors": {
+            "items": {
+              "$ref": "#/components/schemas/CohortSummaryMentorResponse"
+            },
+            "type": "array",
+            "title": "Mentors"
+          },
+          "staff": {
+            "items": {
+              "$ref": "#/components/schemas/CohortSummaryStaffResponse"
+            },
+            "type": "array",
+            "title": "Staff"
+          }
+        },
+        "type": "object",
+        "required": [
+          "students",
+          "mentors",
+          "staff"
+        ],
+        "title": "CohortSummaryResponse"
+      },
+      "CohortSummaryStaffResponse": {
+        "properties": {
+          "employee_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Employee Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "position_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position Name"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "COHORT",
+              "COURSE"
+            ],
+            "title": "Scope",
+            "description": "기수 담당 / 과정 담당"
+          }
+        },
+        "type": "object",
+        "required": [
+          "employee_id",
+          "name",
+          "position_name",
+          "scope"
+        ],
+        "title": "CohortSummaryStaffResponse"
       },
       "CohortUpdate": {
         "properties": {

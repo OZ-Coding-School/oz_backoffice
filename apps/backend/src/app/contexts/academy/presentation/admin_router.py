@@ -5,12 +5,13 @@ PATCH는 보낸 필드만 바꾼다(null을 보내면 그 값을 비운다). 소
 
 import uuid
 from datetime import date
-from typing import Annotated, Any, cast
+from typing import Annotated, Any, Literal, cast
 
 from fastapi import APIRouter, Depends, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.contexts.academy.application.academy_admin import AcademyAdminService
+from app.contexts.academy.application.cohort_summary import CohortSummary, CohortSummaryReader
 from app.contexts.academy.domain.enums import (
     CohortStatus,
     DayNightSeType,
@@ -335,6 +336,64 @@ async def create_cohort(
 @router.get("/cohorts/{cohort_id}", response_model=CohortResponse)
 async def get_cohort(cohort_id: uuid.UUID, _: CohortReader, service: ServiceDep) -> CohortResponse:
     return CohortResponse.model_validate(await service.get_cohort(cohort_id))
+
+
+class CohortStudentCountsResponse(BaseModel):
+    total: int
+    linked: int = Field(description="가입해 회원과 연결된 수강생")
+    by_status: dict[str, int] = Field(description="수강 상태(EnrollmentStatus)별 수")
+
+
+class CohortSummaryMentorResponse(BaseModel):
+    mentor_id: uuid.UUID
+    name: str
+    start_date: date
+
+
+class CohortSummaryStaffResponse(BaseModel):
+    employee_id: uuid.UUID
+    name: str
+    position_name: str | None
+    scope: Literal["COHORT", "COURSE"] = Field(description="기수 담당 / 과정 담당")
+
+
+class CohortSummaryResponse(BaseModel):
+    students: CohortStudentCountsResponse
+    mentors: list[CohortSummaryMentorResponse]
+    staff: list[CohortSummaryStaffResponse]
+
+    @classmethod
+    def of(cls, s: CohortSummary) -> "CohortSummaryResponse":
+        return cls(
+            students=CohortStudentCountsResponse(
+                total=s.students.total, linked=s.students.linked, by_status=s.students.by_status
+            ),
+            mentors=[
+                CohortSummaryMentorResponse(
+                    mentor_id=m.mentor_id, name=m.name, start_date=m.start_date
+                )
+                for m in s.mentors
+            ],
+            staff=[
+                CohortSummaryStaffResponse(
+                    employee_id=x.employee_id,
+                    name=x.name,
+                    position_name=x.position_name,
+                    scope=x.scope,
+                )
+                for x in s.staff
+            ],
+        )
+
+
+@router.get("/cohorts/{cohort_id}/summary", response_model=CohortSummaryResponse)
+async def get_cohort_summary(
+    cohort_id: uuid.UUID, _: CohortReader, service: ServiceDep, request: Request
+) -> CohortSummaryResponse:
+    """수강생 상태별 인원·활성 배정 멘토·담당자(기수·과정 담당) (A96)."""
+    cohort = await service.get_cohort(cohort_id)
+    reader = cast("CohortSummaryReader", request.app.state.cohort_summary)
+    return CohortSummaryResponse.of(await reader.summary_of(cohort.id, cohort.bootcamp_id))
 
 
 @router.patch("/cohorts/{cohort_id}", response_model=CohortResponse)
