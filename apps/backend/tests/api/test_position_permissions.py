@@ -77,6 +77,9 @@ async def test_position_permissions_and_data_scope_drive_access(
         f"/api/v1/admin/positions/{position['id']}", json={"data_scope": "ALL"}, headers=admin
     )
     assert (await client.get(requests.format(other.id), headers=headers)).status_code == 200
+    # 직원 응답에도 직위의 데이터 범위가 보인다 (A91)
+    row = (await client.get(f"/api/v1/admin/employees/{employee.id}", headers=admin)).json()
+    assert row["data_scope"] == "ALL"
 
 
 async def test_permission_rules_and_catalog(

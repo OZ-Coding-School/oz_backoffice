@@ -46,6 +46,7 @@ const LEE = {
   employment_type: "REGULAR",
   assignments: [],
   is_super_admin: false,
+  data_scope: "ASSIGNED",
 };
 
 test("담당자 탭: 과정·기수 고르고 조교 추가 (FE-15c)", async ({ page }) => {

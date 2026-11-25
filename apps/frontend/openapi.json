@@ -15140,6 +15140,11 @@
             "title": "Is Super Admin",
             "description": "최고 관리자 (A87·A90)",
             "default": false
+          },
+          "data_scope": {
+            "$ref": "#/components/schemas/DataScope",
+            "description": "직위의 데이터 범위 (A87·A91)",
+            "default": "ASSIGNED"
           }
         },
         "type": "object",

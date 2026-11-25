@@ -163,7 +163,7 @@ async def test_employees_list_and_transfer(client: AsyncClient, admin: dict[str,
 
     (row,) = (await client.get("/api/v1/admin/employees", headers=admin)).json()
     assert row["user"]["id"] == str(employee.user_id)
-    assert row["is_super_admin"] is False
+    assert (row["is_super_admin"], row["data_scope"]) == (False, "ASSIGNED")
 
     team = await create_team(uuid.UUID(department["id"]))
     moved = await client.patch(

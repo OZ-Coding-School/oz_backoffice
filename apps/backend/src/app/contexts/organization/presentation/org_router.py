@@ -45,6 +45,7 @@ from app.contexts.organization.domain.enums import (
 from app.contexts.organization.infrastructure.repositories import (
     TortoiseBootcampStaffRepository,
     TortoiseCohortStaffRepository,
+    TortoiseEmployeePositionRepository,
 )
 from app.contexts.organization.presentation.dependencies import (
     get_organization_admin_service,
@@ -209,6 +210,9 @@ class EmployeeResponse(BaseModel):
         default_factory=list, description="담당 과정·기수 (A83)"
     )
     is_super_admin: bool = Field(default=False, description="최고 관리자 (A87·A90)")
+    data_scope: DataScope = Field(
+        default=DataScope.ASSIGNED, description="직위의 데이터 범위 (A87·A91)"
+    )
 
 
 class EmployeeUpdateRequest(BaseModel):
@@ -260,6 +264,7 @@ async def _employees(
     cohort_staffs = await TortoiseCohortStaffRepository().list_by_employees(ids)
     names = await academy.bootcamp_names({s.bootcamp_id for s in bootcamp_staffs})
     labels = await academy.cohort_labels({s.cohort_id for s in cohort_staffs})
+    scopes = {p.id: p.data_scope for p in await TortoiseEmployeePositionRepository().list_all()}
     assignments: dict[uuid.UUID, list[EmployeeAssignmentResponse]] = {i: [] for i in ids}
     for b in bootcamp_staffs:
         assignments[b.employee_id].append(
@@ -297,6 +302,7 @@ async def _employees(
                 employment_type=e.employment_type,
                 assignments=assignments.get(e.id, []),
                 is_super_admin=bool(user and user.is_super_admin),
+                data_scope=scopes.get(e.position_id, DataScope.ASSIGNED),
             )
         )
     return responses
