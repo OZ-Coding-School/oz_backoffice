@@ -1,7 +1,7 @@
 # 47. 가입 승인 멘토 탭: 가입 전 멘토 고르기 (FE-15a 보완)
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 후 기록)
+- 관련 PR: #167
 - 관련 결정: `docs/decisions.md` F84 (A105, F66)
 - 이전 기록: [46. 행정 업무 > 계약 (FE-18b)](46_admin_contracts.md), [31. 회원 가입 승인 (FE-15a)](31_signup_approvals.md)
 
