@@ -1216,6 +1216,26 @@ export interface paths {
         patch: operations["update_cohort_api_v1_admin_cohorts__cohort_id__patch"];
         trace?: never;
     };
+    "/api/v1/admin/cohorts/{cohort_id}/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Cohort Summary
+         * @description 수강생 상태별 인원·활성 배정 멘토·담당자(기수·과정 담당) (A96).
+         */
+        get: operations["get_cohort_summary_api_v1_admin_cohorts__cohort_id__summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/rosters/sync": {
         parameters: {
             query?: never;
@@ -4410,6 +4430,64 @@ export interface components {
          * @enum {string}
          */
         CohortStatus: "PLANNED" | "ONGOING" | "ENDED" | "INACTIVE" | "ARCHIVED";
+        /** CohortStudentCountsResponse */
+        CohortStudentCountsResponse: {
+            /** Total */
+            total: number;
+            /**
+             * Linked
+             * @description 가입해 회원과 연결된 수강생
+             */
+            linked: number;
+            /**
+             * By Status
+             * @description 수강 상태(EnrollmentStatus)별 수
+             */
+            by_status: {
+                [key: string]: number;
+            };
+        };
+        /** CohortSummaryMentorResponse */
+        CohortSummaryMentorResponse: {
+            /**
+             * Mentor Id
+             * Format: uuid
+             */
+            mentor_id: string;
+            /** Name */
+            name: string;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+        };
+        /** CohortSummaryResponse */
+        CohortSummaryResponse: {
+            students: components["schemas"]["CohortStudentCountsResponse"];
+            /** Mentors */
+            mentors: components["schemas"]["CohortSummaryMentorResponse"][];
+            /** Staff */
+            staff: components["schemas"]["CohortSummaryStaffResponse"][];
+        };
+        /** CohortSummaryStaffResponse */
+        CohortSummaryStaffResponse: {
+            /**
+             * Employee Id
+             * Format: uuid
+             */
+            employee_id: string;
+            /** Name */
+            name: string;
+            /** Position Name */
+            position_name: string | null;
+            /**
+             * Scope
+             * @description 기수 담당 / 과정 담당
+             * @enum {string}
+             */
+            scope: "COHORT" | "COURSE";
+        };
         /** CohortUpdate */
         CohortUpdate: {
             /** Hrd Net Cohort Id */
@@ -10434,6 +10512,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CohortResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_cohort_summary_api_v1_admin_cohorts__cohort_id__summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cohort_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CohortSummaryResponse"];
                 };
             };
             /** @description Validation Error */
