@@ -2,6 +2,7 @@ import {
   BadgeCheck,
   Building2,
   CalendarDays,
+  FileText,
   GraduationCap,
   KeyRound,
   Layers,
@@ -54,7 +55,7 @@ const MODULES: StaffModule[] = [
   {
     key: "academy",
     label: "학사",
-    description: "과정·기수",
+    description: "과정·기수 · HRD 과정",
     icon: GraduationCap,
     // F73·F74: 과정·기수 / HRD 과정 / 수강생 (만든 메뉴만)
     items: [
@@ -63,6 +64,12 @@ const MODULES: StaffModule[] = [
         label: "과정·기수",
         icon: Layers,
         permissions: ["academy.bootcamp.read"],
+      },
+      {
+        to: "/admin/academy/hrd",
+        label: "HRD 과정",
+        icon: FileText,
+        permissions: ["academy.hrd.read"],
       },
     ],
   },

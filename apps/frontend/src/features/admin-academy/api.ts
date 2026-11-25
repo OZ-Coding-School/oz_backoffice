@@ -113,3 +113,63 @@ export function useSaveCohort(cohort: Cohort) {
     },
   });
 }
+
+export type HrdBootcamp = components["schemas"]["HrdBootcampResponse"];
+export type HrdCohort = components["schemas"]["HrdCohortResponse"];
+export type HrdBootcampChanges = components["schemas"]["HrdBootcampUpdate"];
+
+export const hrdKeys = {
+  all: ["admin-hrd"] as const,
+  list: () => ["admin-hrd", "list"] as const,
+  cohorts: (hrdId: string) => ["admin-hrd", "cohorts", hrdId] as const,
+};
+
+/** HRD 과정 (연결 운영과정·회차 수 A98) */
+export const hrdBootcampsQuery = queryOptions({
+  queryKey: hrdKeys.list(),
+  queryFn: () => unwrap(api.GET("/api/v1/admin/hrd-bootcamps")),
+});
+
+/** HRD 회차 (연결 기수 A98, 회차 번호순) */
+export function hrdCohortsQuery(hrdId: string) {
+  return queryOptions({
+    queryKey: hrdKeys.cohorts(hrdId),
+    queryFn: () =>
+      unwrap(
+        api.GET("/api/v1/admin/hrd-bootcamps/{hrd_bootcamp_id}/cohorts", {
+          params: { path: { hrd_bootcamp_id: hrdId } },
+        }),
+      ),
+  });
+}
+
+/** HRD 과정의 동기화 값 외 항목 (F75). 보낸 필드만 바뀌고 null은 비운다 */
+export function useSaveHrdBootcamp(id: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (body: HrdBootcampChanges) =>
+      unwrap(
+        api.PATCH("/api/v1/admin/hrd-bootcamps/{hrd_bootcamp_id}", { params: { path: { hrd_bootcamp_id: id } }, body }),
+      ),
+    onSuccess: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: hrdKeys.list() }),
+        client.invalidateQueries({ queryKey: academyKeys.bootcamps() }),
+      ]),
+  });
+}
+
+/** 회차 자부담금 (F75) */
+export function useSaveHrdCohort(cohort: HrdCohort) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (selfPay: number | null) =>
+      unwrap(
+        api.PATCH("/api/v1/admin/hrd-cohorts/{hrd_cohort_id}", {
+          params: { path: { hrd_cohort_id: cohort.id } },
+          body: { self_pay_amount: selfPay },
+        }),
+      ),
+    onSuccess: () => client.invalidateQueries({ queryKey: hrdKeys.cohorts(cohort.hrd_net_bootcamp_id) }),
+  });
+}
