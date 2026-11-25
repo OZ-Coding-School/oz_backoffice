@@ -1,6 +1,6 @@
 # 42. 학사 > HRD 과정 (FE-17b)
 
-- 상태: PR 진행 중
+- 상태: 완료 (2026-11-25 병합)
 - 관련 PR: #154
 - 관련 결정: `docs/decisions.md` F75 (A20·A98)
 - 이전 기록: [41. 학사 > 과정·기수 (FE-17a)](41_academy_bootcamps.md)
@@ -32,6 +32,9 @@
 ## 검증
 - `npm run lint`, `format:check`, `typecheck`, `test`(UTC·Asia/Seoul, 365개), `build`, `e2e`(46개)
 - 개발 서버에서 1440 라이트·다크로 표·HRD 과정 패널(조회·수정)·회차 패널(조회·수정)을 확인(API는 모킹)
+
+## 사용자 확인
+- 화면을 확인하고 병합을 승인함.
 
 ## 남은 작업
 - BE-3r 수강생 검색·상세 API → FE-17c 수강생.
