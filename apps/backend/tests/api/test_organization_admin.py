@@ -76,6 +76,7 @@ async def test_team_crud_and_bootcamp_team(client: AsyncClient, admin: dict[str,
         "name": "교육 1팀",
         "description": None,
         "bootcamp_ids": [],
+        "employee_count": 0,
     }
     duplicate = await client.post(
         url, json={"department_id": department["id"], "name": "교육 1팀"}, headers=admin
@@ -185,6 +186,18 @@ async def test_employees_list_and_transfer(client: AsyncClient, admin: dict[str,
         f"/api/v1/admin/employees/{employee.id}", json={"team_id": None}, headers=admin
     )
     assert (direct.json()["department_id"], direct.json()["team_id"]) == (department["id"], None)
+
+    # 부서·팀 직원 수 (A92): 팀이 없는 직원은 부서에만 센다
+    async def count(path: str, id_: str) -> int:
+        rows = (await client.get(f"/api/v1/admin/{path}", headers=admin)).json()
+        return int(next(r["employee_count"] for r in rows if r["id"] == id_))
+
+    assert await count("departments", department["id"]) == 1
+    assert await count("teams", str(team.id)) == 0
+    await client.patch(
+        f"/api/v1/admin/employees/{employee.id}", json={"team_id": str(team.id)}, headers=admin
+    )
+    assert await count("teams", str(team.id)) == 1
     filtered = await client.get(
         "/api/v1/admin/employees", params={"department_id": department["id"]}, headers=admin
     )

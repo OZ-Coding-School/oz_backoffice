@@ -137,6 +137,10 @@ class OrganizationAdminService:
     async def list_departments(self) -> list[Department]:
         return await self._departments.list_all()
 
+    async def employee_counts(self) -> tuple[dict[uuid.UUID, int], dict[uuid.UUID, int]]:
+        """(부서별, 팀별) 직원 수 (A92)."""
+        return await self._employees.count_by_org()
+
     async def create_department(
         self, *, name: str, description: str, rules: str | None, actor_id: uuid.UUID
     ) -> Department:

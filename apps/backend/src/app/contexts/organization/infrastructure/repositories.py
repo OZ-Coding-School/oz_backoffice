@@ -185,6 +185,19 @@ class TortoiseEmployeeRepository(TortoiseRepository[Employee, EmployeeModel]):
             return []
         return [self.to_entity(row) for row in await EmployeeModel.filter(user_id__in=user_ids)]
 
+    async def count_by_org(self) -> tuple[dict[uuid.UUID, int], dict[uuid.UUID, int]]:
+        departments: dict[uuid.UUID, int] = {}
+        teams: dict[uuid.UUID, int] = {}
+        for department_id, team_id in await EmployeeModel.all().values_list(
+            "department_id", "team_id"
+        ):
+            d = uuid.UUID(str(department_id))
+            departments[d] = departments.get(d, 0) + 1
+            if team_id is not None:
+                t = uuid.UUID(str(team_id))
+                teams[t] = teams.get(t, 0) + 1
+        return departments, teams
+
     async def count_by_position(self) -> dict[uuid.UUID, int]:
         counts: dict[uuid.UUID, int] = {}
         for position_id in await EmployeeModel.all().values_list("position_id", flat=True):
