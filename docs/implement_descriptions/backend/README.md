@@ -94,3 +94,4 @@
 | 90 | [직원 응답에 직위 데이터 범위 (BE-3j)](90_employee_data_scope.md) | 완료 (#140) |
 | 91 | [부서·팀 직원 수 (BE-3k)](91_org_employee_counts.md) | 완료 (#142) |
 | 92 | [부서·팀·직위 영향 조회 (BE-3l)](92_org_impact.md) | 완료 (#143) |
+| 93 | [전체 회원 API (BE-3m)](93_member_users.md) | PR 진행 중 |
