@@ -11,11 +11,12 @@ from datetime import date, datetime
 from typing import Annotated, Any, cast
 
 from fastapi import APIRouter, Depends, Query, Request, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from redis.asyncio import Redis
 
 from app.contexts.academy.application.roster_queries import RosterQueries
 from app.contexts.academy.application.roster_sync import RosterSyncDispatcher, RosterSyncService
+from app.contexts.academy.application.student_detail import StudentDetailReader
 from app.contexts.academy.domain.entities import RosterSyncRun, Student
 from app.contexts.academy.domain.enums import (
     EnrollmentStatus,
@@ -42,6 +43,7 @@ from app.core.config import Settings
 from app.core.dependencies import get_app_settings, get_clock
 from app.core.redis import get_redis
 from app.shared.errors import NotFoundError, ServiceUnavailableError
+from app.shared.time import business_date
 
 router = APIRouter(prefix="/admin", tags=["admin-rosters"])
 
@@ -156,6 +158,37 @@ class RosterStudentResponse(BaseModel):
             end_reason=s.end_reason,
             synced_at=s.synced_at,
         )
+
+
+class StudentMemberResponse(BaseModel):
+    user_id: uuid.UUID
+    email: str
+    approved_at: datetime | None
+
+
+class StudentAccountResponse(BaseModel):
+    id: uuid.UUID
+    valid_from: date
+    valid_until: date
+    is_expired: bool
+    total_minutes: int
+    held_minutes: int
+    used_minutes: int
+    remaining_minutes: int
+
+
+class StudentMentoringResponse(BaseModel):
+    team_id: uuid.UUID | None
+    team_label: str | None
+    account: StudentAccountResponse | None = Field(description="1:1 시간 계좌 (지급 전이면 없음)")
+    pending_request_count: int = Field(description="1:1 대기 신청 수")
+    upcoming_session_count: int = Field(description="1:1 예정·진행 중 세션 수")
+    completed_session_count: int = Field(description="1:1 완료 세션 수")
+
+
+class StudentDetailResponse(RosterStudentResponse):
+    member: StudentMemberResponse | None = Field(description="가입 계정 (미가입이면 null)")
+    mentoring: StudentMentoringResponse
 
 
 class UnmappedRecordsResponse(BaseModel):
@@ -281,6 +314,47 @@ async def list_cohort_rosters(
         cohort_id, claimed=claimed, include_removed=include_removed
     )
     return [RosterStudentResponse.of(s) for s in students]
+
+
+@router.get("/cohorts/{cohort_id}/students/{student_id}", response_model=StudentDetailResponse)
+async def get_cohort_student(
+    cohort_id: uuid.UUID,
+    student_id: uuid.UUID,
+    _: Annotated[User, Depends(require_permission(READ, cohort_param="cohort_id"))],
+    request: Request,
+    clock: Annotated[Clock, Depends(get_clock)],
+) -> StudentDetailResponse:
+    """기본·수강 정보 + 가입 계정 + 멘토링 요약 (A99). 그 기수의 수강생이 아니면 404."""
+    reader = cast("StudentDetailReader", request.app.state.student_detail)
+    d = await reader.detail_of(cohort_id, student_id, today=business_date(clock.now()))
+    m, a = d.mentoring, d.mentoring.account
+    return StudentDetailResponse(
+        **RosterStudentResponse.of(d.student).model_dump(),
+        member=StudentMemberResponse(
+            user_id=d.member.user_id, email=d.member.email, approved_at=d.member.approved_at
+        )
+        if d.member
+        else None,
+        mentoring=StudentMentoringResponse(
+            team_id=m.team_id,
+            team_label=m.team_label,
+            account=StudentAccountResponse(
+                id=a.id,
+                valid_from=a.valid_from,
+                valid_until=a.valid_until,
+                is_expired=a.is_expired,
+                total_minutes=a.total_minutes,
+                held_minutes=a.held_minutes,
+                used_minutes=a.used_minutes,
+                remaining_minutes=a.remaining_minutes,
+            )
+            if a
+            else None,
+            pending_request_count=m.pending_requests,
+            upcoming_session_count=m.upcoming_sessions,
+            completed_session_count=m.completed_sessions,
+        ),
+    )
 
 
 @router.get("/rosters/unmapped", response_model=UnmappedRecordsResponse)
