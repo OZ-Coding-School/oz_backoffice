@@ -61,6 +61,7 @@ function employee(overrides: Partial<Employee> = {}): Employee {
     team_id: "t1",
     position_id: "p1",
     employment_type: "REGULAR",
+    is_super_admin: false,
     assignments: [
       {
         staff_id: "s1",
@@ -107,7 +108,7 @@ function mockStaff(
       const q = new URL(request.url).searchParams.get("q");
       calls.q.push(q);
       const items = q ? [employee(), LEE].filter((e) => e.user?.name.includes(q)) : [employee(), LEE];
-      return HttpResponse.json({ items, total: items.length, limit: 20, offset: 0 });
+      return HttpResponse.json(items);
     }),
     http.patch(apiUrl("/api/v1/admin/employees/{employee_id}"), async ({ request }) => {
       calls.patch.push(await request.json());

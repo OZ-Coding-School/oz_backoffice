@@ -2521,7 +2521,7 @@
           "admin-organization"
         ],
         "summary": "List Employees",
-        "description": "직원 목록 (담당자 배정 화면에서 직원을 고를 때도 쓴다). 담당을 함께 준다 (A83).",
+        "description": "직원 전체, 페이지 없음 (A90). 담당자 배정 화면에서 직원을 고를 때도 쓴다. 담당을 함께\n준다 (A83).",
         "operationId": "list_employees_api_v1_admin_employees_get",
         "security": [
           {
@@ -2581,29 +2581,6 @@
               "title": "Q"
             },
             "description": "이름·이메일"
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 100,
-              "minimum": 1,
-              "default": 20,
-              "title": "Limit"
-            }
-          },
-          {
-            "name": "offset",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 0,
-              "default": 0,
-              "title": "Offset"
-            }
           }
         ],
         "responses": {
@@ -2612,7 +2589,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_EmployeeResponse_"
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EmployeeResponse"
+                  },
+                  "title": "Response List Employees Api V1 Admin Employees Get"
                 }
               }
             }
@@ -2682,7 +2663,7 @@
           "admin-organization"
         ],
         "summary": "Update Employee",
-        "description": "소속·직위·고용 형태(org.employee.manage)와 담당(staff.assignment.manage, A89)을 한 번에\n바꾼다. 담당은 직위의 담당 방식을 따른다(422 `invalid_staff_assignment`). 직원 생성은 가입\n승인으로만 한다.",
+        "description": "소속·직위·고용 형태(org.employee.manage), 담당(staff.assignment.manage, A89), 최고\n관리자(최고 관리자만, A90)를 한 트랜잭션에서 바꾼다. 담당은 직위의 담당 방식을 따른다(422\n`invalid_staff_assignment`). 마지막 최고 관리자는 끌 수 없다(409 `last_super_admin`). 직원\n생성은 가입 승인으로만 한다.",
         "operationId": "update_employee_api_v1_admin_employees__employee_id__patch",
         "security": [
           {
@@ -15153,6 +15134,12 @@
             "type": "array",
             "title": "Assignments",
             "description": "담당 과정·기수 (A83)"
+          },
+          "is_super_admin": {
+            "type": "boolean",
+            "title": "Is Super Admin",
+            "description": "최고 관리자 (A87·A90)",
+            "default": false
           }
         },
         "type": "object",
@@ -15245,6 +15232,18 @@
             ],
             "title": "Cohort Ids",
             "description": "담당 기수 (보내면 통째로 교체, 직위가 기수 담당일 때 하나)"
+          },
+          "is_super_admin": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Super Admin",
+            "description": "최고 관리자 켜기·끄기 (최고 관리자만, 마지막 1명은 끌 수 없음, A90)"
           }
         },
         "type": "object",
@@ -17529,37 +17528,6 @@
           "offset"
         ],
         "title": "Page[ContractResponse]"
-      },
-      "Page_EmployeeResponse_": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/EmployeeResponse"
-            },
-            "type": "array",
-            "title": "Items"
-          },
-          "total": {
-            "type": "integer",
-            "title": "Total"
-          },
-          "limit": {
-            "type": "integer",
-            "title": "Limit"
-          },
-          "offset": {
-            "type": "integer",
-            "title": "Offset"
-          }
-        },
-        "type": "object",
-        "required": [
-          "items",
-          "total",
-          "limit",
-          "offset"
-        ],
-        "title": "Page[EmployeeResponse]"
       },
       "Page_MenteeResponse_": {
         "properties": {

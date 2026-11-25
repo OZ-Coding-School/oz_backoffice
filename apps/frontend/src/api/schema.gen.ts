@@ -873,7 +873,8 @@ export interface paths {
         };
         /**
          * List Employees
-         * @description 직원 목록 (담당자 배정 화면에서 직원을 고를 때도 쓴다). 담당을 함께 준다 (A83).
+         * @description 직원 전체, 페이지 없음 (A90). 담당자 배정 화면에서 직원을 고를 때도 쓴다. 담당을 함께
+         *     준다 (A83).
          */
         get: operations["list_employees_api_v1_admin_employees_get"];
         put?: never;
@@ -900,9 +901,10 @@ export interface paths {
         head?: never;
         /**
          * Update Employee
-         * @description 소속·직위·고용 형태(org.employee.manage)와 담당(staff.assignment.manage, A89)을 한 번에
-         *     바꾼다. 담당은 직위의 담당 방식을 따른다(422 `invalid_staff_assignment`). 직원 생성은 가입
-         *     승인으로만 한다.
+         * @description 소속·직위·고용 형태(org.employee.manage), 담당(staff.assignment.manage, A89), 최고
+         *     관리자(최고 관리자만, A90)를 한 트랜잭션에서 바꾼다. 담당은 직위의 담당 방식을 따른다(422
+         *     `invalid_staff_assignment`). 마지막 최고 관리자는 끌 수 없다(409 `last_super_admin`). 직원
+         *     생성은 가입 승인으로만 한다.
          */
         patch: operations["update_employee_api_v1_admin_employees__employee_id__patch"];
         trace?: never;
@@ -4568,6 +4570,12 @@ export interface components {
              * @description 담당 과정·기수 (A83)
              */
             assignments?: components["schemas"]["EmployeeAssignmentResponse"][];
+            /**
+             * Is Super Admin
+             * @description 최고 관리자 (A87·A90)
+             * @default false
+             */
+            is_super_admin: boolean;
         };
         /** EmployeeUpdateRequest */
         EmployeeUpdateRequest: {
@@ -4588,6 +4596,11 @@ export interface components {
              * @description 담당 기수 (보내면 통째로 교체, 직위가 기수 담당일 때 하나)
              */
             cohort_ids?: string[] | null;
+            /**
+             * Is Super Admin
+             * @description 최고 관리자 켜기·끄기 (최고 관리자만, 마지막 1명은 끌 수 없음, A90)
+             */
+            is_super_admin?: boolean | null;
         };
         /**
          * EmploymentType
@@ -5479,17 +5492,6 @@ export interface components {
         Page_ContractResponse_: {
             /** Items */
             items: components["schemas"]["ContractResponse"][];
-            /** Total */
-            total: number;
-            /** Limit */
-            limit: number;
-            /** Offset */
-            offset: number;
-        };
-        /** Page[EmployeeResponse] */
-        Page_EmployeeResponse_: {
-            /** Items */
-            items: components["schemas"]["EmployeeResponse"][];
             /** Total */
             total: number;
             /** Limit */
@@ -9089,8 +9091,6 @@ export interface operations {
                 team_id?: string | null;
                 /** @description 이름·이메일 */
                 q?: string | null;
-                limit?: number;
-                offset?: number;
             };
             header?: never;
             path?: never;
@@ -9104,7 +9104,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Page_EmployeeResponse_"];
+                    "application/json": components["schemas"]["EmployeeResponse"][];
                 };
             };
             /** @description Validation Error */

@@ -213,13 +213,9 @@ async def test_delete_in_use_is_conflict_and_lookups() -> None:
         await positions.delete(employee.position_id)
 
 
-async def test_employee_page_by_department() -> None:
+async def test_employee_search_by_department() -> None:
     first, second = await create_employee(), await create_employee()
-    page, total = await TortoiseEmployeeRepository().list_page(
-        department_id=None, limit=1, offset=1
-    )
-    assert (total, [e.id for e in page]) == (2, [second.id])
-    only, count_one = await TortoiseEmployeeRepository().list_page(
-        department_id=first.department_id, limit=10, offset=0
-    )
-    assert (count_one, [e.id for e in only]) == (1, [first.id])
+    every = await TortoiseEmployeeRepository().search()
+    assert [e.id for e in every] == [first.id, second.id]
+    only = await TortoiseEmployeeRepository().search(department_id=first.department_id)
+    assert [e.id for e in only] == [first.id]

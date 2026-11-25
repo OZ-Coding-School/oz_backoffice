@@ -111,3 +111,55 @@ async def test_permissions_are_split_by_field(
         await client.patch(url, json={"employment_type": "INTERN"}, headers=headers)
     ).status_code == 200
     assert (await client.patch(url, json={"bootcamp_ids": []}, headers=headers)).status_code == 403
+
+
+async def test_super_admin_in_employee_patch(
+    client: AsyncClient, admin: dict[str, str], settings: Settings
+) -> None:
+    """최고 관리자는 직원 수정에서 함께 바꾸고(A90), 최고 관리자만 바꿀 수 있으며, 마지막 1명을
+    끄려 하면 같은 요청의 다른 변경도 되돌린다."""
+    employee = await create_employee()
+    users = TortoiseUserRepository()
+    user = await users.get(employee.user_id)
+    assert user is not None
+    if user.approved_at is None:
+        user.approve(now=datetime.now(UTC))
+        await users.save(user)
+    url = f"/api/v1/admin/employees/{employee.id}"
+
+    on = await client.patch(
+        url, json={"employment_type": "CONTRACT", "is_super_admin": True}, headers=admin
+    )
+    assert (on.status_code, on.json()["is_super_admin"], on.json()["employment_type"]) == (
+        200,
+        True,
+        "CONTRACT",
+    )
+    listed = (await client.get("/api/v1/admin/employees", headers=admin)).json()
+    assert [e["is_super_admin"] for e in listed] == [True]
+
+    # 권한 코드만 있는 운영진은 최고 관리자를 바꿀 수 없다
+    editor = await create_applicant()
+    editor.approve(now=datetime.now(UTC))
+    await users.save(editor)
+    await give_permissions(editor.id, {"org.employee.read", "org.employee.manage"})
+    denied = await client.patch(
+        url, json={"is_super_admin": False}, headers=bearer(settings, editor)
+    )
+    assert (denied.status_code, denied.json()["error"]["code"]) == (403, "super_admin_only")
+
+    # 이 직원만 최고 관리자로 남기고 스스로 끄면 409, 고용 형태도 그대로
+    boss = await users.get_by_email("boss@nextrunners.co.kr")
+    assert boss is not None
+    mine = bearer(settings, user)
+    assert (
+        await client.put(
+            f"/api/v1/admin/users/{boss.id}/super-admin", json={"enabled": False}, headers=mine
+        )
+    ).status_code == 200
+    last = await client.patch(
+        url, json={"employment_type": "INTERN", "is_super_admin": False}, headers=mine
+    )
+    assert (last.status_code, last.json()["error"]["code"]) == (409, "last_super_admin")
+    after = (await client.get(url, headers=mine)).json()
+    assert (after["employment_type"], after["is_super_admin"]) == ("CONTRACT", True)

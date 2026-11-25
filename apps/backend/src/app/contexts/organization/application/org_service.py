@@ -373,18 +373,13 @@ class OrganizationAdminService:
     async def list_employees(
         self,
         *,
-        department_id: uuid.UUID | None,
-        limit: int,
-        offset: int,
+        department_id: uuid.UUID | None = None,
         team_id: uuid.UUID | None = None,
         query: str | None = None,
-    ) -> tuple[list[Employee], int]:
-        return await self._employees.list_page(
-            department_id=department_id,
-            team_id=team_id,
-            query=(query or "").strip() or None,
-            limit=limit,
-            offset=offset,
+    ) -> list[Employee]:
+        """직원 전체 (A90: 화면이 부서·팀별로 묶는다)."""
+        return await self._employees.search(
+            department_id=department_id, team_id=team_id, query=(query or "").strip() or None
         )
 
     async def get_employee(self, employee_id: uuid.UUID) -> Employee:

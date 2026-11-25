@@ -45,6 +45,7 @@ const LEE = {
   position_id: "p2",
   employment_type: "REGULAR",
   assignments: [],
+  is_super_admin: false,
 };
 
 test("담당자 탭: 과정·기수 고르고 조교 추가 (FE-15c)", async ({ page }) => {
@@ -56,9 +57,7 @@ test("담당자 탭: 과정·기수 고르고 조교 추가 (FE-15c)", async ({ 
   await page.route("**/api/v1/me", (route) => route.fulfill({ json: ADMIN }));
   await page.route("**/api/v1/me/staff-access", (route) => route.fulfill({ json: ACCESS }));
   await page.route("**/api/v1/me/staff-registration/options", (route) => route.fulfill({ json: OPTIONS }));
-  await page.route("**/api/v1/admin/employees?**", (route) =>
-    route.fulfill({ json: { items: [LEE], total: 1, limit: 20, offset: 0 } }),
-  );
+  await page.route("**/api/v1/admin/employees*", (route) => route.fulfill({ json: [LEE] }));
   await page.route("**/api/v1/admin/bootcamps/b1/staffs", (route) => route.fulfill({ json: [] }));
   await page.route("**/api/v1/admin/cohorts/c12/staffs", (route) => {
     if (route.request().method() === "POST") {
