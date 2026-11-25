@@ -42,7 +42,7 @@ export function HolidaysPage({ search }: { search: HolidaysSearch }) {
       <div className="flex flex-col gap-1">
         <h1 className="text-h1 text-foreground">공휴일</h1>
         <p className="text-body text-muted-foreground">
-          멘토링 신청 가능 시간에서 빠지는 날이에요. 법정공휴일은 자동으로 정해지고, 추가 휴일은 직접 등록해요.
+          법정공휴일은 자동으로 정해지고, 추가 휴일은 직접 등록해요.
         </p>
       </div>
       <div className="flex items-center gap-3">
