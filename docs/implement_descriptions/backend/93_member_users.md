@@ -1,7 +1,7 @@
 # 93. 전체 회원 API (BE-3m)
 
-- 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 상태: 완료 (2026-11-25 병합)
+- 관련 PR: #146
 - 관련 결정: `docs/decisions.md` A94 (A88)
 - 이전 기록: [92. 부서·팀·직위 영향 조회 (BE-3l)](92_org_impact.md)
 
@@ -33,6 +33,7 @@
 ## 검증
 - `ruff check`, `ruff format --check`, `mypy`, `mypy tests`, `lint-imports` 통과, `pytest` 897 passed. 새 테스트: 승인 계정만·종류 필터·검색·`counts`, 종류별 연결 정보, 비활성화(사유 필수, 이력, 로그인 중인 access 401 `account_disabled`, 비활성 필터) → 활성화(이력, 다시 로그인), 자기 자신·마지막 최고 관리자 409, 조회 권한만이면 비활성화 403
 - 프론트엔드: `lint`, `typecheck` 통과
+- GitHub Actions (PR #146): 백엔드·프론트엔드 검사와 E2E 통과
 
 ## 남은 작업
 - FE-15i 회원 관리 > 전체 회원
