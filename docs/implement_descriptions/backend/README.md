@@ -97,3 +97,4 @@
 | 93 | [전체 회원 API (BE-3m)](93_member_users.md) | 완료 (#146) |
 | 94 | [법정공휴일 동기화 (BE-3n)](94_public_holiday_sync.md) | 완료 (#148) |
 | 95 | [기수 요약 API (BE-3o)](95_cohort_summary.md) | 완료 (#150) |
+| 96 | [과정·기수 응답에 HRD 값 (BE-3p)](96_academy_hrd_fields.md) | 완료 (#151) |
