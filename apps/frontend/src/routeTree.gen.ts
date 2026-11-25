@@ -39,6 +39,7 @@ import { Route as MemberMentoringRequestsIndexRouteImport } from './routes/_memb
 import { Route as MemberMentoringRequestsRequestIdRouteImport } from './routes/_member/mentoring/requests/$requestId'
 import { Route as MemberMentoringSessionsIndexRouteImport } from './routes/_member/mentoring/sessions/index'
 import { Route as MemberMentoringSessionsSessionIdRouteImport } from './routes/_member/mentoring/sessions/$sessionId'
+import { Route as StaffAdminAcademyBootcampsRouteImport } from './routes/_staff/admin/academy/bootcamps'
 import { Route as StaffAdminMembersApprovalsRouteImport } from './routes/_staff/admin/members/approvals'
 import { Route as StaffAdminMembersUsersRouteImport } from './routes/_staff/admin/members/users'
 import { Route as StaffAdminOrgDepartmentsRouteImport } from './routes/_staff/admin/org/departments'
@@ -209,6 +210,12 @@ const MemberMentoringSessionsSessionIdRoute =
     path: '/mentoring/sessions/$sessionId',
     getParentRoute: () => MemberRoute,
   } as any)
+const StaffAdminAcademyBootcampsRoute =
+  StaffAdminAcademyBootcampsRouteImport.update({
+    id: '/admin/academy/bootcamps',
+    path: '/admin/academy/bootcamps',
+    getParentRoute: () => StaffRoute,
+  } as any)
 const StaffAdminMembersApprovalsRoute =
   StaffAdminMembersApprovalsRouteImport.update({
     id: '/admin/members/approvals',
@@ -275,6 +282,7 @@ export interface FileRoutesByFullPath {
   '/mentoring/chat/$threadId': typeof MemberMentoringChatThreadIdRoute
   '/mentoring/requests/$requestId': typeof MemberMentoringRequestsRequestIdRoute
   '/mentoring/sessions/$sessionId': typeof MemberMentoringSessionsSessionIdRoute
+  '/admin/academy/bootcamps': typeof StaffAdminAcademyBootcampsRoute
   '/admin/members/approvals': typeof StaffAdminMembersApprovalsRoute
   '/admin/members/users': typeof StaffAdminMembersUsersRoute
   '/admin/org/departments': typeof StaffAdminOrgDepartmentsRoute
@@ -311,6 +319,7 @@ export interface FileRoutesByTo {
   '/mentoring/chat/$threadId': typeof MemberMentoringChatThreadIdRoute
   '/mentoring/requests/$requestId': typeof MemberMentoringRequestsRequestIdRoute
   '/mentoring/sessions/$sessionId': typeof MemberMentoringSessionsSessionIdRoute
+  '/admin/academy/bootcamps': typeof StaffAdminAcademyBootcampsRoute
   '/admin/members/approvals': typeof StaffAdminMembersApprovalsRoute
   '/admin/members/users': typeof StaffAdminMembersUsersRoute
   '/admin/org/departments': typeof StaffAdminOrgDepartmentsRoute
@@ -352,6 +361,7 @@ export interface FileRoutesById {
   '/_member/mentoring/chat/$threadId': typeof MemberMentoringChatThreadIdRoute
   '/_member/mentoring/requests/$requestId': typeof MemberMentoringRequestsRequestIdRoute
   '/_member/mentoring/sessions/$sessionId': typeof MemberMentoringSessionsSessionIdRoute
+  '/_staff/admin/academy/bootcamps': typeof StaffAdminAcademyBootcampsRoute
   '/_staff/admin/members/approvals': typeof StaffAdminMembersApprovalsRoute
   '/_staff/admin/members/users': typeof StaffAdminMembersUsersRoute
   '/_staff/admin/org/departments': typeof StaffAdminOrgDepartmentsRoute
@@ -390,6 +400,7 @@ export interface FileRouteTypes {
     | '/mentoring/chat/$threadId'
     | '/mentoring/requests/$requestId'
     | '/mentoring/sessions/$sessionId'
+    | '/admin/academy/bootcamps'
     | '/admin/members/approvals'
     | '/admin/members/users'
     | '/admin/org/departments'
@@ -426,6 +437,7 @@ export interface FileRouteTypes {
     | '/mentoring/chat/$threadId'
     | '/mentoring/requests/$requestId'
     | '/mentoring/sessions/$sessionId'
+    | '/admin/academy/bootcamps'
     | '/admin/members/approvals'
     | '/admin/members/users'
     | '/admin/org/departments'
@@ -466,6 +478,7 @@ export interface FileRouteTypes {
     | '/_member/mentoring/chat/$threadId'
     | '/_member/mentoring/requests/$requestId'
     | '/_member/mentoring/sessions/$sessionId'
+    | '/_staff/admin/academy/bootcamps'
     | '/_staff/admin/members/approvals'
     | '/_staff/admin/members/users'
     | '/_staff/admin/org/departments'
@@ -703,6 +716,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MemberMentoringSessionsSessionIdRouteImport
       parentRoute: typeof MemberRoute
     }
+    '/_staff/admin/academy/bootcamps': {
+      id: '/_staff/admin/academy/bootcamps'
+      path: '/admin/academy/bootcamps'
+      fullPath: '/admin/academy/bootcamps'
+      preLoaderRoute: typeof StaffAdminAcademyBootcampsRouteImport
+      parentRoute: typeof StaffRoute
+    }
     '/_staff/admin/members/approvals': {
       id: '/_staff/admin/members/approvals'
       path: '/admin/members/approvals'
@@ -829,6 +849,7 @@ const MemberRouteWithChildren =
 
 interface StaffRouteChildren {
   StaffAdminIndexRoute: typeof StaffAdminIndexRoute
+  StaffAdminAcademyBootcampsRoute: typeof StaffAdminAcademyBootcampsRoute
   StaffAdminMembersApprovalsRoute: typeof StaffAdminMembersApprovalsRoute
   StaffAdminMembersUsersRoute: typeof StaffAdminMembersUsersRoute
   StaffAdminOrgDepartmentsRoute: typeof StaffAdminOrgDepartmentsRoute
@@ -840,6 +861,7 @@ interface StaffRouteChildren {
 
 const StaffRouteChildren: StaffRouteChildren = {
   StaffAdminIndexRoute: StaffAdminIndexRoute,
+  StaffAdminAcademyBootcampsRoute: StaffAdminAcademyBootcampsRoute,
   StaffAdminMembersApprovalsRoute: StaffAdminMembersApprovalsRoute,
   StaffAdminMembersUsersRoute: StaffAdminMembersUsersRoute,
   StaffAdminOrgDepartmentsRoute: StaffAdminOrgDepartmentsRoute,

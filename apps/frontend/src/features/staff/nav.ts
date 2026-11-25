@@ -2,7 +2,9 @@ import {
   BadgeCheck,
   Building2,
   CalendarDays,
+  GraduationCap,
   KeyRound,
+  Layers,
   Network,
   LayoutGrid,
   Settings2,
@@ -48,6 +50,21 @@ const MODULES: StaffModule[] = [
     description: "운영진 홈",
     icon: LayoutGrid,
     items: [{ to: "/admin", label: "홈", icon: LayoutGrid }],
+  },
+  {
+    key: "academy",
+    label: "학사",
+    description: "과정·기수",
+    icon: GraduationCap,
+    // F73·F74: 과정·기수 / HRD 과정 / 수강생 (만든 메뉴만)
+    items: [
+      {
+        to: "/admin/academy/bootcamps",
+        label: "과정·기수",
+        icon: Layers,
+        permissions: ["academy.bootcamp.read"],
+      },
+    ],
   },
   {
     key: "members",
