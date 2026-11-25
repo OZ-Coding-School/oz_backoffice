@@ -1,6 +1,6 @@
 """기수 멘토링 설정·금지 시간대·추가 휴일 저장과 DB 제약."""
 
-from datetime import date, time
+from datetime import UTC, date, datetime, time
 from typing import Any
 
 import pytest
@@ -11,15 +11,19 @@ from app.contexts.mentoring.domain.settings import (
     CohortMentoringSettings,
     MentoringBlockTime,
     MentoringHoliday,
+    PublicHoliday,
+    PublicHolidaySync,
 )
 from app.contexts.mentoring.infrastructure.models import (
     CohortMentoringBlockTimeModel,
     CohortMentoringSettingsModel,
+    PublicHolidayModel,
 )
 from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseCohortMentoringSettingsRepository,
     TortoiseMentoringBlockTimeRepository,
     TortoiseMentoringHolidayRepository,
+    TortoisePublicHolidayRepository,
 )
 from tests.factories.academy import create_cohort
 
@@ -113,3 +117,37 @@ async def test_holidays() -> None:
         'SELECT "created_at" FROM "mentoring_holidays"'
     )
     assert rows[0]["created_at"] is not None
+
+
+async def test_public_holidays_replace_year() -> None:
+    repo = TortoisePublicHolidayRepository()
+    at = datetime(2026, 11, 25, 18, 0, tzinfo=UTC)
+    await repo.replace_year(
+        2026,
+        [
+            PublicHoliday(date(2026, 5, 5), "어린이날"),
+            PublicHoliday(date(2026, 5, 5), "부처님오신날"),
+        ],
+        at,
+    )
+    await repo.replace_year(2027, [PublicHoliday(date(2027, 1, 1), "1월1일")], at)
+    later = datetime(2026, 11, 26, 18, 0, tzinfo=UTC)
+    await repo.replace_year(2026, [PublicHoliday(date(2026, 9, 25), "추석")], later)
+
+    found = await repo.list_between(date(2026, 1, 1), date(2027, 12, 31))
+    assert [(h.holiday_date, h.name) for h in found] == [
+        (date(2026, 9, 25), "추석"),
+        (date(2027, 1, 1), "1월1일"),
+    ]
+    assert await repo.get_sync(2026) == PublicHolidaySync(2026, later, 1)
+    assert await repo.get_sync(2025) is None
+
+    await repo.replace_year(2026, [], later)  # 0건이면 그해를 비운다
+    assert await repo.list_between(date(2026, 1, 1), date(2026, 12, 31)) == []
+    with pytest.raises(IntegrityError):
+        await PublicHolidayModel.bulk_create(
+            [
+                PublicHolidayModel(holiday_date=date(2026, 1, 1), name="1월1일"),
+                PublicHolidayModel(holiday_date=date(2026, 1, 1), name="1월1일"),
+            ]
+        )

@@ -38,6 +38,8 @@ from app.contexts.mentoring.domain.settings import (
     MentoringBlockTime,
     MentoringHoliday,
     OperatingHours,
+    PublicHoliday,
+    PublicHolidaySync,
 )
 from app.contexts.mentoring.domain.settlement import MentoringSettlement, SettlementItem
 from app.contexts.mentoring.domain.team import MentoringTeam, TeamActivity
@@ -59,6 +61,8 @@ from app.contexts.mentoring.infrastructure.models import (
     MentoringTeamModel,
     MentoringTranscriptEntryModel,
     MentorUnavailablePeriodModel,
+    PublicHolidayModel,
+    PublicHolidaySyncModel,
 )
 from app.core.persistence import TortoiseRepository
 from app.shared.errors import ConflictError
@@ -160,6 +164,36 @@ class TortoiseMentoringHolidayRepository(
             holiday_date__gte=start, holiday_date__lte=end
         ).order_by("holiday_date")
         return [self.to_entity(row) for row in rows]
+
+
+class TortoisePublicHolidayRepository:
+    async def list_between(self, start: date, end: date) -> list[PublicHoliday]:
+        rows = await PublicHolidayModel.filter(
+            holiday_date__gte=start, holiday_date__lte=end
+        ).order_by("holiday_date", "name")
+        return [PublicHoliday(holiday_date=row.holiday_date, name=row.name) for row in rows]
+
+    async def replace_year(
+        self, year: int, holidays: list[PublicHoliday], synced_at: datetime
+    ) -> None:
+        await PublicHolidayModel.filter(
+            holiday_date__gte=date(year, 1, 1), holiday_date__lte=date(year, 12, 31)
+        ).delete()
+        if holidays:
+            await PublicHolidayModel.bulk_create(
+                [PublicHolidayModel(holiday_date=h.holiday_date, name=h.name) for h in holidays]
+            )
+        await PublicHolidaySyncModel.update_or_create(
+            defaults={"synced_at": synced_at, "holiday_count": len(holidays)}, year=year
+        )
+
+    async def get_sync(self, year: int) -> PublicHolidaySync | None:
+        row = await PublicHolidaySyncModel.get_or_none(year=year)
+        if row is None:
+            return None
+        return PublicHolidaySync(
+            year=row.year, synced_at=row.synced_at, holiday_count=row.holiday_count
+        )
 
 
 class TortoiseCohortMentorRepository(TortoiseRepository[CohortMentor, CohortMentorModel]):

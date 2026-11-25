@@ -18,7 +18,12 @@ from app.contexts.mentoring.domain.session import (
     SessionQuery,
     SessionView,
 )
-from app.contexts.mentoring.domain.settings import CohortMentoringSettings, MentoringBlockTime
+from app.contexts.mentoring.domain.settings import (
+    CohortMentoringSettings,
+    MentoringBlockTime,
+    PublicHoliday,
+    PublicHolidaySync,
+)
 from app.contexts.mentoring.domain.team import MentoringTeam
 from app.contexts.mentoring.domain.transcript import TranscriptEntry
 from app.shared.errors import ConflictError
@@ -926,3 +931,24 @@ def _in_view(session: MentoringSession, view: SessionView, now: datetime | None)
     if view is SessionView.UPCOMING:
         return session.ends_at > now
     return session.starts_at <= now
+
+
+class InMemoryPublicHolidayRepository:
+    def __init__(self, *holidays: PublicHoliday) -> None:
+        self.items = list(holidays)
+        self.syncs: dict[int, PublicHolidaySync] = {}
+
+    async def list_between(self, start: date, end: date) -> list[PublicHoliday]:
+        found = [h for h in self.items if start <= h.holiday_date <= end]
+        return sorted(found, key=lambda h: (h.holiday_date, h.name))
+
+    async def replace_year(
+        self, year: int, holidays: list[PublicHoliday], synced_at: datetime
+    ) -> None:
+        self.items = [h for h in self.items if h.holiday_date.year != year] + list(holidays)
+        self.syncs[year] = PublicHolidaySync(
+            year=year, synced_at=synced_at, holiday_count=len(holidays)
+        )
+
+    async def get_sync(self, year: int) -> PublicHolidaySync | None:
+        return self.syncs.get(year)

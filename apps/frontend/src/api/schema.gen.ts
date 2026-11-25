@@ -1745,12 +1745,32 @@ export interface paths {
         };
         /**
          * List Holidays
-         * @description 그해 법정공휴일(holidays 패키지)과 추가 휴일.
+         * @description 그해 법정공휴일(특일 정보 API에서 받은 것)과 추가 휴일, 마지막 동기화 시각.
          */
         get: operations["list_holidays_api_v1_admin_mentoring_holidays_get"];
         put?: never;
         /** Create Holiday */
         post: operations["create_holiday_api_v1_admin_mentoring_holidays_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/mentoring-holidays/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sync Public Holidays
+         * @description 올해·내년 법정공휴일을 지금 받아 그해를 통째로 바꾼다. 실패하면 503 `holiday_sync_failed`.
+         */
+        post: operations["sync_public_holidays_api_v1_admin_mentoring_holidays_sync_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4927,6 +4947,16 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** HolidayListResponse */
+        HolidayListResponse: {
+            /** Items */
+            items: components["schemas"]["HolidayResponse"][];
+            /**
+             * Synced At
+             * @description 그해 법정공휴일 마지막 동기화 시각 (null이면 아직 받지 않은 해)
+             */
+            synced_at: string | null;
+        };
         /** HolidayResponse */
         HolidayResponse: {
             /**
@@ -4948,6 +4978,23 @@ export interface components {
          * @enum {string}
          */
         HolidaySource: "PUBLIC" | "CUSTOM";
+        /** HolidaySyncResponse */
+        HolidaySyncResponse: {
+            /** Years */
+            years: components["schemas"]["HolidaySyncYear"][];
+        };
+        /** HolidaySyncYear */
+        HolidaySyncYear: {
+            /** Year */
+            year: number;
+            /**
+             * Synced At
+             * Format: date-time
+             */
+            synced_at: string;
+            /** Holiday Count */
+            holiday_count: number;
+        };
         /**
          * HoursBody
          * @description 운영시간 (한국 시각, 정각·30분, 끝은 24:00까지).
@@ -11557,7 +11604,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HolidayResponse"][];
+                    "application/json": components["schemas"]["HolidayListResponse"];
                 };
             };
             /** @description Validation Error */
@@ -11600,6 +11647,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sync_public_holidays_api_v1_admin_mentoring_holidays_sync_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HolidaySyncResponse"];
                 };
             };
         };

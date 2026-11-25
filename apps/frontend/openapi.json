@@ -5980,7 +5980,7 @@
           "admin-mentoring-settings"
         ],
         "summary": "List Holidays",
-        "description": "그해 법정공휴일(holidays 패키지)과 추가 휴일.",
+        "description": "그해 법정공휴일(특일 정보 API에서 받은 것)과 추가 휴일, 마지막 동기화 시각.",
         "operationId": "list_holidays_api_v1_admin_mentoring_holidays_get",
         "security": [
           {
@@ -6006,11 +6006,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/HolidayResponse"
-                  },
-                  "title": "Response List Holidays Api V1 Admin Mentoring Holidays Get"
+                  "$ref": "#/components/schemas/HolidayListResponse"
                 }
               }
             }
@@ -6070,6 +6066,33 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/admin/mentoring-holidays/sync": {
+      "post": {
+        "tags": [
+          "admin-mentoring-settings"
+        ],
+        "summary": "Sync Public Holidays",
+        "description": "올해·내년 법정공휴일을 지금 받아 그해를 통째로 바꾼다. 실패하면 503 `holiday_sync_failed`.",
+        "operationId": "sync_public_holidays_api_v1_admin_mentoring_holidays_sync_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HolidaySyncResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/admin/mentoring-holidays/{holiday_id}": {
@@ -16066,6 +16089,36 @@
         ],
         "title": "HolidayCreate"
       },
+      "HolidayListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/HolidayResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "synced_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Synced At",
+            "description": "그해 법정공휴일 마지막 동기화 시각 (null이면 아직 받지 않은 해)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "synced_at"
+        ],
+        "title": "HolidayListResponse"
+      },
       "HolidayResponse": {
         "properties": {
           "id": {
@@ -16110,6 +16163,46 @@
           "CUSTOM"
         ],
         "title": "HolidaySource"
+      },
+      "HolidaySyncResponse": {
+        "properties": {
+          "years": {
+            "items": {
+              "$ref": "#/components/schemas/HolidaySyncYear"
+            },
+            "type": "array",
+            "title": "Years"
+          }
+        },
+        "type": "object",
+        "required": [
+          "years"
+        ],
+        "title": "HolidaySyncResponse"
+      },
+      "HolidaySyncYear": {
+        "properties": {
+          "year": {
+            "type": "integer",
+            "title": "Year"
+          },
+          "synced_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Synced At"
+          },
+          "holiday_count": {
+            "type": "integer",
+            "title": "Holiday Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "year",
+          "synced_at",
+          "holiday_count"
+        ],
+        "title": "HolidaySyncYear"
       },
       "HoursBody": {
         "properties": {

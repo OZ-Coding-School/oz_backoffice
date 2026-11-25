@@ -61,3 +61,27 @@ class MentoringHolidayModel(models.Model):
 
     class Meta:
         table = "mentoring_holidays"
+
+
+class PublicHolidayModel(models.Model):
+    """법정공휴일 (특일 정보 API, decisions A95). 같은 날 이름이 둘이면 두 행."""
+
+    id = fields.UUIDField(primary_key=True, default=new_id)
+    holiday_date = fields.DateField(db_index=True)
+    name = fields.CharField(max_length=100)
+    created_at = fields.DatetimeField(auto_now_add=True)
+
+    class Meta:
+        table = "public_holidays"
+        unique_together = (("holiday_date", "name"),)
+
+
+class PublicHolidaySyncModel(models.Model):
+    """해마다 마지막 동기화 시각·건수 (없으면 아직 받지 않은 해)."""
+
+    year = fields.SmallIntField(primary_key=True, generated=False)
+    synced_at = fields.DatetimeField()
+    holiday_count = fields.SmallIntField()
+
+    class Meta:
+        table = "public_holiday_syncs"

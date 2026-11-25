@@ -1,13 +1,17 @@
 """기수 멘토링 설정·금지 시간대·추가 휴일 API (실제 DB)."""
 
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 
+import httpx
 import pytest
+from fastapi import FastAPI
 from httpx import AsyncClient
 
 from app.cli import create_super_admin
 from app.contexts.identity.domain.entities import User
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
+from app.core.clock import FixedClock
 from app.core.config import Settings
 from app.core.security import JWTService
 from tests.factories.academy import create_cohort
@@ -31,6 +35,14 @@ SETTINGS = {
 def bearer(settings: Settings, user: User) -> dict[str, str]:
     token, _ = JWTService(settings).encode(str(user.id), "access", now=datetime.now(UTC))
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+async def http_client(app: FastAPI) -> AsyncIterator[None]:
+    """lifespan을 돌리지 않으므로 공휴일 동기화가 쓰는 공유 클라이언트를 직접 둔다."""
+    app.state.http_client = httpx.AsyncClient()
+    yield
+    await app.state.http_client.aclose()
 
 
 @pytest.fixture
@@ -133,7 +145,9 @@ async def test_block_times_crud_and_overlap(client: AsyncClient, admin: dict[str
     assert wrong_cohort.status_code == 404
 
 
-async def test_holidays(client: AsyncClient, admin: dict[str, str]) -> None:
+@pytest.mark.usefixtures("http_client")
+async def test_holidays(client: AsyncClient, admin: dict[str, str], app: FastAPI) -> None:
+    app.state.clock = FixedClock(datetime(2026, 11, 25, 3, 0, tzinfo=UTC))
     created = await client.post(
         f"{API}/mentoring-holidays",
         json={"holiday_date": "2026-11-20", "name": "학원 휴무"},
@@ -147,10 +161,23 @@ async def test_holidays(client: AsyncClient, admin: dict[str, str]) -> None:
     )
     assert duplicate.json()["error"]["code"] == "holiday_already_exists"
 
+    before = (
+        await client.get(f"{API}/mentoring-holidays", params={"year": 2026}, headers=admin)
+    ).json()
+    assert before["synced_at"] is None  # 아직 받지 않은 해 (A95)
+    assert [(h["holiday_date"], h["source"]) for h in before["items"]] == [("2026-11-20", "CUSTOM")]
+
+    synced = await client.post(f"{API}/mentoring-holidays/sync", headers=admin)
+    assert synced.status_code == 200
+    years = synced.json()["years"]
+    assert [y["year"] for y in years] == [2026, 2027]  # 테스트 시계 기준 올해·내년
+    assert years[0]["holiday_count"] == 22
+
     listed = (
         await client.get(f"{API}/mentoring-holidays", params={"year": 2026}, headers=admin)
     ).json()
-    sources = {(h["holiday_date"], h["source"]) for h in listed}
+    assert listed["synced_at"] is not None
+    sources = {(h["holiday_date"], h["source"]) for h in listed["items"]}
     assert ("2026-11-20", "CUSTOM") in sources
     assert ("2026-09-25", "PUBLIC") in sources  # 추석
 
@@ -185,3 +212,16 @@ async def test_permissions(client: AsyncClient, settings: Settings) -> None:
         )
     ).status_code == 201
     assert (await client.get(f"{API}/mentoring-holidays", params={"year": 2026})).status_code == 401
+    assert (
+        await client.post(f"{API}/mentoring-holidays/sync", headers=assistant)
+    ).status_code == 403
+
+
+@pytest.mark.usefixtures("http_client")
+async def test_sync_unconfigured_is_503(
+    client: AsyncClient, admin: dict[str, str], app: FastAPI
+) -> None:
+    app.state.settings = app.state.settings.model_copy(update={"holiday_driver": "data_go_kr"})
+    response = await client.post(f"{API}/mentoring-holidays/sync", headers=admin)
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "holiday_sync_failed"

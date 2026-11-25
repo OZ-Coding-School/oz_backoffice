@@ -69,6 +69,9 @@ def settings() -> Settings:
         sms_driver="console",
         gmail_sender="",
         google_service_account_json="",
+        # 공휴일 API를 실제로 부르지 않는다 (고정 자료)
+        holiday_driver="fixed",
+        holiday_api_key="",
         # 개발 버킷(compose S3_*)이 아니라 테스트 전용 버킷을 쓴다
         aws_region="ap-northeast-2",
         aws_access_key_id="test",
@@ -101,6 +104,7 @@ def _no_external_services(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """
     monkeypatch.setenv("MEET_DRIVER", "disabled")
     monkeypatch.setenv("MAIL_DRIVER", "console")
+    monkeypatch.setenv("HOLIDAY_DRIVER", "fixed")
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()

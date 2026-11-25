@@ -4,6 +4,7 @@ GET/PUT          /admin/cohorts/{cohort_id}/mentoring-settings           (기수
 GET/POST         /admin/cohorts/{cohort_id}/mentoring-block-times        (기수 범위)
 PATCH/DELETE     /admin/cohorts/{cohort_id}/mentoring-block-times/{id}   (기수 범위)
 GET              /admin/mentoring-holidays?year=                         (법정공휴일 + 추가 휴일)
+POST             /admin/mentoring-holidays/sync                          (올해·내년 법정공휴일, A95)
 POST / DELETE    /admin/mentoring-holidays[/{id}]                        (추가 휴일, 담당 범위 필요)
 """
 
@@ -11,6 +12,7 @@ import uuid
 from datetime import date, datetime, time
 from typing import Annotated, Literal, cast
 
+import httpx
 from fastapi import APIRouter, Depends, Query, Request, Response, status
 from pydantic import BaseModel, Field
 
@@ -18,6 +20,7 @@ from app.contexts.access.presentation.dependencies import require_permission
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.identity.domain.entities import User
 from app.contexts.mentoring.application.calendar import BusinessCalendar, HolidaySource
+from app.contexts.mentoring.application.holiday_sync import PublicHolidaySyncService
 from app.contexts.mentoring.application.settings_service import (
     CohortDirectory,
     MentoringSettingsService,
@@ -32,8 +35,14 @@ from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseCohortMentoringSettingsRepository,
     TortoiseMentoringBlockTimeRepository,
     TortoiseMentoringHolidayRepository,
+    TortoisePublicHolidayRepository,
 )
+from app.core.clock import Clock
+from app.core.config import Settings
+from app.core.dependencies import get_app_settings, get_clock, get_http_client
+from app.core.holidays import build_holiday_source
 from app.core.uow import UnitOfWork
+from app.shared.errors import ServiceUnavailableError
 
 router = APIRouter(prefix="/admin", tags=["admin-mentoring-settings"])
 
@@ -57,6 +66,24 @@ def get_settings_service(request: Request) -> MentoringSettingsService:
 
 
 ServiceDep = Annotated[MentoringSettingsService, Depends(get_settings_service)]
+
+
+def get_holiday_sync_service(
+    settings: Annotated[Settings, Depends(get_app_settings)],
+    http: Annotated[httpx.AsyncClient, Depends(get_http_client)],
+    clock: Annotated[Clock, Depends(get_clock)],
+) -> PublicHolidaySyncService:
+    source = build_holiday_source(settings, http)
+    if source is None:
+        raise ServiceUnavailableError(
+            "공휴일 정보 연동이 설정되지 않았습니다.", code="holiday_sync_failed"
+        )
+    return PublicHolidaySyncService(
+        source=source, holidays=TortoisePublicHolidayRepository(), uow=UnitOfWork(), clock=clock
+    )
+
+
+SyncServiceDep = Annotated[PublicHolidaySyncService, Depends(get_holiday_sync_service)]
 
 
 # ---------------------------------------------------------------- 스키마
@@ -177,6 +204,23 @@ class HolidayResponse(BaseModel):
         return cls(id=h.id, holiday_date=h.holiday_date, name=h.name, source=HolidaySource.CUSTOM)
 
 
+class HolidayListResponse(BaseModel):
+    items: list[HolidayResponse]
+    synced_at: datetime | None = Field(
+        description="그해 법정공휴일 마지막 동기화 시각 (null이면 아직 받지 않은 해)"
+    )
+
+
+class HolidaySyncYear(BaseModel):
+    year: int
+    synced_at: datetime
+    holiday_count: int
+
+
+class HolidaySyncResponse(BaseModel):
+    years: list[HolidaySyncYear]
+
+
 # ---------------------------------------------------------------- 설정
 @router.get("/cohorts/{cohort_id}/mentoring-settings", response_model=SettingsResponse)
 async def get_settings(
@@ -243,23 +287,39 @@ async def delete_block_time(
 
 
 # ---------------------------------------------------------------- 휴일
-@router.get("/mentoring-holidays", response_model=list[HolidayResponse])
+@router.get("/mentoring-holidays", response_model=HolidayListResponse)
 async def list_holidays(
     _: AnyReader,
     year: Annotated[int, Query(ge=2000, le=2100)],
-) -> list[HolidayResponse]:
-    """그해 법정공휴일(holidays 패키지)과 추가 휴일."""
+) -> HolidayListResponse:
+    """그해 법정공휴일(특일 정보 API에서 받은 것)과 추가 휴일, 마지막 동기화 시각."""
     repo = TortoiseMentoringHolidayRepository()
-    custom = {
-        h.holiday_date: h for h in await repo.list_between(date(year, 1, 1), date(year, 12, 31))
-    }
-    holidays = await BusinessCalendar(repo).holidays_between(date(year, 1, 1), date(year, 12, 31))
-    return [
-        HolidayResponse.custom(custom[h.day])
-        if h.source is HolidaySource.CUSTOM
-        else HolidayResponse(id=None, holiday_date=h.day, name=h.name, source=h.source)
-        for h in holidays
-    ]
+    public = TortoisePublicHolidayRepository()
+    start, end = date(year, 1, 1), date(year, 12, 31)
+    custom = {h.holiday_date: h for h in await repo.list_between(start, end)}
+    holidays = await BusinessCalendar(repo, public).holidays_between(start, end)
+    sync = await public.get_sync(year)
+    return HolidayListResponse(
+        items=[
+            HolidayResponse.custom(custom[h.day])
+            if h.source is HolidaySource.CUSTOM
+            else HolidayResponse(id=None, holiday_date=h.day, name=h.name, source=h.source)
+            for h in holidays
+        ],
+        synced_at=sync.synced_at if sync else None,
+    )
+
+
+@router.post("/mentoring-holidays/sync", response_model=HolidaySyncResponse)
+async def sync_public_holidays(_: AnyManager, service: SyncServiceDep) -> HolidaySyncResponse:
+    """올해·내년 법정공휴일을 지금 받아 그해를 통째로 바꾼다. 실패하면 503 `holiday_sync_failed`."""
+    results = await service.sync()
+    return HolidaySyncResponse(
+        years=[
+            HolidaySyncYear(year=r.year, synced_at=r.synced_at, holiday_count=r.holiday_count)
+            for r in results
+        ]
+    )
 
 
 @router.post(

@@ -13,7 +13,6 @@ dependencies = [
     "google-apps-meet>=0.5.2",
     "google-auth>=2.62.1",
     "google-cloud-pubsub>=2.43.0",
-    "holidays>=0.108",
     "httpx>=0.28.1",
     "pyairtable>=3.5.1",
     "pydantic-settings>=2.16.2",

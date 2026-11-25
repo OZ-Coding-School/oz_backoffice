@@ -25,6 +25,8 @@ from app.contexts.mentoring.infrastructure.models.settings import (
     CohortMentoringBlockTimeModel,
     CohortMentoringSettingsModel,
     MentoringHolidayModel,
+    PublicHolidayModel,
+    PublicHolidaySyncModel,
 )
 from app.contexts.mentoring.infrastructure.models.settlement import (
     MentoringSettlementItemModel,
@@ -54,4 +56,6 @@ __all__ = [
     "MentoringTeamMemberModel",
     "MentoringTeamModel",
     "MentoringTranscriptEntryModel",
+    "PublicHolidayModel",
+    "PublicHolidaySyncModel",
 ]

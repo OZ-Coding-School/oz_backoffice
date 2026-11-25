@@ -103,6 +103,12 @@ class Settings(BaseSettings):
     # 녹화 정리 최상위 폴더(공유 드라이브 `멘토링 녹화`) ID (A54). 비우면 수집·정리를 하지 않는다
     meet_recordings_folder_id: str = ""
 
+    # 법정공휴일 (decisions A95·B16). fixed는 2025~2027 고정 자료(개발·테스트),
+    # data_go_kr는 공공데이터포털 특일 정보 API를 호출한다(운영)
+    holiday_driver: Literal["fixed", "data_go_kr"] = "fixed"
+    # 공공데이터포털 서비스 키 (일반 인증키 Decoding 값)
+    holiday_api_key: SecretStr = SecretStr("")
+
     # 업무상 날짜 경계 기준 타임존
     business_timezone: str = "Asia/Seoul"
 
