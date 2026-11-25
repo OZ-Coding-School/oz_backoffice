@@ -14,6 +14,8 @@ class ContractFilter:
     educator_type: EducatorType | None = None
     # 계약자 이름·제목 부분 일치, 숫자가 있으면 휴대폰 부분 일치
     query: str | None = None
+    # 연결된 멘토 프로필 (A103)
+    mentor_id: uuid.UUID | None = None
 
 
 class EducatorContractRepository(Protocol):

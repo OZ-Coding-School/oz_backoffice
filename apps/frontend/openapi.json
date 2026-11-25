@@ -4711,6 +4711,25 @@
             "description": "계약자 이름·제목·휴대폰"
           },
           {
+            "name": "mentor_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "연결된 멘토 (A103)",
+              "title": "Mentor Id"
+            },
+            "description": "연결된 멘토 (A103)"
+          },
+          {
             "name": "limit",
             "in": "query",
             "required": false,
@@ -4785,6 +4804,68 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ContractResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/contracts/manager-candidates": {
+      "get": {
+        "tags": [
+          "admin-contracts"
+        ],
+        "summary": "Contract Manager Candidates",
+        "description": "계약 담당 직원 후보 (A103): 직원 이름·이메일 검색, 같은 이름 → 이름으로 시작 → 나머지\n순으로 20개. 검색어가 없으면 나를 맨 앞에 둔다.",
+        "operationId": "contract_manager_candidates_api_v1_admin_contracts_manager_candidates_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 50
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "직원 이름·이메일",
+              "title": "Q"
+            },
+            "description": "직원 이름·이메일"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ManagerCandidateResponse"
+                  },
+                  "title": "Response Contract Manager Candidates Api V1 Admin Contracts Manager Candidates Get"
                 }
               }
             }
@@ -15474,6 +15555,18 @@
             "format": "uuid",
             "title": "Manager Employee Id"
           },
+          "manager_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manager Name",
+            "description": "담당 직원 이름 (A103)"
+          },
           "mentor_id": {
             "anyOf": [
               {
@@ -15497,6 +15590,17 @@
               }
             ],
             "title": "Instructor Id"
+          },
+          "linked_profile": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LinkedProfileResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "연결된 멘토·강사 프로필 이름 (A103)"
           },
           "contract_file": {
             "anyOf": [
@@ -15545,8 +15649,10 @@
           "start_date",
           "end_date",
           "manager_employee_id",
+          "manager_name",
           "mentor_id",
           "instructor_id",
+          "linked_profile",
           "contract_file",
           "created_at",
           "updated_at"
@@ -17426,6 +17532,26 @@
         ],
         "title": "IntervalResponse"
       },
+      "LinkedProfileResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "실명"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name",
+            "description": "수강생에게 보이는 이름"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "display_name"
+        ],
+        "title": "LinkedProfileResponse"
+      },
       "LivenessResponse": {
         "properties": {
           "status": {
@@ -17459,6 +17585,58 @@
           "password"
         ],
         "title": "LoginRequest"
+      },
+      "ManagerCandidateResponse": {
+        "properties": {
+          "employee_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Employee Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "department_name": {
+            "type": "string",
+            "title": "Department Name"
+          },
+          "team_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Name"
+          },
+          "position_name": {
+            "type": "string",
+            "title": "Position Name"
+          },
+          "is_me": {
+            "type": "boolean",
+            "title": "Is Me",
+            "description": "요청한 본인"
+          }
+        },
+        "type": "object",
+        "required": [
+          "employee_id",
+          "name",
+          "email",
+          "department_name",
+          "team_name",
+          "position_name",
+          "is_me"
+        ],
+        "title": "ManagerCandidateResponse"
       },
       "MeResponse": {
         "properties": {

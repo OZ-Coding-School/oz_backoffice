@@ -3,6 +3,7 @@
 import re
 import uuid
 from datetime import date
+from typing import cast
 
 from tortoise.expressions import Q
 from tortoise.functions import Count
@@ -77,6 +78,8 @@ class TortoiseEducatorContractRepository(
             query = query.filter(educator_type=contract_filter.educator_type)
         if contract_filter.query:
             query = query.filter(_search(contract_filter.query))
+        if contract_filter.mentor_id is not None:
+            query = query.filter(mentor_id=contract_filter.mentor_id)
         total = await query.count()
         rows = await query.order_by("-created_at", "-id").offset(offset).limit(limit)
         return [self.to_entity(row) for row in rows], total
@@ -190,6 +193,13 @@ class TortoiseMentorRepository(TortoiseRepository[Mentor, MentorModel]):
 class TortoiseInstructorRepository:
     async def exists(self, instructor_id: uuid.UUID) -> bool:
         return await InstructorModel.exists(id=instructor_id)
+
+    async def user_ids(self, instructor_ids: list[uuid.UUID]) -> dict[uuid.UUID, uuid.UUID]:
+        """강사 id → 회원 id"""
+        if not instructor_ids:
+            return {}
+        rows = await InstructorModel.filter(id__in=instructor_ids).values_list("id", "user_id")
+        return {cast("uuid.UUID", i): cast("uuid.UUID", u) for i, u in rows}
 
 
 def _search(text: str) -> Q:
