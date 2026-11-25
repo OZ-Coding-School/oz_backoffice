@@ -45,6 +45,7 @@ import { Route as StaffAdminOrgDepartmentsRouteImport } from './routes/_staff/ad
 import { Route as StaffAdminOrgEmployeesRouteImport } from './routes/_staff/admin/org/employees'
 import { Route as StaffAdminOrgPermissionsRouteImport } from './routes/_staff/admin/org/permissions'
 import { Route as StaffAdminOrgPositionsRouteImport } from './routes/_staff/admin/org/positions'
+import { Route as StaffAdminSettingsHolidaysRouteImport } from './routes/_staff/admin/settings/holidays'
 import { Route as MemberMentoringRequestsRequestIdChangeRouteImport } from './routes/_member/mentoring/requests/$requestId_.change'
 
 const AuthRoute = AuthRouteImport.update({
@@ -241,6 +242,12 @@ const StaffAdminOrgPositionsRoute = StaffAdminOrgPositionsRouteImport.update({
   path: '/admin/org/positions',
   getParentRoute: () => StaffRoute,
 } as any)
+const StaffAdminSettingsHolidaysRoute =
+  StaffAdminSettingsHolidaysRouteImport.update({
+    id: '/admin/settings/holidays',
+    path: '/admin/settings/holidays',
+    getParentRoute: () => StaffRoute,
+  } as any)
 const MemberMentoringRequestsRequestIdChangeRoute =
   MemberMentoringRequestsRequestIdChangeRouteImport.update({
     id: '/mentoring/requests/$requestId_/change',
@@ -274,6 +281,7 @@ export interface FileRoutesByFullPath {
   '/admin/org/employees': typeof StaffAdminOrgEmployeesRoute
   '/admin/org/permissions': typeof StaffAdminOrgPermissionsRoute
   '/admin/org/positions': typeof StaffAdminOrgPositionsRoute
+  '/admin/settings/holidays': typeof StaffAdminSettingsHolidaysRoute
   '/mentor/requests/': typeof MemberMentorRequestsIndexRoute
   '/mentor/schedule/': typeof MemberMentorScheduleIndexRoute
   '/mentor/sessions/': typeof MemberMentorSessionsIndexRoute
@@ -309,6 +317,7 @@ export interface FileRoutesByTo {
   '/admin/org/employees': typeof StaffAdminOrgEmployeesRoute
   '/admin/org/permissions': typeof StaffAdminOrgPermissionsRoute
   '/admin/org/positions': typeof StaffAdminOrgPositionsRoute
+  '/admin/settings/holidays': typeof StaffAdminSettingsHolidaysRoute
   '/mentor/requests': typeof MemberMentorRequestsIndexRoute
   '/mentor/schedule': typeof MemberMentorScheduleIndexRoute
   '/mentor/sessions': typeof MemberMentorSessionsIndexRoute
@@ -349,6 +358,7 @@ export interface FileRoutesById {
   '/_staff/admin/org/employees': typeof StaffAdminOrgEmployeesRoute
   '/_staff/admin/org/permissions': typeof StaffAdminOrgPermissionsRoute
   '/_staff/admin/org/positions': typeof StaffAdminOrgPositionsRoute
+  '/_staff/admin/settings/holidays': typeof StaffAdminSettingsHolidaysRoute
   '/_member/mentor/requests/': typeof MemberMentorRequestsIndexRoute
   '/_member/mentor/schedule/': typeof MemberMentorScheduleIndexRoute
   '/_member/mentor/sessions/': typeof MemberMentorSessionsIndexRoute
@@ -386,6 +396,7 @@ export interface FileRouteTypes {
     | '/admin/org/employees'
     | '/admin/org/permissions'
     | '/admin/org/positions'
+    | '/admin/settings/holidays'
     | '/mentor/requests/'
     | '/mentor/schedule/'
     | '/mentor/sessions/'
@@ -421,6 +432,7 @@ export interface FileRouteTypes {
     | '/admin/org/employees'
     | '/admin/org/permissions'
     | '/admin/org/positions'
+    | '/admin/settings/holidays'
     | '/mentor/requests'
     | '/mentor/schedule'
     | '/mentor/sessions'
@@ -460,6 +472,7 @@ export interface FileRouteTypes {
     | '/_staff/admin/org/employees'
     | '/_staff/admin/org/permissions'
     | '/_staff/admin/org/positions'
+    | '/_staff/admin/settings/holidays'
     | '/_member/mentor/requests/'
     | '/_member/mentor/schedule/'
     | '/_member/mentor/sessions/'
@@ -732,6 +745,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StaffAdminOrgPositionsRouteImport
       parentRoute: typeof StaffRoute
     }
+    '/_staff/admin/settings/holidays': {
+      id: '/_staff/admin/settings/holidays'
+      path: '/admin/settings/holidays'
+      fullPath: '/admin/settings/holidays'
+      preLoaderRoute: typeof StaffAdminSettingsHolidaysRouteImport
+      parentRoute: typeof StaffRoute
+    }
     '/_member/mentoring/requests/$requestId_/change': {
       id: '/_member/mentoring/requests/$requestId_/change'
       path: '/mentoring/requests/$requestId/change'
@@ -815,6 +835,7 @@ interface StaffRouteChildren {
   StaffAdminOrgEmployeesRoute: typeof StaffAdminOrgEmployeesRoute
   StaffAdminOrgPermissionsRoute: typeof StaffAdminOrgPermissionsRoute
   StaffAdminOrgPositionsRoute: typeof StaffAdminOrgPositionsRoute
+  StaffAdminSettingsHolidaysRoute: typeof StaffAdminSettingsHolidaysRoute
 }
 
 const StaffRouteChildren: StaffRouteChildren = {
@@ -825,6 +846,7 @@ const StaffRouteChildren: StaffRouteChildren = {
   StaffAdminOrgEmployeesRoute: StaffAdminOrgEmployeesRoute,
   StaffAdminOrgPermissionsRoute: StaffAdminOrgPermissionsRoute,
   StaffAdminOrgPositionsRoute: StaffAdminOrgPositionsRoute,
+  StaffAdminSettingsHolidaysRoute: StaffAdminSettingsHolidaysRoute,
 }
 
 const StaffRouteWithChildren = StaffRoute._addFileChildren(StaffRouteChildren)

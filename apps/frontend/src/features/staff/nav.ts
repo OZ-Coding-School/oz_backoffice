@@ -1,9 +1,11 @@
 import {
   BadgeCheck,
   Building2,
+  CalendarDays,
   KeyRound,
   Network,
   LayoutGrid,
+  Settings2,
   ShieldCheck,
   UserCheck,
   UserRound,
@@ -103,6 +105,21 @@ const MODULES: StaffModule[] = [
         label: "권한",
         icon: KeyRound,
         permissions: ["access.role.read"],
+      },
+    ],
+  },
+  {
+    key: "settings",
+    label: "설정",
+    description: "공휴일",
+    icon: Settings2,
+    // F72: 추가는 mentoring.settings.manage
+    items: [
+      {
+        to: "/admin/settings/holidays",
+        label: "공휴일",
+        icon: CalendarDays,
+        permissions: ["mentoring.settings.read"],
       },
     ],
   },
