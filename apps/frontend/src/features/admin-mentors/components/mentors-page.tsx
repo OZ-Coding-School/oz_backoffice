@@ -22,7 +22,8 @@ export interface MentorsSearch {
 }
 
 const ALL_STATUS = "all";
-const COLUMNS = "grid grid-cols-[minmax(0,1.2fr)_minmax(0,1.6fr)_136px_72px_112px_80px] items-center gap-4";
+// 칸 폭을 고정해 넓은 화면에서도 칸 사이가 벌어지지 않게 하고, 남는 폭은 마지막 칸(상태)이 받는다
+const COLUMNS = "grid grid-cols-[200px_260px_140px_64px_120px_minmax(0,1fr)] items-center gap-4";
 
 /** 강사·멘토 > 멘토 (F79·F80): 검색·상태 + 표(항목마다 칸), 행을 누르면 상세 페이지 */
 export function MentorsPage({ search }: { search: MentorsSearch }) {
