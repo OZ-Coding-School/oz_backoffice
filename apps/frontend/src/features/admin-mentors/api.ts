@@ -13,7 +13,7 @@ export const PAGE_SIZE = 20;
 
 export interface MentorFilter {
   q?: string;
-  status?: "active" | "inactive";
+  status?: "active" | "inactive" | "pending";
 }
 
 export const mentorKeys = {
@@ -37,7 +37,7 @@ export function mentorsQuery(f: MentorFilter) {
               limit: PAGE_SIZE,
               offset: pageParam,
               ...(f.q ? { q: f.q } : {}),
-              ...(f.status ? { is_active: f.status === "active" } : {}),
+              ...(f.status ? { status: f.status } : {}),
             },
           },
         }),
@@ -68,6 +68,14 @@ export function mentorAssignmentsQuery(id: string) {
     queryKey: mentorKeys.assignments(id),
     queryFn: () =>
       unwrap(api.GET("/api/v1/admin/mentors/{mentor_id}/mentor-assignments", { params: { path: { mentor_id: id } } })),
+  });
+}
+
+/** 그 멘토에 속한 계약 (A103·F83): 조회만, 최근 등록부터 */
+export function mentorContractsQuery(id: string) {
+  return queryOptions({
+    queryKey: ["admin-contracts", "list", "mentor", id] as const,
+    queryFn: () => unwrap(api.GET("/api/v1/admin/contracts", { params: { query: { mentor_id: id, limit: 100 } } })),
   });
 }
 

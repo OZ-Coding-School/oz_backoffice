@@ -16,9 +16,11 @@ import { cn } from "@/lib/utils";
 
 import { mentorsQuery, type MentorItem } from "../api";
 
+export type MentorStatus = "active" | "inactive" | "pending";
+
 export interface MentorsSearch {
   q?: string;
-  status?: "active" | "inactive";
+  status?: MentorStatus;
 }
 
 const ALL_STATUS = "all";
@@ -51,7 +53,7 @@ export function MentorsPage({ search }: { search: MentorsSearch }) {
           onValueChange={(v) =>
             void navigate({
               to: "/admin/educators/mentors",
-              search: { ...search, status: v === ALL_STATUS ? undefined : (v as "active" | "inactive") },
+              search: { ...search, status: v === ALL_STATUS ? undefined : (v as MentorStatus) },
             })
           }
         >
@@ -62,6 +64,7 @@ export function MentorsPage({ search }: { search: MentorsSearch }) {
             <SelectItem value={ALL_STATUS}>모든 상태</SelectItem>
             <SelectItem value="active">활성</SelectItem>
             <SelectItem value="inactive">비활성</SelectItem>
+            <SelectItem value="pending">가입 전</SelectItem>
           </SelectContent>
         </Select>
         <div className="relative w-65">
@@ -103,7 +106,7 @@ export function MentorsPage({ search }: { search: MentorsSearch }) {
             ))}
           </div>
           <p className="text-caption text-muted-foreground">
-            괄호 안은 수강생에게 보이는 닉네임이에요. 신청 받기가 꺼진 멘토는 새 신청을 받지 않아요.
+            괄호 안은 수강생에게 보이는 닉네임이에요. 가입 전 멘토는 계약을 먼저 만든 멘토로, 가입하면 계정이 연결돼요.
           </p>
         </div>
       )}
@@ -140,7 +143,7 @@ function MentorRow({ mentor: m }: { mentor: MentorItem }) {
         </Link>
       </span>
       <span role="cell" className="truncate text-body text-foreground">
-        {m.email}
+        {m.email ?? "—"}
       </span>
       <span role="cell" className="text-body text-foreground">
         {maskPhone(m.phone_number) ?? "—"}
@@ -152,7 +155,7 @@ function MentorRow({ mentor: m }: { mentor: MentorItem }) {
         <AcceptingBadge on={m.accepting_requests} />
       </span>
       <span role="cell">
-        <ActiveBadge on={m.is_active} />
+        <StatusBadge mentor={m} />
       </span>
     </div>
   );
@@ -162,6 +165,8 @@ export function AcceptingBadge({ on }: { on: boolean }) {
   return <Badge variant={on ? "info" : "outline"}>{on ? "신청 받는 중" : "신청 꺼짐"}</Badge>;
 }
 
-export function ActiveBadge({ on }: { on: boolean }) {
-  return <Badge variant={on ? "success" : "secondary"}>{on ? "활성" : "비활성"}</Badge>;
+/** 활성 · 비활성 · 가입 전(A104) */
+export function StatusBadge({ mentor: m }: { mentor: Pick<MentorItem, "is_active" | "is_registered"> }) {
+  if (!m.is_registered) return <Badge variant="warning">가입 전</Badge>;
+  return <Badge variant={m.is_active ? "success" : "secondary"}>{m.is_active ? "활성" : "비활성"}</Badge>;
 }

@@ -24,6 +24,8 @@ const FAILED = "처리하지 못했어요. 잠시 후 다시 시도해 주세요
  * 활성화: 확인 후 적용하고, 멘토 비활성화로 꺼졌던 배정이 있으면 다시 켤 배정을 고르는 창.
  */
 export function ActivationActions({ mentor }: { mentor: MentorItem }) {
+  // 가입 전 멘토(A104)는 활성화할 수 없다
+  if (!mentor.is_registered) return null;
   return mentor.is_active ? <Deactivate mentor={mentor} /> : <Activate mentor={mentor} />;
 }
 
@@ -70,7 +72,8 @@ function Deactivate({ mentor }: { mentor: MentorItem }) {
         <DialogContent className="flex max-w-120 flex-col gap-4 p-6">
           <DialogTitle className="text-h2 text-foreground">{mentor.name} 멘토를 비활성화할까요?</DialogTitle>
           <DialogDescription className="text-body text-muted-foreground">
-            로그인과 새 신청이 막히고 활성 배정이 모두 꺼져요. 이미 승인한 세션은 그대로예요.
+            신청 받기와 활성 배정이 모두 꺼지고 대기 중인 신청은 취소돼요. 이미 승인한 세션은 그대로예요. 로그인은 막지
+            않아요.
           </DialogDescription>
           {preview && preview.assignments.length > 0 ? (
             <section aria-labelledby="off-title" className="flex flex-col gap-2">
@@ -142,7 +145,7 @@ function Activate({ mentor }: { mentor: MentorItem }) {
         <DialogContent className="flex max-w-110 flex-col gap-4 p-6">
           <DialogTitle className="text-h2 text-foreground">{mentor.name} 멘토를 활성화할까요?</DialogTitle>
           <DialogDescription className="text-body text-muted-foreground">
-            다시 로그인할 수 있어요. 꺼진 배정은 다음 창에서 골라 다시 켤 수 있어요.
+            새 배정과 신청 받기를 다시 할 수 있어요. 꺼진 배정은 다음 창에서 골라 다시 켤 수 있어요.
           </DialogDescription>
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setConfirming(false)}>
