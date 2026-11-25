@@ -146,7 +146,7 @@ function ModuleLink({ module, active }: { module: StaffModule; active: boolean }
       )}
     >
       <Icon aria-hidden className="size-5" />
-      <span className="text-caption-strong">{module.label}</span>
+      <span className="text-caption-strong whitespace-nowrap">{module.label}</span>
     </Link>
   );
 }

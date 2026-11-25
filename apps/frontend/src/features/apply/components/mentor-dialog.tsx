@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
+import { Markdown } from "@/components/markdown";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -95,7 +96,7 @@ export function MentorIntro({
       {mentor.introduction ? (
         <section className="flex flex-col gap-2">
           <h3 className="text-caption text-muted-foreground">소개</h3>
-          <p className="whitespace-pre-line text-body text-foreground">{mentor.introduction}</p>
+          <Markdown>{mentor.introduction}</Markdown>
         </section>
       ) : null}
     </>

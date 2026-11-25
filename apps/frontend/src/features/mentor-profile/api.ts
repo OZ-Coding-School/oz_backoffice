@@ -27,16 +27,20 @@ export class PhotoUploadError extends Error {
   }
 }
 
-/** 업로드 표(A28)로 S3에 바로 올린다. fields를 모두 넣고 파일은 마지막에 `file`로 */
-async function uploadPhoto(image: Blob): Promise<MentorProfile> {
-  const ticket = await unwrap(
-    api.POST("/api/v1/me/mentor-profile/image/uploads", { body: { content_type: "image/webp" } }),
-  );
+/** 업로드 표(A28)로 S3에 바로 올린다. fields를 모두 넣고 파일은 마지막에 `file`로 (운영진 대리 수정도 쓴다) */
+export async function postPhoto(ticket: { url: string; fields: Record<string, string> }, image: Blob): Promise<void> {
   const form = new FormData();
   for (const [key, value] of Object.entries(ticket.fields)) form.append(key, value);
   form.append("file", image, "profile.webp");
   const res = await fetch(ticket.url, { method: "POST", body: form });
   if (!res.ok) throw new PhotoUploadError();
+}
+
+async function uploadPhoto(image: Blob): Promise<MentorProfile> {
+  const ticket = await unwrap(
+    api.POST("/api/v1/me/mentor-profile/image/uploads", { body: { content_type: "image/webp" } }),
+  );
+  await postPhoto(ticket, image);
   return unwrap(
     api.POST("/api/v1/me/mentor-profile/image/uploads/{upload_id}/confirm", {
       params: { path: { upload_id: ticket.upload_id } },

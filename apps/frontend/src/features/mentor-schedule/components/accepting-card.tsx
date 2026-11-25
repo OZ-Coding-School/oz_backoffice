@@ -7,15 +7,28 @@ import { Switch } from "@/components/ui/switch";
 
 import { useSetAccepting } from "../api";
 
-/** 신청 받기 (F52): 끌 때만 확인 창, 켜기는 바로. 일정 화면과 멘토 홈(F57)이 같이 쓴다 */
+interface AcceptingSetter {
+  mutateAsync: (next: boolean) => Promise<{ canceled_pending_requests?: number }>;
+  isPending: boolean;
+}
+
+/**
+ * 신청 받기 (F52): 끌 때만 확인 창, 켜기는 바로. 일정 화면과 멘토 홈(F57)이 같이 쓴다.
+ * 운영진 멘토 상세(F79)는 `setter`로 운영진 API를 넘기고, 바꿀 권한이 없으면 `readOnly`
+ */
 export function AcceptingCard({
   accepting,
   description = "끄면 새 신청만 막아요. 이미 받은 신청과 세션은 그대로예요.",
+  setter,
+  readOnly = false,
 }: {
   accepting: boolean;
   description?: string;
+  setter?: AcceptingSetter;
+  readOnly?: boolean;
 }) {
-  const set = useSetAccepting();
+  const mine = useSetAccepting();
+  const set: AcceptingSetter = setter ?? mine;
   const [confirming, setConfirming] = useState(false);
   const change = async (next: boolean) => {
     try {
@@ -24,8 +37,8 @@ export function AcceptingCard({
       toast.success(
         next
           ? "신청 받기를 켰어요"
-          : result.canceled_pending_requests > 0
-            ? `신청 받기를 껐어요. 대기 중인 신청 ${result.canceled_pending_requests}건을 취소했어요`
+          : (result.canceled_pending_requests ?? 0) > 0
+            ? `신청 받기를 껐어요. 대기 중인 신청 ${result.canceled_pending_requests ?? 0}건을 취소했어요`
             : "신청 받기를 껐어요",
       );
     } catch {
@@ -47,7 +60,7 @@ export function AcceptingCard({
         <Switch
           aria-labelledby="accepting-title"
           checked={accepting}
-          disabled={set.isPending}
+          disabled={set.isPending || readOnly}
           onCheckedChange={(next) => (next ? void change(true) : setConfirming(true))}
         />
         {accepting ? "받는 중" : "받지 않음"}

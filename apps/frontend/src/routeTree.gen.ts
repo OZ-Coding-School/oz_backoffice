@@ -51,6 +51,8 @@ import { Route as StaffAdminSettingsHolidaysRouteImport } from './routes/_staff/
 import { Route as MemberMentoringRequestsRequestIdChangeRouteImport } from './routes/_member/mentoring/requests/$requestId_.change'
 import { Route as StaffAdminAcademyStudentsIndexRouteImport } from './routes/_staff/admin/academy/students/index'
 import { Route as StaffAdminAcademyStudentsStudentIdRouteImport } from './routes/_staff/admin/academy/students/$studentId'
+import { Route as StaffAdminEducatorsMentorsIndexRouteImport } from './routes/_staff/admin/educators/mentors/index'
+import { Route as StaffAdminEducatorsMentorsMentorIdRouteImport } from './routes/_staff/admin/educators/mentors/$mentorId'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/_auth',
@@ -281,6 +283,18 @@ const StaffAdminAcademyStudentsStudentIdRoute =
     path: '/admin/academy/students/$studentId',
     getParentRoute: () => StaffRoute,
   } as any)
+const StaffAdminEducatorsMentorsIndexRoute =
+  StaffAdminEducatorsMentorsIndexRouteImport.update({
+    id: '/admin/educators/mentors/',
+    path: '/admin/educators/mentors/',
+    getParentRoute: () => StaffRoute,
+  } as any)
+const StaffAdminEducatorsMentorsMentorIdRoute =
+  StaffAdminEducatorsMentorsMentorIdRouteImport.update({
+    id: '/admin/educators/mentors/$mentorId',
+    path: '/admin/educators/mentors/$mentorId',
+    getParentRoute: () => StaffRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof MemberIndexRoute
@@ -320,7 +334,9 @@ export interface FileRoutesByFullPath {
   '/mentoring/sessions/': typeof MemberMentoringSessionsIndexRoute
   '/mentoring/requests/$requestId/change': typeof MemberMentoringRequestsRequestIdChangeRoute
   '/admin/academy/students/$studentId': typeof StaffAdminAcademyStudentsStudentIdRoute
+  '/admin/educators/mentors/$mentorId': typeof StaffAdminEducatorsMentorsMentorIdRoute
   '/admin/academy/students/': typeof StaffAdminAcademyStudentsIndexRoute
+  '/admin/educators/mentors/': typeof StaffAdminEducatorsMentorsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof MemberIndexRoute
@@ -360,7 +376,9 @@ export interface FileRoutesByTo {
   '/mentoring/sessions': typeof MemberMentoringSessionsIndexRoute
   '/mentoring/requests/$requestId/change': typeof MemberMentoringRequestsRequestIdChangeRoute
   '/admin/academy/students/$studentId': typeof StaffAdminAcademyStudentsStudentIdRoute
+  '/admin/educators/mentors/$mentorId': typeof StaffAdminEducatorsMentorsMentorIdRoute
   '/admin/academy/students': typeof StaffAdminAcademyStudentsIndexRoute
+  '/admin/educators/mentors': typeof StaffAdminEducatorsMentorsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -405,7 +423,9 @@ export interface FileRoutesById {
   '/_member/mentoring/sessions/': typeof MemberMentoringSessionsIndexRoute
   '/_member/mentoring/requests/$requestId_/change': typeof MemberMentoringRequestsRequestIdChangeRoute
   '/_staff/admin/academy/students/$studentId': typeof StaffAdminAcademyStudentsStudentIdRoute
+  '/_staff/admin/educators/mentors/$mentorId': typeof StaffAdminEducatorsMentorsMentorIdRoute
   '/_staff/admin/academy/students/': typeof StaffAdminAcademyStudentsIndexRoute
+  '/_staff/admin/educators/mentors/': typeof StaffAdminEducatorsMentorsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -447,7 +467,9 @@ export interface FileRouteTypes {
     | '/mentoring/sessions/'
     | '/mentoring/requests/$requestId/change'
     | '/admin/academy/students/$studentId'
+    | '/admin/educators/mentors/$mentorId'
     | '/admin/academy/students/'
+    | '/admin/educators/mentors/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -487,7 +509,9 @@ export interface FileRouteTypes {
     | '/mentoring/sessions'
     | '/mentoring/requests/$requestId/change'
     | '/admin/academy/students/$studentId'
+    | '/admin/educators/mentors/$mentorId'
     | '/admin/academy/students'
+    | '/admin/educators/mentors'
   id:
     | '__root__'
     | '/_auth'
@@ -531,7 +555,9 @@ export interface FileRouteTypes {
     | '/_member/mentoring/sessions/'
     | '/_member/mentoring/requests/$requestId_/change'
     | '/_staff/admin/academy/students/$studentId'
+    | '/_staff/admin/educators/mentors/$mentorId'
     | '/_staff/admin/academy/students/'
+    | '/_staff/admin/educators/mentors/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -838,6 +864,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StaffAdminAcademyStudentsStudentIdRouteImport
       parentRoute: typeof StaffRoute
     }
+    '/_staff/admin/educators/mentors/': {
+      id: '/_staff/admin/educators/mentors/'
+      path: '/admin/educators/mentors'
+      fullPath: '/admin/educators/mentors/'
+      preLoaderRoute: typeof StaffAdminEducatorsMentorsIndexRouteImport
+      parentRoute: typeof StaffRoute
+    }
+    '/_staff/admin/educators/mentors/$mentorId': {
+      id: '/_staff/admin/educators/mentors/$mentorId'
+      path: '/admin/educators/mentors/$mentorId'
+      fullPath: '/admin/educators/mentors/$mentorId'
+      preLoaderRoute: typeof StaffAdminEducatorsMentorsMentorIdRouteImport
+      parentRoute: typeof StaffRoute
+    }
   }
 }
 
@@ -918,7 +958,9 @@ interface StaffRouteChildren {
   StaffAdminOrgPositionsRoute: typeof StaffAdminOrgPositionsRoute
   StaffAdminSettingsHolidaysRoute: typeof StaffAdminSettingsHolidaysRoute
   StaffAdminAcademyStudentsStudentIdRoute: typeof StaffAdminAcademyStudentsStudentIdRoute
+  StaffAdminEducatorsMentorsMentorIdRoute: typeof StaffAdminEducatorsMentorsMentorIdRoute
   StaffAdminAcademyStudentsIndexRoute: typeof StaffAdminAcademyStudentsIndexRoute
+  StaffAdminEducatorsMentorsIndexRoute: typeof StaffAdminEducatorsMentorsIndexRoute
 }
 
 const StaffRouteChildren: StaffRouteChildren = {
@@ -934,7 +976,10 @@ const StaffRouteChildren: StaffRouteChildren = {
   StaffAdminSettingsHolidaysRoute: StaffAdminSettingsHolidaysRoute,
   StaffAdminAcademyStudentsStudentIdRoute:
     StaffAdminAcademyStudentsStudentIdRoute,
+  StaffAdminEducatorsMentorsMentorIdRoute:
+    StaffAdminEducatorsMentorsMentorIdRoute,
   StaffAdminAcademyStudentsIndexRoute: StaffAdminAcademyStudentsIndexRoute,
+  StaffAdminEducatorsMentorsIndexRoute: StaffAdminEducatorsMentorsIndexRoute,
 }
 
 const StaffRouteWithChildren = StaffRoute._addFileChildren(StaffRouteChildren)

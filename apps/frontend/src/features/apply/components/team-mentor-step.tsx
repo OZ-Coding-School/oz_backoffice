@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { Markdown } from "@/components/markdown";
 import { Badge } from "@/components/ui/badge";
 import { formatKst, formatMinutes } from "@/lib/datetime";
 
@@ -44,7 +45,9 @@ export function TeamMentorStep({
         </div>
         {chips.length ? <Chips items={chips} /> : null}
         {mentor?.introduction ? (
-          <p className="line-clamp-3 whitespace-pre-line text-body text-foreground">{mentor.introduction}</p>
+          <div className="line-clamp-3 overflow-hidden">
+            <Markdown>{mentor.introduction}</Markdown>
+          </div>
         ) : null}
         <button
           type="button"

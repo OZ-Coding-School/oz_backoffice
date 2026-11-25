@@ -46,3 +46,4 @@
 | 42 | [학사 > HRD 과정 (FE-17b)](42_academy_hrd.md) | 완료 (#154) |
 | 43 | [학사 > 수강생 (FE-17c)](43_academy_students.md) | 완료 (#157) |
 | 44 | [학사 > 수강생 > 명단 동기화 (FE-17d)](44_academy_roster_sync.md) | 완료 (#158) |
+| 45 | [강사·멘토 > 멘토 (FE-18a)](45_admin_mentors.md) | 완료 (#162) |
