@@ -1,7 +1,7 @@
 # 91. 부서·팀 직원 수 (BE-3k)
 
-- 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 상태: 완료 (2026-11-25 병합)
+- 관련 PR: #142
 - 관련 결정: `docs/decisions.md` A92
 - 이전 기록: [90. 직원 응답에 직위 데이터 범위 (BE-3j)](90_employee_data_scope.md)
 
@@ -26,6 +26,7 @@ FE-15g 조직 설정 > 부서는 목록·조직도에 부서·팀별 직원 수�
 ## 검증
 - `ruff check`, `ruff format --check`, `mypy`, `mypy tests`, `lint-imports` 통과, `pytest` 892 passed (팀이 없는 직원은 부서에만 세는지, 팀으로 옮기면 팀 수가 느는지)
 - 프론트엔드: `lint`, `typecheck`, `vitest` 321 passed
+- GitHub Actions (PR #142): 백엔드·프론트엔드 검사와 E2E 통과
 
 ## 남은 작업
 - FE-15g 조직 설정 > 부서

@@ -92,4 +92,4 @@
 | 88 | [담당 역할 칸 제거·직원 수정에서 담당 지정 (BE-3h)](88_staff_assignments_without_role.md) | 완료 (#136) |
 | 89 | [직원 목록 전체·최고 관리자 함께 수정 (BE-3i)](89_employee_list_all.md) | 완료 (#139) |
 | 90 | [직원 응답에 직위 데이터 범위 (BE-3j)](90_employee_data_scope.md) | 완료 (#140) |
-| 91 | [부서·팀 직원 수 (BE-3k)](91_org_employee_counts.md) | PR 진행 중 |
+| 91 | [부서·팀 직원 수 (BE-3k)](91_org_employee_counts.md) | 완료 (#142) |
