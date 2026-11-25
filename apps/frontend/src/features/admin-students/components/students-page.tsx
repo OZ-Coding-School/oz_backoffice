@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Search, Users } from "lucide-react";
+import { ChevronDown, ChevronRight, Search, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { EmptyState } from "@/components/empty-state";
@@ -15,15 +15,17 @@ import { useDebounced } from "@/lib/use-debounced";
 import { cn } from "@/lib/utils";
 
 import { rosterQuery, type EnrollmentStatus, type RosterStudent } from "../api";
-import { matches } from "../filter";
+import { groupStudents, matches, type StudentGroup, type StudentGroupBy } from "../filter";
 import { ENROLLMENT, ENROLLMENT_ORDER } from "../labels";
 
 export interface StudentsSearch {
   cohort?: string;
   status?: EnrollmentStatus;
   q?: string;
+  group?: StudentGroupBy;
 }
 
+const NO_GROUP = "none";
 const COLUMNS = "grid grid-cols-[140px_150px_minmax(0,1fr)_80px_96px] items-center gap-3";
 const COHORT_STATUS: Record<string, string> = {
   PLANNED: "개강 전",
@@ -122,7 +124,7 @@ function CohortStudents({
           value={cohort.bootcamp_id}
           onValueChange={(bootcampId) => {
             const first = cohorts.find((c) => c.bootcamp_id === bootcampId);
-            if (first) onChange({ cohort: first.id });
+            if (first) onChange({ cohort: first.id, group: search.group });
           }}
         >
           <SelectTrigger aria-label="과정" className="w-60">
@@ -136,7 +138,7 @@ function CohortStudents({
             ))}
           </SelectContent>
         </Select>
-        <Select value={cohort.id} onValueChange={(id) => onChange({ cohort: id })}>
+        <Select value={cohort.id} onValueChange={(id) => onChange({ cohort: id, group: search.group })}>
           <SelectTrigger aria-label="기수" className="w-44">
             <SelectValue />
           </SelectTrigger>
@@ -149,6 +151,21 @@ function CohortStudents({
           </SelectContent>
         </Select>
         <div className="flex-1" />
+        <Select
+          value={search.group ?? NO_GROUP}
+          onValueChange={(v) =>
+            onChange({ ...search, cohort: cohort.id, group: v === NO_GROUP ? undefined : (v as StudentGroupBy) })
+          }
+        >
+          <SelectTrigger aria-label="묶어 보기" className="w-40">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NO_GROUP}>묶지 않음</SelectItem>
+            <SelectItem value="status">수강 상태별</SelectItem>
+            <SelectItem value="signup">가입 상태별</SelectItem>
+          </SelectContent>
+        </Select>
         <div className="relative w-64">
           <Search aria-hidden className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -169,7 +186,12 @@ function CohortStudents({
               <li key={t.label}>
                 <Link
                   to="/admin/academy/students"
-                  search={{ cohort: cohort.id, ...(t.value ? { status: t.value } : {}), q: search.q }}
+                  search={{
+                    cohort: cohort.id,
+                    ...(t.value ? { status: t.value } : {}),
+                    q: search.q,
+                    group: search.group,
+                  }}
                   aria-current={active ? "page" : undefined}
                   aria-label={roster.data ? `${t.label} ${t.count}` : t.label}
                   className={cn(
@@ -208,15 +230,41 @@ function CohortStudents({
               </span>
             ))}
           </div>
-          {visible.map((s) => (
-            <StudentRow key={s.id} student={s} cohortId={cohort.id} />
-          ))}
+          {search.group
+            ? groupStudents(visible, search.group).map((g) => (
+                <GroupRows key={`${search.group}-${g.key}`} group={g} cohortId={cohort.id} />
+              ))
+            : visible.map((s) => <StudentRow key={s.id} student={s} cohortId={cohort.id} />)}
         </div>
       )}
       <p className="text-caption text-muted-foreground">
         휴대폰은 가려서 보여요. Airtable 원본에서 빠진 수강생은 보이지 않아요.
       </p>
     </>
+  );
+}
+
+/** 접는 묶음 머리 + 건수 (F77), 처음엔 펼침 */
+function GroupRows({ group, cohortId }: { group: StudentGroup; cohortId: string }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <div role="rowgroup" aria-label={`${group.label} ${group.items.length}명`}>
+      <div role="row" className="border-t border-border bg-muted/60">
+        <span role="cell" className="block">
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={() => setOpen((v) => !v)}
+            className="flex w-full items-center gap-2 px-4 py-2 text-left text-body-strong text-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {open ? <ChevronDown aria-hidden className="size-4" /> : <ChevronRight aria-hidden className="size-4" />}
+            {group.label}
+            <span className="text-caption font-normal text-muted-foreground">{group.items.length}명</span>
+          </button>
+        </span>
+      </div>
+      {open ? group.items.map((s) => <StudentRow key={s.id} student={s} cohortId={cohortId} />) : null}
+    </div>
   );
 }
 

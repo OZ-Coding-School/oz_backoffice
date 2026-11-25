@@ -2,7 +2,7 @@
 
 - 상태: PR 진행 중
 - 관련 PR: #157
-- 관련 결정: `docs/decisions.md` F76·F73 (A99·A81)
+- 관련 결정: `docs/decisions.md` F76·F77·F73 (A99·A81)
 - 이전 기록: [42. 학사 > HRD 과정 (FE-17b)](42_academy_hrd.md)
 
 ## 배경
@@ -13,7 +13,7 @@
 | 파일 | 내용 |
 | --- | --- |
 | `features/admin-students/api.ts` | 기수 명단, 수강생 상세(A99), 최근 신청·세션(대기 신청 + 세션, 최근 3건) |
-| `features/admin-students/labels.ts`, `filter.ts` | 수강 상태 배지·HRD 상태(Airtable 원문), 이름·이메일·휴대폰(숫자 3자리 이상) 검색 |
+| `features/admin-students/labels.ts`, `filter.ts` | 수강 상태 배지·HRD 상태(Airtable 원문), 이름·이메일·휴대폰(숫자 3자리 이상) 검색, 묶어 보기(수강 상태는 탭 순서, 가입 상태는 가입 → 미가입, 빈 묶음 제외) |
 | `features/admin-students/components/students-page.tsx` | 과정·기수 선택(담당 기수 `staff-access`, 처음엔 첫 기수, 과정을 바꾸면 그 과정의 첫 기수)·검색(입력이 멈추면 주소)·수강 상태 탭(건수)·명단 표(휴대폰 가림) |
 | `features/admin-students/components/student-page.tsx` | 상세: 머리(이름·수강 상태·가입 여부·기수·이메일) + 탭 기본 정보(기본·수강 정보·가입 계정·명단 원천)·멘토링(요약 카드 잔여·보류·사용·팀 + 최근 신청·세션, 신청 조회 권한이 있을 때만) |
 | `routes/_staff/admin/academy/students/index.tsx`, `$studentId.tsx` | `/admin/academy/students?cohort=&status=&q=`, `/admin/academy/students/{id}?cohort=&tab=mentoring`(기수가 없으면 목록으로) |
@@ -25,13 +25,14 @@
 - 상세는 별도 페이지 + 탭 기본 정보·멘토링(출결·행정은 범위 밖), 멘토링 요약 카드는 멘토링 탭에.
 - 다른 기수 수강 이력·[멘티 상세 보기]는 넣지 않는다(멘티 상세는 FE-20 때).
 - 학사 메뉴 순서는 수강생 · 과정·기수 · HRD 과정.
+- 화면을 본 뒤 '묶어 보기'(없음 · 수강 상태 · 가입 상태, `?group=`)를 더함: 표 안의 접는 묶음 머리 + 건수, 처음엔 펼침, 상태 탭과 함께 쓴다(F77).
 
 ## 발견한 문제와 해결
 - 최근 신청·세션의 행이 갈 운영진 신청·세션 화면(FE-21)이 아직 없어 누르지 않는 행으로 두었다.
 - 스크린샷을 찍는 도중 개발 서버(5173)가 내려가 빌드 결과를 다른 포트로 띄워 찍었다.
 
 ## 검증
-- `npm run lint`, `format:check`, `typecheck`, `test`(UTC·Asia/Seoul, 373개), `build`, `e2e`(47개)
+- `npm run lint`, `format:check`, `typecheck`, `test`(UTC·Asia/Seoul, 375개), `build`, `e2e`(47개)
 - 빌드 결과로 1440 라이트·다크 목록·상세 기본 정보·멘토링 탭 확인(API는 모킹)
 
 ## 남은 작업

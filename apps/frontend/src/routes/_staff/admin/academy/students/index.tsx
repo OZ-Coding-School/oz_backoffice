@@ -14,6 +14,7 @@ export const Route = createFileRoute("/_staff/admin/academy/students/")({
     const cohort = text(search.cohort);
     if (cohort) out.cohort = cohort;
     if (ENROLLMENT_ORDER.includes(search.status as EnrollmentStatus)) out.status = search.status as EnrollmentStatus;
+    if (search.group === "status" || search.group === "signup") out.group = search.group;
     const q = text(search.q);
     if (q) out.q = q;
     return out;

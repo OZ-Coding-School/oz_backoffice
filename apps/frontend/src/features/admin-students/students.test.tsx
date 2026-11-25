@@ -9,7 +9,7 @@ import { server } from "@/mocks/node";
 import { renderRoute } from "@/test/render";
 
 import type { RosterStudent, StudentDetail } from "./api";
-import { matches } from "./filter";
+import { groupStudents, matches } from "./filter";
 
 const ADMIN = makeMe({ name: "김관리", account_type: "STAFF", is_super_admin: false });
 
@@ -155,6 +155,19 @@ describe("검색어 일치", () => {
   });
 });
 
+describe("묶어 보기", () => {
+  it("수강 상태는 탭 순서, 가입 상태는 가입 → 미가입, 빈 묶음은 뺀다", () => {
+    expect(groupStudents([GA, NA, DA], "status").map((g) => [g.label, g.items.length])).toEqual([
+      ["수강 중", 2],
+      ["중도 포기", 1],
+    ]);
+    expect(groupStudents([GA, NA, DA], "signup").map((g) => [g.label, g.items.map((s) => s.name)])).toEqual([
+      ["가입", ["가수강"]],
+      ["미가입", ["나하늘", "다도윤"]],
+    ]);
+  });
+});
+
 describe("학사 > 수강생 (FE-17c)", () => {
   beforeEach(() => {
     resetAuth();
@@ -248,5 +261,31 @@ describe("학사 > 수강생 (FE-17c)", () => {
     await renderRoute("/admin/academy/students/s1?cohort=c12&tab=mentoring");
     await screen.findByRole("region", { name: "멘토링 요약" });
     expect(screen.queryByRole("region", { name: "최근 신청·세션" })).not.toBeInTheDocument();
+  });
+
+  it("가입 상태별로 묶고 묶음을 접는다, 상태 탭과 함께 쓴다 (F77)", async () => {
+    mockApi();
+    const { router } = await renderRoute("/admin/academy/students?cohort=c12");
+    await screen.findByRole("table", { name: "수강생" });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("combobox", { name: "묶어 보기" }));
+    await user.click(await screen.findByRole("option", { name: "가입 상태별" }));
+    await waitFor(() => expect(router.state.location.search).toEqual({ cohort: "c12", group: "signup" }));
+    const table = screen.getByRole("table", { name: "수강생" });
+    const unsigned = within(table).getByRole("rowgroup", { name: "미가입 2명" });
+    expect(
+      within(unsigned)
+        .getAllByRole("row")
+        .slice(1)
+        .map((r) => r.getAttribute("aria-label")),
+    ).toEqual(["나하늘", "다도윤"]);
+    await user.click(within(unsigned).getByRole("button", { name: /미가입/ }));
+    expect(within(unsigned).getAllByRole("row")).toHaveLength(1);
+
+    await user.click(screen.getByRole("link", { name: "중도 포기 1" }));
+    await waitFor(() =>
+      expect(router.state.location.search).toEqual({ cohort: "c12", status: "DROPPED", group: "signup" }),
+    );
+    expect(within(screen.getByRole("table", { name: "수강생" })).getAllByRole("rowgroup")).toHaveLength(1);
   });
 });
