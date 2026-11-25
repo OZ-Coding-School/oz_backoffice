@@ -62,6 +62,7 @@ function employee(overrides: Partial<Employee> = {}): Employee {
     position_id: "p1",
     employment_type: "REGULAR",
     is_super_admin: false,
+    data_scope: "ASSIGNED",
     assignments: [
       {
         staff_id: "s1",

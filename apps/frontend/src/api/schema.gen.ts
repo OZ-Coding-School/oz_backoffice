@@ -4576,6 +4576,11 @@ export interface components {
              * @default false
              */
             is_super_admin: boolean;
+            /**
+             * @description 직위의 데이터 범위 (A87·A91)
+             * @default ASSIGNED
+             */
+            data_scope: components["schemas"]["DataScope"];
         };
         /** EmployeeUpdateRequest */
         EmployeeUpdateRequest: {
