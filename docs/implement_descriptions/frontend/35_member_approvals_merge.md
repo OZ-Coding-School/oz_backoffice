@@ -1,7 +1,7 @@
 # 35. 회원 관리·가입 승인 통합 (FE-15e)
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #138
 - 관련 결정: `docs/decisions.md` F64·F66
 - 이전 기록: [34. 조직 설정 > 권한 (FE-15d)](34_org_permissions.md)
 
