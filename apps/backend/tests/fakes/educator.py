@@ -39,7 +39,8 @@ class InMemoryContractRepository:
         matched = [
             c
             for c in self.items.values()
-            if not contract_filter.statuses or c.status in contract_filter.statuses
+            if (not contract_filter.statuses or c.status in contract_filter.statuses)
+            and (contract_filter.mentor_id is None or c.mentor_id == contract_filter.mentor_id)
         ]
         return matched[offset : offset + limit], len(matched)
 
@@ -122,6 +123,18 @@ class InMemoryMentorRepository:
             for m in self.items.values()
             if m.user_id is None and (m.contact_name, m.contact_phone) == (name, phone)
         ]
+
+    async def search_pending(
+        self, *, name: str, phone: str | None, query: str | None, limit: int
+    ) -> list[Mentor]:
+        pending = [m for m in self.items.values() if m.user_id is None]
+        if query:
+            found = [m for m in pending if query in (m.contact_name or "")]
+        else:
+            found = [
+                m for m in pending if m.contact_name == name or (phone and m.contact_phone == phone)
+            ]
+        return found[:limit]
 
     async def list_page(
         self,

@@ -110,6 +110,7 @@ function mockApprovals({ students = [applicant()], mentors = [MENTOR_APPLICANT] 
           ? {
               signup_type: "MENTOR",
               students: [],
+              mentors: [],
               contracts: [
                 {
                   contract_id: "ct1",
@@ -127,6 +128,7 @@ function mockApprovals({ students = [applicant()], mentors = [MENTOR_APPLICANT] 
           : {
               signup_type: "STUDENT",
               contracts: [],
+              mentors: [],
               students: q
                 ? [student({ student_id: "st9", name: "나수강", name_match: false, phone_match: false })]
                 : [

@@ -17,6 +17,7 @@ from app.contexts.educator.domain.enums import (
     DisplayNamePreference,
     EducatorType,
 )
+from app.contexts.educator.domain.profiles import Mentor
 from app.contexts.educator.infrastructure.models import ContractFileModel
 from app.contexts.educator.infrastructure.repositories import (
     TortoiseEducatorContractRepository,
@@ -24,7 +25,7 @@ from app.contexts.educator.infrastructure.repositories import (
 )
 from app.shared.ids import new_id
 from tests.factories.academy import create_cohort, make_student
-from tests.factories.educator import create_mentor, create_user
+from tests.factories.educator import create_user
 from tests.factories.organization import create_employee
 
 pytestmark = pytest.mark.integration
@@ -73,40 +74,44 @@ async def test_no_claim_when_missing_or_duplicated() -> None:
     assert (duplicated.candidate_count, duplicated.student_id) == (2, None)
 
 
-async def test_mentor_contracts_any_status_are_linked() -> None:
-    contracts = TortoiseEducatorContractRepository()
+async def _mentor_contract(
+    employee_id: uuid.UUID, mentor_id: uuid.UUID | None, **overrides: Any
+) -> EducatorContract:
+    values: dict[str, Any] = {
+        "manager_employee_id": employee_id,
+        "educator_type": EducatorType.MENTOR,
+        "contractor_name": "김멘토",
+        "contractor_phone": "01077778888",
+        "title": "계약",
+        "start_date": date(2026, 1, 1),
+        "end_date": date(2099, 12, 31),
+        "mentor_id": mentor_id,
+    }
+    values.update(overrides)
+    if values.get("status", ContractStatus.DRAFT) is not ContractStatus.DRAFT:
+        file = await ContractFileModel.create(
+            file_name="a.pdf", file_ext="pdf", file_size=1, storage_key=f"contracts/{new_id()}"
+        )
+        values["contract_file_id"] = file.id
+    entity = EducatorContract(**values)
+    await TortoiseEducatorContractRepository().add(entity)
+    return entity
+
+
+async def test_signup_registers_the_pending_mentor() -> None:
+    """가입 전 멘토(A104)가 하나면 계정을 연결한다. 진행 중 계약이 있으면 활성 (A105)."""
+    mentors = TortoiseMentorRepository()
     employee = await create_employee()
-
-    async def contract(**overrides: Any) -> EducatorContract:
-        values: dict[str, Any] = {
-            "manager_employee_id": employee.id,
-            "educator_type": EducatorType.MENTOR,
-            "contractor_name": "김멘토",
-            "contractor_phone": "01077778888",
-            "title": "계약",
-            "start_date": date(2026, 1, 1),
-            "end_date": date(2026, 12, 31),
-        }
-        values.update(overrides)
-        if values.get("status", ContractStatus.DRAFT) is not ContractStatus.DRAFT:
-            file = await ContractFileModel.create(
-                file_name="a.pdf", file_ext="pdf", file_size=1, storage_key=f"contracts/{new_id()}"
-            )
-            values["contract_file_id"] = file.id
-        entity = EducatorContract(**values)
-        await contracts.add(entity)
-        return entity
-
-    draft = await contract()
-    ended = await contract(status=ContractStatus.ENDED)
-    await contract(educator_type=EducatorType.INSTRUCTOR)  # 강사 계약 제외
-    other_mentor = await create_mentor()
-    await contract(mentor_id=other_mentor.id)  # 이미 연결된 계약 제외
+    pending = Mentor.pending(name="김멘토", phone="01077778888")
+    await mentors.add(pending)
+    active = await _mentor_contract(employee.id, pending.id, status=ContractStatus.ACTIVE)
+    draft = await _mentor_contract(employee.id, pending.id)
+    # 예전 미연결 계약은 자동으로 잇지 않는다
+    legacy = await _mentor_contract(employee.id, None)
     user = await create_user(name="김멘토")
+    onboarding = MentorOnboarding(contracts=TortoiseEducatorContractRepository(), mentors=mentors)
 
-    match = await MentorOnboarding(
-        contracts=contracts, mentors=TortoiseMentorRepository()
-    ).link_contracts(
+    match = await onboarding.link_contracts(
         user_id=user.id,
         name="김멘토",
         phone_number="01077778888",
@@ -114,14 +119,96 @@ async def test_mentor_contracts_any_status_are_linked() -> None:
         display_name_preference=DisplayNamePreference.NICKNAME,
     )
 
-    assert sorted(match.contract_ids) == sorted([draft.id, ended.id])
-    mentor = await TortoiseMentorRepository().get_by_user(user.id)
+    assert match.mentor_id == pending.id
+    assert sorted(match.contract_ids) == sorted([active.id, draft.id])
+    mentor = await mentors.get(pending.id)
     assert mentor is not None
-    assert (mentor.id, mentor.nickname) == (match.mentor_id, "오즈")
-    for contract_id in (draft.id, ended.id):
-        linked = await contracts.get(contract_id)
-        assert linked is not None
-        assert linked.mentor_id == mentor.id
+    assert (mentor.user_id, mentor.nickname, mentor.is_active, mentor.contact_name) == (
+        user.id,
+        "오즈",
+        True,
+        None,
+    )
+    still = await TortoiseEducatorContractRepository().get(legacy.id)
+    assert still is not None
+    assert still.mentor_id is None
+
+
+async def test_signup_without_active_contract_or_with_two_pending() -> None:
+    mentors = TortoiseMentorRepository()
+    employee = await create_employee()
+    onboarding = MentorOnboarding(contracts=TortoiseEducatorContractRepository(), mentors=mentors)
+    draft_only = Mentor.pending(name="이멘토", phone="01011112222")
+    await mentors.add(draft_only)
+    await _mentor_contract(employee.id, draft_only.id, contractor_name="이멘토")
+    user = await create_user(name="이멘토")
+    match = await onboarding.link_contracts(
+        user_id=user.id,
+        name="이멘토",
+        phone_number="01011112222",
+        nickname=None,
+        display_name_preference=DisplayNamePreference.NAME,
+    )
+    registered = await mentors.get(draft_only.id)
+    assert registered is not None
+    assert (match.mentor_id, registered.is_active) == (draft_only.id, False)
+
+    for _ in range(2):
+        await mentors.add(Mentor.pending(name="박멘토", phone="01033334444"))
+    other = await create_user(name="박멘토")
+    twice = await onboarding.link_contracts(
+        user_id=other.id,
+        name="박멘토",
+        phone_number="01033334444",
+        nickname=None,
+        display_name_preference=DisplayNamePreference.NAME,
+    )
+    assert (twice.mentor_id, twice.candidate_count) == (None, 2)
+    nobody = await onboarding.link_contracts(
+        user_id=other.id,
+        name="없는사람",
+        phone_number="01000000000",
+        nickname=None,
+        display_name_preference=DisplayNamePreference.NAME,
+    )
+    assert (nobody.mentor_id, nobody.candidate_count) == (None, 0)
+
+
+async def test_manual_approval_with_pending_mentor() -> None:
+    """운영진 승인 (A105): 가입 전 멘토를 고르면 그 멘토에 계정을 연결하고 예전 계약도 잇는다."""
+    from app.shared.errors import BusinessRuleViolation
+
+    mentors = TortoiseMentorRepository()
+    employee = await create_employee()
+    onboarding = MentorOnboarding(contracts=TortoiseEducatorContractRepository(), mentors=mentors)
+    pending = Mentor.pending(name="최멘토", phone="01055550000")
+    await mentors.add(pending)
+    own = await _mentor_contract(employee.id, pending.id, contractor_name="최멘토")
+    legacy = await _mentor_contract(employee.id, None, contractor_name="최멘토")
+    candidates = await onboarding.candidate_mentors(
+        name="최멘토", phone_number=None, query=None, limit=20
+    )
+    assert [(c.mentor_id, c.contract_count) for c in candidates] == [(pending.id, 1)]
+
+    user = await create_user(name="최멘토2")
+    match = await onboarding.approve(
+        user_id=user.id,
+        nickname=None,
+        display_name_preference=DisplayNamePreference.NAME,
+        contract_ids=[legacy.id],
+        mentor_id=pending.id,
+    )
+    assert match.mentor_id == pending.id
+    assert sorted(match.contract_ids) == sorted([own.id, legacy.id])
+    with pytest.raises(BusinessRuleViolation) as again:
+        await onboarding.approve(
+            user_id=(await create_user()).id,
+            nickname=None,
+            display_name_preference=DisplayNamePreference.NAME,
+            contract_ids=[],
+            mentor_id=pending.id,
+        )
+    assert again.value.code == "mentor_already_registered"
 
 
 async def test_selected_student_rules() -> None:

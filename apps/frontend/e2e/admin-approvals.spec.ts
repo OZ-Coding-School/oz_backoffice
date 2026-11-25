@@ -59,6 +59,7 @@ test("운영진: 메뉴 → 가입 승인 → 명단을 골라 승인 (FE-15a)",
       json: {
         signup_type: "STUDENT",
         contracts: [],
+        mentors: [],
         students: [
           {
             student_id: "st1",

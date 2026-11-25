@@ -65,6 +65,13 @@ class MentorRepository(Protocol):
         """이름·휴대폰이 같은 멘토: 가입한 멘토는 회원 정보, 가입 전 멘토는 연락처로 (A104)."""
         ...
 
+    async def search_pending(
+        self, *, name: str, phone: str | None, query: str | None, limit: int
+    ) -> list[Mentor]:
+        """가입 전 멘토 (A105). query가 없으면 이름 또는 휴대폰이 같은 멘토,
+        있으면 연락처 이름 부분 일치·휴대폰 숫자 부분 일치."""
+        ...
+
     async def list_page(
         self,
         *,
