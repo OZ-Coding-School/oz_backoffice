@@ -249,17 +249,17 @@ function GroupRows({ group, cohortId }: { group: StudentGroup; cohortId: string 
   const [open, setOpen] = useState(true);
   return (
     <div role="rowgroup" aria-label={`${group.label} ${group.items.length}명`}>
-      <div role="row" className="border-t border-border bg-muted/60">
+      <div role="row" className={cn("border-t border-border", group.tint)}>
         <span role="cell" className="block">
           <button
             type="button"
             aria-expanded={open}
             onClick={() => setOpen((v) => !v)}
-            className="flex w-full items-center gap-2 px-4 py-2 text-left text-body-strong text-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex w-full items-center gap-2 px-4 py-2 text-left text-foreground outline-none hover:bg-foreground/5 focus-visible:ring-2 focus-visible:ring-ring"
           >
             {open ? <ChevronDown aria-hidden className="size-4" /> : <ChevronRight aria-hidden className="size-4" />}
-            {group.label}
-            <span className="text-caption font-normal text-muted-foreground">{group.items.length}명</span>
+            <Badge variant={group.badge}>{group.label}</Badge>
+            <span className="text-caption text-muted-foreground">{group.items.length}명</span>
           </button>
         </span>
       </div>

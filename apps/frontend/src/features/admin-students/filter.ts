@@ -1,5 +1,7 @@
 import type { RosterStudent } from "./api";
-import { ENROLLMENT, ENROLLMENT_ORDER } from "./labels";
+import type { BadgeProps } from "@/components/ui/badge";
+
+import { ENROLLMENT, ENROLLMENT_ORDER, SIGNUP } from "./labels";
 
 /** 이름·휴대폰(숫자)·이메일 부분 일치 */
 export function matches(s: RosterStudent, q: string): boolean {
@@ -18,6 +20,8 @@ export type StudentGroupBy = "status" | "signup";
 export interface StudentGroup {
   key: string;
   label: string;
+  badge: NonNullable<BadgeProps["variant"]>;
+  tint: string;
   items: RosterStudent[];
 }
 
@@ -28,11 +32,13 @@ export function groupStudents(students: readonly RosterStudent[], by: StudentGro
       ? ENROLLMENT_ORDER.map((st) => ({
           key: st,
           label: ENROLLMENT[st].label,
+          badge: ENROLLMENT[st].badge,
+          tint: ENROLLMENT[st].tint,
           items: students.filter((s) => s.status === st),
         }))
       : [
-          { key: "signed", label: "가입", items: students.filter((s) => s.user_id) },
-          { key: "unsigned", label: "미가입", items: students.filter((s) => !s.user_id) },
+          { key: "signed", ...SIGNUP.signed, items: students.filter((s) => s.user_id) },
+          { key: "unsigned", ...SIGNUP.unsigned, items: students.filter((s) => !s.user_id) },
         ];
   return groups.filter((g) => g.items.length > 0);
 }

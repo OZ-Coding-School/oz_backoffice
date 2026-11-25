@@ -4,12 +4,19 @@ import type { EnrollmentStatus } from "./api";
 
 type Tone = NonNullable<BadgeProps["variant"]>;
 
-export const ENROLLMENT: Record<EnrollmentStatus, { label: string; badge: Tone }> = {
-  ENROLLED: { label: "수강 중", badge: "info" },
-  COMPLETED: { label: "수료", badge: "success" },
-  DROPPED: { label: "중도 포기", badge: "secondary" },
-  EARLY_EMPLOYED: { label: "조기 취업", badge: "secondary" },
-  TRANSFERRED: { label: "기수 이동", badge: "secondary" },
+/** 수강 상태 배지와 묶음 머리 배경 (F77) */
+export const ENROLLMENT: Record<EnrollmentStatus, { label: string; badge: Tone; tint: string }> = {
+  ENROLLED: { label: "수강 중", badge: "info", tint: "bg-info-subtle" },
+  COMPLETED: { label: "수료", badge: "success", tint: "bg-success-subtle" },
+  DROPPED: { label: "중도 포기", badge: "destructive", tint: "bg-destructive-subtle" },
+  EARLY_EMPLOYED: { label: "조기 취업", badge: "success", tint: "bg-success-subtle" },
+  TRANSFERRED: { label: "기수 이동", badge: "warning", tint: "bg-warning-subtle" },
+};
+
+/** 가입 상태 묶음 (F77) */
+export const SIGNUP: Record<"signed" | "unsigned", { label: string; badge: Tone; tint: string }> = {
+  signed: { label: "가입", badge: "default", tint: "bg-accent" },
+  unsigned: { label: "미가입", badge: "secondary", tint: "bg-muted" },
 };
 
 export const ENROLLMENT_ORDER: EnrollmentStatus[] = [
