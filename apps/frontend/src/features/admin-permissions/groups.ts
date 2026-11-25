@@ -57,6 +57,8 @@ export function toggle(
 export interface PermissionChange {
   code: string;
   label: string;
+  /** 영역 이름 ('학사') */
+  area: string;
   on: boolean;
 }
 
@@ -68,7 +70,7 @@ export function diff(
 ): PermissionChange[] {
   return defs
     .filter((d) => before.has(d.code) !== after.has(d.code))
-    .map((d) => ({ code: d.code, label: `${d.entity} · ${d.action}`, on: after.has(d.code) }));
+    .map((d) => ({ code: d.code, label: `${d.entity} · ${d.action}`, area: d.area, on: after.has(d.code) }));
 }
 
 /** 저장 본문: 정의 순서의 코드 목록 */

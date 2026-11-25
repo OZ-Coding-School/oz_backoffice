@@ -68,6 +68,9 @@ test("조직 설정 > 권한: 관리를 켜고 확인 후 저장 (FE-15d)", asyn
   await page.route("**/api/v1/me/staff-access", (route) => route.fulfill({ json: ACCESS }));
   await page.route("**/api/v1/admin/permissions", (route) => route.fulfill({ json: DEFS }));
   await page.route("**/api/v1/admin/positions", (route) => route.fulfill({ json: [MANAGER] }));
+  await page.route("**/api/v1/admin/positions/p1/impact", (route) =>
+    route.fulfill({ json: { employees: [], registrations: [], teams: [], bootcamps: [] } }),
+  );
   await page.route("**/api/v1/admin/positions/p1/permissions", async (route) => {
     saved = route.request().postDataJSON();
     return route.fulfill({ json: { ...MANAGER, permissions: (saved as { permissions: string[] }).permissions } });
