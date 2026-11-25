@@ -25,6 +25,8 @@ import { employeeFormSchema as schema, payload, type Editable, type EmployeeForm
 import { NO_TEAM_LABEL } from "../groups";
 
 const SCOPE_TITLES = { COURSE: "담당 과정", COHORT: "담당 기수" } as const;
+const SUPER_ADMIN_HELP = "최고 관리자는 직위와 상관없이 모든 권한과 모든 데이터를 볼 수 있어요.";
+const superAdminLabel = (on: boolean) => (on ? "지정됨" : "지정 안 됨");
 
 /** 직원 상세·수정 슬라이드 패널 (F67). 수정은 같은 패널에서 조회와 같은 섹션·줄 구성으로 한다 */
 export function EmployeeSheet({
@@ -155,11 +157,8 @@ function EmployeeView({ employee, options }: { employee: Employee; options: Staf
         </Section>
       ) : null}
       <Section title="최고 관리자">
-        <p className="text-body text-foreground">
-          {employee.is_super_admin
-            ? "최고 관리자예요. 직위와 상관없이 모든 권한과 모든 데이터를 볼 수 있어요."
-            : "최고 관리자가 아니에요. 직위의 권한과 데이터 범위를 따라요."}
-        </p>
+        <Row label="지정 여부">{superAdminLabel(employee.is_super_admin)}</Row>
+        <p className="text-caption text-muted-foreground">{SUPER_ADMIN_HELP}</p>
       </Section>
     </>
   );
@@ -406,22 +405,24 @@ function FormSections({
       ) : null}
       <Section title="최고 관리자">
         {editable.superAdmin ? (
-          <div className="flex items-center gap-3">
-            <label htmlFor={`${id}-super`} className="flex-1 text-body text-foreground">
-              켜면 직위와 상관없이 모든 권한과 모든 데이터를 볼 수 있어요.
-            </label>
-            <Switch
-              id={`${id}-super`}
-              aria-label="최고 관리자"
-              checked={superAdmin}
-              onCheckedChange={(on) => form.setValue("is_super_admin", on, { shouldDirty: true })}
-            />
-          </div>
+          <Row label="지정 여부" htmlFor={`${id}-super`}>
+            <span className="flex h-9 items-center gap-2.5">
+              <Switch
+                id={`${id}-super`}
+                aria-label="최고 관리자"
+                checked={superAdmin}
+                onCheckedChange={(on) => form.setValue("is_super_admin", on, { shouldDirty: true })}
+              />
+              <span aria-hidden>{superAdminLabel(superAdmin)}</span>
+            </span>
+          </Row>
         ) : (
-          <p className="text-body text-foreground">
-            {employee.is_super_admin ? "최고 관리자예요." : "최고 관리자가 아니에요."} 최고 관리자만 바꿀 수 있어요.
-          </p>
+          <Row label="지정 여부">{superAdminLabel(employee.is_super_admin)}</Row>
         )}
+        <p className="text-caption text-muted-foreground">
+          {SUPER_ADMIN_HELP}
+          {editable.superAdmin ? null : " 최고 관리자만 바꿀 수 있어요."}
+        </p>
       </Section>
     </>
   );
