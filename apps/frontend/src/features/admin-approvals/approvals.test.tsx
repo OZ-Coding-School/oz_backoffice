@@ -179,10 +179,11 @@ describe("회원 가입 승인 (FE-15a)", () => {
     );
     const tabs = screen.getByRole("navigation", { name: "가입 유형" });
     expect(await within(tabs).findByRole("link", { name: "수강생 1" })).toHaveAttribute("aria-current", "page");
-    expect(within(tabs).getByRole("link", { name: "멘토 1" })).toHaveAttribute(
+    expect(within(tabs).getByRole("link", { name: "멘토·강사 1" })).toHaveAttribute(
       "href",
-      "/admin/members/approvals?type=mentor",
+      "/admin/members/approvals?tab=mentor",
     );
+    expect(within(tabs).queryByRole("link", { name: /운영진/ })).not.toBeInTheDocument(); // 운영진 승인 권한 없음
     const row = within(screen.getByRole("table")).getByRole("row", { name: /가수강/ });
     expect(row).toHaveTextContent("010-****-1234");
     expect(row).toHaveTextContent("백엔드 12기");
@@ -226,7 +227,7 @@ describe("회원 가입 승인 (FE-15a)", () => {
 
   it("멘토 승인: 계약을 고르거나 고르지 않고 승인한다", async () => {
     const calls = mockApprovals();
-    await renderRoute("/admin/members/approvals?type=mentor");
+    await renderRoute("/admin/members/approvals?tab=mentor");
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "김멘토 승인" }));
     const dialog = await screen.findByRole("dialog", { name: "가입 승인 · 김멘토" });

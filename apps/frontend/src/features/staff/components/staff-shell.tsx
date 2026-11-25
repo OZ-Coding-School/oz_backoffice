@@ -21,7 +21,7 @@ import { pendingRegistrationsQuery } from "@/features/admin-staff-registrations/
 import { useLogout } from "@/features/member/logout";
 import { cn } from "@/lib/utils";
 
-import { staffAccessQuery } from "../api";
+import { hasPermission, staffAccessQuery } from "../api";
 import { roleLines } from "../labels";
 import { currentStaffNav, staffModules, type StaffModule, type StaffNavItem } from "../nav";
 
@@ -35,15 +35,19 @@ export function StaffShell({ me, children }: { me: Me; children: ReactNode }) {
   const modules = staffModules(access.data ?? { permissions: [] });
   const current = currentStaffNav(modules, pathname);
   const module = current?.module ?? modules[0];
-  // 메뉴 배지: 가입 승인 대기 (F60). 그 메뉴가 보일 때만 부른다
+  // 메뉴 배지: 가입 승인 대기 = 수강생·멘토 신청 + 운영진 신청 (F60·F66). 볼 수 있는 것만 부른다
   const showApprovals = modules.some((m) => m.items.some((i) => i.badge === "approvals"));
-  const approvals = useQuery({ ...approvalCountQuery("all"), enabled: showApprovals });
-  const showRegistrations = modules.some((m) => m.items.some((i) => i.badge === "staffRegistrations"));
-  const registrations = useQuery({ ...pendingRegistrationsQuery, enabled: showRegistrations });
-  const badges: Partial<Record<NonNullable<StaffNavItem["badge"]>, number>> = {
-    approvals: approvals.data,
-    staffRegistrations: registrations.data,
-  };
+  const can = (code: string) => showApprovals && !!access.data && hasPermission(access.data, code);
+  const approvals = useQuery({
+    ...approvalCountQuery("all"),
+    enabled: can("member.approval.read") || can("educator.contract.read"),
+  });
+  const registrations = useQuery({ ...pendingRegistrationsQuery, enabled: can("staff.registration.read") });
+  const pending =
+    approvals.data === undefined && registrations.data === undefined
+      ? undefined
+      : (approvals.data ?? 0) + (registrations.data ?? 0);
+  const badges: Partial<Record<NonNullable<StaffNavItem["badge"]>, number>> = { approvals: pending };
 
   return (
     <div className="flex min-h-dvh min-w-[1280px] bg-background">

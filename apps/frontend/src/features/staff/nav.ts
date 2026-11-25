@@ -1,4 +1,4 @@
-import { Building2, KeyRound, LayoutGrid, ShieldCheck, UserCheck, UserCog, Users, type LucideIcon } from "lucide-react";
+import { Building2, KeyRound, LayoutGrid, ShieldCheck, UserCheck, Users, type LucideIcon } from "lucide-react";
 
 import { hasPermission, type StaffAccess } from "./api";
 
@@ -9,7 +9,7 @@ export interface StaffNavItem {
   /** 이 권한 중 하나라도 있어야 보인다 (없으면 모두) */
   permissions?: string[];
   /** 메뉴 배지 (대기 건수) */
-  badge?: "approvals" | "staffRegistrations";
+  badge?: "approvals";
 }
 
 export interface StaffModule {
@@ -39,25 +39,17 @@ const MODULES: StaffModule[] = [
   {
     key: "members",
     label: "회원",
-    title: "회원·권한",
-    description: "회원 가입·운영진 권한",
+    title: "회원 관리",
+    description: "회원 가입 승인",
     icon: ShieldCheck,
     items: [
       {
         to: "/admin/members/approvals",
         label: "가입 승인",
         icon: UserCheck,
-        // 수강생은 회원 가입 승인, 멘토는 계약 권한 (A33·A86)
-        permissions: ["member.approval.read", "educator.contract.read"],
+        // 수강생 · 멘토·강사 · 운영진 탭 (A33·A86·F66). 배지는 세 탭 대기 합
+        permissions: ["member.approval.read", "educator.contract.read", "staff.registration.read"],
         badge: "approvals",
-      },
-      {
-        to: "/admin/members/staff-registrations",
-        label: "운영진 승인",
-        icon: UserCog,
-        // 운영진 가입 승인 (A12·A86)
-        permissions: ["staff.registration.read"],
-        badge: "staffRegistrations",
       },
       {
         to: "/admin/members/staff",

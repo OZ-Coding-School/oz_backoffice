@@ -1,28 +1,34 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { approvalsQuery, type ApprovalTab } from "@/features/admin-approvals/api";
+import type { SignupTab } from "@/features/admin-approvals/tabs";
 import { ApprovalsPage } from "@/features/admin-approvals/components/approvals-page";
+import type { RegistrationTab } from "@/features/admin-staff-registrations/api";
+import { staffOptionsQuery } from "@/features/auth/staff-api";
 
 interface ApprovalsSearch {
-  type?: "mentor";
+  tab?: Exclude<SignupTab, "student">;
   cohort?: string;
+  status?: Exclude<RegistrationTab, "pending">;
 }
 
-/** 회원 가입 승인 (F60). 탭 `type`(기본 수강생), 기수 `cohort`(수강생 탭) */
+/**
+ * 가입 승인 (F60·F66). 탭 `tab`(기본 수강생, mentor·staff), 기수 `cohort`(수강생 탭),
+ * 처리 상태 `status`(운영진 탭, 기본 대기)
+ */
 export const Route = createFileRoute("/_staff/admin/members/approvals")({
-  validateSearch: (search: Record<string, unknown>): ApprovalsSearch => ({
-    ...(search.type === "mentor" ? { type: "mentor" as const } : {}),
-    ...(typeof search.cohort === "string" && search.cohort && search.type !== "mentor"
-      ? { cohort: search.cohort }
-      : {}),
-  }),
-  loaderDeps: ({ search }): { tab: ApprovalTab; cohort?: string } => ({
-    tab: search.type === "mentor" ? "mentor" : "student",
-    cohort: search.cohort,
-  }),
-  loader: ({ context, deps }) => context.queryClient.prefetchInfiniteQuery(approvalsQuery(deps.tab, deps.cohort)),
+  validateSearch: (search: Record<string, unknown>): ApprovalsSearch => {
+    const tab = search.tab === "mentor" || search.tab === "staff" ? search.tab : undefined;
+    return {
+      ...(tab ? { tab } : {}),
+      ...(typeof search.cohort === "string" && search.cohort && !tab ? { cohort: search.cohort } : {}),
+      ...(tab === "staff" && (search.status === "approved" || search.status === "rejected")
+        ? { status: search.status }
+        : {}),
+    };
+  },
+  loader: ({ context }) => context.queryClient.prefetchQuery(staffOptionsQuery),
   component: function Approvals() {
-    const { type, cohort } = Route.useSearch();
-    return <ApprovalsPage tab={type === "mentor" ? "mentor" : "student"} cohortId={cohort} />;
+    const { tab, cohort, status } = Route.useSearch();
+    return <ApprovalsPage tab={tab} cohortId={cohort} status={status ?? "pending"} />;
   },
 });

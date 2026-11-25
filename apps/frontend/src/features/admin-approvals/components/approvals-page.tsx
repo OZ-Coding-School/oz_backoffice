@@ -8,6 +8,8 @@ import { ErrorState } from "@/components/error-state";
 import { LoadMore } from "@/components/load-more";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { RegistrationsPanel } from "@/features/admin-staff-registrations/components/registrations-page";
+import { pendingRegistrationsQuery, type RegistrationTab } from "@/features/admin-staff-registrations/api";
 import { hasPermission, staffAccessQuery } from "@/features/staff/api";
 import { Spinner } from "@/components/ui/spinner";
 import { maskPhone } from "@/features/profile/mask";
@@ -15,49 +17,58 @@ import { StaffCohortSelect } from "@/features/staff/components/staff-cohort-sele
 import { cn } from "@/lib/utils";
 
 import { approvalCountQuery, approvalsQuery, type Applicant, type ApprovalTab } from "../api";
+import { SIGNUP_TABS, signupTabsFor, type SignupTab } from "../tabs";
 import { appliedAt, matchLabel, requestedCohort } from "../labels";
 import { ApproveMentorDialog, ApproveStudentDialog, RejectDialog } from "./approval-dialogs";
 
-const TABS: { value: ApprovalTab; label: string; type: "STUDENT" | "MENTOR" }[] = [
-  { value: "student", label: "수강생", type: "STUDENT" },
-  { value: "mentor", label: "멘토", type: "MENTOR" },
-];
-
 type Action = { kind: "approve" | "reject"; applicant: Applicant } | null;
 
-/** 회원 가입 승인 (Figma `가입 승인 (FE-15a)`, F60·A33·A82). 데스크톱만(F58) */
-export function ApprovalsPage({ tab, cohortId }: { tab: ApprovalTab; cohortId: string | undefined }) {
-  const list = useInfiniteQuery(approvalsQuery(tab, cohortId));
-  const students = useQuery(approvalCountQuery("STUDENT", cohortId));
-  const mentors = useQuery(approvalCountQuery("MENTOR"));
-  const navigate = useNavigate();
-  const [action, setAction] = useState<Action>(null);
+/**
+ * 가입 승인 (Figma `가입 승인 통합 (FE-15e)`, F60·F66·A33·A82): 탭 수강생 · 멘토·강사 · 운영진.
+ * 운영진 탭은 운영진 승인(F61)을 옮긴 것이다. 데스크톱만(F58)
+ */
+export function ApprovalsPage({
+  tab,
+  cohortId,
+  status,
+}: {
+  tab: SignupTab | undefined;
+  cohortId: string | undefined;
+  status: RegistrationTab;
+}) {
   const access = useQuery(staffAccessQuery);
-  // 수강생은 회원 가입 승인 관리, 멘토는 계약 관리가 있어야 승인·반려 (A33·A86)
-  const canDecide = access.data
-    ? hasPermission(access.data, tab === "student" ? "member.approval.manage" : "educator.contract.manage")
-    : false;
-  const items = list.data?.pages.flatMap((p) => p.items) ?? [];
-  const counts = { student: students.data, mentor: mentors.data };
+  const allowed = signupTabsFor(access.data);
+  const current = tab && allowed.includes(tab) ? tab : allowed[0];
+  const students = useQuery({ ...approvalCountQuery("STUDENT", cohortId), enabled: allowed.includes("student") });
+  const mentors = useQuery({ ...approvalCountQuery("MENTOR"), enabled: allowed.includes("mentor") });
+  const staff = useQuery({ ...pendingRegistrationsQuery, enabled: allowed.includes("staff") });
+  const navigate = useNavigate();
+  const counts: Record<SignupTab, number | undefined> = {
+    student: students.data,
+    mentor: mentors.data,
+    staff: staff.data,
+  };
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
         <h1 className="text-h1 text-foreground">가입 승인</h1>
-        <p className="text-body text-muted-foreground">자동 매칭되지 않은 가입 신청을 확인해 명단·계약에 연결해요.</p>
+        <p className="text-body text-muted-foreground">
+          수강생·멘토·강사·운영진의 가입 신청을 확인하고 승인하거나 반려해요.
+        </p>
       </div>
       <div className="flex items-end gap-3">
         <nav aria-label="가입 유형" className="flex-1">
           <ul className="flex gap-1 border-b border-border">
-            {TABS.map((t) => {
-              const active = t.value === tab;
+            {SIGNUP_TABS.filter((t) => allowed.includes(t.value)).map((t) => {
+              const active = t.value === current;
               const count = counts[t.value];
               return (
                 <li key={t.value}>
                   <Link
                     to="/admin/members/approvals"
                     search={{
-                      ...(t.value === "mentor" ? { type: "mentor" as const } : {}),
+                      ...(t.value === "student" ? {} : { tab: t.value }),
                       ...(cohortId && t.value === "student" ? { cohort: cohortId } : {}),
                     }}
                     activeOptions={{ exact: true, includeSearch: true }}
@@ -78,13 +89,39 @@ export function ApprovalsPage({ tab, cohortId }: { tab: ApprovalTab; cohortId: s
             })}
           </ul>
         </nav>
-        {tab === "student" ? (
+        {current === "student" ? (
           <StaffCohortSelect
             value={cohortId}
             onChange={(cohort) => void navigate({ to: "/admin/members/approvals", search: cohort ? { cohort } : {} })}
           />
         ) : null}
       </div>
+      {!access.data ? (
+        <div className="flex justify-center py-10">
+          <Spinner />
+        </div>
+      ) : current === "staff" ? (
+        <RegistrationsPanel tab={status} />
+      ) : current ? (
+        <MemberSignupList tab={current} cohortId={cohortId} />
+      ) : null}
+    </div>
+  );
+}
+
+/** 수강생 · 멘토·강사 탭의 신청 목록 (FE-15a) */
+function MemberSignupList({ tab, cohortId }: { tab: ApprovalTab; cohortId: string | undefined }) {
+  const list = useInfiniteQuery(approvalsQuery(tab, cohortId));
+  const [action, setAction] = useState<Action>(null);
+  const access = useQuery(staffAccessQuery);
+  // 수강생은 회원 가입 승인 관리, 멘토는 계약 관리가 있어야 승인·반려 (A33·A86)
+  const canDecide = access.data
+    ? hasPermission(access.data, tab === "student" ? "member.approval.manage" : "educator.contract.manage")
+    : false;
+  const items = list.data?.pages.flatMap((p) => p.items) ?? [];
+
+  return (
+    <>
       {list.isPending ? (
         <div className="flex justify-center py-10">
           <Spinner />
@@ -180,6 +217,6 @@ export function ApprovalsPage({ tab, cohortId }: { tab: ApprovalTab; cohortId: s
         <ApproveMentorDialog applicant={action.applicant} onClose={() => setAction(null)} />
       ) : null}
       {action?.kind === "reject" ? <RejectDialog applicant={action.applicant} onClose={() => setAction(null)} /> : null}
-    </div>
+    </>
   );
 }

@@ -24,8 +24,8 @@ import {
 } from "../api";
 import { ReviewDialog } from "./review-dialog";
 
-/** 운영진 승인 (Figma `운영진 승인 (FE-15b)`, F61·A11·A62). 데스크톱만(F58) */
-export function RegistrationsPage({ tab }: { tab: RegistrationTab }) {
+/** 가입 승인 > 운영진 탭 (Figma `가입 승인 통합 (FE-15e)`, F61·F66·A11·A62). 데스크톱만(F58) */
+export function RegistrationsPanel({ tab }: { tab: RegistrationTab }) {
   const list = useInfiniteQuery(registrationsQuery(tab));
   const pending = useQuery(pendingRegistrationsQuery);
   const options = useQuery(staffOptionsQuery);
@@ -37,29 +37,23 @@ export function RegistrationsPage({ tab }: { tab: RegistrationTab }) {
   const canReview = access.data ? hasPermission(access.data, "staff.registration.manage") : false; // A86
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-h1 text-foreground">운영진 승인</h1>
-        <p className="text-body text-muted-foreground">운영진이 처음 로그인해 입력한 소속·담당을 확인하고 승인해요.</p>
-      </div>
+    <div className="flex flex-col gap-4">
       <nav aria-label="처리 상태">
-        <ul className="flex gap-1 border-b border-border">
+        <ul className="inline-flex gap-1 rounded-lg bg-muted p-1">
           {REGISTRATION_TABS.map((t) => {
             const active = t.value === tab;
             const count = t.value === "pending" ? pending.data : undefined;
             return (
               <li key={t.value}>
                 <Link
-                  to="/admin/members/staff-registrations"
-                  search={t.value === "pending" ? {} : { status: t.value }}
+                  to="/admin/members/approvals"
+                  search={t.value === "pending" ? { tab: "staff" } : { tab: "staff", status: t.value }}
                   activeOptions={{ exact: true, includeSearch: true }}
                   aria-current={active ? "page" : undefined}
                   aria-label={count === undefined ? t.label : `${t.label} ${count}`}
                   className={cn(
-                    "-mb-px inline-flex h-10 items-center gap-1.5 border-b-2 px-3 text-body outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    active
-                      ? "border-primary text-primary-text"
-                      : "border-transparent text-muted-foreground hover:text-foreground",
+                    "inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-body-sm outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    active ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
                   )}
                 >
                   {t.label}
