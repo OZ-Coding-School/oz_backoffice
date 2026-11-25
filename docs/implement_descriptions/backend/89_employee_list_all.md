@@ -1,7 +1,7 @@
 # 89. 직원 목록 전체·최고 관리자 함께 수정 (BE-3i)
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #139
 - 관련 결정: `docs/decisions.md` A90 (A83·A87·A89 보완)
 - 이전 기록: [88. 담당 역할 칸 제거·직원 수정에서 담당 지정 (BE-3h)](88_staff_assignments_without_role.md)
 
