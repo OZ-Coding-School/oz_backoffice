@@ -48,3 +48,4 @@
 | 44 | [학사 > 수강생 > 명단 동기화 (FE-17d)](44_academy_roster_sync.md) | 완료 (#158) |
 | 45 | [강사·멘토 > 멘토 (FE-18a)](45_admin_mentors.md) | 완료 (#162) |
 | 46 | [행정 업무 > 계약, 멘토 계약 탭·가입 전 멘토 (FE-18b)](46_admin_contracts.md) | 완료 (#166) |
+| 47 | [가입 승인 멘토 탭: 가입 전 멘토 고르기 (FE-15a 보완)](47_approval_pending_mentors.md) | PR 진행 중 |
