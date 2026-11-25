@@ -1,28 +1,33 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ChevronDown, ChevronRight, Search, Users } from "lucide-react";
+import { ChevronDown, ChevronRight, RefreshCw, Search, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { maskPhone } from "@/features/profile/mask";
 import { staffAccessQuery, type StaffCohort } from "@/features/staff/api";
+import { formatKst } from "@/lib/datetime";
 import { useDebounced } from "@/lib/use-debounced";
 import { cn } from "@/lib/utils";
 
 import { rosterQuery, type EnrollmentStatus, type RosterStudent } from "../api";
 import { groupStudents, matches, type StudentGroup, type StudentGroupBy } from "../filter";
 import { ENROLLMENT, ENROLLMENT_ORDER } from "../labels";
+import { syncRunsQuery } from "../sync-api";
+import { SyncSheet } from "./sync-sheet";
 
 export interface StudentsSearch {
   cohort?: string;
   status?: EnrollmentStatus;
   q?: string;
   group?: StudentGroupBy;
+  sync?: boolean;
 }
 
 const NO_GROUP = "none";
@@ -46,9 +51,16 @@ export function StudentsPage({ search }: { search: StudentsSearch }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-h1 text-foreground">수강생</h1>
-        <p className="text-body text-muted-foreground">기수를 골라 Airtable 명단에서 동기화된 수강생을 봐요.</p>
+      <div className="flex items-end gap-3">
+        <div className="flex flex-1 flex-col gap-1">
+          <h1 className="text-h1 text-foreground">수강생</h1>
+          <p className="text-body text-muted-foreground">기수를 골라 Airtable 명단에서 동기화된 수강생을 봐요.</p>
+        </div>
+        <LastSync />
+        <Button variant="outline" size="sm" onClick={() => go({ ...search, sync: true })}>
+          <RefreshCw aria-hidden />
+          명단 동기화
+        </Button>
       </div>
       {access.isPending ? (
         <div className="flex justify-center py-10">
@@ -69,7 +81,22 @@ export function StudentsPage({ search }: { search: StudentsSearch }) {
           onChange={(next) => go(next)}
         />
       )}
+      {search.sync && access.data ? (
+        <SyncSheet access={access.data} cohorts={cohorts} onClose={() => go({ ...search, sync: undefined })} />
+      ) : null}
     </div>
+  );
+}
+
+/** 마지막 동기화 시각 (보이는 실행 이력 중 가장 최근 성공) */
+function LastSync() {
+  const runs = useInfiniteQuery(syncRunsQuery);
+  const last = runs.data?.pages[0]?.items.find((r) => r.status === "SUCCEEDED");
+  if (!last) return null;
+  return (
+    <span className="pb-1 text-caption text-muted-foreground">
+      마지막 동기화 {formatKst(last.finished_at ?? last.started_at, "M/d HH:mm")} · 매시간 자동
+    </span>
   );
 }
 
