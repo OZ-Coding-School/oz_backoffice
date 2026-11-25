@@ -37,3 +37,4 @@
 | 33 | [FE-15c 직원·담당자](33_staff_and_employees.md) | 완료 (#131) |
 | 34 | [조직 설정 > 권한 (FE-15d)](34_org_permissions.md) | 완료 (#137) |
 | 35 | [회원 관리·가입 승인 통합 (FE-15e)](35_member_approvals_merge.md) | 완료 (#138) |
+| 36 | [조직 설정 > 직원 (FE-15f)](36_org_employees.md) | 완료 (#141) |

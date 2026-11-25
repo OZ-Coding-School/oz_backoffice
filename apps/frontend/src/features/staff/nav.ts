@@ -51,13 +51,6 @@ const MODULES: StaffModule[] = [
         permissions: ["member.approval.read", "educator.contract.read", "staff.registration.read"],
         badge: "approvals",
       },
-      {
-        to: "/admin/members/staff",
-        label: "직원·담당자",
-        icon: Users,
-        // 직원 조회 또는 담당자 조회 (A83·A86)
-        permissions: ["org.employee.read", "staff.assignment.read"],
-      },
     ],
   },
   {
@@ -66,8 +59,15 @@ const MODULES: StaffModule[] = [
     title: "조직 설정",
     description: "부서·직위·직원·권한",
     icon: Building2,
-    // F64·F65: 부서·직위·직원 메뉴는 만들 때 더한다
+    // F64·F65: 부서·직위 메뉴는 만들 때 더한다
     items: [
+      {
+        to: "/admin/org/employees",
+        label: "직원",
+        icon: Users,
+        // 직원 조회 또는 담당자 조회 (A83·A86·F67)
+        permissions: ["org.employee.read", "staff.assignment.read"],
+      },
       {
         to: "/admin/org/permissions",
         label: "권한",
