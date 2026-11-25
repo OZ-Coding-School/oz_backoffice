@@ -701,7 +701,7 @@ export interface paths {
         };
         /**
          * List Departments
-         * @description 전체 부서 (이름순).
+         * @description 전체 부서 (이름순), 직원 수 포함 (A92).
          */
         get: operations["list_departments_api_v1_admin_departments_get"];
         put?: never;
@@ -743,7 +743,7 @@ export interface paths {
         };
         /**
          * List Teams
-         * @description 전체 팀과 담당 과정 (이름순).
+         * @description 전체 팀과 담당 과정 (이름순), 직원 수 포함 (A92).
          */
         get: operations["list_teams_api_v1_admin_teams_get"];
         put?: never;
@@ -4483,6 +4483,12 @@ export interface components {
             description: string;
             /** Rules */
             rules: string | null;
+            /**
+             * Employee Count
+             * @description 부서의 직원 수 (팀 없는 직원 포함, A92)
+             * @default 0
+             */
+            employee_count: number;
         };
         /** DepartmentUpdateRequest */
         DepartmentUpdateRequest: {
@@ -7439,6 +7445,12 @@ export interface components {
              * @description 담당 과정 (과정당 한 팀)
              */
             bootcamp_ids: string[];
+            /**
+             * Employee Count
+             * @description 팀의 직원 수 (A92)
+             * @default 0
+             */
+            employee_count: number;
         };
     };
     responses: never;

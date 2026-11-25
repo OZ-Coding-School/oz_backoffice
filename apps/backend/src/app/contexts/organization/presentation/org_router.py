@@ -88,10 +88,17 @@ class DepartmentResponse(BaseModel):
     name: str
     description: str
     rules: str | None
+    employee_count: int = Field(default=0, description="부서의 직원 수 (팀 없는 직원 포함, A92)")
 
     @classmethod
-    def of(cls, d: Department) -> "DepartmentResponse":
-        return cls(id=d.id, name=d.name, description=d.description, rules=d.rules)
+    def of(cls, d: Department, employee_count: int = 0) -> "DepartmentResponse":
+        return cls(
+            id=d.id,
+            name=d.name,
+            description=d.description,
+            rules=d.rules,
+            employee_count=employee_count,
+        )
 
 
 class DepartmentCreateRequest(BaseModel):
@@ -112,15 +119,17 @@ class TeamResponse(BaseModel):
     name: str
     description: str | None
     bootcamp_ids: list[uuid.UUID] = Field(description="담당 과정 (과정당 한 팀)")
+    employee_count: int = Field(default=0, description="팀의 직원 수 (A92)")
 
     @classmethod
-    def of(cls, t: Team, bootcamp_ids: list[uuid.UUID]) -> "TeamResponse":
+    def of(cls, t: Team, bootcamp_ids: list[uuid.UUID], employee_count: int = 0) -> "TeamResponse":
         return cls(
             id=t.id,
             department_id=t.department_id,
             name=t.name,
             description=t.description,
             bootcamp_ids=bootcamp_ids,
+            employee_count=employee_count,
         )
 
 
@@ -311,8 +320,12 @@ async def _employees(
 # ---------------------------------------------------------------- 부서
 @router.get("/departments", response_model=list[DepartmentResponse])
 async def list_departments(_: DepartmentReader, service: ServiceDep) -> list[DepartmentResponse]:
-    """전체 부서 (이름순)."""
-    return [DepartmentResponse.of(d) for d in await service.list_departments()]
+    """전체 부서 (이름순), 직원 수 포함 (A92)."""
+    by_department, _by_team = await service.employee_counts()
+    return [
+        DepartmentResponse.of(d, by_department.get(d.id, 0))
+        for d in await service.list_departments()
+    ]
 
 
 @router.post("/departments", response_model=DepartmentResponse, status_code=status.HTTP_201_CREATED)
@@ -338,7 +351,8 @@ async def update_department(
     department = await service.update_department(
         department_id, DepartmentChanges(**_sent(body, ("rules",))), actor_id=admin.id
     )
-    return DepartmentResponse.of(department)
+    by_department, _by_team = await service.employee_counts()
+    return DepartmentResponse.of(department, by_department.get(department.id, 0))
 
 
 @router.delete("/departments/{department_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -353,8 +367,9 @@ async def delete_department(
 # ---------------------------------------------------------------- 팀
 @router.get("/teams", response_model=list[TeamResponse])
 async def list_teams(_: DepartmentReader, service: ServiceDep) -> list[TeamResponse]:
-    """전체 팀과 담당 과정 (이름순)."""
-    return [TeamResponse.of(t, ids) for t, ids in await service.list_teams()]
+    """전체 팀과 담당 과정 (이름순), 직원 수 포함 (A92)."""
+    _by_department, by_team = await service.employee_counts()
+    return [TeamResponse.of(t, ids, by_team.get(t.id, 0)) for t, ids in await service.list_teams()]
 
 
 @router.post("/teams", response_model=TeamResponse, status_code=status.HTTP_201_CREATED)
@@ -379,7 +394,8 @@ async def update_team(
         team_id, TeamChanges(**_sent(body, ("description",))), actor_id=admin.id
     )
     ids = next((ids for t, ids in await service.list_teams() if t.id == team.id), [])
-    return TeamResponse.of(team, ids)
+    _by_department, by_team = await service.employee_counts()
+    return TeamResponse.of(team, ids, by_team.get(team.id, 0))
 
 
 @router.delete("/teams/{team_id}", status_code=status.HTTP_204_NO_CONTENT)
