@@ -27,11 +27,18 @@ export class PhotoUploadError extends Error {
   }
 }
 
-/** 업로드 표(A28)로 S3에 바로 올린다. fields를 모두 넣고 파일은 마지막에 `file`로 (운영진 대리 수정도 쓴다) */
-export async function postPhoto(ticket: { url: string; fields: Record<string, string> }, image: Blob): Promise<void> {
+/**
+ * 업로드 표(A28·A26)로 S3에 바로 올린다. fields를 모두 넣고 파일은 마지막에 `file`로.
+ * 운영진 멘토 사진 대리 수정과 계약서 업로드도 쓴다.
+ */
+export async function postPhoto(
+  ticket: { url: string; fields: Record<string, string> },
+  image: Blob,
+  fileName = "profile.webp",
+): Promise<void> {
   const form = new FormData();
   for (const [key, value] of Object.entries(ticket.fields)) form.append(key, value);
-  form.append("file", image, "profile.webp");
+  form.append("file", image, fileName);
   const res = await fetch(ticket.url, { method: "POST", body: form });
   if (!res.ok) throw new PhotoUploadError();
 }

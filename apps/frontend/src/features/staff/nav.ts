@@ -2,6 +2,7 @@ import {
   BadgeCheck,
   Building2,
   CalendarDays,
+  FileSignature,
   FileText,
   GraduationCap,
   KeyRound,
@@ -93,6 +94,22 @@ const MODULES: StaffModule[] = [
         label: "멘토",
         icon: UserRound,
         permissions: ["educator.mentor.read"],
+      },
+    ],
+  },
+  {
+    key: "administration",
+    label: "행정 업무",
+    title: "행정 업무",
+    description: "계약",
+    icon: FileSignature,
+    // F83: 멘토·강사 계약 (다른 행정 메뉴는 범위 밖, F15)
+    items: [
+      {
+        to: "/admin/administration/contracts",
+        label: "계약",
+        icon: FileText,
+        permissions: ["educator.contract.read"],
       },
     ],
   },
