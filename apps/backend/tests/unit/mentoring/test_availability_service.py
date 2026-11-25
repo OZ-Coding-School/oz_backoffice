@@ -27,6 +27,7 @@ from tests.fakes.educator import InMemoryMentorRepository
 from tests.fakes.mentoring import (
     InMemoryBlockTimeRepository,
     InMemoryCohortMentorRepository,
+    InMemoryPublicHolidayRepository,
     InMemorySettingsRepository,
     InMemoryUnavailablePeriodRepository,
 )
@@ -84,7 +85,7 @@ class Harness:
             assignments=self.assignments,
             unavailable_periods=InMemoryUnavailablePeriodRepository(),
             blocks=InMemoryBlockTimeRepository(),
-            calendar=BusinessCalendar(Holidays()),
+            calendar=BusinessCalendar(Holidays(), InMemoryPublicHolidayRepository()),
             mentors=MentorQueries(self.mentors),
             enrollments=self.enrollments,
             busy=NoBusySchedule(),

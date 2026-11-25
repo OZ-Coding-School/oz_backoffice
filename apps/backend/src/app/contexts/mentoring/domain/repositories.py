@@ -16,6 +16,8 @@ from app.contexts.mentoring.domain.settings import (
     CohortMentoringSettings,
     MentoringBlockTime,
     MentoringHoliday,
+    PublicHoliday,
+    PublicHolidaySync,
 )
 from app.contexts.mentoring.domain.settlement import MentoringSettlement
 from app.contexts.mentoring.domain.team import MentoringTeam
@@ -48,6 +50,20 @@ class MentoringHolidayRepository(Protocol):
     async def get_by_date(self, day: date) -> MentoringHoliday | None: ...
     async def delete(self, holiday_id: uuid.UUID) -> None: ...
     async def list_between(self, start: date, end: date) -> list[MentoringHoliday]: ...
+
+
+class PublicHolidayRepository(Protocol):
+    async def list_between(self, start: date, end: date) -> list[PublicHoliday]:
+        """날짜순."""
+        ...
+
+    async def replace_year(
+        self, year: int, holidays: list[PublicHoliday], synced_at: datetime
+    ) -> None:
+        """그해 법정공휴일을 통째로 바꾸고 동기화 시각·건수를 남긴다 (A95)."""
+        ...
+
+    async def get_sync(self, year: int) -> PublicHolidaySync | None: ...
 
 
 class CohortMentorRepository(Protocol):

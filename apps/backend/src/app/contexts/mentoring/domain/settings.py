@@ -197,3 +197,20 @@ class MentoringHoliday(Entity):
             "invalid_holiday_name",
         )
         self.name = name
+
+
+@dataclass(frozen=True, slots=True)
+class PublicHoliday:
+    """법정공휴일 (특일 정보 API에서 받아 저장, decisions A95·B16)."""
+
+    holiday_date: date
+    name: str
+
+
+@dataclass(frozen=True, slots=True)
+class PublicHolidaySync:
+    """그해 마지막 동기화 결과."""
+
+    year: int
+    synced_at: datetime
+    holiday_count: int

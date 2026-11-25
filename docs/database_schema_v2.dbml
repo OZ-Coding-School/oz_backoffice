@@ -547,13 +547,35 @@ Table cohort_mentoring_block_times {
 }
 
 Table mentoring_holidays {
-  note: "운영진이 등록하는 전사 공통 추가 휴일 (임시공휴일·휴무일, decisions A34). 법정공휴일은 holidays 패키지로 판단하고 이 표로 보충한다. 금지 시간대가 적용되지 않는 날"
+  note: "운영진이 등록하는 전사 공통 추가 휴일 (임시공휴일·휴무일, decisions A34). 법정공휴일은 public_holidays(특일 정보 API 동기화, A95)로 판단하고 이 표로 보충한다. 금지 시간대가 적용되지 않는 날"
 
   id uuid [pk, note: "default=uuid7 사용"]
   holiday_date date [not null, unique, note: "휴일"]
   name varchar(50) [not null, note: "휴일 이름 (예: 임시공휴일, 학원 휴무)"]
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
+}
+
+Table public_holidays {
+  note: "법정공휴일 (decisions A95·B16). 공공데이터포털 특일 정보 API(isHoliday=Y)에서 매일 03:00 KST 올해·내년을 받아 그해를 통째로 바꾼다. 같은 날 이름이 둘이면 두 행. 받아 오지 못한 해는 법정공휴일이 없는 것으로 본다"
+
+  id uuid [pk, note: "default=uuid7 사용"]
+  holiday_date date [not null, note: "휴일"]
+  name varchar(100) [not null, note: "API의 dateName (예: 설날, 대체공휴일)"]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (holiday_date, name) [unique]
+    holiday_date
+  }
+}
+
+Table public_holiday_syncs {
+  note: "해마다 법정공휴일 마지막 동기화 결과 (A95). 행이 없으면 아직 받지 않은 해"
+
+  year smallint [pk, note: "연도"]
+  synced_at timestamptz [not null, note: "마지막으로 받아 바꾼 시각"]
+  holiday_count smallint [not null, note: "그때 받은 공휴일 수 (0이면 그해를 비움)"]
 }
 
 Table cohort_mentors {

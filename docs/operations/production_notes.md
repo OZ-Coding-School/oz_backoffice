@@ -45,6 +45,7 @@
 | `MEET_PUBSUB_TOPIC`, `MEET_PUBSUB_SUBSCRIPTION` | `projects/<ID>/topics/<토픽>`, `projects/<ID>/subscriptions/<구독>` | 운영용 토픽·구독을 따로 만든다. worker가 구독을 실시간 수신한다(A50) |
 | `MEET_RECORDINGS_FOLDER_ID` | 공유 드라이브 `멘토링 녹화` 폴더 ID | 위임에 `drive` 범위, 주최 계정이 그 공유 드라이브 콘텐츠 관리자여야 한다(A54) |
 | `MEET_ORGANIZER_USER_ID` | 주최 계정(`GMAIL_SENDER`) 사용자 ID | 관리 콘솔 → 디렉터리 → 사용자 → 그 계정 주소의 숫자(A51). 없으면 이벤트 구독을 하지 않는다 |
+| `HOLIDAY_DRIVER`, `HOLIDAY_API_KEY` | `data_go_kr`, 공공데이터포털 서비스 키(일반 인증키 Decoding) | 법정공휴일 동기화(A95). `fixed`는 2025~2027 고정 자료라 운영에서 쓰지 않는다. 키가 없으면 동기화를 건너뛴다 ([외부 준비물 8](external_setup.md#8-공공데이터포털-특일-정보-api-법정공휴일)) |
 | `SMS_DRIVER` | 업체 어댑터 값 | 업체 확정 전에는 `console` → SMS 503 |
 
 ### 1-1. 비밀 값
@@ -140,8 +141,9 @@ app.workers.tasks.mentoring       # 배정 만료(매일 00:00 KST), 대기 신�
 3. 최고 관리자 등록: `python -m app.cli create-super-admin <email>` (멱등). 권한은 직위별로 운영진 화면(조직 설정 > 권한)에서 정한다(A87). 역할·권한 시드(`seed-roles`)는 없앴다(마이그레이션 31이 예전 역할 테이블을 지운다).
 4. 최고 관리자: `python -m app.cli create-super-admin <회사 이메일> [--name 이름]` (멱등, A14).
 5. 메일 확인: `python -m app.cli send-test-mail <받는주소>`.
-6. 명단 동기화: 첫 동기화는 운영진 화면(수동 실행) 또는 매시간 작업으로 돈다.
-7. worker·scheduler를 띄우고 로그에서 2-1의 모듈이 모두 `Importing tasks from module ...`으로 나오는지 확인한다.
+6. 법정공휴일: 공휴일 화면(설정 > 공휴일)의 [지금 가져오기]로 올해·내년을 받는다. 받기 전에는 법정공휴일이 없는 것으로 계산된다(A95). 이후 매일 03:00 작업이 갱신한다.
+7. 명단 동기화: 첫 동기화는 운영진 화면(수동 실행) 또는 매시간 작업으로 돈다.
+8. worker·scheduler를 띄우고 로그에서 2-1의 모듈이 모두 `Importing tasks from module ...`으로 나오는지 확인한다.
 
 ### 4-1. 마이그레이션 되돌리기
 - `aerich downgrade -v <번호>`는 테이블을 지운다. 운영에서는 백업을 먼저 받고 실행한다. 각 PR 본문 "참고 사항"에 되돌리는 방법을 적어 두었다.
@@ -156,6 +158,7 @@ app.workers.tasks.mentoring       # 배정 만료(매일 00:00 KST), 대기 신�
 | `mentoring.requests.expire` | 10분마다 | 승인 가능한 희망 일시가 남지 않은 대기 신청 취소·보류 시간 반환 |
 | `mentoring.meet.artifacts.sync` | 매시 정각 | 종료 7일 이내 세션 녹화·전사·요약 보완 수집·남은 정리(M20). 설정이 없으면 건너뜀 |
 | `mentoring.meet.events.subscribe` | 6시간마다 | 주최 계정 Meet 이벤트 구독 생성·갱신. 설정이 없으면 건너뜀 |
+| `mentoring.public_holidays.sync` | 매일 03:00 | 특일 정보 API에서 올해·내년 법정공휴일을 받아 그해를 통째로 교체(0건이면 비움, 실패면 유지). 키가 없으면 건너뜀 |
 | `mentoring.meet.sync` | 10분마다 | 공간 없는 시작 전 예정 세션에 Meet 공간 생성, 취소된 세션 공간 막기. `MEET_DRIVER=disabled`면 건너뜀 |
 
 - 모두 멱등이라 scheduler가 멈췄다 다시 떠도 밀린 대상을 처리한다. 매일 작업은 서버 시간대와 무관하게 `cron_offset=Asia/Seoul`로 동작한다(10분마다·매시간 작업은 시간대와 무관).
@@ -165,3 +168,4 @@ app.workers.tasks.mentoring       # 배정 만료(매일 00:00 KST), 대기 신�
 - 2026-11-12: 대기 신청 만료 작업 추가 (P11-1), Meet 공간 생성·보완 작업과 `MEET_DRIVER` 추가 (P12-1), Meet 이벤트 구독·실시간 수신과 `MEET_PUBSUB_*` 추가 (P12-2), 녹화 수집·정리 작업과 `MEET_RECORDINGS_FOLDER_ID` 추가 (P13-2)
 - 2026-11-16: 채팅 실시간 수신(SSE) 프록시·로드 밸런서·Redis 연결 참고사항 추가 (P15-2)
 - 2026-11-20: 녹화 서명 링크 경로의 프록시·접근 로그 참고사항 추가 (A68, BE-2b)
+- 2026-11-25: 법정공휴일 동기화 작업과 `HOLIDAY_DRIVER`·`HOLIDAY_API_KEY` 추가 (A95, BE-3n)

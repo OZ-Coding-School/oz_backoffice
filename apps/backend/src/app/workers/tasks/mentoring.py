@@ -17,6 +17,8 @@
   수집·남은 정리(M20).
 - `mentoring.enrollment_ended.process`: 명단 동기화가 성공하면 보낸다(roster 작업). 수강 중이 아닌
   수강생을 팀에서 빼고 대기 신청·시작 전 1:1 세션을 취소한 뒤 1:1 잔여를 회수한다(A39·A45, 멱등).
+- `mentoring.public_holidays.sync`: 매일 03:00 KST, 특일 정보 API에서 올해·내년 법정공휴일을 받아
+  그해를 통째로 바꾼다(A95). 실패하면 기존 자료를 그대로 두고 다음 날 다시 받는다.
 
 취소·반려·자동 취소 작업은 그 신청의 채팅방에 안내를 남긴다
 (A57·A58, 작업마다 Redis 연결을 열고 닫는다).
@@ -30,6 +32,7 @@ import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+import httpx
 from redis.asyncio import Redis
 from taskiq import TaskiqEvents, TaskiqState
 
@@ -53,6 +56,7 @@ from app.contexts.mentoring.application.calendar import BusinessCalendar
 from app.contexts.mentoring.application.chat_notices import MentoringNotices
 from app.contexts.mentoring.application.chat_service import ChatService
 from app.contexts.mentoring.application.enrollment_ended import EnrollmentEndedService
+from app.contexts.mentoring.application.holiday_sync import PublicHolidaySyncService
 from app.contexts.mentoring.application.meet_event_service import MeetEventService
 from app.contexts.mentoring.application.meet_service import MeetSpaceService
 from app.contexts.mentoring.application.request_cleanup import RequestCleanup
@@ -77,10 +81,12 @@ from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseMentoringSessionRepository,
     TortoiseMentoringTeamRepository,
     TortoiseMentorUnavailablePeriodRepository,
+    TortoisePublicHolidayRepository,
     TortoiseTranscriptEntryRepository,
 )
 from app.core.clock import SystemClock
 from app.core.config import get_settings
+from app.core.holidays import build_holiday_source
 from app.core.meet import (
     build_drive_archive_client,
     build_meet_client,
@@ -91,6 +97,7 @@ from app.core.redis import create_redis
 from app.core.uow import UnitOfWork
 from app.integrations.google.meet import MeetUnavailableError
 from app.integrations.google.meet_events import MeetEvent, MeetEventListener
+from app.shared.errors import ServiceUnavailableError
 from app.workers.broker import broker
 
 logger = logging.getLogger(__name__)
@@ -202,7 +209,9 @@ def build_request_service(notices: MentoringNotices | None = None) -> MentoringR
         assignments=TortoiseCohortMentorRepository(),
         unavailable_periods=TortoiseMentorUnavailablePeriodRepository(),
         blocks=TortoiseMentoringBlockTimeRepository(),
-        calendar=BusinessCalendar(TortoiseMentoringHolidayRepository()),
+        calendar=BusinessCalendar(
+            TortoiseMentoringHolidayRepository(), TortoisePublicHolidayRepository()
+        ),
         mentors=mentors,
         enrollments=students,
         busy=TortoiseMentoringSessionRepository(),
@@ -433,3 +442,27 @@ async def sync_meet_artifacts() -> None:
 class TaskiqArtifactScheduler:
     async def collect_needed(self, session_id: uuid.UUID) -> None:
         await collect_meet_artifacts.kiq(str(session_id))
+
+
+DAILY_0300_KST = {"cron": "0 3 * * *", "cron_offset": "Asia/Seoul"}
+
+
+@broker.task(task_name="mentoring.public_holidays.sync", schedule=[DAILY_0300_KST])
+async def sync_public_holidays() -> None:
+    async with httpx.AsyncClient() as http:
+        source = build_holiday_source(get_settings(), http)
+        if source is None:
+            return
+        service = PublicHolidaySyncService(
+            source=source,
+            holidays=TortoisePublicHolidayRepository(),
+            uow=UnitOfWork(),
+            clock=SystemClock(),
+        )
+        try:
+            results = await service.sync()
+        except ServiceUnavailableError:
+            logger.warning("법정공휴일 동기화 실패, 기존 자료를 유지합니다.")
+            return
+    for r in results:
+        logger.info("법정공휴일 %d년 %d건 동기화", r.year, r.holiday_count)

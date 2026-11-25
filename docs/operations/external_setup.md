@@ -11,6 +11,7 @@
 | 4 | SMS 발송 업체 계약·발신번호 등록 | P7 어댑터(별도 PR) | 사용자 | 업체 미정 (현재 console 드라이버) |
 | 5 | Google OAuth 클라이언트 (운영진 로그인) | P2 (구현 완료) | GCP 관리자 | 로컬 등록 완료, 운영 URI는 배포 때 |
 | 6 | Airtable 토큰 | P5 (구현 완료) | 사용자 | 완료 |
+| 8 | 공공데이터포털 특일 정보 API 서비스 키 (법정공휴일) | BE-3n (구현 완료) | 사용자 | 미신청 (로컬은 `HOLIDAY_DRIVER=fixed`) |
 | 7 | AWS S3 운영 버킷·IAM | 운영 배포 | AWS 관리자 | 배포 때 ([운영 참고](production_notes.md#3-aws-s3)) |
 
 ---
@@ -186,3 +187,13 @@ gcloud pubsub subscriptions create oz-meet-events-pull \
 - Personal Access Token 범위: `data.records:read`, `schema.bases:read`. 대상 Base: KDT 학생관리툴.
 - 환경 변수: `AIRTABLE_TOKEN`, `AIRTABLE_BASE_ID`, `AIRTABLE_STUDENT_TABLE_ID`, `AIRTABLE_BOOTCAMP_TABLE_ID`.
 - 토큰을 다시 발급하면 운영 비밀 저장소의 값도 바꾼다.
+
+## 8. 공공데이터포털 특일 정보 API (법정공휴일)
+
+법정공휴일(대체공휴일·선거일·임시공휴일 포함)을 매일 받아 DB에 저장한다(decisions A95·B16).
+
+1. [공공데이터포털](https://www.data.go.kr)에 로그인하고 **'한국천문연구원_특일 정보'** 를 검색해 [활용신청]한다(개발계정, 자동 승인). 쓰는 기능은 **국경일·공휴일 정보 조회(`getRestDeInfo`)** 하나다.
+2. 마이페이지 → 데이터 활용 → 그 API의 **일반 인증키(Decoding)** 를 복사한다. 승인 직후에는 키가 동기화되기까지 1~2시간 `SERVICE_KEY_IS_NOT_REGISTERED_ERROR`가 날 수 있다.
+3. 환경 변수: `HOLIDAY_DRIVER=data_go_kr`, `HOLIDAY_API_KEY=<Decoding 키>`. 키 값은 비밀 저장소에 둔다.
+4. 확인: 운영진 화면 설정 > 공휴일에서 [지금 가져오기] → 올해·내년 건수와 동기화 시각이 나오면 된다. 실패하면 503 `holiday_sync_failed`이고 worker 로그에 실패 원인(예외 종류)이 남는다.
+5. 개발계정 트래픽은 하루 10,000건이다. 정기 작업은 하루 2건(올해·내년)만 부른다.

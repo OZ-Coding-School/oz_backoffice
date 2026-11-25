@@ -28,6 +28,7 @@ from app.contexts.mentoring.infrastructure.repositories import (
     TortoiseMentoringHolidayRepository,
     TortoiseMentoringSessionRepository,
     TortoiseMentorUnavailablePeriodRepository,
+    TortoisePublicHolidayRepository,
 )
 from app.core.clock import Clock
 from app.core.dependencies import get_clock
@@ -43,7 +44,9 @@ def get_available_times_service(
         assignments=TortoiseCohortMentorRepository(),
         unavailable_periods=TortoiseMentorUnavailablePeriodRepository(),
         blocks=TortoiseMentoringBlockTimeRepository(),
-        calendar=BusinessCalendar(TortoiseMentoringHolidayRepository()),
+        calendar=BusinessCalendar(
+            TortoiseMentoringHolidayRepository(), TortoisePublicHolidayRepository()
+        ),
         mentors=cast("MentorLookup", request.app.state.mentor_queries),
         enrollments=cast("EnrollmentLookup", request.app.state.student_queries),
         busy=TortoiseMentoringSessionRepository(),
