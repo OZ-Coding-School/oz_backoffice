@@ -53,3 +53,8 @@ export function contractError(e: unknown): string {
   const code = e instanceof ApiError ? e.code : undefined;
   return (code && ERRORS[code]) ?? "처리하지 못했어요. 잠시 후 다시 시도해 주세요.";
 }
+
+export const FILE_HELP = "PDF 10MB까지 올릴 수 있어요. 확정하려면 계약서가 있어야 해요.";
+export const MENTOR_HELP =
+  "멘토 계약은 항상 멘토에 속해요. 잘못 만든 계약은 다른 멘토로 옮길 수 있고, 연결 해제는 없어요.";
+export const NEW_MENTOR_HELP = "이름·휴대폰이 같은 멘토가 있으면 그 멘토에 붙고, 없으면 가입 전 멘토가 생겨요.";

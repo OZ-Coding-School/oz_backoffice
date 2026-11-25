@@ -12,13 +12,7 @@ import { maskPhone } from "@/features/profile/mask";
 import { useDebounced } from "@/lib/use-debounced";
 import { cn } from "@/lib/utils";
 
-import {
-  managerCandidatesQuery,
-  useMoveContract,
-  useUpdateContract,
-  type Contract,
-  type ManagerCandidate,
-} from "../api";
+import { managerCandidatesQuery, useMoveContract, type Contract, type ManagerCandidate } from "../api";
 import { contractError } from "../labels";
 
 export interface ManagerChoice {
@@ -94,44 +88,6 @@ export function ManagerList({
         </ul>
       )}
     </div>
-  );
-}
-
-/** 담당 직원 변경: 확정한 계약도 바꿀 수 있다 (A25) */
-export function ManagerDialog({ contract: c, onClose }: { contract: Contract; onClose: () => void }) {
-  const save = useUpdateContract(c.id);
-  const [choice, setChoice] = useState<ManagerChoice | null>(null);
-  const submit = async () => {
-    if (!choice) return;
-    try {
-      await save.mutateAsync({ manager_employee_id: choice.id });
-      toast.success(`담당 직원을 ${choice.name}(으)로 바꿨어요`);
-      onClose();
-    } catch (e) {
-      toast.error(contractError(e));
-    }
-  };
-  return (
-    <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
-      <DialogContent className="flex max-w-120 flex-col gap-4 p-6">
-        <DialogTitle className="text-h2 text-foreground">담당 직원 변경</DialogTitle>
-        <DialogDescription className="text-body text-muted-foreground">
-          지금 담당: {c.manager_name ?? "—"}
-        </DialogDescription>
-        <ManagerList value={choice} onChange={setChoice} />
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={onClose}>
-            돌아가기
-          </Button>
-          <Button
-            disabled={!choice || choice.id === c.manager_employee_id || save.isPending}
-            onClick={() => void submit()}
-          >
-            변경
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
   );
 }
 

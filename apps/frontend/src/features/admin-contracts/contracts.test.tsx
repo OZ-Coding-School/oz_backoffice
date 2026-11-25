@@ -192,7 +192,7 @@ describe("행정 업무 > 계약 (FE-18b)", () => {
     await renderRoute("/admin/administration/contracts?contract=k1");
     const sheet = await screen.findByRole("dialog", { name: "2026 백엔드 멘토 계약" });
     expect(await within(sheet).findByRole("region", { name: "계약 정보" })).toHaveTextContent(
-      "계약자김멘토휴대폰010-****-1234이메일kim@mentor.com기간2026.11.01 ~ 2027.04.30등록2026.10.28",
+      "계약자김멘토휴대폰010-****-1234이메일kim@mentor.com시작일2026.11.01종료일2027.04.30등록2026.10.28",
     );
     expect(within(sheet).getByRole("region", { name: "계약서" })).toHaveTextContent("멘토 계약서.pdf182KB");
     expect(within(sheet).getByRole("link", { name: "멘토 보기" })).toHaveAttribute(
@@ -223,19 +223,22 @@ describe("행정 업무 > 계약 (FE-18b)", () => {
     expect(calls).toContainEqual({ path: "confirm", body: "k2" });
   });
 
-  it("담당 직원 변경과 다른 멘토로 옮기기", async () => {
+  it("[수정]에서 담당 직원 변경, 다른 멘토로 옮기기", async () => {
     const calls = mockApi();
     await renderRoute("/admin/administration/contracts?contract=k1");
     const sheet = await screen.findByRole("dialog", { name: "2026 백엔드 멘토 계약" });
     const user = userEvent.setup();
-    await user.click(await within(sheet).findByRole("button", { name: "변경" }));
-    const managerDialog = await screen.findByRole("dialog", { name: "담당 직원 변경" });
-    await user.click(await within(managerDialog).findByRole("option", { name: /이매니저/ }));
-    await user.click(within(managerDialog).getByRole("button", { name: "변경" }));
-    expect(await screen.findByText("담당 직원을 이매니저(으)로 바꿨어요")).toBeInTheDocument();
+    // 확정한 계약은 [수정]에서 담당 직원만 바꾼다 (A25·F68)
+    await user.click(await within(sheet).findByRole("button", { name: "수정" }));
+    const form = await within(sheet).findByRole("form", { name: "계약 수정" });
+    expect(within(sheet).getByText("수정 중")).toBeInTheDocument();
+    expect(within(form).queryByRole("textbox", { name: "계약자" })).not.toBeInTheDocument();
+    await user.click(await within(form).findByRole("option", { name: /이매니저/ }));
+    await user.click(within(form).getByRole("button", { name: "저장" }));
+    expect(await screen.findByText("계약을 저장했어요")).toBeInTheDocument();
     expect(calls).toContainEqual({ path: "update", body: { manager_employee_id: "e2" } });
 
-    await user.click(within(sheet).getByRole("button", { name: "다른 멘토로 옮기기" }));
+    await user.click(await within(sheet).findByRole("button", { name: "옮기기" }));
     const move = await screen.findByRole("dialog", { name: "다른 멘토로 옮기기" });
     await user.click(await within(move).findByRole("option", { name: /이멘토/ }));
     await user.click(within(move).getByRole("button", { name: "옮기기" }));
@@ -249,13 +252,14 @@ describe("행정 업무 > 계약 (FE-18b)", () => {
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "계약 추가" }));
     const form = await screen.findByRole("form", { name: "계약 추가" });
-    await user.type(within(form).getByLabelText("계약자 이름"), "이멘토");
+    expect(within(form).getByRole("radio", { name: "멘토" })).toBeChecked();
+    await user.type(within(form).getByLabelText("계약자"), "이멘토");
     await user.type(within(form).getByLabelText("휴대폰"), "010-2222-5678");
     await user.type(within(form).getByLabelText("제목"), "2026 데이터 멘토 계약");
     await user.type(within(form).getByLabelText("시작일"), "2026-12-01");
     await user.type(within(form).getByLabelText("종료일"), "2027-05-31");
     expect(await within(form).findByRole("option", { name: /김관리 \(나\)/ })).toHaveAttribute("aria-selected", "true");
-    await user.click(within(form).getByRole("button", { name: "저장" }));
+    await user.click(within(form).getByRole("button", { name: "추가" }));
     expect(await screen.findByText("계약을 작성 중으로 저장했어요")).toBeInTheDocument();
     expect(calls).toContainEqual({
       path: "create",
@@ -280,7 +284,7 @@ describe("행정 업무 > 계약 (FE-18b)", () => {
     const sheet = await screen.findByRole("dialog", { name: "2026 백엔드 멘토 계약" });
     await within(sheet).findByRole("region", { name: "계약 정보" });
     expect(within(sheet).queryByRole("button", { name: "해지" })).not.toBeInTheDocument();
-    expect(within(sheet).queryByRole("button", { name: "변경" })).not.toBeInTheDocument();
+    expect(within(sheet).queryByRole("button", { name: "수정" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "계약 추가" })).not.toBeInTheDocument();
   });
 });
