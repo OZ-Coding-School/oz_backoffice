@@ -1,7 +1,7 @@
 # 36. 조직 설정 > 직원 (FE-15f)
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #141
 - 관련 결정: `docs/decisions.md` F66·F67 (A88·A89·A90·A91)
 - 이전 기록: [35. 회원 관리·가입 승인 통합 (FE-15e)](35_member_approvals_merge.md)
 
