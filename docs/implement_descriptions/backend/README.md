@@ -99,3 +99,4 @@
 | 95 | [기수 요약 API (BE-3o)](95_cohort_summary.md) | 완료 (#150) |
 | 96 | [과정·기수 응답에 HRD 값 (BE-3p)](96_academy_hrd_fields.md) | 완료 (#151) |
 | 97 | [HRD 연결 정보 (BE-3q)](97_hrd_links.md) | 완료 (#153) |
+| 98 | [수강생 상세 API (BE-3r)](98_student_detail.md) | 완료 (#155) |
