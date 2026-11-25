@@ -6,6 +6,7 @@ import {
   LayoutGrid,
   ShieldCheck,
   UserCheck,
+  UserRound,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -50,7 +51,7 @@ const MODULES: StaffModule[] = [
     key: "members",
     label: "회원",
     title: "회원 관리",
-    description: "회원 가입 승인",
+    description: "가입 승인·전체 회원",
     icon: ShieldCheck,
     items: [
       {
@@ -60,6 +61,13 @@ const MODULES: StaffModule[] = [
         // 수강생 · 멘토·강사 · 운영진 탭 (A33·A86·F66). 배지는 세 탭 대기 합
         permissions: ["member.approval.read", "educator.contract.read", "staff.registration.read"],
         badge: "approvals",
+      },
+      {
+        to: "/admin/members/users",
+        label: "전체 회원",
+        icon: UserRound,
+        // 승인된 계정 조회·비활성화 (A94·F71)
+        permissions: ["member.user.read"],
       },
     ],
   },
