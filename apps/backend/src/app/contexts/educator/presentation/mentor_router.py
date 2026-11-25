@@ -3,7 +3,7 @@
 - 멘토 본인(승인된 회원 + 멘토 프로필): GET/PATCH `/me/mentor-profile`,
   사진 업로드 요청·확정, 사진 삭제
 - 운영진(mentor.manage, decisions A36): GET `/admin/mentors`(목록·검색),
-  GET/PATCH `/admin/mentors/{id}/profile`,
+  GET `/admin/mentors/{id}`(목록 항목과 같은 단건, A102), GET/PATCH `/admin/mentors/{id}/profile`,
   사진 대리 업로드·삭제
 사진은 브라우저가 최적화해 올린다. 서버는 PNG·JPEG·WebP 2MB 이하인지와 형식만 검사한다.
 """
@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 from app.contexts.access.presentation.dependencies import ApprovedUser, require_permission
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.educator.application.mentor_cohorts import MentorCohortReader
-from app.contexts.educator.application.mentor_profiles import MentorProfileService
+from app.contexts.educator.application.mentor_profiles import MentorProfileService, MentorSummary
 from app.contexts.educator.application.uploads import DirectUploads
 from app.contexts.educator.domain.enums import DisplayNamePreference
 from app.contexts.educator.domain.profiles import (
@@ -202,23 +202,9 @@ async def delete_my_image(
 
 
 # ---------------------------------------------------------------- 운영진
-@admin_router.get("", response_model=Page[MentorListItem])
-async def list_mentors(
-    request: Request,
-    _: Reader,
-    profiles: ProfilesDep,
-    users: UsersDep,
-    q: Annotated[str | None, Query(max_length=50, description="이름·이메일·휴대폰·닉네임")] = None,
-    is_active: bool | None = None,
-    limit: Annotated[int, Query(ge=1, le=100)] = 20,
-    offset: Annotated[int, Query(ge=0)] = 0,
-) -> Page[MentorListItem]:
-    summaries, total = await profiles.list_mentors(
-        query=q.strip() if q and q.strip() else None,
-        is_active=is_active,
-        limit=limit,
-        offset=offset,
-    )
+async def _list_items(
+    request: Request, summaries: list[MentorSummary], users: UsersDep
+) -> list[MentorListItem]:
     found = await users.get_many([s.mentor.user_id for s in summaries])
     reader = cast("MentorCohortReader", request.app.state.mentor_cohorts)
     cohorts = await reader.active_cohorts([s.mentor.id for s in summaries])
@@ -249,7 +235,37 @@ async def list_mentors(
                 ],
             )
         )
+    return items
+
+
+@admin_router.get("", response_model=Page[MentorListItem])
+async def list_mentors(
+    request: Request,
+    _: Reader,
+    profiles: ProfilesDep,
+    users: UsersDep,
+    q: Annotated[str | None, Query(max_length=50, description="이름·이메일·휴대폰·닉네임")] = None,
+    is_active: bool | None = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> Page[MentorListItem]:
+    summaries, total = await profiles.list_mentors(
+        query=q.strip() if q and q.strip() else None,
+        is_active=is_active,
+        limit=limit,
+        offset=offset,
+    )
+    items = await _list_items(request, summaries, users)
     return Page(items=items, total=total, limit=limit, offset=offset)
+
+
+@admin_router.get("/{mentor_id}", response_model=MentorListItem)
+async def get_mentor(
+    request: Request, mentor_id: uuid.UUID, _: Reader, profiles: ProfilesDep, users: UsersDep
+) -> MentorListItem:
+    """멘토 하나 (A102): 목록 항목과 같은 응답. 상세 화면 머리·계정 칸"""
+    items = await _list_items(request, [await profiles.summary(mentor_id)], users)
+    return items[0]
 
 
 @admin_router.get("/{mentor_id}/profile", response_model=MentorProfileResponse)

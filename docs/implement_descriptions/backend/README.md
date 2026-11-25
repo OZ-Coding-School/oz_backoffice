@@ -102,3 +102,4 @@
 | 98 | [수강생 상세 API (BE-3r)](98_student_detail.md) | 완료 (#156) |
 | 99 | [멘토 목록 보완 (BE-3s)](99_mentor_list_fields.md) | 완료 (#159) |
 | 100 | [멘토 단위 배정 조회 (BE-3t)](100_mentor_assignments.md) | 완료 (#160) |
+| 101 | [멘토 단건 조회 (BE-3u)](101_mentor_detail.md) | 완료 (#161) |

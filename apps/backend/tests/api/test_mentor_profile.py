@@ -1,5 +1,6 @@
 """멘토 프로필 API (실제 DB + S3 에뮬레이터 floci)."""
 
+import uuid
 from datetime import UTC, date, datetime
 from typing import Any
 
@@ -146,6 +147,13 @@ async def test_admin_lists_and_edits_mentors(client: AsyncClient, admin: dict[st
         (str(cohort.id), 12)
     ]
 
+    # 단건 (A102): 목록 항목과 같은 응답
+    one = await client.get(f"/api/v1/admin/mentors/{mentor.id}", headers=admin)
+    assert one.status_code == 200
+    assert one.json() == item
+    missing = await client.get(f"/api/v1/admin/mentors/{uuid.uuid4()}", headers=admin)
+    assert (missing.status_code, missing.json()["error"]["code"]) == (404, "mentor_not_found")
+
     base = f"/api/v1/admin/mentors/{mentor.id}/profile"
     edited = await client.patch(base, json={"expertise": "백엔드"}, headers=admin)
     assert edited.json()["expertise"] == "백엔드"
@@ -160,3 +168,7 @@ async def test_admin_requires_contract_manage(
     member = await _approved_user()
     forbidden = await client.get("/api/v1/admin/mentors", headers=bearer(settings, member))
     assert forbidden.status_code == 403
+    one = await client.get(
+        f"/api/v1/admin/mentors/{uuid.uuid4()}", headers=bearer(settings, member)
+    )
+    assert one.status_code == 403
