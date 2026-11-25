@@ -60,6 +60,7 @@ async def test_hierarchy_crud(client: AsyncClient, admin: dict[str, str]) -> Non
         admin,
     )
     assert bootcamp["code"] == "AH"
+    assert (bootcamp["hrd_net_id"], bootcamp["hrd_bootcamp_name"]) == ("AIG1", "백엔드 KDT")  # A97
     cohort = await _post(
         client,
         f"/bootcamps/{bootcamp['id']}/cohorts",
@@ -72,6 +73,7 @@ async def test_hierarchy_crud(client: AsyncClient, admin: dict[str, str]) -> Non
         admin,
     )
     assert cohort["status"] == "PLANNED"
+    assert (cohort["hrd_net_id"], cohort["hrd_cohort_number"]) == ("AIG1", 1)  # A97
 
     patched = await client.patch(
         f"{API}/cohorts/{cohort['id']}",
@@ -84,7 +86,7 @@ async def test_hierarchy_crud(client: AsyncClient, admin: dict[str, str]) -> Non
     )
     assert cleared.json()["hrd_net_id"] is None
     listed = await client.get(f"{API}/bootcamps/{bootcamp['id']}/cohorts", headers=admin)
-    assert [c["id"] for c in listed.json()] == [cohort["id"]]
+    assert [(c["id"], c["hrd_net_id"]) for c in listed.json()] == [(cohort["id"], None)]
 
     in_use = await client.delete(f"{API}/bootcamps/{bootcamp['id']}", headers=admin)
     assert (in_use.status_code, in_use.json()["error"]["code"]) == (409, "in_use")

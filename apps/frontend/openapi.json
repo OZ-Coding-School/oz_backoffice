@@ -14270,6 +14270,30 @@
               }
             ],
             "title": "Airtable Cohort Prefix"
+          },
+          "hrd_net_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hrd Net Id",
+            "description": "HRD 훈련과정 ID (A97)"
+          },
+          "hrd_bootcamp_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hrd Bootcamp Name",
+            "description": "HRD 과정 이름 (A97)"
           }
         },
         "type": "object",
@@ -14734,6 +14758,30 @@
               }
             ],
             "title": "Discord Guild Id"
+          },
+          "hrd_net_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hrd Net Id",
+            "description": "연결된 HRD 회차의 훈련과정 ID (A97)"
+          },
+          "hrd_cohort_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hrd Cohort Number",
+            "description": "HRD 회차 번호 (A97)"
           }
         },
         "type": "object",

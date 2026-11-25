@@ -12,11 +12,16 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.contexts.academy.application.academy_admin import AcademyAdminService
 from app.contexts.academy.application.cohort_summary import CohortSummary, CohortSummaryReader
+from app.contexts.academy.domain.entities import Bootcamp, Cohort
 from app.contexts.academy.domain.enums import (
     CohortStatus,
     DayNightSeType,
     HRDNetTrainType,
     WeekendSeType,
+)
+from app.contexts.academy.infrastructure.models import (
+    HrdNetBootcampCohortModel,
+    HrdNetBootcampModel,
 )
 from app.contexts.academy.infrastructure.repositories import (
     TortoiseBootcampRepository,
@@ -148,6 +153,8 @@ class BootcampResponse(_FromEntity):
     code: str
     is_active: bool
     airtable_cohort_prefix: str | None
+    hrd_net_id: str | None = Field(default=None, description="HRD 훈련과정 ID (A97)")
+    hrd_bootcamp_name: str | None = Field(default=None, description="HRD 과정 이름 (A97)")
 
 
 class CohortCreate(BaseModel):
@@ -177,6 +184,49 @@ class CohortResponse(_FromEntity):
     end_date: date
     status: CohortStatus
     discord_guild_id: str | None
+    hrd_net_id: str | None = Field(default=None, description="연결된 HRD 회차의 훈련과정 ID (A97)")
+    hrd_cohort_number: int | None = Field(default=None, description="HRD 회차 번호 (A97)")
+
+
+async def _bootcamps_out(bootcamps: list[Bootcamp]) -> list[BootcampResponse]:
+    """HRD 훈련과정 ID·이름을 붙인다 (A97)."""
+    ids = {b.hrd_net_bootcamp_id for b in bootcamps}
+    hrd = {row.id: row for row in await HrdNetBootcampModel.filter(id__in=ids)} if ids else {}
+    out = []
+    for b in bootcamps:
+        row = hrd.get(b.hrd_net_bootcamp_id)
+        out.append(
+            BootcampResponse.model_validate(b).model_copy(
+                update={
+                    "hrd_net_id": row.hrd_net_id if row else None,
+                    "hrd_bootcamp_name": row.name if row else None,
+                }
+            )
+        )
+    return out
+
+
+async def _cohorts_out(cohorts: list[Cohort]) -> list[CohortResponse]:
+    """HRD 훈련과정 ID·회차 번호를 붙인다 (A97)."""
+    ids = {c.hrd_net_cohort_id for c in cohorts}
+    rows = (
+        await HrdNetBootcampCohortModel.filter(id__in=ids).prefetch_related("hrd_net_bootcamp")
+        if ids
+        else []
+    )
+    hrd = {row.id: row for row in rows}
+    out = []
+    for c in cohorts:
+        row = hrd.get(c.hrd_net_cohort_id)
+        out.append(
+            CohortResponse.model_validate(c).model_copy(
+                update={
+                    "hrd_net_id": row.hrd_net_bootcamp.hrd_net_id if row else None,
+                    "hrd_cohort_number": row.cohort_number if row else None,
+                }
+            )
+        )
+    return out
 
 
 def _not_null(changes: dict[str, Any], *fields: str) -> dict[str, Any]:
@@ -272,7 +322,7 @@ async def list_bootcamps(
 ) -> list[BootcampResponse]:
     """운영과정 목록. 기본은 활성 과정만."""
     bootcamps = await service.list_bootcamps(include_inactive=include_inactive)
-    return [BootcampResponse.model_validate(b) for b in bootcamps]
+    return await _bootcamps_out(list(bootcamps))
 
 
 @router.post("/bootcamps", response_model=BootcampResponse, status_code=status.HTTP_201_CREATED)
@@ -280,14 +330,14 @@ async def create_bootcamp(
     body: BootcampCreate, admin: BootcampManager, service: ServiceDep
 ) -> BootcampResponse:
     created = await service.create_bootcamp(body.model_dump(), actor_id=admin.id)
-    return BootcampResponse.model_validate(created)
+    return (await _bootcamps_out([created]))[0]
 
 
 @router.get("/bootcamps/{bootcamp_id}", response_model=BootcampResponse)
 async def get_bootcamp(
     bootcamp_id: uuid.UUID, _: BootcampReader, service: ServiceDep
 ) -> BootcampResponse:
-    return BootcampResponse.model_validate(await service.get_bootcamp(bootcamp_id))
+    return (await _bootcamps_out([await service.get_bootcamp(bootcamp_id)]))[0]
 
 
 @router.patch("/bootcamps/{bootcamp_id}", response_model=BootcampResponse)
@@ -300,7 +350,7 @@ async def update_bootcamp(
     """
     changes = _not_null(_sent(body), "name", "code", "is_active")
     updated = await service.update_bootcamp(bootcamp_id, changes, actor_id=admin.id)
-    return BootcampResponse.model_validate(updated)
+    return (await _bootcamps_out([updated]))[0]
 
 
 @router.delete("/bootcamps/{bootcamp_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -317,7 +367,7 @@ async def delete_bootcamp(
 async def list_cohorts(
     bootcamp_id: uuid.UUID, _: BootcampCohortReader, service: ServiceDep
 ) -> list[CohortResponse]:
-    return [CohortResponse.model_validate(c) for c in await service.list_cohorts(bootcamp_id)]
+    return await _cohorts_out(await service.list_cohorts(bootcamp_id))
 
 
 @router.post(
@@ -330,12 +380,12 @@ async def create_cohort(
 ) -> CohortResponse:
     """기수는 HRD 회차에 연결한다 (운영과정의 대표 HRD 과정과 달라도 된다, decisions D6)."""
     created = await service.create_cohort(bootcamp_id, body.model_dump(), actor_id=admin.id)
-    return CohortResponse.model_validate(created)
+    return (await _cohorts_out([created]))[0]
 
 
 @router.get("/cohorts/{cohort_id}", response_model=CohortResponse)
 async def get_cohort(cohort_id: uuid.UUID, _: CohortReader, service: ServiceDep) -> CohortResponse:
-    return CohortResponse.model_validate(await service.get_cohort(cohort_id))
+    return (await _cohorts_out([await service.get_cohort(cohort_id)]))[0]
 
 
 class CohortStudentCountsResponse(BaseModel):
@@ -404,7 +454,7 @@ async def update_cohort(
         _sent(body), "hrd_net_cohort_id", "cohort_number", "start_date", "end_date", "status"
     )
     updated = await service.update_cohort(cohort_id, changes, actor_id=admin.id)
-    return CohortResponse.model_validate(updated)
+    return (await _cohorts_out([updated]))[0]
 
 
 @router.delete("/cohorts/{cohort_id}", status_code=status.HTTP_204_NO_CONTENT)
