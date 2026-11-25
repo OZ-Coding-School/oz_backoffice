@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from app.contexts.identity.domain.entities import OAuthAccount, User
-from app.contexts.identity.domain.enums import MemberSignupType, SocialLoginProvider
+from app.contexts.identity.domain.enums import AccountType, MemberSignupType, SocialLoginProvider
 from app.contexts.identity.domain.signup import MemberSignup
 
 
@@ -30,6 +30,24 @@ class UserRepository(Protocol):
 
     async def lock_super_admin_ids(self) -> list[uuid.UUID]:
         """최고 관리자 행을 잠가 읽는다 (UoW 안에서)."""
+        ...
+
+    async def search_approved(
+        self,
+        *,
+        account_type: AccountType | None,
+        query: str | None,
+        active: bool | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[User], int]:
+        """승인된 계정(탈퇴 제외), 가입 승인 최신순. query는 이름·이메일·휴대폰 (A94)."""
+        ...
+
+    async def count_approved_by_type(
+        self, *, query: str | None, active: bool | None
+    ) -> dict[AccountType, int]:
+        """승인된 계정의 종류별 수 (목록 탭 건수)."""
         ...
 
 

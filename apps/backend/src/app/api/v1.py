@@ -13,6 +13,7 @@ from app.contexts.educator.presentation.mentor_router import admin_router as men
 from app.contexts.educator.presentation.mentor_router import me_router as mentor_me_router
 from app.contexts.identity.presentation.approval_router import admin_router as approval_admin_router
 from app.contexts.identity.presentation.approval_router import me_router as member_signup_router
+from app.contexts.identity.presentation.member_router import router as member_admin_router
 from app.contexts.identity.presentation.password_change_router import (
     me_router as password_change_me_router,
 )
@@ -90,6 +91,7 @@ router.include_router(password_router)
 router.include_router(password_change_verify_router)
 router.include_router(password_change_me_router)
 router.include_router(member_signup_router)
+router.include_router(member_admin_router)
 router.include_router(approval_admin_router)
 router.include_router(me_router)
 router.include_router(staff_registration_router)

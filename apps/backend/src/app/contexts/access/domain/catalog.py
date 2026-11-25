@@ -59,6 +59,7 @@ PERMISSION_DEFINITIONS: tuple[PermissionDefinition, ...] = (
     _action("academy.roster.sync", "수강생 명단", "동기화", "명단 동기화 실행", "academy.roster.read"),
     *_entity("member.approval", "회원 관리", "회원 가입 승인", "가입 신청 조회", "가입 승인·반려, 수동 매칭", cohort_bound=True),
     *_entity("staff.registration", "회원 관리", "운영진 가입 승인", "운영진 신청 조회", "운영진 승인·반려"),
+    *_entity("member.user", "회원 관리", "회원", "전체 회원 목록·상세 조회", "계정 비활성화·활성화"),
     *_entity("educator.contract", "강사·멘토", "계약", "계약·계약서 조회", "계약 등록·확정·해지, 회원 연결"),
     *_entity("educator.mentor", "강사·멘토", "멘토", "멘토 목록·프로필·일정 조회", "프로필 대리 수정, 활성화·비활성화, 일정 대리"),
     *_entity("mentoring.settings", "멘토링", "멘토링 설정", "기수 설정·금지 시간대·추가 휴일 조회", "설정·금지 시간대·추가 휴일 변경", cohort_bound=True),

@@ -15,7 +15,7 @@ pytestmark = pytest.mark.unit
 
 
 def test_definitions_are_consistent() -> None:
-    assert len(PERMISSIONS) == len(PERMISSION_DEFINITIONS) == 40
+    assert len(PERMISSIONS) == len(PERMISSION_DEFINITIONS) == 42
     for p in PERMISSION_DEFINITIONS:
         if p.requires is not None:
             assert PERMISSIONS_BY_CODE[p.requires].entity == p.entity

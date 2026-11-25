@@ -100,7 +100,7 @@ async def test_permission_rules_and_catalog(
     assert await code(["nope"]) == (422, "permission_not_found")
 
     catalog = (await client.get("/api/v1/admin/permissions", headers=admin)).json()
-    assert len(catalog) == 40
+    assert len(catalog) == 42
     manage = next(p for p in catalog if p["code"] == "mentoring.team.manage")
     assert (manage["entity"], manage["cohort_bound"], manage["requires"]) == (
         "멘토링 팀",

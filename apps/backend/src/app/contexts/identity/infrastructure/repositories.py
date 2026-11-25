@@ -6,9 +6,11 @@ from tortoise.expressions import Q
 
 from app.contexts.identity.domain.entities import OAuthAccount, User
 from app.contexts.identity.domain.enums import (
+    AccountType,
     MemberSignupStatus,
     MemberSignupType,
     SocialLoginProvider,
+    UserApprovalStatus,
 )
 from app.contexts.identity.domain.repositories import PendingSignupFilter, SignupVisibility
 from app.contexts.identity.domain.signup import MemberSignup
@@ -55,6 +57,44 @@ class TortoiseUserRepository:
             .values_list("id", flat=True)
         )
         return [uuid.UUID(str(i)) for i in ids]
+
+    @staticmethod
+    def _approved(query: str | None, active: bool | None):  # type: ignore[no-untyped-def]  # Tortoise QuerySet
+        rows = UserModel.filter(
+            approval_status=UserApprovalStatus.APPROVED, deleted_at__isnull=True
+        )
+        if active is not None:
+            rows = rows.filter(is_active=active)
+        if query:
+            digits = "".join(c for c in query if c.isdigit())
+            condition = Q(name__icontains=query) | Q(email__icontains=query)
+            if digits:
+                condition |= Q(phone_number__contains=digits)
+            rows = rows.filter(condition)
+        return rows
+
+    async def search_approved(
+        self,
+        *,
+        account_type: AccountType | None,
+        query: str | None,
+        active: bool | None,
+        limit: int,
+        offset: int,
+    ) -> tuple[list[User], int]:
+        rows = self._approved(query, active)
+        if account_type is not None:
+            rows = rows.filter(account_type=account_type)
+        found = await rows.order_by("-approved_at", "-id").offset(offset).limit(limit)
+        return [_to_entity(m) for m in found], await rows.count()
+
+    async def count_approved_by_type(
+        self, *, query: str | None, active: bool | None
+    ) -> dict[AccountType, int]:
+        counts = {t: 0 for t in AccountType}
+        for value in await self._approved(query, active).values_list("account_type", flat=True):
+            counts[AccountType(value)] += 1
+        return counts
 
     async def add(self, user: User) -> None:
         model = UserModel(id=user.id)
