@@ -1,3 +1,4 @@
+import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 /**
@@ -5,12 +6,15 @@ import type { ReactNode } from "react";
  * 운영진·수강생·멘토 화면이 같은 모양을 쓴다.
  */
 export function PageHeader({
+  icon: Icon,
   title,
   description,
   meta,
   actions,
   hideTitle = false,
 }: {
+  /** 제목 왼쪽 아이콘 타일 (메뉴 아이콘과 같은 것) */
+  icon?: LucideIcon;
   title: string;
   description?: ReactNode;
   /** 제목 아래 줄: `<MetaChip>`·상태 표시 */
@@ -20,8 +24,13 @@ export function PageHeader({
   hideTitle?: boolean;
 }) {
   return (
-    <header className="flex flex-wrap items-start gap-3">
-      <div className="flex min-w-0 flex-1 flex-col gap-2">
+    <header className="flex flex-wrap items-start gap-4">
+      {Icon && !hideTitle ? (
+        <span className="hidden size-12 shrink-0 items-center justify-center rounded-2xl bg-linear-to-br from-primary to-primary/70 text-primary-foreground shadow-md md:inline-flex">
+          <Icon aria-hidden className="size-6" />
+        </span>
+      ) : null}
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         {hideTitle ? null : <h1 className="text-h1 text-foreground">{title}</h1>}
         {meta ? (
           <div className="flex flex-wrap items-center gap-2 text-body-sm text-muted-foreground">{meta}</div>

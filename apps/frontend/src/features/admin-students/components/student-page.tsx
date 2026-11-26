@@ -1,10 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, CircleCheck, History, Hourglass, IdCard, Users, Wallet } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { StatTile } from "@/components/stat-tile";
+import { SectionCard } from "@/components/section-card";
+import { ProfileHero } from "@/components/profile-hero";
 import { ErrorState } from "@/components/error-state";
-import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { RECEIVED_STATUS, desiredLabel } from "@/features/mentor-requests/labels";
@@ -92,19 +94,16 @@ const cohortName = (cohort: StaffCohort | undefined) =>
 function Head({ student: s, cohort }: { student: StudentDetail; cohort: StaffCohort | undefined }) {
   const status = ENROLLMENT[s.status];
   return (
-    <div className="flex items-center gap-3">
-      <Avatar name={s.name} />
-      <div className="flex min-w-0 flex-col gap-0.5">
-        <div className="flex items-center gap-2">
-          <h1 className="text-h1 text-foreground">{s.name}</h1>
+    <ProfileHero
+      name={s.name}
+      badges={
+        <>
           <Badge variant={status.badge}>{status.label}</Badge>
           <Badge variant={s.member ? "default" : "outline"}>{s.member ? "가입함" : "미가입"}</Badge>
-        </div>
-        <p className="truncate text-body text-muted-foreground">
-          {[cohortName(cohort), s.email].filter(Boolean).join(" · ")}
-        </p>
-      </div>
-    </div>
+        </>
+      }
+      description={[cohortName(cohort), s.email].filter(Boolean).join(" · ")}
+    />
   );
 }
 
@@ -120,11 +119,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 function BasicTab({ student: s, cohort }: { student: StudentDetail; cohort: StaffCohort | undefined }) {
   const status = ENROLLMENT[s.status];
   return (
-    <section
-      aria-label="기본·수강 정보"
-      className="flex flex-col gap-4 rounded-2xl border border-border bg-card shadow-sm p-6"
-    >
-      <h2 className="text-h3 text-foreground">기본 · 수강 정보</h2>
+    <SectionCard icon={IdCard} title="기본 · 수강 정보" description="Airtable 명단과 가입 계정 정보예요.">
       <dl className="flex flex-col gap-3">
         <Row label="이름">{s.name}</Row>
         <Row label="휴대폰">{maskPhone(s.phone_number) ?? "—"}</Row>
@@ -149,17 +144,7 @@ function BasicTab({ student: s, cohort }: { student: StudentDetail; cohort: Staf
           {s.synced_at ? ` · ${formatKst(s.synced_at, "M/d HH:mm")} 동기화` : ""}
         </Row>
       </dl>
-    </section>
-  );
-}
-
-function Stat({ label, value, hint }: { label: string; value: string; hint: string }) {
-  return (
-    <div className="flex flex-col gap-1 rounded-2xl border border-border bg-card shadow-sm p-4">
-      <span className="text-caption text-muted-foreground">{label}</span>
-      <span className="text-h2 text-foreground">{value}</span>
-      <span className="text-caption text-muted-foreground">{hint}</span>
-    </div>
+    </SectionCard>
   );
 }
 
@@ -178,32 +163,33 @@ function MentoringTab({
   return (
     <div className="flex flex-col gap-4">
       <section aria-label="멘토링 요약" className="grid grid-cols-4 gap-3">
-        <Stat
+        <StatTile
+          icon={Wallet}
           label="잔여"
           value={a ? formatMinutes(a.remaining_minutes) : "지급 전"}
           hint={a?.is_expired ? "기간이 끝난 계좌예요" : "바로 신청할 수 있는 시간"}
         />
-        <Stat
+        <StatTile
+          icon={Hourglass}
           label="보류"
           value={a ? formatMinutes(a.held_minutes) : "—"}
           hint={`대기 중인 신청 ${m.pending_request_count}건`}
         />
-        <Stat
+        <StatTile
+          icon={CircleCheck}
           label="사용"
           value={a ? formatMinutes(a.used_minutes) : "—"}
           hint={`완료 세션 ${m.completed_session_count}회 · 예정 ${m.upcoming_session_count}회`}
         />
-        <Stat label="팀" value={m.team_label ?? "없음"} hint={m.team_label ? "팀 멘토링 참여" : "1:1 멘토링만"} />
+        <StatTile
+          icon={Users}
+          label="팀"
+          value={m.team_label ?? "없음"}
+          hint={m.team_label ? "팀 멘토링 참여" : "1:1 멘토링만"}
+        />
       </section>
       {canSeeRecent ? (
-        <section
-          aria-label="최근 신청·세션"
-          className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
-        >
-          <div className="flex items-center gap-2 px-4 py-3">
-            <h2 className="text-body-strong text-foreground">최근 신청·세션</h2>
-            <span className="text-caption text-muted-foreground">최근 3건</span>
-          </div>
+        <SectionCard icon={History} title="최근 신청·세션" description="최근 3건" bodyClassName="gap-0 p-0 md:p-0">
           {recent.isPending ? (
             <div className="flex justify-center py-6">
               <Spinner />
@@ -211,9 +197,7 @@ function MentoringTab({
           ) : recent.isError ? (
             <ErrorState className="m-4" onRetry={() => void recent.refetch()} />
           ) : recent.data.length === 0 ? (
-            <p className="border-t border-border px-4 py-6 text-center text-body text-muted-foreground">
-              신청·세션이 없어요.
-            </p>
+            <p className="px-4 py-6 text-center text-body text-muted-foreground">신청·세션이 없어요.</p>
           ) : (
             <div role="table" aria-label="최근 신청·세션">
               <div
@@ -234,7 +218,7 @@ function MentoringTab({
               ))}
             </div>
           )}
-        </section>
+        </SectionCard>
       ) : null}
     </div>
   );
