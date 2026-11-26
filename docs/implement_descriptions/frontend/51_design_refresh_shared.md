@@ -1,7 +1,7 @@
 # 51. 디자인 다듬기 ① 공용 부품 (F92)
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #174
 - 관련 결정: `docs/decisions.md` F91·F92 (F68)
 - 이전 기록: [50. 멘토링 > 멘토링 설정 (FE-19a)](50_mentoring_settings.md)
 
