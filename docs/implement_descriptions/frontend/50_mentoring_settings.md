@@ -1,7 +1,7 @@
 # 50. 멘토링 > 멘토링 설정 (FE-19a)
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #173
 - 관련 결정: `docs/decisions.md` F90 (F59·F68·F86, A34·A37)
 - 이전 기록: [49. 멘토 일정 대리 (FE-18c-2)](49_mentor_schedule_admin.md)
 
