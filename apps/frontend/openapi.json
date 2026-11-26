@@ -10414,6 +10414,149 @@
         }
       }
     },
+    "/api/v1/admin/mentors/{mentor_id}/sessions": {
+      "get": {
+        "tags": [
+          "admin-mentoring-sessions"
+        ],
+        "summary": "Mentor Sessions For Admin",
+        "description": "멘토 한 명의 세션 (A106): 일정 대리 시간표용. 멘토 본인 목록과 같은 필터(상태 여러 개·\nfrom·to·order)와 응답. 기수 범위와 무관하게 멘토 조회 권한으로 본다.",
+        "operationId": "mentor_sessions_for_admin_api_v1_admin_mentors__mentor_id__sessions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "mentor_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Mentor Id"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MentoringSessionStatus"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "여러 개 가능 (예: status=SCHEDULED&status=IN_PROGRESS, A70)",
+              "title": "Status"
+            },
+            "description": "여러 개 가능 (예: status=SCHEDULED&status=IN_PROGRESS, A70)"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string",
+              "description": "시작 시각 정렬. desc(기본) 최신순, asc 이른 순 (A75)",
+              "default": "desc",
+              "title": "Order"
+            },
+            "description": "시작 시각 정렬. desc(기본) 최신순, asc 이른 순 (A75)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_SessionResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/cohorts/{cohort_id}/mentoring/settlements/aggregate": {
       "post": {
         "tags": [
@@ -19464,6 +19607,37 @@
           "offset"
         ],
         "title": "Page[MentorListItem]"
+      },
+      "Page_SessionResponse_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SessionResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "Page[SessionResponse]"
       },
       "Page_ThreadResponse_": {
         "properties": {

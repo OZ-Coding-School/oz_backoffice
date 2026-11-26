@@ -33,6 +33,7 @@ class StudentLookup(Protocol):
 class MentorLookup(Protocol):
     """educator `MentorQueries`."""
 
+    async def get(self, mentor_id: uuid.UUID) -> Mentor | None: ...
     async def get_by_user(self, user_id: uuid.UUID) -> Mentor | None: ...
 
 
@@ -76,6 +77,14 @@ class MentoringSessionQueries:
         if mentor is None:
             raise NotFoundError("멘토 프로필이 없습니다.", code="mentor_profile_not_found")
         return await self._sessions.list_for_mentor(mentor.id, query)
+
+    async def list_by_mentor(
+        self, mentor_id: uuid.UUID, query: SessionQuery
+    ) -> tuple[list[MentoringSession], int]:
+        """운영진: 멘토 한 명의 세션, 기수와 무관 (A106). 없는 멘토는 404."""
+        if await self._mentors.get(mentor_id) is None:
+            raise NotFoundError("멘토를 찾을 수 없습니다.", code="mentor_not_found")
+        return await self._sessions.list_for_mentor(mentor_id, query)
 
     async def counts_mine(self, user_id: uuid.UUID) -> dict[MentoringSessionStatus, int]:
         """본인 1:1·소속 팀 세션의 상태별 수 (목록 필터와 무관, A68)."""

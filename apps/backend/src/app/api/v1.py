@@ -66,6 +66,9 @@ from app.contexts.mentoring.presentation.session_router import (
     admin_router as session_admin_router,
 )
 from app.contexts.mentoring.presentation.session_router import me_router as session_me_router
+from app.contexts.mentoring.presentation.session_router import (
+    mentor_admin_router as session_mentor_admin_router,
+)
 from app.contexts.mentoring.presentation.session_router import router as session_router
 from app.contexts.mentoring.presentation.settings_router import router as mentoring_settings_router
 from app.contexts.mentoring.presentation.settlement_router import (
@@ -127,6 +130,7 @@ router.include_router(artifact_admin_router)
 router.include_router(record_router)  # 세션 라우터의 /{session_id}보다 먼저
 router.include_router(record_admin_router)
 router.include_router(session_router)
+router.include_router(session_mentor_admin_router)
 router.include_router(settlement_admin_router)
 router.include_router(settlement_me_router)
 router.include_router(session_me_router)
