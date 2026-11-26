@@ -1,7 +1,7 @@
 # 106. 달력 참고용 휴일 조회 (BE-3z)
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #172
 - 관련 결정: `docs/decisions.md` A107 (F89)
 - 이전 기록: [105. 운영진 멘토별 세션 조회 (BE-3y)](105_admin_mentor_sessions.md)
 
