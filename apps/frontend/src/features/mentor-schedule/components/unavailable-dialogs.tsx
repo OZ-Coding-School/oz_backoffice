@@ -16,6 +16,7 @@ import { formatKstDay, formatKst } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 
 import { useDeleteUnavailable, useSaveUnavailable, type ScheduleChange, type UnavailableInput } from "../api";
+import { useScheduleScope } from "../scope";
 import {
   bodyOf,
   CATEGORY_MAX_LENGTH,
@@ -62,7 +63,8 @@ export function UnavailableDialog({
   period: UnavailablePeriod | null;
   defaultDay: string;
 }) {
-  const save = useSaveUnavailable(period?.id ?? null);
+  const scope = useScheduleScope();
+  const save = useSaveUnavailable(period?.id ?? null, scope.mentorId);
   const [serverError, setServerError] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ body: UnavailableInput; change: ScheduleChange } | null>(null);
   const form = useForm<UnavailableForm>({
@@ -379,7 +381,8 @@ export function DeleteUnavailableDialog({
   period: UnavailablePeriod | null;
   onClose: () => void;
 }) {
-  const remove = useDeleteUnavailable();
+  const scope = useScheduleScope();
+  const remove = useDeleteUnavailable(scope.mentorId);
   const [error, setError] = useState<string | null>(null);
   const onDelete = async () => {
     if (!period) return;

@@ -19,7 +19,7 @@ import type { MentoringSession } from "@/features/sessions/api";
 import { formatKst } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 
-import { scheduleQuery, weekSessionsQuery } from "../api";
+import { scheduleQueryOf, weekSessionsQueryOf } from "../api";
 import { isLocked } from "../form";
 import {
   addDays,
@@ -33,6 +33,7 @@ import {
   weekTitle,
   type UnavailablePeriod,
 } from "../schedule";
+import { useScheduleScope } from "../scope";
 import { AcceptingCard } from "./accepting-card";
 import { DeleteUnavailableDialog, UnavailableDialog } from "./unavailable-dialogs";
 
@@ -59,9 +60,10 @@ interface Editor {
 }
 
 /** 멘토 일정 (Figma `일정 · 보기 (FE-11a)`, F51·F52·A37) */
-export function SchedulePage({ monday }: { monday: string }) {
-  const schedule = useQuery(scheduleQuery);
-  const sessions = useQuery(weekSessionsQuery(monday));
+export function SchedulePage({ monday, embedded = false }: { monday: string; embedded?: boolean }) {
+  const scope = useScheduleScope();
+  const schedule = useQuery(scheduleQueryOf(scope.mentorId));
+  const sessions = useQuery(weekSessionsQueryOf(monday, scope.mentorId));
   const [now] = useState(() => Date.now());
   const [dialog, setDialog] = useState<{ open: boolean; period: UnavailablePeriod | null }>({
     open: false,
@@ -79,9 +81,11 @@ export function SchedulePage({ monday }: { monday: string }) {
     <div className="flex flex-col gap-4 md:gap-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-start">
         <div className="flex flex-1 flex-col gap-1">
-          <h1 className="text-h1 text-foreground">일정</h1>
+          {embedded ? null : <h1 className="text-h1 text-foreground">일정</h1>}
           <p className="text-body text-muted-foreground">
-            안 되는 시간만 등록해요. 나머지 시간은 기수 운영시간 안에서 수강생이 신청할 수 있어요.
+            {embedded
+              ? "멘토 대신 안 되는 시간을 등록해요. 나머지 시간은 기수 운영시간 안에서 수강생이 신청할 수 있어요."
+              : "안 되는 시간만 등록해요. 나머지 시간은 기수 운영시간 안에서 수강생이 신청할 수 있어요."}
           </p>
         </div>
         <Button className="max-md:w-full" onClick={() => setDialog({ open: true, period: null })}>
@@ -165,7 +169,11 @@ function WeekCard({
   const today = kstDateKey(new Date(now));
   const [picked, setPicked] = useState(days.includes(today) ? today : monday);
   const selected = days.includes(picked) ? picked : monday;
-  const go = (offset: number) => void navigate({ to: "/mentor/schedule", search: { week: addDays(monday, offset) } });
+  const scope = useScheduleScope();
+  const go = (offset: number) =>
+    scope.onWeek
+      ? scope.onWeek(addDays(monday, offset))
+      : void navigate({ to: "/mentor/schedule", search: { week: addDays(monday, offset) } });
 
   return (
     <section
@@ -289,6 +297,7 @@ function Timetable({
 }
 
 function BlockView({ block, editor }: { block: Block; editor: Editor }) {
+  const scope = useScheduleScope();
   // 하루 1,440분 중 위치 (계산 값이라 인라인 스타일)
   const style: CSSProperties = {
     top: `${(block.start / DAY_MINUTES) * 100}%`,
@@ -298,6 +307,13 @@ function BlockView({ block, editor }: { block: Block; editor: Editor }) {
     "absolute inset-x-0.5 overflow-hidden rounded-md px-1.5 py-1 text-caption",
     block.kind === "unavailable" ? "bg-destructive-subtle text-destructive-text" : "bg-accent text-primary-text",
   );
+  // 운영진 일정 대리(F85)에는 세션 상세 화면이 아직 없어 블록만 보여 준다
+  if (block.sessionId && scope.mentorId)
+    return (
+      <span style={style} className={className}>
+        {block.label}
+      </span>
+    );
   if (block.sessionId)
     return (
       <Link
