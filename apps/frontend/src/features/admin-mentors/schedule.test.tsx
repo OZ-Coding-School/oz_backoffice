@@ -64,6 +64,7 @@ function mockApi(codes?: string[]) {
       const items = [makeSession({ starts_at: "2026-11-24T10:00:00Z", ends_at: "2026-11-24T11:00:00Z" })];
       return HttpResponse.json({ items, total: 1, limit: 100, offset: 0 });
     }),
+    http.get(apiUrl("/api/v1/mentoring/holidays"), () => HttpResponse.json({ items: [] })),
     http.delete(apiUrl("/api/v1/admin/mentors/{mentor_id}/schedule/unavailable-periods/{period_id}"), ({ params }) => {
       calls.push({ path: "delete", body: params.period_id });
       return new HttpResponse(null, { status: 204 });
@@ -86,17 +87,17 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe("강사·멘토 > 멘토 상세 > 일정 대리 (FE-18c-2)", () => {
-  it("운영진 API로 그 멘토의 시간표·불가 시간을 보여 주고, 불가 시간을 지운다", async () => {
+  it("운영진 API로 그 멘토의 월 달력·개인 일정을 보여 주고, 개인 일정을 지운다", async () => {
     const calls = mockApi();
     const { router } = await renderRoute("/admin/educators/mentors/m1?tab=schedule");
-    expect(await screen.findByRole("heading", { name: "11월 23일 ~ 29일" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "2026년 11월" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { level: 1, name: "일정" })).not.toBeInTheDocument();
-    const tuesday = screen.getByRole("group", { name: "11월 24일 (화)" });
-    expect(within(tuesday).getByText("본업 · 매주")).toBeInTheDocument();
-    // 운영진 화면에는 세션 상세가 없어 블록은 링크가 아니다
-    expect(await within(tuesday).findByText("가수강 · 1:1")).toBeInTheDocument();
-    expect(within(tuesday).queryByRole("link", { name: "가수강 · 1:1" })).not.toBeInTheDocument();
-    expect(calls).toContainEqual({ path: "sessions", body: "2026-11-22T15:00:00.000Z" });
+    const calendar = screen.getByRole("region", { name: "월 달력" });
+    expect(within(calendar).getAllByRole("button", { name: "본업 · 매주 9:00" }).length).toBeGreaterThan(0);
+    // 운영진 화면에는 세션 상세가 없어 세션 막대는 링크가 아니다
+    expect(await within(calendar).findByRole("img", { name: "가수강 · 1:1 19:00" })).toBeInTheDocument();
+    expect(within(calendar).queryByRole("link", { name: "가수강 · 1:1 19:00" })).not.toBeInTheDocument();
+    expect(calls).toContainEqual({ path: "sessions", body: "2026-10-25T15:00:00.000Z" });
 
     const user = userEvent.setup();
     const list = screen.getByRole("region", { name: "개인 일정" });
@@ -105,8 +106,8 @@ describe("강사·멘토 > 멘토 상세 > 일정 대리 (FE-18c-2)", () => {
     await user.click(within(confirm).getByRole("button", { name: "지우기" }));
     await waitFor(() => expect(calls).toContainEqual({ path: "delete", body: "p1" }));
 
-    await user.click(screen.getByRole("button", { name: "다음 주" }));
-    await waitFor(() => expect(router.state.location.search).toEqual({ tab: "schedule", week: "2026-11-30" }));
+    await user.click(screen.getByRole("button", { name: "다음 달" }));
+    await waitFor(() => expect(router.state.location.search).toEqual({ tab: "schedule", month: "2026-12" }));
   });
 
   it("신청 받기를 끄면 운영진 API로 바꾼다", async () => {
@@ -123,5 +124,11 @@ describe("강사·멘토 > 멘토 상세 > 일정 대리 (FE-18c-2)", () => {
     await renderRoute("/admin/educators/mentors/m1?tab=schedule");
     expect(await screen.findByRole("button", { name: "개인 일정 추가" })).toBeDisabled();
     expect(await screen.findByRole("switch", { name: "신청 받기" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "본업 수정" })).not.toBeInTheDocument();
+    // 달 이동은 그대로
+    expect(screen.getByRole("button", { name: "다음 달" })).toBeEnabled();
+    await userEvent.setup().click(screen.getByRole("button", { name: "본업 보기" }));
+    const panel = await screen.findByRole("dialog", { name: "본업" });
+    expect(within(panel).queryByRole("button", { name: "수정" })).not.toBeInTheDocument();
   });
 });

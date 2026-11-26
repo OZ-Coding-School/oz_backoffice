@@ -3,15 +3,16 @@ import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query
 import { api, unwrap } from "@/api/client";
 import type { components } from "@/api/schema.gen";
 
-import { dayStartMs, addDays } from "./schedule";
+import { addDays, dayStartMs, monthGridDays } from "./schedule";
 
 export const scheduleKeys = {
   mine: ["mentor-schedule"] as const,
   // 세션 목록 키 아래에 두어 기록·취소 뒤 함께 다시 부른다
-  weekSessions: (monday: string) => ["sessions", "mentor", "week", monday] as const,
+  monthSessions: (month: string) => ["sessions", "mentor", "month", month] as const,
   /** 운영진 일정 대리 (F85·A106) */
   of: (mentorId: string) => ["mentor-schedule", "admin", mentorId] as const,
-  weekSessionsOf: (mentorId: string, monday: string) => ["sessions", "admin-mentor", mentorId, "week", monday] as const,
+  monthSessionsOf: (mentorId: string, month: string) => ["sessions", "admin-mentor", mentorId, "month", month] as const,
+  holidays: (from: string, to: string) => ["mentoring-holidays", from, to] as const,
 };
 
 /** 내 일정: 신청 받기 + 끝나지 않은 불가 시간 (F52) */
@@ -31,54 +32,50 @@ export function scheduleQueryOf(mentorId: string | null) {
   });
 }
 
-/** 대상 멘토의 그 주 세션 (운영진은 A106). 시간표에는 목록만 쓴다 */
-export function weekSessionsQueryOf(monday: string, mentorId: string | null) {
-  const from = new Date(dayStartMs(monday)).toISOString();
-  const to = new Date(dayStartMs(addDays(monday, 7))).toISOString();
-  const query = { from, to, status: WEEK_STATUSES, order: "asc" as const, limit: 100, offset: 0 };
-  return queryOptions({
-    queryKey: (mentorId
-      ? scheduleKeys.weekSessionsOf(mentorId, monday)
-      : scheduleKeys.weekSessions(monday)) as readonly string[],
-    queryFn: async () => ({
-      items: (mentorId
-        ? await unwrap(
-            api.GET("/api/v1/admin/mentors/{mentor_id}/sessions", { params: { path: { mentor_id: mentorId }, query } }),
-          )
-        : await unwrap(api.GET("/api/v1/me/mentor-sessions", { params: { query } }))
-      ).items,
-    }),
-  });
-}
-
-const WEEK_STATUSES: ("SCHEDULED" | "IN_PROGRESS" | "COMPLETED" | "NO_SHOW")[] = [
+const SESSION_STATUSES: ("SCHEDULED" | "IN_PROGRESS" | "COMPLETED" | "NO_SHOW")[] = [
   "SCHEDULED",
   "IN_PROGRESS",
   "COMPLETED",
   "NO_SHOW",
 ];
+const PAGE = 100;
 
-/** 그 주(월 00:00 ~ 다음 월 00:00 KST)의 내 세션. 취소는 뺀다 */
-export function weekSessionsQuery(monday: string) {
-  const from = new Date(dayStartMs(monday)).toISOString();
-  const to = new Date(dayStartMs(addDays(monday, 7))).toISOString();
+/**
+ * 대상 멘토의 달력 6주 세션 (운영진은 A106). 취소는 빼고, 100건씩 끝까지 받는다.
+ * `month`는 키, 기간은 달력에 보이는 첫날 ~ 마지막 날 다음 날 00:00 (KST)
+ */
+export function monthSessionsQueryOf(month: string, mentorId: string | null) {
+  const days = monthGridDays(month);
+  const from = new Date(dayStartMs(days[0] ?? `${month}-01`)).toISOString();
+  const to = new Date(dayStartMs(addDays(days.at(-1) ?? `${month}-01`, 1))).toISOString();
   return queryOptions({
-    queryKey: scheduleKeys.weekSessions(monday),
-    queryFn: () =>
-      unwrap(
-        api.GET("/api/v1/me/mentor-sessions", {
-          params: {
-            query: {
-              from,
-              to,
-              status: WEEK_STATUSES,
-              order: "asc",
-              limit: 100,
-              offset: 0,
-            },
-          },
-        }),
-      ),
+    queryKey: (mentorId
+      ? scheduleKeys.monthSessionsOf(mentorId, month)
+      : scheduleKeys.monthSessions(month)) as readonly string[],
+    queryFn: async () => {
+      const items = [];
+      for (let offset = 0; ; offset += PAGE) {
+        const query = { from, to, status: SESSION_STATUSES, order: "asc" as const, limit: PAGE, offset };
+        const page = mentorId
+          ? await unwrap(
+              api.GET("/api/v1/admin/mentors/{mentor_id}/sessions", {
+                params: { path: { mentor_id: mentorId }, query },
+              }),
+            )
+          : await unwrap(api.GET("/api/v1/me/mentor-sessions", { params: { query } }));
+        items.push(...page.items);
+        if (items.length >= page.total || page.items.length === 0) return { items };
+      }
+    },
+  });
+}
+
+/** 달력 참고용 휴일 (A107): 법정공휴일 + 추가 휴일. 신청 가능 시간과는 무관 */
+export function holidaysQuery(from: string, to: string) {
+  return queryOptions({
+    queryKey: scheduleKeys.holidays(from, to),
+    queryFn: () => unwrap(api.GET("/api/v1/mentoring/holidays", { params: { query: { from, to } } })),
+    staleTime: 60 * 60_000,
   });
 }
 

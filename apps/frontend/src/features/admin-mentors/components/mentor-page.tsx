@@ -11,7 +11,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { kstDateKey } from "@/features/apply/slots";
 import { assignmentPeriod } from "@/features/mentor-profile/labels";
 import { SchedulePage } from "@/features/mentor-schedule/components/schedule-page";
-import { weekStart } from "@/features/mentor-schedule/schedule";
+import { monthOf } from "@/features/mentor-schedule/schedule";
 import { ScheduleScopeContext } from "@/features/mentor-schedule/scope";
 import { hasPermission, staffAccessQuery } from "@/features/staff/api";
 import { cn } from "@/lib/utils";
@@ -45,14 +45,14 @@ export function MentorPage({
   mentorId,
   tab,
   assignment,
-  week,
+  month,
 }: {
   mentorId: string;
   tab: MentorTab;
   /** 배정 패널: 배정 id 또는 new (F85) */
   assignment?: string;
   /** 일정 탭의 주(그 주의 아무 날) */
-  week?: string;
+  month?: string;
 }) {
   const mentor = useQuery(mentorQuery(mentorId));
   const access = useQuery(staffAccessQuery);
@@ -110,7 +110,7 @@ export function MentorPage({
           ) : tab === "contracts" ? (
             <ContractsTab mentorId={mentorId} />
           ) : tab === "schedule" ? (
-            <ScheduleTab mentor={m} week={week} canManage={canManage} />
+            <ScheduleTab mentor={m} month={month} canManage={canManage} />
           ) : (
             <AssignmentsTab
               mentor={m}
@@ -317,28 +317,26 @@ function ContractsTab({ mentorId }: { mentorId: string }) {
 }
 
 /** 일정 탭 (F85·A106): 멘토 일정 화면(FE-11)을 운영진 API로. 바꾸려면 멘토 관리 권한 */
-function ScheduleTab({ mentor, week, canManage }: { mentor: MentorItem; week?: string; canManage: boolean }) {
+function ScheduleTab({ mentor, month, canManage }: { mentor: MentorItem; month?: string; canManage: boolean }) {
   const navigate = useNavigate();
   const [today] = useState(() => kstDateKey(new Date()));
-  const monday = weekStart(week ?? today);
+  const shown = month ?? monthOf(today);
   const scope = useMemo(
     () => ({
       mentorId: mentor.id,
       readOnly: !canManage,
-      onWeek: (next: string) =>
+      onMonth: (next: string) =>
         void navigate({
           to: "/admin/educators/mentors/$mentorId",
           params: { mentorId: mentor.id },
-          search: { tab: "schedule", week: next },
+          search: { tab: "schedule", month: next },
         }),
     }),
     [mentor.id, navigate, canManage],
   );
   return (
     <ScheduleScopeContext.Provider value={scope}>
-      <fieldset disabled={!canManage} className="contents">
-        <SchedulePage monday={monday} embedded />
-      </fieldset>
+      <SchedulePage month={shown} embedded />
     </ScheduleScopeContext.Provider>
   );
 }

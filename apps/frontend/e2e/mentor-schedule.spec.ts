@@ -15,7 +15,7 @@ test.describe("멘토 일정", () => {
   // 시각 표시는 단위 테스트가 시간대별로 확인한다
   test.use({ timezoneId: "Asia/Seoul" });
 
-  test("휴대폰: 하루 보기에서 요일 칩으로 날짜를 바꾸고 신청 받기를 확인 후 끈다 (F51·F52)", async ({ page }) => {
+  test("휴대폰: 작은 달력에서 날짜를 고르고 신청 받기를 확인 후 끈다 (F51·F89)", async ({ page }) => {
     await page.clock.setFixedTime(new Date("2026-11-24T03:00:00Z"));
     await page.setViewportSize({ width: 390, height: 844 });
     let accepting = true;
@@ -56,6 +56,7 @@ test.describe("멘토 일정", () => {
       accepting = (route.request().postDataJSON() as { accepting_requests: boolean }).accepting_requests;
       return route.fulfill({ json: { mentor_id: "m1", accepting_requests: accepting, canceled_pending_requests: 1 } });
     });
+    await page.route("**/api/v1/mentoring/holidays**", (route) => route.fulfill({ json: { items: [] } }));
     await page.route("**/api/v1/me/mentor-schedule", (route) =>
       route.fulfill({
         json: {
@@ -84,18 +85,20 @@ test.describe("멘토 일정", () => {
     await page.getByRole("navigation", { name: "하단 메뉴" }).getByRole("button", { name: "더보기" }).click();
     await page.getByRole("dialog", { name: "더보기" }).getByRole("link", { name: "일정" }).click();
     await expect(page).toHaveURL(/\/mentor\/schedule$/);
-    const tuesday = page.getByRole("group", { name: "11월 24일 (화)" });
-    await expect(tuesday.getByText("본업 · 매주")).toBeVisible();
-    await page.getByRole("tab", { name: "11월 25일 (수)" }).click();
-    await expect(page.getByRole("group", { name: "11월 25일 (수)" })).toBeVisible();
-    await expect(tuesday).toBeHidden();
+    // 휴대폰은 작은 달력 + 고른 날 목록 (F89)
+    const picked = page.getByRole("region", { name: "고른 날 일정" });
+    await expect(picked.getByText("11/24(화) · 1건")).toBeVisible();
+    await expect(picked.getByRole("button", { name: "본업 · 매주 9:00" })).toBeVisible();
+    await page.getByRole("button", { name: "11월 29일 (일)" }).click();
+    await expect(picked.getByText("일정이 없어요.")).toBeVisible();
+    await expect(page.getByRole("region", { name: "월 달력" })).toBeHidden();
 
     await page.getByRole("switch", { name: "신청 받기" }).click();
     await page.getByRole("dialog", { name: "신청 받기를 끌까요?" }).getByRole("button", { name: "끄기" }).click();
     await expect(page.getByText("신청 받기를 껐어요. 대기 중인 신청 1건을 취소했어요")).toBeVisible();
   });
 
-  test("데스크톱: 불가 시간 추가 → 충돌 확인 → 그래도 저장 (F53)", async ({ page }) => {
+  test("데스크톱: 개인 일정 추가 패널 → 충돌 확인 → 그래도 저장 (F53·F89)", async ({ page }) => {
     await page.clock.setFixedTime(new Date("2026-11-24T03:00:00Z"));
     await page.setViewportSize({ width: 1440, height: 900 });
     const confirms: (string | null)[] = [];
@@ -165,6 +168,7 @@ test.describe("멘토 일정", () => {
         },
       });
     });
+    await page.route("**/api/v1/mentoring/holidays**", (route) => route.fulfill({ json: { items: [] } }));
     await page.route("**/api/v1/me/mentor-schedule", (route) =>
       route.fulfill({ json: { mentor_id: "m1", accepting_requests: true, unavailable_periods: [] } }),
     );

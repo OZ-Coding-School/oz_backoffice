@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 
@@ -42,7 +42,7 @@ function mockSchedule(accepting = true) {
       const params = new URL(request.url).searchParams;
       sessionQueries.push(params);
       const items =
-        params.get("from") === "2026-11-22T15:00:00.000Z"
+        params.get("from") === "2026-10-25T15:00:00.000Z"
           ? [makeSession({ starts_at: "2026-11-24T10:00:00Z", ends_at: "2026-11-24T11:00:00Z" })]
           : [];
       return HttpResponse.json({
@@ -52,6 +52,12 @@ function mockSchedule(accepting = true) {
         offset: 0,
         counts: { SCHEDULED: 1, IN_PROGRESS: 0, COMPLETED: 0, NO_SHOW: 0, CANCELED: 0 },
         view_counts: { upcoming: 1, record_missing: 0, past: 0, all: 1 },
+      });
+    }),
+    http.get(apiUrl("/api/v1/mentoring/holidays"), ({ request }) => {
+      const from = new URL(request.url).searchParams.get("from");
+      return HttpResponse.json({
+        items: from === "2026-11-30" ? [{ holiday_date: "2026-12-25", name: "기독탄신일", source: "PUBLIC" }] : [],
       });
     }),
   );
@@ -67,19 +73,18 @@ beforeEach(() => {
 
 afterEach(() => vi.useRealTimers());
 
-describe("멘토 일정 (F51·F52)", () => {
-  it("이번 주 시간표에 매주 불가 시간 회차와 내 세션을, 목록에 등록한 불가 시간을 보여 준다", async () => {
+describe("멘토 일정 월 달력 (F51·F89)", () => {
+  it("이번 달 달력에 반복 개인 일정을 이어진 막대로, 세션을 그날에, 목록에 등록한 개인 일정을 보여 준다", async () => {
     const queries = mockSchedule();
     await renderRoute("/mentor/schedule");
-    expect(await screen.findByRole("heading", { name: "11월 23일 ~ 29일" })).toBeInTheDocument();
-    expect(queries[0]?.get("from")).toBe("2026-11-22T15:00:00.000Z");
-    expect(queries[0]?.get("to")).toBe("2026-11-29T15:00:00.000Z");
+    expect(await screen.findByRole("heading", { name: "2026년 11월" })).toBeInTheDocument();
+    expect(queries[0]?.get("from")).toBe("2026-10-25T15:00:00.000Z");
+    expect(queries[0]?.get("to")).toBe("2026-12-06T15:00:00.000Z");
 
-    const monday = screen.getByRole("group", { name: "11월 23일 (월)" });
-    expect(within(monday).queryByText("본업 · 매주")).not.toBeInTheDocument();
-    const tuesday = screen.getByRole("group", { name: "11월 24일 (화)" });
-    expect(within(tuesday).getByText("본업 · 매주")).toBeInTheDocument();
-    expect(await within(tuesday).findByRole("link", { name: "가수강 · 1:1 19:00–20:00" })).toHaveAttribute(
+    const calendar = screen.getByRole("region", { name: "월 달력" });
+    // 매주 화~금 → 한 주에 막대 하나 (11/3 주 ~ 12/1 주 다섯 줄, 12/31까지)
+    expect(within(calendar).getAllByRole("button", { name: "본업 · 매주 9:00" })).toHaveLength(5);
+    expect(await within(calendar).findByRole("link", { name: "가수강 · 1:1 19:00" })).toHaveAttribute(
       "href",
       "/mentor/sessions/s1",
     );
@@ -87,30 +92,44 @@ describe("멘토 일정 (F51·F52)", () => {
     const list = screen.getByRole("region", { name: "개인 일정" });
     expect(within(list).getByText("매주 화·수·목·금 09:00~12:00 · 12/31까지")).toBeInTheDocument();
     expect(within(list).getByText("회사 근무")).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "11월 24일 (화)" })).toHaveAttribute("aria-selected", "true");
+    // 휴대폰 작은 달력: 오늘이 골라져 있고 그날 목록
+    expect(screen.getByRole("button", { name: "11월 24일 (화)" })).toHaveAttribute("aria-pressed", "true");
+    expect(
+      within(screen.getByRole("region", { name: "고른 날 일정" })).getByText("11/24(화) · 2건"),
+    ).toBeInTheDocument();
   });
 
-  it("다음 주로 넘기면 그 주를 부른다", async () => {
+  it("다음 달로 넘기면 그 달을 부르고 공휴일을 참고로 보여 준다. [오늘]은 이번 달로", async () => {
     const queries = mockSchedule();
     const { router } = await renderRoute("/mentor/schedule");
-    await userEvent.setup().click(await screen.findByRole("button", { name: "다음 주" }));
-    await waitFor(() => expect(router.state.location.search).toEqual({ week: "2026-11-30" }));
-    expect(await screen.findByRole("heading", { name: "11월 30일 ~ 12월 6일" })).toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "다음 달" }));
+    await waitFor(() => expect(router.state.location.search).toEqual({ month: "2026-12" }));
+    expect(await screen.findByRole("heading", { name: "2026년 12월" })).toBeInTheDocument();
     expect(queries.at(-1)?.get("from")).toBe("2026-11-29T15:00:00.000Z");
-    // [오늘]은 이번 주로 돌아온다 (F88)
-    await userEvent.setup().click(screen.getByRole("button", { name: "오늘" }));
-    await waitFor(() => expect(router.state.location.search).toEqual({ week: "2026-11-23" }));
+    const christmas = screen.getByRole("group", { name: "12월 25일 (금)" });
+    expect(await within(christmas).findByText("기독탄신일")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "오늘" }));
+    await waitFor(() => expect(router.state.location.search).toEqual({ month: "2026-11" }));
     expect(screen.getByRole("button", { name: "오늘" })).toBeDisabled();
   });
 
-  it("시간표 빈 칸을 누르면 그 날짜·시각으로 추가 창이 열린다 (F88)", async () => {
+  it("달력의 개인 일정을 누르면 상세 패널이 열리고, [수정]은 같은 패널에서 고친다", async () => {
     mockSchedule();
     await renderRoute("/mentor/schedule");
-    const thursday = await screen.findByRole("group", { name: "11월 26일 (목)" });
-    // 한 시간 48px: 15시 칸 (jsdom은 칸 위치가 0)
-    fireEvent.click(thursday, { clientY: 15 * 48 + 5 });
-    const dialog = await screen.findByRole("dialog", { name: "개인 일정 추가" });
-    expect(within(dialog).getByText("11/26(목) 15:00–16:00")).toBeInTheDocument();
+    const user = userEvent.setup();
+    const calendar = await screen.findByRole("region", { name: "월 달력" });
+    const [bar] = within(calendar).getAllByRole("button", { name: "본업 · 매주 9:00" });
+    await user.click(bar!);
+    const panel = await screen.findByRole("dialog", { name: "본업" });
+    expect(within(panel).getByText("매주 화·수·목·금")).toBeInTheDocument();
+    expect(within(panel).getByText("2026.11.03 ~ 2026.12.31")).toBeInTheDocument();
+    await user.click(within(panel).getByRole("button", { name: "수정" }));
+    expect(await within(panel).findByText("수정 중")).toBeInTheDocument();
+    expect(within(panel).getByLabelText("반복 종료 (선택)")).toHaveValue("2026-12-31");
+    await user.click(within(panel).getByRole("button", { name: "취소" }));
+    expect(await within(panel).findByRole("button", { name: "수정" })).toBeInTheDocument();
   });
 
   it("신청 받기를 끌 때는 확인 창 뒤에 끄고 취소 건수를 알린다", async () => {
