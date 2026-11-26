@@ -2928,6 +2928,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/mentors/{mentor_id}/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Mentor Sessions For Admin
+         * @description 멘토 한 명의 세션 (A106): 일정 대리 시간표용. 멘토 본인 목록과 같은 필터(상태 여러 개·
+         *     from·to·order)와 응답. 기수 범위와 무관하게 멘토 조회 권한으로 본다.
+         */
+        get: operations["mentor_sessions_for_admin_api_v1_admin_mentors__mentor_id__sessions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/cohorts/{cohort_id}/mentoring/settlements/aggregate": {
         parameters: {
             query?: never;
@@ -6258,6 +6279,17 @@ export interface components {
         Page_MentorListItem_: {
             /** Items */
             items: components["schemas"]["MentorListItem"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** Page[SessionResponse] */
+        Page_SessionResponse_: {
+            /** Items */
+            items: components["schemas"]["SessionResponse"][];
             /** Total */
             total: number;
             /** Limit */
@@ -14397,6 +14429,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mentor_sessions_for_admin_api_v1_admin_mentors__mentor_id__sessions_get: {
+        parameters: {
+            query?: {
+                /** @description 여러 개 가능 (예: status=SCHEDULED&status=IN_PROGRESS, A70) */
+                status?: components["schemas"]["MentoringSessionStatus"][] | null;
+                from?: string | null;
+                to?: string | null;
+                /** @description 시작 시각 정렬. desc(기본) 최신순, asc 이른 순 (A75) */
+                order?: "asc" | "desc";
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                mentor_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_SessionResponse_"];
                 };
             };
             /** @description Validation Error */

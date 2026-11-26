@@ -1156,3 +1156,36 @@ async def test_team_session_lists_team_members(client: AsyncClient, settings: Se
     assert [s["id"] for s in team_only.json()["items"]] == [session["id"]]
     stranger = await client.get(mine, params={"team_id": str(new_id())}, headers=ctx["student_h"])
     assert (stranger.json()["items"], stranger.json()["total"]) == ([], 0)
+
+
+async def test_admin_mentor_sessions(client: AsyncClient, settings: Settings) -> None:
+    """운영진 멘토 일정 (A106): 멘토 한 명의 세션을 기간·상태로 본다."""
+    ctx = await _setup(client, settings)
+    request_id = (await client.post(URL, json=_body(ctx), headers=ctx["student_h"])).json()["id"]
+    approved = await client.post(
+        f"{URL}/{request_id}/approve",
+        json={"starts_at": ctx["at"].isoformat()},
+        headers=ctx["mentor_h"],
+    )
+    assert approved.status_code == 200, approved.text
+    path = f"/api/v1/admin/mentors/{ctx['mentor'].id}/sessions"
+    week = {
+        "from": (ctx["at"] - timedelta(days=1)).isoformat(),
+        "to": (ctx["at"] + timedelta(days=1)).isoformat(),
+        "status": ["SCHEDULED", "IN_PROGRESS"],
+        "order": "asc",
+    }
+    found = await client.get(path, params=week, headers=ctx["admin"])
+    assert found.status_code == 200, found.text
+    assert [s["id"] for s in found.json()["items"]] == [approved.json()["session"]["id"]]
+    assert datetime.fromisoformat(found.json()["items"][0]["starts_at"]) == ctx["at"]
+    later = await client.get(
+        path,
+        params={**week, "from": (ctx["at"] + timedelta(hours=1)).isoformat()},
+        headers=ctx["admin"],
+    )
+    assert later.json()["items"] == []
+
+    missing = await client.get(f"/api/v1/admin/mentors/{new_id()}/sessions", headers=ctx["admin"])
+    assert (missing.status_code, missing.json()["error"]["code"]) == (404, "mentor_not_found")
+    assert (await client.get(path, headers=ctx["student_h"])).status_code == 403

@@ -3,6 +3,8 @@
 수강생:  GET /me/mentoring/sessions                본인 1:1 + 소속 팀 세션
 멘토:    GET /me/mentor-sessions                    본인 세션
 참여자:  GET /mentoring/sessions/{id}               1:1 신청 수강생·팀원·담당 멘토 (아니면 404)
+운영진 멘토 일정 (educator.mentor.read, A106):
+         GET /admin/mentors/{mentor_id}/sessions     멘토 한 명의 세션 (기수 무관)
 운영진 (mentoring.request.read, 기수 범위):
          GET /admin/cohorts/{cohort_id}/mentoring/sessions?mentor_id=
          GET /admin/cohorts/{cohort_id}/mentoring/sessions/{id}
@@ -45,6 +47,10 @@ me_router = APIRouter(prefix="/me", tags=["mentoring-sessions"])
 admin_router = APIRouter(
     prefix="/admin/cohorts/{cohort_id}/mentoring/sessions", tags=["admin-mentoring-sessions"]
 )
+mentor_admin_router = APIRouter(
+    prefix="/admin/mentors/{mentor_id}/sessions", tags=["admin-mentoring-sessions"]
+)
+MentorReader = Annotated[User, Depends(require_permission("educator.mentor.read", any_scope=True))]
 
 SessionReader = Annotated[
     User, Depends(require_permission("mentoring.request.read", cohort_param="cohort_id"))
@@ -358,3 +364,19 @@ async def cohort_session(
 ) -> AdminSessionResponse:
     session = await queries.get_for_cohort(cohort_id, session_id)
     return (await presenter.admin([session]))[0]
+
+
+@mentor_admin_router.get("", response_model=Page[SessionResponse])
+async def mentor_sessions_for_admin(
+    mentor_id: uuid.UUID,
+    _: MentorReader,
+    queries: QueriesDep,
+    presenter: PresenterDep,
+    query: MemberQueryDep,
+) -> Page[SessionResponse]:
+    """멘토 한 명의 세션 (A106): 일정 대리 시간표용. 멘토 본인 목록과 같은 필터(상태 여러 개·
+    from·to·order)와 응답. 기수 범위와 무관하게 멘토 조회 권한으로 본다."""
+    items, total = await queries.list_by_mentor(mentor_id, query)
+    return Page(
+        items=await presenter.public(items), total=total, limit=query.limit, offset=query.offset
+    )
