@@ -16,6 +16,7 @@ from app.core.config import Settings
 from app.core.security import JWTService
 from tests.factories.academy import create_cohort
 from tests.factories.access import ASSISTANT, MANAGER, give_role
+from tests.factories.educator import create_mentor, create_user
 from tests.factories.staff_review import create_applicant
 
 pytestmark = pytest.mark.api
@@ -225,3 +226,43 @@ async def test_sync_unconfigured_is_503(
     response = await client.post(f"{API}/mentoring-holidays/sync", headers=admin)
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "holiday_sync_failed"
+
+
+@pytest.mark.usefixtures("http_client")
+async def test_calendar_holidays_for_any_signed_in_user(
+    client: AsyncClient, admin: dict[str, str], settings: Settings, app: FastAPI
+) -> None:
+    """달력 참고용 휴일 (A107): 멘토도 기간으로 법정공휴일·추가 휴일을 받는다."""
+    app.state.clock = FixedClock(datetime(2026, 11, 25, 3, 0, tzinfo=UTC))
+    await client.post(
+        f"{API}/mentoring-holidays",
+        json={"holiday_date": "2026-12-24", "name": "학원 휴무"},
+        headers=admin,
+    )
+    synced = await client.post(f"{API}/mentoring-holidays/sync", headers=admin)
+    assert synced.status_code == 200, synced.text
+    user = await create_user()
+    await create_mentor(user)
+    headers = bearer(settings, user)
+
+    url = "/api/v1/mentoring/holidays"
+    listed = await client.get(
+        url, params={"from": "2026-12-01", "to": "2026-12-31"}, headers=headers
+    )
+    assert listed.status_code == 200
+    assert listed.json()["items"] == [
+        {"holiday_date": "2026-12-24", "name": "학원 휴무", "source": "CUSTOM"},
+        {"holiday_date": "2026-12-25", "name": "기독탄신일", "source": "PUBLIC"},
+    ]
+
+    too_long = await client.get(
+        url, params={"from": "2026-01-01", "to": "2026-12-31"}, headers=headers
+    )
+    assert too_long.json()["error"]["code"] == "invalid_holiday_range"
+    reversed_ = await client.get(
+        url, params={"from": "2026-12-31", "to": "2026-12-01"}, headers=headers
+    )
+    assert reversed_.status_code == 422
+    assert (
+        await client.get(url, params={"from": "2026-12-01", "to": "2026-12-31"})
+    ).status_code == 401
