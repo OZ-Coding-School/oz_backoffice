@@ -1,7 +1,7 @@
 # 57. 디자인 다듬기 ⑦ 수강생 화면 (F92)
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #180
 - 관련 결정: `docs/decisions.md` F91·F92
 - 이전 기록: [56. 디자인 다듬기](56_design_refresh_settings.md)
 
