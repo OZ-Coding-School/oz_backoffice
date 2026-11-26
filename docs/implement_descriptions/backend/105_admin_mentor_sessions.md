@@ -1,7 +1,7 @@
 # 105. 운영진 멘토별 세션 조회 (BE-3y)
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 후 기록)
+- 관련 PR: #170
 - 관련 결정: `docs/decisions.md` A106 (F85)
 - 이전 기록: [104. 가입 전 멘토의 가입 연결 (BE-3x)](104_pending_mentor_signup.md)
 
