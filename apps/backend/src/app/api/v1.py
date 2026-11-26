@@ -70,6 +70,9 @@ from app.contexts.mentoring.presentation.session_router import (
     mentor_admin_router as session_mentor_admin_router,
 )
 from app.contexts.mentoring.presentation.session_router import router as session_router
+from app.contexts.mentoring.presentation.settings_router import (
+    calendar_router as mentoring_calendar_router,
+)
 from app.contexts.mentoring.presentation.settings_router import router as mentoring_settings_router
 from app.contexts.mentoring.presentation.settlement_router import (
     admin_router as settlement_admin_router,
@@ -111,6 +114,7 @@ router.include_router(contract_router)
 router.include_router(mentor_me_router)
 router.include_router(mentor_admin_router)
 router.include_router(mentoring_settings_router)
+router.include_router(mentoring_calendar_router)
 router.include_router(mentor_assignment_admin_router)
 router.include_router(mentor_assignment_me_router)
 router.include_router(mentor_schedule_me_router)

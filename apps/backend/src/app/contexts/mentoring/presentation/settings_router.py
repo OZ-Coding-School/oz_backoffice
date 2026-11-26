@@ -6,6 +6,8 @@ PATCH/DELETE     /admin/cohorts/{cohort_id}/mentoring-block-times/{id}   (기수
 GET              /admin/mentoring-holidays?year=                         (법정공휴일 + 추가 휴일)
 POST             /admin/mentoring-holidays/sync                          (올해·내년 법정공휴일, A95)
 POST / DELETE    /admin/mentoring-holidays[/{id}]                        (추가 휴일, 담당 범위 필요)
+
+GET              /mentoring/holidays?from=&to=                (로그인한 누구나, 달력 참고, A107)
 """
 
 import uuid
@@ -16,7 +18,7 @@ import httpx
 from fastapi import APIRouter, Depends, Query, Request, Response, status
 from pydantic import BaseModel, Field
 
-from app.contexts.access.presentation.dependencies import require_permission
+from app.contexts.access.presentation.dependencies import CurrentUser, require_permission
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.identity.domain.entities import User
 from app.contexts.mentoring.application.calendar import BusinessCalendar, HolidaySource
@@ -42,9 +44,13 @@ from app.core.config import Settings
 from app.core.dependencies import get_app_settings, get_clock, get_http_client
 from app.core.holidays import build_holiday_source
 from app.core.uow import UnitOfWork
-from app.shared.errors import ServiceUnavailableError
+from app.shared.errors import BusinessRuleViolation, ServiceUnavailableError
 
 router = APIRouter(prefix="/admin", tags=["admin-mentoring-settings"])
+calendar_router = APIRouter(prefix="/mentoring", tags=["mentoring-calendar"])
+
+# 달력 한 화면(6주)보다 넉넉히
+CALENDAR_MAX_DAYS = 100
 
 READ = "mentoring.settings.read"
 MANAGE = "mentoring.settings.manage"
@@ -336,3 +342,39 @@ async def create_holiday(
 async def delete_holiday(holiday_id: uuid.UUID, user: AnyManager, service: ServiceDep) -> Response:
     await service.delete_holiday(holiday_id, actor_id=user.id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+class CalendarHolidayResponse(BaseModel):
+    holiday_date: date
+    name: str
+    source: HolidaySource
+
+
+class CalendarHolidayListResponse(BaseModel):
+    items: list[CalendarHolidayResponse]
+
+
+@calendar_router.get("/holidays", response_model=CalendarHolidayListResponse)
+async def list_calendar_holidays(
+    _: CurrentUser,
+    from_: Annotated[date, Query(alias="from")],
+    to: date,
+) -> CalendarHolidayListResponse:
+    """기간 안 법정공휴일과 추가 휴일 (A107). 달력에 참고로 보여 줄 뿐 신청 가능 시간과는 무관하다.
+
+    `to`는 포함, 기간은 100일까지(넘거나 거꾸로면 422 `invalid_holiday_range`).
+    """
+    if to < from_ or (to - from_).days >= CALENDAR_MAX_DAYS:
+        raise BusinessRuleViolation(
+            f"기간은 시작일부터 {CALENDAR_MAX_DAYS}일 안이어야 합니다.",
+            code="invalid_holiday_range",
+        )
+    holidays = await BusinessCalendar(
+        TortoiseMentoringHolidayRepository(), TortoisePublicHolidayRepository()
+    ).holidays_between(from_, to)
+    return CalendarHolidayListResponse(
+        items=[
+            CalendarHolidayResponse(holiday_date=h.day, name=h.name, source=h.source)
+            for h in holidays
+        ]
+    )

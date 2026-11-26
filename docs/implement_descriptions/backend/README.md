@@ -107,3 +107,4 @@
 | 103 | [가입 전 멘토와 멘토 계약 (BE-3w)](103_pending_mentors.md) | 완료 (#164) |
 | 104 | [가입 전 멘토의 가입 연결 (BE-3x)](104_pending_mentor_signup.md) | 완료 (#165) |
 | 105 | [운영진 멘토별 세션 조회 (BE-3y)](105_admin_mentor_sessions.md) | 완료 (#170) |
+| 106 | [달력 참고용 휴일 조회 (BE-3z)](106_calendar_holidays.md) | 완료 (#172) |
