@@ -84,7 +84,7 @@ describe("멘토 일정 (F51·F52)", () => {
       "/mentor/sessions/s1",
     );
 
-    const list = screen.getByRole("region", { name: "등록한 불가 시간" });
+    const list = screen.getByRole("region", { name: "개인 일정" });
     expect(within(list).getByText("매주 화·수·목·금 09:00~12:00 · 12/31까지")).toBeInTheDocument();
     expect(within(list).getByText("회사 근무")).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "11월 24일 (화)" })).toHaveAttribute("aria-selected", "true");
@@ -109,7 +109,7 @@ describe("멘토 일정 (F51·F52)", () => {
     const thursday = await screen.findByRole("group", { name: "11월 26일 (목)" });
     // 한 시간 48px: 15시 칸 (jsdom은 칸 위치가 0)
     fireEvent.click(thursday, { clientY: 15 * 48 + 5 });
-    const dialog = await screen.findByRole("dialog", { name: "불가 시간 추가" });
+    const dialog = await screen.findByRole("dialog", { name: "개인 일정 추가" });
     expect(within(dialog).getByText("11/26(목) 15:00–16:00")).toBeInTheDocument();
   });
 

@@ -99,9 +99,9 @@ describe("강사·멘토 > 멘토 상세 > 일정 대리 (FE-18c-2)", () => {
     expect(calls).toContainEqual({ path: "sessions", body: "2026-11-22T15:00:00.000Z" });
 
     const user = userEvent.setup();
-    const list = screen.getByRole("region", { name: "등록한 불가 시간" });
+    const list = screen.getByRole("region", { name: "개인 일정" });
     await user.click(within(list).getByRole("button", { name: "본업 삭제" }));
-    const confirm = await screen.findByRole("dialog", { name: "이 불가 시간을 지울까요?" });
+    const confirm = await screen.findByRole("dialog", { name: "이 개인 일정을 지울까요?" });
     await user.click(within(confirm).getByRole("button", { name: "지우기" }));
     await waitFor(() => expect(calls).toContainEqual({ path: "delete", body: "p1" }));
 
@@ -121,7 +121,7 @@ describe("강사·멘토 > 멘토 상세 > 일정 대리 (FE-18c-2)", () => {
   it("멘토 관리 권한이 없으면 고칠 수 없다", async () => {
     mockApi(["educator.mentor.read"]);
     await renderRoute("/admin/educators/mentors/m1?tab=schedule");
-    expect(await screen.findByRole("button", { name: "불가 시간 추가" })).toBeDisabled();
+    expect(await screen.findByRole("button", { name: "개인 일정 추가" })).toBeDisabled();
     expect(await screen.findByRole("switch", { name: "신청 받기" })).toBeDisabled();
   });
 });

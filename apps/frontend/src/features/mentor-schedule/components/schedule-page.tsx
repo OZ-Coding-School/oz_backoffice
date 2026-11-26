@@ -109,7 +109,7 @@ export function SchedulePage({ monday, embedded = false }: { monday: string; emb
       ) : (
         <>
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_22.5rem] lg:items-start lg:gap-6">
-            {/* 휴대폰은 신청 받기 → 시간표 → 불가 시간, 넓은 화면은 오른쪽 열에 신청 받기·불가 시간 (F87) */}
+            {/* 휴대폰은 신청 받기 → 시간표 → 개인 일정, 넓은 화면은 오른쪽 열에 신청 받기·개인 일정 (F87) */}
             <div className="flex flex-col gap-4 max-lg:contents lg:order-2">
               <div className="max-lg:order-1">
                 <AcceptingCard accepting={schedule.data.accepting_requests} />
@@ -149,7 +149,7 @@ function dayBlocks(key: string, periods: UnavailablePeriod[], sessions: Mentorin
         blocks.push({
           id: `${p.id}-${range[0]}`,
           kind: "unavailable",
-          label: `${p.category ?? "불가 시간"} · ${repeatLabel(p)}`,
+          label: `${p.category ?? "개인 일정"} · ${repeatLabel(p)}`,
           start: seg[0],
           end: seg[1],
           period: p,
@@ -207,7 +207,7 @@ function WeekCard({
         <div className="flex items-center gap-3 text-caption text-muted-foreground max-md:order-last max-md:w-full md:ml-3">
           <span className="inline-flex items-center gap-1.5">
             <span aria-hidden className="h-3 w-1 rounded-full bg-destructive" />
-            불가 시간
+            개인 일정
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span aria-hidden className="h-3 w-1 rounded-full bg-primary" />
@@ -375,7 +375,7 @@ function Timetable({
 
 /**
  * 하루 칸. 마우스를 빈 칸에 올리면 30분 칸에 "+ 15:00"을 보여 주고, 누르면 그 날짜·시각으로 추가 창 (F88).
- * 키보드·터치는 '등록한 불가 시간'의 [+]로 추가한다.
+ * 키보드·터치는 '개인 일정'의 [+]로 추가한다.
  */
 function DayColumn({
   day,
@@ -465,7 +465,7 @@ function BlockView({ block, editor }: { block: Block; editor: Editor }) {
     "absolute inset-x-0.5 z-10 flex overflow-hidden rounded-md border-l-3 py-0.5 pr-1 pl-1.5 text-left text-caption",
     short ? "flex-row items-center gap-1" : "flex-col",
     block.kind === "unavailable"
-      ? "border-destructive bg-destructive-subtle text-destructive-text"
+      ? "border-destructive bg-[#fee2e2] text-destructive-text dark:bg-[#5a1d1d]"
       : "border-primary bg-sidebar-accent text-sidebar-accent-foreground",
   );
   const body = (
@@ -522,15 +522,15 @@ function PeriodList({ periods, editor, onAdd }: { periods: UnavailablePeriod[]; 
     >
       <div className="flex items-center gap-2">
         <h2 id="periods-title" className="flex-1 text-h3 text-foreground">
-          등록한 불가 시간
+          개인 일정
         </h2>
-        <Button variant="outline" size="sm" className="size-8 px-0" aria-label="불가 시간 추가" onClick={onAdd}>
+        <Button variant="outline" size="sm" className="size-8 px-0" aria-label="개인 일정 추가" onClick={onAdd}>
           <Plus aria-hidden />
         </Button>
       </div>
       {periods.length === 0 ? (
         <p className="text-body-sm text-muted-foreground">
-          등록한 불가 시간이 없어요. 나머지 시간은 모두 신청을 받아요.
+          등록한 개인 일정이 없어요. 나머지 시간은 모두 신청을 받아요.
         </p>
       ) : (
         <ul className="flex flex-col divide-y divide-border border-t border-border">
@@ -538,7 +538,7 @@ function PeriodList({ periods, editor, onAdd }: { periods: UnavailablePeriod[]; 
             <li key={p.id} className="flex items-start gap-2 py-3">
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="flex items-center gap-2">
-                  <span className="text-body-strong text-foreground">{p.category ?? "불가 시간"}</span>
+                  <span className="text-body-strong text-foreground">{p.category ?? "개인 일정"}</span>
                   <Badge variant="outline">{repeatLabel(p)}</Badge>
                 </span>
                 <span className="text-caption text-muted-foreground">{periodLabel(p)}</span>
@@ -550,7 +550,7 @@ function PeriodList({ periods, editor, onAdd }: { periods: UnavailablePeriod[]; 
                     variant="ghost"
                     size="sm"
                     className="size-8 px-0 text-muted-foreground hover:text-foreground"
-                    aria-label={`${p.category ?? "불가 시간"} 수정`}
+                    aria-label={`${p.category ?? "개인 일정"} 수정`}
                     onClick={() => editor.edit(p)}
                   >
                     <Pencil aria-hidden />
@@ -559,7 +559,7 @@ function PeriodList({ periods, editor, onAdd }: { periods: UnavailablePeriod[]; 
                     variant="ghost"
                     size="sm"
                     className="size-8 px-0 text-muted-foreground hover:bg-destructive-subtle hover:text-destructive-text"
-                    aria-label={`${p.category ?? "불가 시간"} 삭제`}
+                    aria-label={`${p.category ?? "개인 일정"} 삭제`}
                     onClick={() => editor.remove(p)}
                   >
                     <Trash2 aria-hidden />

@@ -96,8 +96,8 @@ describe("불가 시간 추가·수정·삭제 (F53)", () => {
     );
     await renderRoute("/mentor/schedule");
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "불가 시간 추가" }));
-    const dialog = await screen.findByRole("dialog", { name: "불가 시간 추가" });
+    await user.click(await screen.findByRole("button", { name: "개인 일정 추가" }));
+    const dialog = await screen.findByRole("dialog", { name: "개인 일정 추가" });
     await user.click(within(dialog).getByRole("radio", { name: "매주" }));
     expect(within(dialog).queryByRole("switch", { name: "하루 종일" })).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "저장" }));
@@ -136,8 +136,8 @@ describe("불가 시간 추가·수정·삭제 (F53)", () => {
     );
     await renderRoute("/mentor/schedule");
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "불가 시간 추가" }));
-    const dialog = await screen.findByRole("dialog", { name: "불가 시간 추가" });
+    await user.click(await screen.findByRole("button", { name: "개인 일정 추가" }));
+    const dialog = await screen.findByRole("dialog", { name: "개인 일정 추가" });
     await user.click(within(dialog).getByRole("switch", { name: "하루 종일" }));
     expect(within(dialog).queryByRole("combobox", { name: "시작 시각" })).not.toBeInTheDocument();
     const last = within(dialog).getByLabelText("마지막 날 (선택)");
@@ -157,7 +157,7 @@ describe("불가 시간 추가·수정·삭제 (F53)", () => {
         },
       ]),
     );
-    expect(await screen.findByText("불가 시간을 추가했어요")).toBeInTheDocument();
+    expect(await screen.findByText("개인 일정을 추가했어요")).toBeInTheDocument();
   });
 
   it("분류 '기타'는 직접 적는다", async () => {
@@ -171,8 +171,8 @@ describe("불가 시간 추가·수정·삭제 (F53)", () => {
     );
     await renderRoute("/mentor/schedule");
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "불가 시간 추가" }));
-    const dialog = await screen.findByRole("dialog", { name: "불가 시간 추가" });
+    await user.click(await screen.findByRole("button", { name: "개인 일정 추가" }));
+    const dialog = await screen.findByRole("dialog", { name: "개인 일정 추가" });
     await user.click(within(dialog).getByRole("button", { name: "기타" }));
     await user.type(within(dialog).getByRole("textbox", { name: "분류 직접 입력" }), "스터디");
     await user.click(within(dialog).getByRole("button", { name: "저장" }));
@@ -195,11 +195,11 @@ describe("불가 시간 추가·수정·삭제 (F53)", () => {
     );
     await renderRoute("/mentor/schedule");
     const user = userEvent.setup();
-    const list = await screen.findByRole("region", { name: "등록한 불가 시간" });
+    const list = await screen.findByRole("region", { name: "개인 일정" });
     expect(within(list).queryByRole("button", { name: "강의 수정" })).not.toBeInTheDocument();
 
     await user.click(within(list).getByRole("button", { name: "본업 수정" }));
-    const dialog = await screen.findByRole("dialog", { name: "불가 시간 수정" });
+    const dialog = await screen.findByRole("dialog", { name: "개인 일정 수정" });
     expect(within(dialog).getByRole("button", { name: "화" })).toHaveAttribute("aria-pressed", "true");
     expect(within(dialog).getByLabelText("반복 종료 (선택)")).toHaveValue("2026-12-31");
     await user.click(within(dialog).getByRole("button", { name: "저장" }));
@@ -210,7 +210,7 @@ describe("불가 시간 추가·수정·삭제 (F53)", () => {
     });
 
     await user.click(within(list).getByRole("button", { name: "본업 삭제" }));
-    const confirm = await screen.findByRole("dialog", { name: "이 불가 시간을 지울까요?" });
+    const confirm = await screen.findByRole("dialog", { name: "이 개인 일정을 지울까요?" });
     await user.click(within(confirm).getByRole("button", { name: "지우기" }));
     await waitFor(() => expect(deletes).toEqual(["p1"]));
   });
@@ -220,7 +220,7 @@ describe("불가 시간 추가·수정·삭제 (F53)", () => {
     await renderRoute("/mentor/schedule");
     const tuesday = await screen.findByRole("group", { name: "11월 24일 (화)" });
     await userEvent.setup().click(within(tuesday).getByRole("button", { name: "본업 · 매주 수정" }));
-    expect(await screen.findByRole("dialog", { name: "불가 시간 수정" })).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: "개인 일정 수정" })).toBeInTheDocument();
   });
 
   it("서버 오류는 문구로 안내한다", async () => {
@@ -232,8 +232,8 @@ describe("불가 시간 추가·수정·삭제 (F53)", () => {
     );
     await renderRoute("/mentor/schedule");
     const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "불가 시간 추가" }));
-    const dialog = await screen.findByRole("dialog", { name: "불가 시간 추가" });
+    await user.click(await screen.findByRole("button", { name: "개인 일정 추가" }));
+    const dialog = await screen.findByRole("dialog", { name: "개인 일정 추가" });
     await user.click(within(dialog).getByRole("button", { name: "저장" }));
     expect(
       await within(dialog).findByText("비활성 멘토는 일정을 바꿀 수 없어요. 운영진에게 문의해 주세요."),

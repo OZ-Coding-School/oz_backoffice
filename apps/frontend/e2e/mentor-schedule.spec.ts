@@ -170,8 +170,8 @@ test.describe("멘토 일정", () => {
     );
 
     await page.goto("/mentor/schedule");
-    await page.getByRole("button", { name: "불가 시간 추가" }).click();
-    const dialog = page.getByRole("dialog", { name: "불가 시간 추가" });
+    await page.getByRole("button", { name: "개인 일정 추가" }).click();
+    const dialog = page.getByRole("dialog", { name: "개인 일정 추가" });
     await dialog.getByRole("button", { name: "저장" }).click();
     const conflict = page.getByRole("dialog", { name: "겹치는 일정이 1건 있어요" });
     await expect(conflict.getByText("승인 세션 → 취소·환불")).toBeVisible();

@@ -43,12 +43,12 @@ const REPEATS = [
 const OTHER = "기타";
 
 const ERROR_MESSAGES: Record<string, string> = {
-  unavailable_period_started: "이미 시작한 한 번 불가 시간은 바꿀 수 없어요.",
+  unavailable_period_started: "이미 시작한 한 번 개인 일정은 바꿀 수 없어요.",
   invalid_unavailable_range: "시작과 종료를 다시 확인해 주세요. 한 번에 24시간까지 등록할 수 있어요.",
   invalid_slot_boundary: "시각은 정각이나 30분으로 골라 주세요.",
   invalid_repeat_rule: "반복 설정을 다시 확인해 주세요.",
   mentor_inactive: "비활성 멘토는 일정을 바꿀 수 없어요. 운영진에게 문의해 주세요.",
-  unavailable_period_not_found: "이미 지워진 불가 시간이에요. 화면을 새로 불러와 주세요.",
+  unavailable_period_not_found: "이미 지워진 개인 일정이에요. 화면을 새로 불러와 주세요.",
 };
 const FALLBACK = "저장하지 못했어요. 잠시 후 다시 시도해 주세요.";
 
@@ -112,8 +112,8 @@ export function UnavailableDialog({
         change.conflicts.length > 0
           ? `저장했어요. 겹친 일정 ${change.conflicts.length}건을 정리했어요`
           : period
-            ? "불가 시간을 고쳤어요"
-            : "불가 시간을 추가했어요",
+            ? "개인 일정을 고쳤어요"
+            : "개인 일정을 추가했어요",
       );
       close();
     } catch (e) {
@@ -131,9 +131,9 @@ export function UnavailableDialog({
         <DialogContent className={SHEET}>
           <div className="flex items-center gap-1.5 pr-8">
             <DialogTitle className="text-h2 text-foreground">
-              {period ? "불가 시간 수정" : "불가 시간 추가"}
+              {period ? "개인 일정 수정" : "개인 일정 추가"}
             </DialogTitle>
-            <HelpTip label="불가 시간">
+            <HelpTip label="개인 일정">
               등록한 시간에는 수강생이 신청할 수 없어요. 이미 받은 신청·세션과 겹치면 저장 전에 알려 드려요.
             </HelpTip>
           </div>
@@ -488,7 +488,7 @@ export function DeleteUnavailableDialog({
     setError(null);
     try {
       await remove.mutateAsync(period.id);
-      toast.success("불가 시간을 지웠어요");
+      toast.success("개인 일정을 지웠어요");
       onClose();
     } catch (e) {
       const code = e instanceof ApiError ? e.code : undefined;
@@ -506,9 +506,9 @@ export function DeleteUnavailableDialog({
       }}
     >
       <DialogContent className="flex max-w-110 flex-col gap-4 p-6">
-        <DialogTitle className="text-h2 text-foreground">이 불가 시간을 지울까요?</DialogTitle>
+        <DialogTitle className="text-h2 text-foreground">이 개인 일정을 지울까요?</DialogTitle>
         <DialogDescription className="text-body text-muted-foreground">
-          {period ? `${period.category ?? "불가 시간"} · ${periodLabel(period)}` : ""}
+          {period ? `${period.category ?? "개인 일정"} · ${periodLabel(period)}` : ""}
           <br />
           지우면 이 시간에도 수강생이 신청할 수 있어요.
         </DialogDescription>
