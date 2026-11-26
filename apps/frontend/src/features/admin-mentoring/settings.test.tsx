@@ -127,11 +127,11 @@ describe("멘토링 > 멘토링 설정 (FE-19a)", () => {
     const { router } = await renderRoute("/admin/mentoring/settings");
     await waitFor(() => expect(router.state.location.pathname).toBe("/admin/cohorts/c12/mentoring/settings"));
     expect(await screen.findByRole("heading", { level: 1, name: "멘토링 설정" })).toBeInTheDocument();
-    expect(screen.getByText("백엔드 부트캠프 12기 · 마지막 저장 11/02 14:10")).toBeInTheDocument();
+    expect(screen.getByText("마지막 저장 11월 2일 14:10")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "현재 기수" })).toHaveTextContent("백엔드 부트캠프 12기");
 
-    const save = screen.getByRole("button", { name: "저장" });
-    expect(save).toBeDisabled();
+    // 바뀐 것이 없으면 저장 막대가 없다
+    expect(screen.queryByRole("button", { name: "저장" })).not.toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "60분" })).toBeChecked();
     expect(screen.getByLabelText("기본 지급 · 1:1")).toHaveValue("4");
     expect(screen.getByRole("switch", { name: "주말·공휴일 운영" })).not.toBeChecked();
@@ -142,7 +142,8 @@ describe("멘토링 > 멘토링 설정 (FE-19a)", () => {
     await user.clear(grant);
     await user.type(grant, "8");
     await user.click(screen.getByRole("switch", { name: "주말·공휴일 운영" }));
-    await user.click(save);
+    expect(screen.getByText("저장하지 않은 변경이 있어요")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "저장" }));
     await waitFor(() => expect(calls).toHaveLength(1));
     expect(calls[0]?.body).toEqual({
       allow_1_on_1: true,
@@ -156,7 +157,7 @@ describe("멘토링 > 멘토링 설정 (FE-19a)", () => {
       weekend_hours: { start: "10:00", end: "18:00" },
     });
     expect(await screen.findByText("멘토링 설정을 저장했어요")).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByRole("button", { name: "저장" })).toBeDisabled());
+    await waitFor(() => expect(screen.queryByRole("button", { name: "저장" })).not.toBeInTheDocument());
   });
 
   it("아직 저장하지 않은 기수는 기본값과 안내를 보여 주고 그대로 저장할 수 있다. 방식은 하나 이상", async () => {
@@ -202,7 +203,7 @@ describe("멘토링 > 멘토링 설정 (FE-19a)", () => {
     expect(calls.map((c) => c.method)).toEqual(["POST"]);
     await user.click(within(panel).getByRole("button", { name: "닫기" }));
 
-    await user.click(screen.getByRole("button", { name: /11\/01 ~ 12\/20 · 09:00 ~ 18:00/ }));
+    await user.click(screen.getByRole("button", { name: /11.1 ~ 12.20 · 09:00 ~ 18:00/ }));
     const view = await screen.findByRole("dialog", { name: "금지 시간대" });
     expect(within(view).getByText("2026.11.01 ~ 2026.12.20")).toBeInTheDocument();
     await user.click(within(view).getByRole("button", { name: "삭제" }));
@@ -221,7 +222,7 @@ describe("멘토링 > 멘토링 설정 (FE-19a)", () => {
     expect(screen.queryByRole("button", { name: "저장" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "금지 시간대 추가" })).not.toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "1:1 멘토링" })).toBeDisabled();
-    await userEvent.setup().click(screen.getByRole("button", { name: /11\/01 ~ 12\/20/ }));
+    await userEvent.setup().click(screen.getByRole("button", { name: /11.1 ~ 12.20/ }));
     const view = await screen.findByRole("dialog", { name: "금지 시간대" });
     expect(within(view).queryByRole("button", { name: "수정" })).not.toBeInTheDocument();
   });
