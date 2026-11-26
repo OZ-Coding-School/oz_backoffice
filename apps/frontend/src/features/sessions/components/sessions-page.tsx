@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { CalendarDays } from "lucide-react";
 import { useMemo } from "react";
 
+import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
 import { LoadMore } from "@/components/load-more";
@@ -24,12 +25,11 @@ export function SessionsPage({ tab }: { tab: SessionTab }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-h1 text-foreground">진행 기록</h1>
-        <p className="text-body text-muted-foreground">
-          예정된 멘토링과 진행한 멘토링이에요. 완료한 세션은 녹화와 멘토 기록을 다시 볼 수 있어요.
-        </p>
-      </div>
+      <PageHeader
+        icon={CalendarDays}
+        title="진행 기록"
+        description="예정된 멘토링과 진행한 멘토링이에요. 완료한 세션은 녹화와 멘토 기록을 다시 볼 수 있어요."
+      />
       <nav aria-label="세션 상태" className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
         <ul className="flex min-w-max gap-1 border-b border-border">
           {SESSION_TABS.map((t) => {

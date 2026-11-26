@@ -1,8 +1,10 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { CalendarDays, Hourglass, MessageSquare, Video, type LucideIcon } from "lucide-react";
+import { CalendarDays, Hourglass, LayoutGrid, MessageSquare, Video, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 
+import { CardTitle } from "@/components/section-card";
+import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -32,10 +34,7 @@ export function StudentHome({ me }: { me: Me }) {
 
   return (
     <div className="flex flex-col gap-4 md:gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-h1 text-foreground">안녕하세요, {me.name}님</h1>
-        <p className="text-body text-muted-foreground">오늘 확인할 일을 모아 봤어요.</p>
-      </div>
+      <PageHeader icon={LayoutGrid} title={`안녕하세요, ${me.name}님`} description="오늘 확인할 일을 모아 봤어요." />
       <ul aria-label="할 일 요약" className="grid grid-cols-3 gap-2 md:gap-3">
         <li>
           <Link to="/mentoring/sessions" search={{ tab: "scheduled" }} className={SUMMARY}>
@@ -106,8 +105,10 @@ function SummaryBody({
 }) {
   return (
     <>
-      <span className="flex items-start gap-1.5 text-caption text-muted-foreground">
-        <Icon aria-hidden className="mt-px size-3.5 shrink-0" />
+      <span className="flex items-center gap-2 text-caption text-muted-foreground">
+        <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-lg bg-sidebar-accent text-sidebar-accent-foreground">
+          <Icon aria-hidden className="size-3.5" />
+        </span>
         {label}
       </span>
       <span className={cn("text-h2", value ? tone : "text-muted-foreground")}>{value ?? "-"}</span>
@@ -134,10 +135,9 @@ function MentoringCard({
       className="flex flex-col gap-4 rounded-2xl border border-border bg-card shadow-sm p-4 md:p-5"
     >
       <div className="flex items-center gap-2">
-        <CalendarDays aria-hidden className="size-4.5 text-primary-text" />
-        <h2 id="home-mentoring" className="flex-1 text-h3 text-foreground">
+        <CardTitle icon={Video} id="home-mentoring" className="flex-1">
           멘토링
-        </h2>
+        </CardTitle>
         {canApply ? (
           <Link to="/mentoring/apply" className="text-body-sm text-primary-text hover:underline">
             멘토링 신청

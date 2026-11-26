@@ -112,8 +112,10 @@ function SummaryBody({
 }) {
   return (
     <>
-      <span className="flex items-start gap-1.5 text-caption text-muted-foreground">
-        <Icon aria-hidden className="mt-px size-3.5 shrink-0" />
+      <span className="flex items-center gap-2 text-caption text-muted-foreground">
+        <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-lg bg-sidebar-accent text-sidebar-accent-foreground">
+          <Icon aria-hidden className="size-3.5" />
+        </span>
         {label}
       </span>
       <span className={cn("text-h2", value ? tone : "text-muted-foreground")}>{value ?? "-"}</span>

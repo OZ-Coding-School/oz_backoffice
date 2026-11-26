@@ -1,11 +1,12 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, FileSearch, Info, User, Users } from "lucide-react";
+import { ArrowLeft, FileSearch, FileText, Info, User, Users } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
+import { PageHeader } from "@/components/page-header";
 import { ApiError } from "@/api/errors";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
@@ -132,13 +133,11 @@ function ChangeForm({ request }: { request: MentoringRequest }) {
 
   return (
     <form onSubmit={(e) => void save(e)} className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-h1 text-foreground">신청 변경</h1>
-        <p className="text-body text-muted-foreground">
-          {request.mentor_display_name}에게 보낸 {request.team_id ? "팀" : "1:1"} 신청을 바꿔요. 저장하면 기존 신청은 새
-          신청으로 바뀌어요.
-        </p>
-      </div>
+      <PageHeader
+        icon={FileText}
+        title="신청 변경"
+        description={`${request.mentor_display_name}에게 보낸 ${request.team_id ? "팀" : "1:1"} 신청을 바꿔요. 저장하면 기존 신청은 새 신청으로 바뀌어요.`}
+      />
       {request.status === "APPROVED" ? (
         <Alert
           variant="warning"
