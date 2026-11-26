@@ -1,7 +1,7 @@
 # 54. 디자인 다듬기 ④ 회원 관리 (F92)
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #177
 - 관련 결정: `docs/decisions.md` F91·F92
 - 이전 기록: [53. 디자인 다듬기](53_design_refresh_educators.md)
 
