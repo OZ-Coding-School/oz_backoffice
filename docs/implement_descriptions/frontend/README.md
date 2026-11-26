@@ -49,4 +49,4 @@
 | 45 | [강사·멘토 > 멘토 (FE-18a)](45_admin_mentors.md) | 완료 (#162) |
 | 46 | [행정 업무 > 계약, 멘토 계약 탭·가입 전 멘토 (FE-18b)](46_admin_contracts.md) | 완료 (#166) |
 | 47 | [가입 승인 멘토 탭: 가입 전 멘토 고르기 (FE-15a 보완)](47_approval_pending_mentors.md) | 완료 (#167) |
-| 48 | [멘토 기수 배정 관리, 계약 패널 F68 정리 (FE-18c-1)](48_mentor_assignments.md) | PR 진행 중 |
+| 48 | [멘토 기수 배정 관리, 계약 패널 F68 정리 (FE-18c-1)](48_mentor_assignments.md) | 완료 (#169) |
