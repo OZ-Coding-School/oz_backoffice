@@ -451,7 +451,7 @@ describe("강사·멘토 > 멘토 (FE-18a)", () => {
       "과정백엔드 부트캠프기수12기기수 기간2026.06.02 ~ 2026.11.30기수 상태진행 중",
     );
     expect(within(sheet).getByRole("region", { name: "정산 조건" })).toHaveTextContent(
-      "실제 진행 시간단가 기준시간당단가30,000원노쇼 1건10,000원",
+      "실제 진행 시간단가 기준시간당단가30,000원노쇼 단가10,000원",
     );
     const user = userEvent.setup();
     await user.click(within(sheet).getByRole("button", { name: "수정" }));

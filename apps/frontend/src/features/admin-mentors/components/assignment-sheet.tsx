@@ -48,6 +48,7 @@ const UNITS = [
 const HELP = {
   start: "기수 기간 안의 날짜여야 해요.",
   end: "비우면 종료일 없이 이어져요. 종료일이 지나면 다음 날 00:00에 배정이 자동으로 끝나요.",
+  noShow: "수강생이 오지 않은 세션 1건마다 멘토에게 정산하는 금액이에요. 0이면 정산하지 않아요.",
   policy: "실제 진행 시간은 멘토가 기록한 진행 시간으로, 신청 시간은 수강생이 신청한 시간으로 정산해요.",
 };
 
@@ -214,7 +215,9 @@ function AssignmentView({
           </PanelRow>
           <PanelRow label="단가 기준">{UNITS.find((u) => u.value === a.pay_unit)?.label}</PanelRow>
           <PanelRow label="단가">{won(a.pay_rate)}</PanelRow>
-          <PanelRow label="노쇼 1건">{a.no_show_pay_amount > 0 ? won(a.no_show_pay_amount) : "없음"}</PanelRow>
+          <PanelRow label="노쇼 단가" help={HELP.noShow}>
+            {a.no_show_pay_amount > 0 ? won(a.no_show_pay_amount) : "없음"}
+          </PanelRow>
         </PanelSection>
         {end ? (
           <PanelSection title="종료">
@@ -359,7 +362,7 @@ function Fields({ form, id }: { form: ReturnType<typeof useForm<Values>>; id: st
           />
           {err("rate")}
         </PanelRow>
-        <PanelRow label="노쇼 1건" htmlFor={`${id}-noshow`} top={!!errors.no_show}>
+        <PanelRow label="노쇼 단가" htmlFor={`${id}-noshow`} help={HELP.noShow} top={!!errors.no_show}>
           <Input
             id={`${id}-noshow`}
             inputMode="numeric"

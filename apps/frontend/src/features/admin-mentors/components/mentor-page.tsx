@@ -1,12 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Plus } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { ErrorState } from "@/components/error-state";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { assignmentPeriod } from "@/features/mentor-profile/labels";
 import { hasPermission, staffAccessQuery } from "@/features/staff/api";
@@ -163,16 +162,20 @@ function AssignmentsTab({
   if (list.isError) return <ErrorState onRetry={() => void list.refetch()} />;
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-3">
-        <p className="flex-1 text-body text-muted-foreground">
-          {list.data.length ? `배정 ${list.data.length}건 · 활성 먼저` : "아직 배정된 기수가 없어요."}
-        </p>
-        {canAdd ? (
-          <Button size="sm" onClick={() => open("new")}>
-            배정 추가
-          </Button>
-        ) : null}
-      </div>
+      <p className="text-body text-muted-foreground">
+        {list.data.length ? `배정 ${list.data.length}건 · 활성 먼저` : "아직 배정된 기수가 없어요."}
+      </p>
+      {canAdd ? (
+        // 카드 목록 맨 위의 점선 추가 카드 (F85 보완): 목록과 같은 폭·모서리로 이어 보이게
+        <button
+          type="button"
+          onClick={() => open("new")}
+          className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-primary/40 bg-sidebar-accent/40 px-5 py-4 text-body-strong text-sidebar-accent-foreground outline-none transition-colors hover:border-primary/70 hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <Plus aria-hidden className="size-4" />
+          배정 추가
+        </button>
+      ) : null}
       {list.data.length ? (
         <ul aria-label="배정" className="flex flex-col gap-3">
           {list.data.map((a) => (
