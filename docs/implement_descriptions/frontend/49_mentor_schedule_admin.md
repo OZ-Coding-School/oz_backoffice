@@ -1,7 +1,7 @@
 # 49. 멘토 일정 대리 (FE-18c-2)
 
 - 상태: PR 진행 중
-- 관련 PR: (작성 후 기록)
+- 관련 PR: #171
 - 관련 결정: `docs/decisions.md` F85 (A37·A79·A106, F51~F53)
 - 이전 기록: [48. 멘토 기수 배정 관리 (FE-18c-1)](48_mentor_assignments.md)
 
