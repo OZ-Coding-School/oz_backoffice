@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { Inbox } from "lucide-react";
+import { CardTitle } from "@/components/section-card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
@@ -53,9 +55,9 @@ export function AcceptingCard({
       className="flex items-center gap-4 rounded-2xl border border-border bg-card shadow-sm p-4 md:p-5"
     >
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <h2 id="accepting-title" className="text-h3 text-foreground">
+        <CardTitle icon={Inbox} id="accepting-title">
           신청 받기
-        </h2>
+        </CardTitle>
         <p className="text-body-sm text-muted-foreground">{description}</p>
       </div>
       <label className="inline-flex shrink-0 items-center gap-2 text-body text-foreground">

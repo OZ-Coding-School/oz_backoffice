@@ -1,8 +1,9 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { FileText, Search } from "lucide-react";
+import { FileSignature, FileText, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
 import { LoadMore } from "@/components/load-more";
@@ -62,13 +63,12 @@ export function ContractsPage({ search }: { search: ContractsSearch }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center gap-3">
-        <div className="flex flex-1 flex-col gap-1">
-          <h1 className="text-h1 text-foreground">계약</h1>
-          <p className="text-body text-muted-foreground">멘토·강사 계약서를 등록하고 확정·해지해요.</p>
-        </div>
-        {canManage ? <Button onClick={() => go({ ...search, contract: "new" })}>계약 추가</Button> : null}
-      </div>
+      <PageHeader
+        icon={FileSignature}
+        title="계약"
+        description="멘토·강사 계약서를 등록하고 확정·해지해요."
+        actions={canManage ? <Button onClick={() => go({ ...search, contract: "new" })}>계약 추가</Button> : null}
+      />
       <div className="flex items-center gap-2">
         <Select
           value={search.status ?? ALL}
