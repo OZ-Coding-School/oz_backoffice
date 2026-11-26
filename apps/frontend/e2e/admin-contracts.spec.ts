@@ -79,13 +79,13 @@ test("행정 업무 > 계약: 멘토 계약을 추가하고 패널에서 확정 
   await expect(page.getByRole("heading", { level: 1, name: "계약" })).toBeVisible();
   await page.getByRole("button", { name: "계약 추가" }).click();
   const form = page.getByRole("form", { name: "계약 추가" });
-  await form.getByLabel("계약자 이름").fill("이멘토");
+  await form.getByLabel("계약자").fill("이멘토");
   await form.getByLabel("휴대폰").fill("010-2222-5678");
   await form.getByLabel("제목").fill("2026 데이터 멘토 계약");
   await form.getByLabel("시작일").fill("2026-12-01");
   await form.getByLabel("종료일").fill("2027-05-31");
   await expect(form.getByRole("option", { name: /김관리 \(나\)/ })).toHaveAttribute("aria-selected", "true");
-  await form.getByRole("button", { name: "저장" }).click();
+  await form.getByRole("button", { name: "추가" }).click();
   await expect(page.getByText("계약을 작성 중으로 저장했어요")).toBeVisible();
   expect(created).toMatchObject({ contractor_name: "이멘토", manager_employee_id: "e1", educator_type: "MENTOR" });
   const sheet = page.getByRole("dialog", { name: "2026 데이터 멘토 계약" });

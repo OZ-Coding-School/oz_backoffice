@@ -22,9 +22,9 @@ import {
   type Contract,
   type ContractAction,
 } from "../api";
-import { contractError, fileSize, linkedText, period, STATUS, TYPE_LABELS } from "../labels";
+import { contractError, FILE_HELP, fileSize, linkedText, MENTOR_HELP, STATUS, TYPE_LABELS } from "../labels";
 import { ContractForm } from "./contract-form";
-import { ManagerDialog, MoveDialog } from "./pickers";
+import { MoveDialog } from "./pickers";
 
 /** 계약 패널 (F83): 조회·수정(작성 중)·확정·해지·삭제, 추가는 `contractId === "new"` */
 export function ContractSheet({
@@ -44,14 +44,11 @@ export function ContractSheet({
     <Sheet open onOpenChange={(open) => (open ? undefined : onClose())}>
       <SheetContent aria-describedby={undefined} className="w-120">
         {isNew ? (
-          <>
-            <PanelHead
-              title="계약 추가"
-              description="저장하면 작성 중이에요. 확정은 저장한 뒤에 해요."
-              onClose={onClose}
-            />
-            <ContractForm onDone={(saved) => (saved ? onOpen(saved.id) : onClose())} />
-          </>
+          <ContractForm
+            title="계약 추가"
+            description="저장하면 작성 중이에요. 확정은 저장한 뒤에 해요."
+            onDone={(saved) => (saved ? onOpen(saved.id) : onClose())}
+          />
         ) : (
           <ContractView contractId={contractId} canManage={canManage} onClose={onClose} />
         )}
@@ -114,78 +111,71 @@ function ContractView({
       </>
     );
   const status = STATUS[c.status];
-  const head = (
-    <PanelHead
-      title={c.title}
-      description={`${c.contractor_name} · ${TYPE_LABELS[c.educator_type]} 계약`}
-      badges={<Badge variant={status.badge}>{status.label}</Badge>}
-      onClose={onClose}
-    />
-  );
+  const draft = c.status === "DRAFT";
+  const description = `${c.contractor_name} · ${TYPE_LABELS[c.educator_type]} 계약`;
   if (editing)
     return (
-      <>
-        {head}
-        <ContractForm contract={c} onDone={() => setEditing(false)} />
-      </>
+      <ContractForm
+        contract={c}
+        title={c.title}
+        description={description}
+        badge={<Badge variant={status.badge}>{status.label}</Badge>}
+        onDone={() => setEditing(false)}
+      />
     );
-  const draft = c.status === "DRAFT";
+  const red = "border-destructive-text text-destructive-text hover:bg-destructive-subtle hover:text-destructive-text";
   return (
     <>
-      {head}
+      <PanelHead
+        title={c.title}
+        description={description}
+        badges={<Badge variant={status.badge}>{status.label}</Badge>}
+        actions={
+          canManage ? (
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+                수정
+              </Button>
+              {draft ? (
+                <>
+                  <Button size="sm" onClick={() => setConfirming("confirm")}>
+                    확정
+                  </Button>
+                  <Button variant="outline" size="sm" className={red} onClick={() => setConfirming("delete")}>
+                    삭제
+                  </Button>
+                </>
+              ) : c.status === "ACTIVE" ? (
+                <Button variant="outline" size="sm" className={red} onClick={() => setConfirming("terminate")}>
+                  해지
+                </Button>
+              ) : null}
+            </div>
+          ) : null
+        }
+        onClose={onClose}
+      />
       <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-6">
         <PanelSection title="계약 정보">
           <PanelRow label="계약자">{c.contractor_name}</PanelRow>
           <PanelRow label="휴대폰">{maskPhone(c.contractor_phone) ?? c.contractor_phone}</PanelRow>
           <PanelRow label="이메일">{c.contractor_email ?? "—"}</PanelRow>
-          <PanelRow label="기간">{period(c)}</PanelRow>
+          <PanelRow label="시작일">{c.start_date.replaceAll("-", ".")}</PanelRow>
+          <PanelRow label="종료일">{c.end_date.replaceAll("-", ".")}</PanelRow>
           <PanelRow label="등록">{c.created_at ? formatKst(c.created_at, "yyyy.MM.dd") : "—"}</PanelRow>
         </PanelSection>
         <PanelSection title="계약서">
-          <FileRow contract={c} />
+          <PanelRow label="파일" help={FILE_HELP}>
+            <FileRow contract={c} />
+          </PanelRow>
         </PanelSection>
         <PanelSection title={c.educator_type === "MENTOR" ? "멘토" : "강사"}>
           <LinkRow contract={c} canMove={canManage && canPickMentor} onMove={() => setPicker("mentor")} />
         </PanelSection>
-        <PanelSection title="담당 직원">
-          <div className="flex items-center gap-2">
-            <span className="min-w-0 flex-1 truncate text-body-strong text-foreground">{c.manager_name ?? "—"}</span>
-            {canManage ? (
-              <Button variant="outline" size="sm" onClick={() => setPicker("manager")}>
-                변경
-              </Button>
-            ) : null}
-          </div>
+        <PanelSection title="담당">
+          <PanelRow label="담당 직원">{c.manager_name ?? "—"}</PanelRow>
         </PanelSection>
       </div>
-      {canManage && (draft || c.status === "ACTIVE") ? (
-        <div className="flex gap-2 border-t border-border px-6 py-3">
-          {draft ? (
-            <>
-              <Button
-                variant="outline"
-                className="border-destructive-text text-destructive-text hover:bg-destructive-subtle hover:text-destructive-text"
-                onClick={() => setConfirming("delete")}
-              >
-                삭제
-              </Button>
-              <span className="flex-1" />
-              <Button variant="outline" onClick={() => setEditing(true)}>
-                수정
-              </Button>
-              <Button onClick={() => setConfirming("confirm")}>확정</Button>
-            </>
-          ) : (
-            <Button
-              variant="outline"
-              className="border-destructive-text text-destructive-text hover:bg-destructive-subtle hover:text-destructive-text"
-              onClick={() => setConfirming("terminate")}
-            >
-              해지
-            </Button>
-          )}
-        </div>
-      ) : null}
       {confirming ? (
         <ActionDialog
           contract={c}
@@ -194,7 +184,6 @@ function ContractView({
           onCancel={() => setConfirming(null)}
         />
       ) : null}
-      {picker === "manager" ? <ManagerDialog contract={c} onClose={() => setPicker(null)} /> : null}
       {picker === "mentor" ? <MoveDialog contract={c} onClose={() => setPicker(null)} /> : null}
     </>
   );
@@ -218,7 +207,7 @@ function FileRow({ contract: c }: { contract: Contract }) {
     <div className="flex items-center gap-3">
       <div className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-body-strong text-foreground">{file.file_name}</span>
-        <span className="text-caption text-muted-foreground">
+        <span className="text-caption font-normal text-muted-foreground">
           {fileSize(file.file_size)}
           {file.created_at ? ` · ${formatKst(file.created_at, "yyyy.MM.dd")} 올림` : ""}
         </span>
@@ -234,14 +223,14 @@ function LinkRow({ contract: c, canMove, onMove }: { contract: Contract; canMove
   const linked = linkedText(c);
   if (c.educator_type === "INSTRUCTOR")
     return (
-      <p className="text-body text-muted-foreground">
-        {linked.muted ? "연결된 강사가 없어요. 강사 연결은 강사 화면에서 할 수 있게 돼요." : linked.text}
-      </p>
+      <PanelRow label="강사" help="강사 연결은 강사 화면을 만들 때 더해요.">
+        <span className={linked.muted ? "font-normal text-muted-foreground" : ""}>{linked.text}</span>
+      </PanelRow>
     );
   return (
-    <div className="flex flex-col gap-2">
+    <PanelRow label="멘토" help={MENTOR_HELP}>
       <div className="flex items-center gap-2">
-        <span className="min-w-0 flex-1 truncate text-body-strong text-foreground">{linked.text}</span>
+        <span className="min-w-0 flex-1 truncate">{linked.text}</span>
         {c.mentor_id ? (
           <Button variant="outline" size="sm" asChild>
             <Link
@@ -255,14 +244,11 @@ function LinkRow({ contract: c, canMove, onMove }: { contract: Contract; canMove
         ) : null}
         {canMove && c.mentor_id ? (
           <Button variant="outline" size="sm" onClick={onMove}>
-            다른 멘토로 옮기기
+            옮기기
           </Button>
         ) : null}
       </div>
-      <p className="text-caption text-muted-foreground">
-        잘못 만든 계약은 다른 멘토로 옮길 수 있어요. 연결 해제는 없어요.
-      </p>
-    </div>
+    </PanelRow>
   );
 }
 
