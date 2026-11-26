@@ -10,11 +10,13 @@ import {
   Network,
   LayoutGrid,
   Settings2,
+  SlidersHorizontal,
   ShieldCheck,
   UserCheck,
   UserRound,
   UserRoundCog,
   Users,
+  Video,
   type LucideIcon,
 } from "lucide-react";
 
@@ -28,6 +30,8 @@ export interface StaffNavItem {
   permissions?: string[];
   /** 메뉴 배지 (대기 건수) */
   badge?: "approvals";
+  /** 기수 단위 화면처럼 `to`와 주소가 다를 때 이 메뉴로 볼 주소 (F90) */
+  match?: RegExp;
 }
 
 export interface StaffModule {
@@ -82,6 +86,22 @@ const MODULES: StaffModule[] = [
     ],
   },
 
+  {
+    key: "mentoring",
+    label: "멘토링",
+    description: "기수 단위",
+    icon: Video,
+    // F90: 기수 단위 화면은 `/admin/cohorts/{id}/mentoring/…`. 메뉴 주소는 현재 기수로 보낸다
+    items: [
+      {
+        to: "/admin/mentoring/settings",
+        label: "멘토링 설정",
+        icon: SlidersHorizontal,
+        permissions: ["mentoring.settings.read"],
+        match: /^\/admin\/cohorts\/[^/]+\/mentoring\/settings(\/|$)/,
+      },
+    ],
+  },
   {
     key: "educators",
     label: "강사·멘토",
@@ -205,7 +225,7 @@ export function currentStaffNav(
   let best: { module: StaffModule; item: StaffNavItem } | undefined;
   for (const module of modules)
     for (const item of module.items) {
-      const match = pathname === item.to || pathname.startsWith(`${item.to}/`);
+      const match = pathname === item.to || pathname.startsWith(`${item.to}/`) || !!item.match?.test(pathname);
       if (match && (!best || item.to.length > best.item.to.length)) best = { module, item };
     }
   return best;
