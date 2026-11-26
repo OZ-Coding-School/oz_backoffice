@@ -49,6 +49,22 @@ interface Block {
   end: number;
   sessionId?: string;
   period?: UnavailablePeriod;
+  /** 같은 반복 일정이 앞(뒤) 날에도 같은 시각이면 이어 그린다 (F88) */
+  joinLeft?: boolean;
+  joinRight?: boolean;
+}
+
+/** 이웃한 날의 같은 반복 일정·같은 시각 블록끼리 이어 붙일 표시 (넓은 화면 주간 보기) */
+function linkRepeats(columns: Block[][]): Block[][] {
+  const same = (a: Block, b: Block) =>
+    !!a.period && a.period.repeat !== "ONCE" && a.period.id === b.period?.id && a.start === b.start && a.end === b.end;
+  return columns.map((blocks, i) =>
+    blocks.map((b) => ({
+      ...b,
+      joinLeft: (columns[i - 1] ?? []).some((o) => same(b, o)),
+      joinRight: (columns[i + 1] ?? []).some((o) => same(b, o)),
+    })),
+  );
 }
 
 /** 추가·수정·삭제 창 열기 (F53·F88) */
@@ -265,7 +281,7 @@ function WeekCard({
         selected={selected}
         today={today}
         now={now}
-        columns={days.map((key) => dayBlocks(key, periods, sessions))}
+        columns={linkRepeats(days.map((key) => dayBlocks(key, periods, sessions)))}
         editor={editor}
       />
     </section>
@@ -467,12 +483,15 @@ function BlockView({ block, editor }: { block: Block; editor: Editor }) {
     block.kind === "unavailable"
       ? "border-destructive bg-[#fee2e2] text-destructive-text dark:bg-[#5a1d1d]"
       : "border-primary bg-sidebar-accent text-sidebar-accent-foreground",
+    // 이어지는 반복 일정: 칸 사이 선까지 덮고, 색 막대·글자는 첫 날에만 (휴대폰 하루 보기는 그대로)
+    block.joinLeft && "md:-left-px md:rounded-l-none md:border-l-0 md:pl-2.5",
+    block.joinRight && "md:right-0 md:rounded-r-none",
   );
   const body = (
-    <>
+    <span className={cn("contents", block.joinLeft && "md:hidden")}>
       <span className="shrink-0 truncate text-[11px] leading-4 font-semibold tracking-tight">{time}</span>
       <span className="truncate">{block.label}</span>
-    </>
+    </span>
   );
   // 운영진 일정 대리(F85)에는 세션 상세 화면이 아직 없어 블록만 보여 준다
   if (block.sessionId && scope.mentorId)
