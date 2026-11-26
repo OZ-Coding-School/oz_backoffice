@@ -203,7 +203,10 @@ function ResultCard({ request }: { request: MentoringRequest }) {
         ? "반려한 신청이에요"
         : "취소된 신청이에요";
   return (
-    <section aria-label="처리 결과" className="flex flex-col gap-3 rounded-2xl border border-border bg-card shadow-sm p-5">
+    <section
+      aria-label="처리 결과"
+      className="flex flex-col gap-3 rounded-2xl border border-border bg-card shadow-sm p-5"
+    >
       <h2 className="text-h3 text-foreground">{title}</h2>
       <dl className="flex flex-col gap-2.5">
         {rows.map(([label, value]) => (

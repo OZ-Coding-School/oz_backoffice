@@ -101,7 +101,10 @@ function Detail({ session }: { session: MentoringSession }) {
 
 function RequestInfo({ session }: { session: MentoringSession }) {
   return (
-    <section aria-label="신청 정보" className="flex flex-col gap-3 rounded-2xl border border-border bg-card shadow-sm p-5">
+    <section
+      aria-label="신청 정보"
+      className="flex flex-col gap-3 rounded-2xl border border-border bg-card shadow-sm p-5"
+    >
       <h2 className="text-h3 text-foreground">신청 정보</h2>
       <dl className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-x-4 gap-y-2 text-body">
         <dt className="text-caption text-muted-foreground">신청 시간</dt>
@@ -139,7 +142,10 @@ function NoteCard({ sessionId }: { sessionId: string }) {
     }
   };
   return (
-    <section aria-labelledby="note-title" className="flex flex-col gap-3 rounded-2xl border border-border bg-card shadow-sm p-5">
+    <section
+      aria-labelledby="note-title"
+      className="flex flex-col gap-3 rounded-2xl border border-border bg-card shadow-sm p-5"
+    >
       <div className="flex items-center gap-2">
         <h2 id="note-title" className="flex-1 text-h3 text-foreground">
           내부 메모

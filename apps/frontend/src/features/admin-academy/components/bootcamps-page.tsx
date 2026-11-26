@@ -51,7 +51,10 @@ export function BootcampsPage({ search }: { search: BootcampsSearch }) {
         <EmptyState icon={GraduationCap} title="과정이 없어요" description="명단 동기화가 과정을 만들어요." />
       ) : (
         <div className="grid grid-cols-[280px_minmax(0,1fr)] items-start gap-6">
-          <nav aria-label="과정" className="flex flex-col gap-0.5 rounded-2xl border border-border bg-card shadow-sm p-2">
+          <nav
+            aria-label="과정"
+            className="flex flex-col gap-0.5 rounded-2xl border border-border bg-card shadow-sm p-2"
+          >
             <span className="px-2 py-1 text-caption text-muted-foreground">과정 {ordered.length}개</span>
             {ordered.map((b) => (
               <BootcampItem key={b.id} bootcamp={b} selected={b.id === selected.id} />
@@ -143,7 +146,11 @@ function CohortsPanel({
       ) : visible.length === 0 ? (
         <EmptyState icon={GraduationCap} title="기수가 없어요" />
       ) : (
-        <div role="table" aria-label="기수" className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+        <div
+          role="table"
+          aria-label="기수"
+          className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
+        >
           <div role="row" className={cn(COLUMNS, "bg-muted px-4 py-2.5 text-caption text-muted-foreground")}>
             {["기수", "기간", "상태", "HRD 회차", "디스코드 서버"].map((h) => (
               <span key={h} role="columnheader">

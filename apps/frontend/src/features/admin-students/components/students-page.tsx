@@ -249,7 +249,11 @@ function CohortStudents({
           {...(search.q ? { description: "이름·휴대폰·이메일을 다시 확인해 주세요." } : {})}
         />
       ) : (
-        <div role="table" aria-label="수강생" className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+        <div
+          role="table"
+          aria-label="수강생"
+          className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
+        >
           <div role="row" className={cn(COLUMNS, "bg-muted px-4 py-2.5 text-caption text-muted-foreground")}>
             {["이름", "휴대폰", "이메일", "가입", "수강 상태"].map((h) => (
               <span key={h} role="columnheader">

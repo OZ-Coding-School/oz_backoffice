@@ -184,7 +184,10 @@ function Fact({
 /** 멘토 기록 (A53): 기록이 있을 때만 전체 폭 (F34) */
 function MentorRecord({ session, recordedAt }: { session: MentoringSession; recordedAt: string }) {
   return (
-    <section aria-labelledby="mentor-record" className="flex flex-col rounded-2xl border border-border bg-card shadow-sm">
+    <section
+      aria-labelledby="mentor-record"
+      className="flex flex-col rounded-2xl border border-border bg-card shadow-sm"
+    >
       <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-4 md:px-5">
         <h2 id="mentor-record" className="text-h3 text-foreground">
           멘토 기록

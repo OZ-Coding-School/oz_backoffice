@@ -69,7 +69,10 @@ function Detail({ settlement: s }: { settlement: SettlementDetail }) {
       </header>
       <dl className="grid gap-2.5 md:grid-cols-3 md:gap-4">
         {stats.map((stat) => (
-          <div key={stat.label} className="flex flex-col gap-1 rounded-2xl border border-border bg-card shadow-sm p-4 md:p-5">
+          <div
+            key={stat.label}
+            className="flex flex-col gap-1 rounded-2xl border border-border bg-card shadow-sm p-4 md:p-5"
+          >
             <dt className="text-caption text-muted-foreground">{stat.label}</dt>
             <dd className="text-h2 text-foreground">{stat.value}</dd>
           </div>
