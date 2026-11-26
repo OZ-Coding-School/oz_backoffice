@@ -1,7 +1,7 @@
 # 53. 디자인 다듬기 ③ 강사·멘토·행정 (F92)
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #176
 - 관련 결정: `docs/decisions.md` F91·F92
 - 이전 기록: [52. 디자인 다듬기](52_design_refresh_academy.md)
 
