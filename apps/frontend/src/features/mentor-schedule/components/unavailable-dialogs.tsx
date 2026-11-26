@@ -1,17 +1,19 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { TriangleAlert } from "lucide-react";
-import { useState } from "react";
-import { Controller, useForm, useWatch } from "react-hook-form";
+import { CalendarRange, TriangleAlert } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { Controller, useForm, useWatch, type UseFormReturn } from "react-hook-form";
 import { toast } from "sonner";
 
 import { ApiError } from "@/api/errors";
-import { FormField } from "@/components/form-field";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { HelpTip } from "@/components/ui/help-tip";
 import { Input } from "@/components/ui/input";
+import { Segmented } from "@/components/ui/segmented";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { formatKstDay, formatKst } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 
@@ -21,9 +23,11 @@ import {
   bodyOf,
   CATEGORY_MAX_LENGTH,
   CATEGORY_SUGGESTIONS,
+  crossesMidnight,
   emptyForm,
   formOf,
   REASON_MAX_LENGTH,
+  summaryOf,
   TIME_OPTIONS,
   unavailableSchema,
   type UnavailableForm,
@@ -32,10 +36,11 @@ import { periodLabel, type UnavailablePeriod } from "../schedule";
 
 const WEEKDAYS = ["월", "화", "수", "목", "금", "토", "일"];
 const REPEATS = [
-  ["ONCE", "한 번"],
-  ["DAILY", "매일"],
-  ["WEEKLY", "매주"],
+  { value: "ONCE", label: "한 번" },
+  { value: "DAILY", label: "매일" },
+  { value: "WEEKLY", label: "매주" },
 ] as const;
+const OTHER = "기타";
 
 const ERROR_MESSAGES: Record<string, string> = {
   unavailable_period_started: "이미 시작한 한 번 불가 시간은 바꿀 수 없어요.",
@@ -49,19 +54,32 @@ const FALLBACK = "저장하지 못했어요. 잠시 후 다시 시도해 주세�
 
 /** 휴대폰은 전체 화면 창, 그 밖은 가운데 창 (F53) */
 const SHEET =
-  "flex max-w-140 flex-col gap-5 p-6 max-md:inset-0 max-md:top-0 max-md:h-dvh max-md:max-h-none max-md:max-w-none max-md:translate-y-0 max-md:rounded-none max-md:border-0 max-md:p-4";
+  "flex max-h-[90dvh] max-w-140 flex-col gap-5 overflow-y-auto p-6 max-md:inset-0 max-md:top-0 max-md:h-dvh max-md:max-h-none max-md:max-w-none max-md:translate-y-0 max-md:rounded-none max-md:border-0 max-md:p-4";
 
-/** 불가 시간 추가·수정 창 (Figma `Modal / 불가 시간 추가`, F53·A37). 충돌이면 확인 창을 거친다 */
+const CHIP =
+  "h-8 rounded-full border px-3.5 text-label outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring";
+const CHIP_ON = "border-primary/50 bg-sidebar-accent text-body-strong text-sidebar-accent-foreground";
+const CHIP_OFF = "border-border text-foreground hover:bg-muted";
+
+type Form = UseFormReturn<UnavailableForm>;
+
+/**
+ * 불가 시간 추가·수정 창 (Figma `불가 시간 추가 · 데스크톱 (F88 개편)`, F53·F88·A37).
+ * 질문 순서: 반복 → 요일 → 시간 → 적용 기간 → 분류 → 메모, 아래에 요약 한 줄. 충돌이면 확인 창을 거친다.
+ */
 export function UnavailableDialog({
   open,
   onOpenChange,
   period,
   defaultDay,
+  defaultTime,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   period: UnavailablePeriod | null;
   defaultDay: string;
+  /** 시간표 빈 칸을 눌러 열면 그 시각 (F88) */
+  defaultTime?: string;
 }) {
   const scope = useScheduleScope();
   const save = useSaveUnavailable(period?.id ?? null, scope.mentorId);
@@ -69,15 +87,12 @@ export function UnavailableDialog({
   const [preview, setPreview] = useState<{ body: UnavailableInput; change: ScheduleChange } | null>(null);
   const form = useForm<UnavailableForm>({
     resolver: zodResolver(unavailableSchema),
-    values: period ? formOf(period) : emptyForm(defaultDay),
+    values: period ? formOf(period) : emptyForm(defaultDay, defaultTime),
   });
-  const [repeat, allDay, category, reason] = useWatch({
-    control: form.control,
-    name: ["repeat", "allDay", "category", "reason"],
-  });
+  const values = useWatch({ control: form.control }) as UnavailableForm;
   const errors = form.formState.errors;
-  const once = repeat === "ONCE";
-  const dayOnly = once && allDay;
+  const once = values.repeat === "ONCE";
+  const allDay = once && values.allDay;
 
   const close = () => {
     setServerError(null);
@@ -108,13 +123,20 @@ export function UnavailableDialog({
     }
   };
 
-  const onSubmit = form.handleSubmit((values) => send(bodyOf(values), false));
+  const onSubmit = form.handleSubmit((v) => send(bodyOf(v), false));
 
   return (
     <>
       <Dialog open={open && !preview} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
         <DialogContent className={SHEET}>
-          <DialogTitle className="text-h2 text-foreground">{period ? "불가 시간 수정" : "불가 시간 추가"}</DialogTitle>
+          <div className="flex items-center gap-1.5 pr-8">
+            <DialogTitle className="text-h2 text-foreground">
+              {period ? "불가 시간 수정" : "불가 시간 추가"}
+            </DialogTitle>
+            <HelpTip label="불가 시간">
+              등록한 시간에는 수강생이 신청할 수 없어요. 이미 받은 신청·세션과 겹치면 저장 전에 알려 드려요.
+            </HelpTip>
+          </div>
           <DialogDescription className="sr-only">신청을 받지 않을 시간을 등록해요</DialogDescription>
           <form
             id="unavailable-form"
@@ -122,45 +144,21 @@ export function UnavailableDialog({
             className="flex flex-1 flex-col gap-5"
             noValidate
           >
-            <Controller
-              control={form.control}
-              name="repeat"
-              render={({ field }) => (
-                <fieldset className="flex flex-col gap-2">
-                  <legend className="mb-2 text-label text-foreground">반복</legend>
-                  <div role="radiogroup" aria-label="반복" className="flex gap-1">
-                    {REPEATS.map(([value, label]) => (
-                      <button
-                        key={value}
-                        type="button"
-                        role="radio"
-                        aria-checked={field.value === value}
-                        onClick={() => field.onChange(value)}
-                        className={cn(
-                          "h-8 rounded-md px-3 text-label outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                          field.value === value ? "bg-accent text-accent-foreground" : "text-muted-foreground",
-                        )}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </fieldset>
-              )}
-            />
-            {once ? (
-              <label className="inline-flex w-fit items-center gap-2 text-body text-foreground">
-                <input type="checkbox" className="size-4 accent-primary" {...form.register("allDay")} />
-                하루 종일
-              </label>
-            ) : null}
-            {repeat === "WEEKLY" ? (
+            <Question label="반복">
               <Controller
                 control={form.control}
-                name="weekdays"
+                name="repeat"
                 render={({ field }) => (
-                  <fieldset className="flex flex-col gap-2">
-                    <legend className="mb-2 text-label text-foreground">요일</legend>
+                  <Segmented label="반복" value={field.value} onChange={field.onChange} options={REPEATS} />
+                )}
+              />
+            </Question>
+            {values.repeat === "WEEKLY" ? (
+              <Question label="요일" error={errors.weekdays?.message}>
+                <Controller
+                  control={form.control}
+                  name="weekdays"
+                  render={({ field }) => (
                     <div className="flex gap-1.5">
                       {WEEKDAYS.map((label, i) => {
                         const day = i + 1;
@@ -174,10 +172,8 @@ export function UnavailableDialog({
                               field.onChange(on ? field.value.filter((d) => d !== day) : [...field.value, day])
                             }
                             className={cn(
-                              "h-9 flex-1 rounded-md border text-label outline-none focus-visible:ring-2 focus-visible:ring-ring md:w-10 md:flex-none",
-                              on
-                                ? "border-primary bg-primary text-primary-foreground"
-                                : "border-border text-foreground",
+                              "size-10 rounded-full border text-label outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring max-md:size-auto max-md:aspect-square max-md:flex-1",
+                              on ? CHIP_ON : cn(CHIP_OFF, day > 5 && "text-muted-foreground"),
                             )}
                           >
                             {label}
@@ -185,66 +181,39 @@ export function UnavailableDialog({
                         );
                       })}
                     </div>
-                    {errors.weekdays?.message ? (
-                      <p className="text-caption text-destructive-text">{errors.weekdays.message}</p>
-                    ) : null}
-                  </fieldset>
-                )}
-              />
-            ) : null}
-            <DateTimeRow form={form} which="start" dayOnly={dayOnly} />
-            <DateTimeRow form={form} which="end" dayOnly={dayOnly} />
-            {!once ? (
-              <FormField label="반복 종료 (선택)" error={errors.repeatUntil?.message}>
-                {(field) => <Input type="date" {...field} {...form.register("repeatUntil")} />}
-              </FormField>
-            ) : null}
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-              <div className="flex flex-col gap-2">
-                <FormField label="분류" error={errors.category?.message}>
-                  {(field) => (
-                    <Input
-                      {...field}
-                      maxLength={CATEGORY_MAX_LENGTH}
-                      placeholder="불가 시간"
-                      {...form.register("category")}
-                    />
                   )}
-                </FormField>
-                <div className="flex flex-wrap gap-1.5" aria-label="분류 추천">
-                  {CATEGORY_SUGGESTIONS.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      aria-pressed={category === c}
-                      onClick={() => form.setValue("category", c, { shouldDirty: true })}
-                      className={cn(
-                        "h-8 rounded-md border px-3 text-label outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                        category === c
-                          ? "border-primary bg-accent text-accent-foreground"
-                          : "border-border text-foreground",
-                      )}
-                    >
-                      {c}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <FormField
-                label="메모 (선택)"
-                error={errors.reason?.message}
-                helper={`${reason.length} / ${REASON_MAX_LENGTH}`}
-              >
-                {(field) => <Input {...field} maxLength={REASON_MAX_LENGTH} {...form.register("reason")} />}
-              </FormField>
-            </div>
-            <p className="text-caption text-muted-foreground">
-              30분 단위로 고를 수 있고, 종료를 다음 날로 하면 자정을 넘겨요(한 번에 24시간까지). 이미 받은 신청·세션과
-              겹치면 저장 전에 알려 드려요.
+                />
+              </Question>
+            ) : null}
+            <TimeQuestion form={form} values={values} allDay={allDay} once={once} />
+            <PeriodQuestion form={form} once={once} allDay={allDay} />
+            <CategoryQuestion form={form} category={values.category} />
+            <Question
+              label="메모 (선택)"
+              htmlFor="unavailable-reason"
+              error={errors.reason?.message}
+              aside={`${values.reason.length} / ${REASON_MAX_LENGTH}`}
+            >
+              <Input
+                id="unavailable-reason"
+                maxLength={REASON_MAX_LENGTH}
+                placeholder="나만 보는 메모예요"
+                {...form.register("reason")}
+              />
+            </Question>
+            <p
+              aria-live="polite"
+              className="flex items-center gap-2 rounded-lg bg-sidebar-accent px-3.5 py-2.5 text-body-strong text-sidebar-accent-foreground"
+            >
+              <CalendarRange aria-hidden className="size-4 shrink-0" />
+              <span>
+                {values.category.trim() ? `${values.category.trim()} · ` : ""}
+                {summaryOf(values)}
+              </span>
             </p>
             {serverError ? <Alert variant="error" title={serverError} /> : null}
             <div className="mt-auto flex justify-end gap-2 max-md:sticky max-md:bottom-0 max-md:bg-popover max-md:pt-2">
-              <Button type="button" variant="ghost" className="max-md:flex-1" onClick={close}>
+              <Button type="button" variant="outline" className="max-md:flex-1" onClick={close}>
                 취소
               </Button>
               <Button type="submit" className="max-md:flex-1" disabled={save.isPending}>
@@ -264,59 +233,189 @@ export function UnavailableDialog({
   );
 }
 
-function DateTimeRow({
-  form,
-  which,
-  dayOnly,
+/** 질문 한 칸: 라벨(+ 오른쪽 보조) · 입력 · 오류 */
+function Question({
+  label,
+  htmlFor,
+  help,
+  aside,
+  error,
+  children,
 }: {
-  form: ReturnType<typeof useForm<UnavailableForm>>;
-  which: "start" | "end";
-  dayOnly: boolean;
+  label: string;
+  htmlFor?: string;
+  help?: string;
+  aside?: ReactNode;
+  error?: string;
+  children: ReactNode;
 }) {
-  const dateName = which === "start" ? "startDate" : "endDate";
-  const timeName = which === "start" ? "startTime" : "endTime";
-  const errors = form.formState.errors;
-  const dateLabel = dayOnly
-    ? which === "start"
-      ? "첫 날"
-      : "마지막 날"
-    : which === "start"
-      ? "시작 날짜"
-      : "종료 날짜";
+  const Label = htmlFor ? "label" : "span";
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_8rem] gap-3 md:grid-cols-[minmax(0,1fr)_10rem]">
-      <FormField label={dateLabel} error={errors[dateName]?.message} className={cn(dayOnly && "col-span-2")}>
-        {(field) => <Input type="date" {...field} {...form.register(dateName)} />}
-      </FormField>
-      {dayOnly ? null : (
-        <Controller
-          control={form.control}
-          name={timeName}
-          render={({ field }) => (
-            <div className="flex flex-col gap-1.5">
-              <span id={`${timeName}-label`} className="text-label text-foreground">
-                {which === "start" ? "시작 시각" : "종료 시각"}
-              </span>
-              <Select value={field.value} onValueChange={field.onChange}>
-                <SelectTrigger aria-labelledby={`${timeName}-label`}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TIME_OPTIONS.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {t}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors[timeName]?.message ? (
-                <p className="text-caption text-destructive-text">{errors[timeName]?.message}</p>
-              ) : null}
-            </div>
-          )}
-        />
-      )}
+    <div role={htmlFor ? undefined : "group"} aria-label={htmlFor ? undefined : label} className="flex flex-col gap-2">
+      <div className="flex items-center gap-1.5">
+        <Label htmlFor={htmlFor} className="text-label text-foreground">
+          {label}
+        </Label>
+        {help ? <HelpTip label={label}>{help}</HelpTip> : null}
+        {aside ? <span className="ml-auto text-caption text-muted-foreground">{aside}</span> : null}
+      </div>
+      {children}
+      {error ? <p className="text-caption text-destructive-text">{error}</p> : null}
     </div>
+  );
+}
+
+function TimeSelect({ form, name, label }: { form: Form; name: "startTime" | "endTime"; label: string }) {
+  return (
+    <Controller
+      control={form.control}
+      name={name}
+      render={({ field }) => (
+        <Select value={field.value} onValueChange={field.onChange}>
+          <SelectTrigger aria-label={label} className="w-28">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {TIME_OPTIONS.map((t) => (
+              <SelectItem key={t} value={t}>
+                {t}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+    />
+  );
+}
+
+/** 시간: 시작 ~ 종료 (30분 단위). 종료가 시작보다 이르면 다음 날. 한 번은 '하루 종일' 스위치 */
+function TimeQuestion({
+  form,
+  values,
+  allDay,
+  once,
+}: {
+  form: Form;
+  values: UnavailableForm;
+  allDay: boolean;
+  once: boolean;
+}) {
+  const errors = form.formState.errors;
+  return (
+    <Question
+      label="시간"
+      help="30분 단위로 골라요. 종료가 시작보다 이르면 다음 날로 넘어가요(자정을 넘는 시간)."
+      error={errors.endTime?.message}
+    >
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        {allDay ? (
+          <span className="text-body text-muted-foreground">그날 전체</span>
+        ) : (
+          <div className="flex items-center gap-2">
+            <TimeSelect form={form} name="startTime" label="시작 시각" />
+            <span aria-hidden className="text-muted-foreground">
+              ~
+            </span>
+            <TimeSelect form={form} name="endTime" label="종료 시각" />
+            {crossesMidnight(values) && values.endTime !== "00:00" ? <Badge variant="outline">다음 날</Badge> : null}
+          </div>
+        )}
+        {once ? (
+          <Controller
+            control={form.control}
+            name="allDay"
+            render={({ field }) => (
+              <label className="ml-auto inline-flex items-center gap-2 text-body text-foreground">
+                <Switch checked={field.value} onCheckedChange={field.onChange} aria-label="하루 종일" />
+                하루 종일
+              </label>
+            )}
+          />
+        ) : null}
+      </div>
+    </Question>
+  );
+}
+
+/** 적용 기간: 반복은 시작일 ~ 반복 종료(비우면 계속), 한 번은 날짜(하루 종일이면 마지막 날까지) */
+function PeriodQuestion({ form, once, allDay }: { form: Form; once: boolean; allDay: boolean }) {
+  const errors = form.formState.errors;
+  if (once && !allDay)
+    return (
+      <Question label="날짜" htmlFor="unavailable-start" error={errors.startDate?.message}>
+        <Input id="unavailable-start" type="date" className="md:w-48" {...form.register("startDate")} />
+      </Question>
+    );
+  const [firstLabel, lastLabel, lastName] = once
+    ? (["첫 날", "마지막 날 (선택)", "endDate"] as const)
+    : (["시작일", "반복 종료 (선택)", "repeatUntil"] as const);
+  return (
+    <Question
+      label={once ? "날짜" : "적용 기간"}
+      help={once ? "여러 날 쉬면 마지막 날을 골라요." : "반복 종료를 비우면 계속 반복해요."}
+      error={errors.startDate?.message ?? errors[lastName]?.message}
+    >
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+        <Input type="date" aria-label={firstLabel} {...form.register("startDate")} />
+        <span aria-hidden className="text-muted-foreground">
+          ~
+        </span>
+        <Input type="date" aria-label={lastLabel} {...form.register(lastName)} />
+      </div>
+    </Question>
+  );
+}
+
+/** 분류: 칩만 고른다. '기타'를 고르면 직접 적는다 (F88) */
+function CategoryQuestion({ form, category }: { form: Form; category: string }) {
+  const suggested = (CATEGORY_SUGGESTIONS as readonly string[]).includes(category);
+  const [otherOn, setOtherOn] = useState(false);
+  const other = otherOn || (category !== "" && !suggested);
+  const pick = (value: string) => {
+    setOtherOn(false);
+    form.setValue("category", category === value ? "" : value, { shouldDirty: true });
+  };
+  return (
+    <Question label="분류 (선택)" error={form.formState.errors.category?.message}>
+      <div className="flex flex-wrap gap-1.5">
+        {CATEGORY_SUGGESTIONS.map((c) => (
+          <button
+            key={c}
+            type="button"
+            aria-pressed={category === c}
+            onClick={() => pick(c)}
+            className={cn(CHIP, category === c ? CHIP_ON : CHIP_OFF)}
+          >
+            {c}
+          </button>
+        ))}
+        <button
+          type="button"
+          aria-pressed={other}
+          onClick={() => {
+            if (other) {
+              setOtherOn(false);
+              form.setValue("category", "", { shouldDirty: true });
+            } else {
+              setOtherOn(true);
+              if (suggested) form.setValue("category", "", { shouldDirty: true });
+            }
+          }}
+          className={cn(CHIP, other ? CHIP_ON : CHIP_OFF)}
+        >
+          {OTHER}
+        </button>
+      </div>
+      {other ? (
+        <Input
+          aria-label="분류 직접 입력"
+          autoFocus={otherOn}
+          maxLength={CATEGORY_MAX_LENGTH}
+          placeholder="예: 스터디"
+          {...form.register("category")}
+        />
+      ) : null}
+    </Question>
   );
 }
 

@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 
@@ -79,7 +79,7 @@ describe("멘토 일정 (F51·F52)", () => {
     expect(within(monday).queryByText("본업 · 매주")).not.toBeInTheDocument();
     const tuesday = screen.getByRole("group", { name: "11월 24일 (화)" });
     expect(within(tuesday).getByText("본업 · 매주")).toBeInTheDocument();
-    expect(await within(tuesday).findByRole("link", { name: "가수강 · 1:1" })).toHaveAttribute(
+    expect(await within(tuesday).findByRole("link", { name: "가수강 · 1:1 19:00–20:00" })).toHaveAttribute(
       "href",
       "/mentor/sessions/s1",
     );
@@ -97,6 +97,20 @@ describe("멘토 일정 (F51·F52)", () => {
     await waitFor(() => expect(router.state.location.search).toEqual({ week: "2026-11-30" }));
     expect(await screen.findByRole("heading", { name: "11월 30일 ~ 12월 6일" })).toBeInTheDocument();
     expect(queries.at(-1)?.get("from")).toBe("2026-11-29T15:00:00.000Z");
+    // [오늘]은 이번 주로 돌아온다 (F88)
+    await userEvent.setup().click(screen.getByRole("button", { name: "오늘" }));
+    await waitFor(() => expect(router.state.location.search).toEqual({ week: "2026-11-23" }));
+    expect(screen.getByRole("button", { name: "오늘" })).toBeDisabled();
+  });
+
+  it("시간표 빈 칸을 누르면 그 날짜·시각으로 추가 창이 열린다 (F88)", async () => {
+    mockSchedule();
+    await renderRoute("/mentor/schedule");
+    const thursday = await screen.findByRole("group", { name: "11월 26일 (목)" });
+    // 한 시간 48px: 15시 칸 (jsdom은 칸 위치가 0)
+    fireEvent.click(thursday, { clientY: 15 * 48 + 5 });
+    const dialog = await screen.findByRole("dialog", { name: "불가 시간 추가" });
+    expect(within(dialog).getByText("11/26(목) 15:00–16:00")).toBeInTheDocument();
   });
 
   it("신청 받기를 끌 때는 확인 창 뒤에 끄고 취소 건수를 알린다", async () => {

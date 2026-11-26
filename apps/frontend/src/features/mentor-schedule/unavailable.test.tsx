@@ -99,12 +99,13 @@ describe("불가 시간 추가·수정·삭제 (F53)", () => {
     await user.click(await screen.findByRole("button", { name: "불가 시간 추가" }));
     const dialog = await screen.findByRole("dialog", { name: "불가 시간 추가" });
     await user.click(within(dialog).getByRole("radio", { name: "매주" }));
-    expect(within(dialog).queryByRole("checkbox", { name: "하루 종일" })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("switch", { name: "하루 종일" })).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "저장" }));
     expect(await within(dialog).findByText("요일을 하나 이상 골라 주세요.")).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "화" }));
     await user.click(within(dialog).getByRole("button", { name: "목" }));
     await user.click(within(dialog).getByRole("button", { name: "본업" }));
+    expect(within(dialog).getByText("본업 · 매주 화·목 09:00–10:00 · 11/24부터 계속")).toBeInTheDocument();
     await user.click(within(dialog).getByRole("button", { name: "저장" }));
 
     const conflict = await screen.findByRole("dialog", { name: "겹치는 일정이 1건 있어요" });
@@ -137,9 +138,9 @@ describe("불가 시간 추가·수정·삭제 (F53)", () => {
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "불가 시간 추가" }));
     const dialog = await screen.findByRole("dialog", { name: "불가 시간 추가" });
-    await user.click(within(dialog).getByRole("checkbox", { name: "하루 종일" }));
+    await user.click(within(dialog).getByRole("switch", { name: "하루 종일" }));
     expect(within(dialog).queryByRole("combobox", { name: "시작 시각" })).not.toBeInTheDocument();
-    const last = within(dialog).getByLabelText("마지막 날");
+    const last = within(dialog).getByLabelText("마지막 날 (선택)");
     await user.clear(last);
     await user.type(last, "2026-11-26");
     await user.click(within(dialog).getByRole("button", { name: "저장" }));
@@ -159,7 +160,26 @@ describe("불가 시간 추가·수정·삭제 (F53)", () => {
     expect(await screen.findByText("불가 시간을 추가했어요")).toBeInTheDocument();
   });
 
-  it("목록 ⋯ 메뉴로 고치고 지운다. 이미 시작한 한 번은 메뉴가 없다", async () => {
+  it("분류 '기타'는 직접 적는다", async () => {
+    mockSchedule([]);
+    const bodies: Record<string, unknown>[] = [];
+    server.use(
+      http.post(apiUrl("/api/v1/me/mentor-schedule/unavailable-periods"), async ({ request }) => {
+        bodies.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json({ applied: true, unavailable_period: WEEKLY, conflicts: [] }, { status: 201 });
+      }),
+    );
+    await renderRoute("/mentor/schedule");
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "불가 시간 추가" }));
+    const dialog = await screen.findByRole("dialog", { name: "불가 시간 추가" });
+    await user.click(within(dialog).getByRole("button", { name: "기타" }));
+    await user.type(within(dialog).getByRole("textbox", { name: "분류 직접 입력" }), "스터디");
+    await user.click(within(dialog).getByRole("button", { name: "저장" }));
+    await waitFor(() => expect(bodies[0]).toMatchObject({ category: "스터디" }));
+  });
+
+  it("목록 아이콘 버튼으로 고치고 지운다. 이미 시작한 한 번은 버튼이 없다", async () => {
     mockSchedule();
     const puts: unknown[] = [];
     const deletes: string[] = [];

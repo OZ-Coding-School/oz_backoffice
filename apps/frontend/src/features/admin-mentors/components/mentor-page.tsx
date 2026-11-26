@@ -324,6 +324,7 @@ function ScheduleTab({ mentor, week, canManage }: { mentor: MentorItem; week?: s
   const scope = useMemo(
     () => ({
       mentorId: mentor.id,
+      readOnly: !canManage,
       onWeek: (next: string) =>
         void navigate({
           to: "/admin/educators/mentors/$mentorId",
@@ -331,7 +332,7 @@ function ScheduleTab({ mentor, week, canManage }: { mentor: MentorItem; week?: s
           search: { tab: "schedule", week: next },
         }),
     }),
-    [mentor.id, navigate],
+    [mentor.id, navigate, canManage],
   );
   return (
     <ScheduleScopeContext.Provider value={scope}>

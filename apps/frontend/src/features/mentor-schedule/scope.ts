@@ -8,6 +8,8 @@ import { createContext, useContext } from "react";
 export interface ScheduleScope {
   mentorId: string | null;
   onWeek: ((monday: string) => void) | null;
+  /** 고칠 권한이 없으면 시간표 빈 칸을 눌러 추가하지 않는다 (F88) */
+  readOnly?: boolean;
 }
 
 export const ScheduleScopeContext = createContext<ScheduleScope>({ mentorId: null, onWeek: null });
