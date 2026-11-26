@@ -3,6 +3,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { ChevronDown, ChevronRight, RefreshCw, Search, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
+import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
 import { Badge } from "@/components/ui/badge";
@@ -51,17 +52,20 @@ export function StudentsPage({ search }: { search: StudentsSearch }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-end gap-3">
-        <div className="flex flex-1 flex-col gap-1">
-          <h1 className="text-h1 text-foreground">수강생</h1>
-          <p className="text-body text-muted-foreground">기수를 골라 Airtable 명단에서 동기화된 수강생을 봐요.</p>
-        </div>
-        <LastSync />
-        <Button variant="outline" size="sm" onClick={() => go({ ...search, sync: true })}>
-          <RefreshCw aria-hidden />
-          명단 동기화
-        </Button>
-      </div>
+      <PageHeader
+        icon={Users}
+        title="수강생"
+        description="기수를 골라 Airtable 명단에서 동기화된 수강생을 봐요."
+        actions={
+          <>
+            <LastSync />
+            <Button variant="outline" size="sm" onClick={() => go({ ...search, sync: true })}>
+              <RefreshCw aria-hidden />
+              명단 동기화
+            </Button>
+          </>
+        }
+      />
       {access.isPending ? (
         <div className="flex justify-center py-10">
           <Spinner />

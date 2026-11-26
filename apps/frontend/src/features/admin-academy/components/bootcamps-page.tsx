@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { GraduationCap } from "lucide-react";
+import { GraduationCap, Layers } from "lucide-react";
 
+import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
 import { Badge } from "@/components/ui/badge";
@@ -35,12 +36,11 @@ export function BootcampsPage({ search }: { search: BootcampsSearch }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-h1 text-foreground">과정·기수</h1>
-        <p className="text-body text-muted-foreground">
-          Airtable에서 동기화된 과정과 기수예요. 운영에 필요한 항목만 고칠 수 있어요.
-        </p>
-      </div>
+      <PageHeader
+        icon={Layers}
+        title="과정·기수"
+        description="Airtable에서 동기화된 과정과 기수예요. 운영에 필요한 항목만 고칠 수 있어요."
+      />
       {bootcamps.isPending ? (
         <div className="flex justify-center py-10">
           <Spinner />

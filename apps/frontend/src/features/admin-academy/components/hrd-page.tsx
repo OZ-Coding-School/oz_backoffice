@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { FileText } from "lucide-react";
 
+import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
 import { Spinner } from "@/components/ui/spinner";
@@ -29,12 +30,11 @@ export function HrdPage({ search }: { search: HrdSearch }) {
   const selected = items.find((h) => h.id === search.hrd);
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-h1 text-foreground">HRD 과정</h1>
-        <p className="text-body text-muted-foreground">
-          HRD-Net 훈련과정과 회차예요. 훈련과정 ID·회차 번호·기간은 Airtable 동기화가 정해요.
-        </p>
-      </div>
+      <PageHeader
+        icon={FileText}
+        title="HRD 과정"
+        description="HRD-Net 훈련과정과 회차예요. 훈련과정 ID·회차 번호·기간은 Airtable 동기화가 정해요."
+      />
       {list.isPending ? (
         <div className="flex justify-center py-10">
           <Spinner />
