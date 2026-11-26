@@ -63,7 +63,7 @@ export function ApprovePanel({ request, now }: { request: MentoringRequest; now:
   return (
     <section
       aria-labelledby="approve-title"
-      className="flex flex-col gap-3 rounded-xl border border-border bg-card p-5"
+      className="flex flex-col gap-3 rounded-2xl border border-border bg-card shadow-sm p-5"
     >
       <div className="flex flex-col gap-1">
         <h2 id="approve-title" className="text-h3 text-foreground">
@@ -139,7 +139,7 @@ function slotText(iso: string, duration: number): string {
 export function RejectPanel({ request }: { request: MentoringRequest }) {
   const [open, setOpen] = useState(false);
   return (
-    <section className="flex flex-col gap-2 rounded-xl border border-border bg-card p-5">
+    <section className="flex flex-col gap-2 rounded-2xl border border-border bg-card shadow-sm p-5">
       <h2 className="text-body-strong text-foreground">희망 일시에 진행이 어렵다면</h2>
       <p className="text-caption text-muted-foreground">사유와 함께 반려하면 신청자의 차감 예정 시간이 돌아가요</p>
       <Button variant="outline" className="text-destructive-text" onClick={() => setOpen(true)}>

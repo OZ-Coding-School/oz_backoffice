@@ -69,7 +69,7 @@ function Detail({ settlement: s }: { settlement: SettlementDetail }) {
       </header>
       <dl className="grid gap-2.5 md:grid-cols-3 md:gap-4">
         {stats.map((stat) => (
-          <div key={stat.label} className="flex flex-col gap-1 rounded-xl border border-border bg-card p-4 md:p-5">
+          <div key={stat.label} className="flex flex-col gap-1 rounded-2xl border border-border bg-card shadow-sm p-4 md:p-5">
             <dt className="text-caption text-muted-foreground">{stat.label}</dt>
             <dd className="text-h2 text-foreground">{stat.value}</dd>
           </div>
@@ -104,7 +104,7 @@ function TypeBadge({ item }: { item: SettlementItem }) {
 
 function ItemTable({ items }: { items: SettlementItem[] }) {
   return (
-    <div className="hidden overflow-hidden rounded-xl border border-border bg-card lg:block">
+    <div className="hidden overflow-hidden rounded-2xl border border-border bg-card shadow-sm lg:block">
       <table className="w-full text-left">
         <thead className="bg-muted text-caption text-muted-foreground">
           <tr>
@@ -158,7 +158,7 @@ function ItemCard({ item }: { item: SettlementItem }) {
   return (
     <article
       aria-label={`${when(item)} ${counterpartLabel(item)}`}
-      className="flex flex-col gap-1.5 rounded-xl border border-border bg-card px-4 py-3.5"
+      className="flex flex-col gap-1.5 rounded-2xl border border-border bg-card shadow-sm px-4 py-3.5"
     >
       <div className="flex items-center gap-2">
         <span className="flex-1 text-body-strong text-foreground">{when(item)}</span>

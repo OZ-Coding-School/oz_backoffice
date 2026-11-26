@@ -56,7 +56,7 @@ export function RecordCard({ session, now }: { session: MentoringSession; now: n
 
 function Card({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section aria-label={title} className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4 md:p-6">
+    <section aria-label={title} className="flex flex-col gap-4 rounded-2xl border border-border bg-card shadow-sm p-4 md:p-6">
       <div className="flex items-center gap-2">
         <h2 className="flex-1 text-h3 text-foreground">{title}</h2>
         {action}

@@ -94,7 +94,7 @@ export function HolidaysPage({ search }: { search: HolidaysSearch }) {
           ) : (
             <section
               aria-label={`${year}년 공휴일`}
-              className="sticky top-6 flex max-h-[calc(100vh-3rem)] flex-col gap-3 overflow-y-auto rounded-xl border border-border bg-card p-4"
+              className="sticky top-6 flex max-h-[calc(100vh-3rem)] flex-col gap-3 overflow-y-auto rounded-2xl border border-border bg-card shadow-sm p-4"
             >
               <h3 className="text-body-strong text-foreground">{year}년 공휴일</h3>
               <HolidayList label={`${year}년 공휴일`} year={year} items={holidays} empty="공휴일이 없어요." />

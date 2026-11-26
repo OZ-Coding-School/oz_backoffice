@@ -118,7 +118,7 @@ function StatusBadge({ request }: { request: MentoringRequest }) {
 
 function RequestTable({ items }: { items: MentoringRequest[] }) {
   return (
-    <div className="hidden overflow-hidden rounded-xl border border-border bg-card lg:block">
+    <div className="hidden overflow-hidden rounded-2xl border border-border bg-card shadow-sm lg:block">
       <table className="w-full text-left">
         <thead className="bg-muted text-caption text-muted-foreground">
           <tr>
@@ -180,7 +180,7 @@ function RequestCard({ request }: { request: MentoringRequest }) {
       to="/mentor/requests/$requestId"
       params={{ requestId: request.id }}
       aria-label={`${request.topic} · ${RECEIVED_STATUS[request.status].label}`}
-      className="flex flex-col gap-1.5 rounded-xl border border-border bg-card px-4 py-3.5 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+      className="flex flex-col gap-1.5 rounded-2xl border border-border bg-card shadow-sm px-4 py-3.5 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
     >
       <div className="flex items-center gap-2">
         <span className="min-w-0 flex-1 text-body-strong text-foreground">{request.topic}</span>

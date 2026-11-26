@@ -33,7 +33,7 @@ export function DayPanel({
   return (
     <section
       aria-label="선택한 날"
-      className="sticky top-6 flex flex-col overflow-hidden rounded-xl border border-border bg-card"
+      className="sticky top-6 flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
     >
       <div className="flex flex-col gap-0.5 border-b border-border bg-muted px-4 py-3">
         <span className="text-caption text-muted-foreground">선택한 날</span>

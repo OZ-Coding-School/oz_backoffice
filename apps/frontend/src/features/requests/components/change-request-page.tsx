@@ -170,7 +170,7 @@ function ChangeForm({ request }: { request: MentoringRequest }) {
       <Section number={2} title="신청 내용" />
       <ContentStep form={form} />
       {serverError ? <Alert variant="error" title={serverError} /> : null}
-      <div className="flex flex-col gap-3 rounded-xl border border-border bg-card px-5 py-4 md:flex-row md:items-center">
+      <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card shadow-sm px-5 py-4 md:flex-row md:items-center">
         <p className="flex flex-1 items-start gap-2 text-caption text-muted-foreground">
           <Info aria-hidden className="mt-0.5 size-3.5 shrink-0" />
           진행 시간을 바꾸면 차감 예정 시간도 그만큼 다시 잡혀요

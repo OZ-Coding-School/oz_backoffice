@@ -269,7 +269,7 @@ function ContractsTab({ mentorId }: { mentorId: string }) {
   const items = list.data.items;
   if (items.length === 0)
     return (
-      <p className="rounded-xl border border-border bg-card p-6 text-body text-muted-foreground">
+      <p className="rounded-2xl border border-border bg-card shadow-sm p-6 text-body text-muted-foreground">
         이 멘토의 계약이 없어요. 계약은 행정 업무 › 계약에서 추가해요.
       </p>
     );

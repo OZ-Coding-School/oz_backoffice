@@ -19,14 +19,16 @@ import {
   Wallet,
   type LucideIcon,
 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { Controller, useForm, useWatch, type Control, type UseFormReturn } from "react-hook-form";
 import { toast } from "sonner";
 
 import { ApiError } from "@/api/errors";
 import { ErrorState } from "@/components/error-state";
+import { MetaChip, PageHeader } from "@/components/page-header";
+import { SaveBar } from "@/components/save-bar";
+import { SectionCard, SettingRow } from "@/components/section-card";
 import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import { HelpTip } from "@/components/ui/help-tip";
 import { Input } from "@/components/ui/input";
 import { Segmented } from "@/components/ui/segmented";
@@ -115,22 +117,22 @@ function SettingsForm({
 
   return (
     <div className={cn("flex flex-col gap-6", canManage && (dirty || !settings) && "pb-4")}>
-      <header className="flex flex-col gap-2">
-        <h1 className="text-h1 text-foreground">멘토링 설정</h1>
-        <div className="flex flex-wrap items-center gap-2 text-body-sm text-muted-foreground">
-          <span className="rounded-full bg-sidebar-accent px-2.5 py-0.5 text-caption-strong text-sidebar-accent-foreground">
-            {title}
-          </span>
-          {settings?.updated_at ? (
-            <span className="inline-flex items-center gap-1">
-              <CircleCheck aria-hidden className="size-3.5 text-success-text" />
-              마지막 저장 {formatKst(settings.updated_at, "M월 d일 HH:mm")}
-            </span>
-          ) : (
-            <span>아직 저장하지 않았어요</span>
-          )}
-        </div>
-      </header>
+      <PageHeader
+        title="멘토링 설정"
+        meta={
+          <>
+            <MetaChip>{title}</MetaChip>
+            {settings?.updated_at ? (
+              <span className="inline-flex items-center gap-1">
+                <CircleCheck aria-hidden className="size-3.5 text-success-text" />
+                마지막 저장 {formatKst(settings.updated_at, "M월 d일 HH:mm")}
+              </span>
+            ) : (
+              <span>아직 저장하지 않았어요</span>
+            )}
+          </>
+        }
+      />
       {!settings ? (
         <Alert
           title="아직 저장하지 않은 기수예요"
@@ -143,11 +145,11 @@ function SettingsForm({
         {/* 금지 시간대 패널의 폼이 이 폼으로 제출되지 않게 폼은 왼쪽 열만 감싼다 */}
         <form id={FORM_ID} aria-label="멘토링 설정" noValidate onSubmit={(e) => void onSubmit(e)}>
           <fieldset disabled={!canManage} className="flex min-w-0 flex-col gap-6">
-            <Section icon={ListChecks} title="기본 규칙" description="수강생이 멘토링을 신청하는 방법이에요.">
+            <SectionCard rows icon={ListChecks} title="기본 규칙" description="수강생이 멘토링을 신청하는 방법이에요.">
               <ModeRow control={form.control} error={form.formState.errors.allow1on1?.message} />
               <Rules form={form} />
-            </Section>
-            <Section icon={Clock} title="운영시간" description="수강생은 이 시간 안에서만 신청할 수 있어요.">
+            </SectionCard>
+            <SectionCard rows icon={Clock} title="운영시간" description="수강생은 이 시간 안에서만 신청할 수 있어요.">
               <HoursRow
                 form={form}
                 icon={Sun}
@@ -167,7 +169,7 @@ function SettingsForm({
                 start="weekendStart"
                 end="weekendEnd"
               />
-            </Section>
+            </SectionCard>
           </fieldset>
         </form>
         <div className="sticky top-20 flex flex-col gap-6">
@@ -178,69 +180,16 @@ function SettingsForm({
 
       {/* 바뀐 것이 있거나 처음 저장할 때만 아래에 떠오른다 */}
       {canManage && (dirty || !settings) ? (
-        <SaveBar dirty={dirty} canSave={canSave} pending={save.isPending} onReset={() => form.reset()} />
+        <SaveBar
+          dirty={dirty}
+          message={dirty ? undefined : "기본값으로 저장하면 이 기수에서 신청을 받을 수 있어요"}
+          canSave={canSave}
+          pending={save.isPending}
+          onReset={() => form.reset()}
+          form={FORM_ID}
+        />
       ) : null}
       <DiscardDialog blocker={blocker} />
-    </div>
-  );
-}
-
-/** 카드: 아이콘 배지 + 제목·설명, 아래 설정 줄을 구분선으로 */
-function Section({
-  icon: Icon,
-  title,
-  description,
-  help,
-  action,
-  children,
-}: {
-  icon: LucideIcon;
-  title: string;
-  description: string;
-  help?: string;
-  action?: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <section aria-label={title} className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-      <div className="flex items-center gap-3 px-6 pt-5 pb-4">
-        <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-sidebar-accent text-sidebar-accent-foreground">
-          <Icon aria-hidden className="size-4.5" />
-        </span>
-        <div className="flex min-w-0 flex-1 flex-col">
-          <h2 className="flex items-center gap-1.5 text-h3 text-foreground">
-            {title}
-            {help ? <HelpTip label={title}>{help}</HelpTip> : null}
-          </h2>
-          <p className="text-body-sm text-muted-foreground">{description}</p>
-        </div>
-        {action}
-      </div>
-      <div className="flex flex-col divide-y divide-border border-t border-border">{children}</div>
-    </section>
-  );
-}
-
-/** 설정 한 줄: 왼쪽 이름·짧은 설명 | 오른쪽 조작 */
-function SettingRow({
-  title,
-  description,
-  error,
-  children,
-}: {
-  title: string;
-  description: string;
-  error?: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="flex items-center gap-6 px-6 py-4">
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="text-body-strong text-foreground">{title}</span>
-        <span className="text-body-sm text-muted-foreground">{description}</span>
-        {error ? <span className="text-caption text-destructive-text">{error}</span> : null}
-      </div>
-      <div className="flex shrink-0 items-center gap-2">{children}</div>
     </div>
   );
 }
@@ -644,7 +593,7 @@ function BlockTimes({ cohortId, title, canManage }: { cohortId: string; title: s
                   type="button"
                   aria-label={`${md(b.period_start)} ~ ${md(b.period_end)} · ${b.start_time.slice(0, 5)} ~ ${b.end_time.slice(0, 5)}`}
                   onClick={() => setSheet({ mode: "view", block: b })}
-                  className="group flex w-full items-center gap-3 rounded-xl border border-border bg-card p-3 text-left outline-none transition-all hover:border-primary/30 hover:shadow-sm focus-visible:ring-2 focus-visible:ring-ring"
+                  className="group flex w-full items-center gap-3 rounded-2xl border border-border bg-card shadow-sm p-3 text-left outline-none transition-all hover:border-primary/30 hover:shadow-sm focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <span className="flex w-16 shrink-0 flex-col items-center rounded-lg bg-muted py-1.5 text-center">
                     <span className="text-caption-strong text-foreground">{md(b.period_start)}</span>
@@ -665,42 +614,5 @@ function BlockTimes({ cohortId, title, canManage }: { cohortId: string; title: s
       </div>
       <BlockTimeSheet cohortId={cohortId} cohortTitle={title} state={sheet} canManage={canManage} onChange={setSheet} />
     </section>
-  );
-}
-
-/** 아래 고정 저장 막대: 상태 + [되돌리기][저장] */
-function SaveBar({
-  dirty,
-  canSave,
-  pending,
-  onReset,
-}: {
-  dirty: boolean;
-  canSave: boolean;
-  pending: boolean;
-  onReset: () => void;
-}) {
-  return (
-    <div className="sticky bottom-4 z-10">
-      <div
-        className={cn(
-          "flex items-center gap-3 rounded-2xl border px-5 py-3 shadow-lg backdrop-blur transition-colors",
-          dirty ? "border-primary/40 bg-card/95" : "border-info/40 bg-card/95",
-        )}
-      >
-        <span aria-hidden className={cn("size-2 rounded-full", dirty ? "bg-warning" : "bg-info")} />
-        <span className="flex-1 text-body text-foreground">
-          {dirty ? "저장하지 않은 변경이 있어요" : "기본값으로 저장하면 이 기수에서 신청을 받을 수 있어요"}
-        </span>
-        {dirty ? (
-          <Button type="button" variant="ghost" onClick={onReset} disabled={pending}>
-            되돌리기
-          </Button>
-        ) : null}
-        <Button type="submit" form={FORM_ID} disabled={!canSave}>
-          저장
-        </Button>
-      </div>
-    </div>
   );
 }

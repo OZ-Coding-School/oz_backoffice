@@ -90,7 +90,7 @@ function useCanApply(): boolean {
 }
 
 const SUMMARY =
-  "flex h-full flex-col justify-between gap-1.5 rounded-xl border border-border bg-card p-3 outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring md:gap-2 md:p-4";
+  "flex h-full flex-col justify-between gap-1.5 rounded-2xl border border-border bg-card shadow-sm p-3 outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring md:gap-2 md:p-4";
 
 /** 요약 칸: 아이콘·이름(휴대폰은 두 줄로 넘김)과 수. 불러오기 전은 '-' */
 function SummaryBody({
@@ -131,7 +131,7 @@ function MentoringCard({
   return (
     <section
       aria-labelledby="home-mentoring"
-      className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4 md:p-5"
+      className="flex flex-col gap-4 rounded-2xl border border-border bg-card shadow-sm p-4 md:p-5"
     >
       <div className="flex items-center gap-2">
         <CalendarDays aria-hidden className="size-4.5 text-primary-text" />

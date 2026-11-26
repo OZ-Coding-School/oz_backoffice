@@ -56,7 +56,7 @@ export function EmployeesPage({ employeeId }: { employeeId?: string }) {
       ) : employees.isError || options.isError || access.isError ? (
         <ErrorState onRetry={() => void Promise.all([employees.refetch(), options.refetch(), access.refetch()])} />
       ) : (
-        <section aria-label="직원 목록" className="overflow-hidden rounded-xl border border-border bg-card">
+        <section aria-label="직원 목록" className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
           <div className="flex items-center gap-3 border-b border-border px-4 py-3">
             <div className="relative w-70">
               <Search aria-hidden className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />

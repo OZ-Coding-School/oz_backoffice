@@ -91,7 +91,7 @@ function Ledger({ accountId }: { accountId: string }) {
   if (list.isError) return <ErrorState onRetry={() => void list.refetch()} />;
   if (items.length === 0) return <EmptyState icon={Wallet} title="아직 내역이 없어요" />;
   return (
-    <section aria-label="내역" className="overflow-hidden rounded-xl border border-border bg-card">
+    <section aria-label="내역" className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
       {/* 태블릿·데스크톱: 표 */}
       <table className="hidden w-full text-left md:table">
         <thead className="bg-muted text-caption text-muted-foreground">

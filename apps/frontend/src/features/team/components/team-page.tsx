@@ -83,7 +83,7 @@ function TeamCard({ team, cohortName }: { team: StudentTeam; cohortName: string 
     : "대기 중인 신청이 없어요";
 
   return (
-    <section aria-label={team.label} className="overflow-hidden rounded-xl border border-border bg-card">
+    <section aria-label={team.label} className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
       <div className="flex items-center gap-4 bg-accent px-4 py-6 md:px-6">
         <span className="inline-flex size-14 shrink-0 items-center justify-center rounded-xl bg-primary text-body-strong text-primary-foreground">
           {team.team_number}팀

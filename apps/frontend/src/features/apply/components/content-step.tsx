@@ -19,7 +19,7 @@ export function ContentStep({ form }: { form: UseFormReturn<ContentForm> }) {
   const [tab, setTab] = useState<"write" | "preview">("write");
   const errors = form.formState.errors;
   return (
-    <section className="flex flex-col gap-5 rounded-xl border border-border bg-card p-4 md:p-6">
+    <section className="flex flex-col gap-5 rounded-2xl border border-border bg-card shadow-sm p-4 md:p-6">
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between">
           <label htmlFor="apply-topic" className="text-label text-foreground">

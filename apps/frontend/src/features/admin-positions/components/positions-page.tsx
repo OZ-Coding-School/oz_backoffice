@@ -145,7 +145,7 @@ function PositionTable({
   const firstMoved = order.findIndex((p) => movedIds.has(p.id));
 
   return (
-    <section aria-label="직위 목록" className="flex flex-col overflow-hidden rounded-xl border border-border bg-card">
+    <section aria-label="직위 목록" className="flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
       <div className="flex items-center gap-3 border-b border-border px-4 py-3">
         <span className="text-label text-muted-foreground">
           직위 {positions.length}개 · 직원 {employees}명

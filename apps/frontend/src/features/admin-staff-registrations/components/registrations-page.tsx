@@ -73,7 +73,7 @@ export function RegistrationsPanel({ tab }: { tab: RegistrationTab }) {
       ) : items.length === 0 ? (
         <EmptyState icon={UserCog} title={processed ? "처리한 신청이 없어요" : "처리할 운영진 신청이 없어요"} />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-border bg-card">
+        <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
           <table className="w-full text-left text-body">
             <thead className="bg-muted text-caption text-muted-foreground">
               <tr>

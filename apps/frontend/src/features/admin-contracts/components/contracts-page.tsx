@@ -124,7 +124,7 @@ export function ContractsPage({ search }: { search: ContractsSearch }) {
         />
       ) : (
         <div className="flex flex-col gap-3">
-          <div role="table" aria-label="계약" className="overflow-hidden rounded-xl border border-border bg-card">
+          <div role="table" aria-label="계약" className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
             <div role="row" className={cn(COLUMNS, "bg-muted px-4 py-2.5 text-caption text-muted-foreground")}>
               {["계약자", "유형", "제목", "기간", "연결", "담당", "상태"].map((h) => (
                 <span key={h} role="columnheader">

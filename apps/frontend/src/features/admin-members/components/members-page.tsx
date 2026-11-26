@@ -132,7 +132,7 @@ export function MembersPage({ search }: { search: MembersSearch }) {
           {...(search.q ? { description: "이름·이메일·휴대폰을 다시 확인해 주세요." } : {})}
         />
       ) : (
-        <div role="table" aria-label="회원" className="overflow-hidden rounded-xl border border-border bg-card">
+        <div role="table" aria-label="회원" className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
           <div role="row" className={cn(COLUMNS, "bg-muted px-4 py-2.5 text-caption text-muted-foreground")}>
             {["이름", "이메일", "휴대폰", "종류", "승인일", "마지막 로그인", "상태"].map((h) => (
               <span key={h} role="columnheader">

@@ -50,7 +50,7 @@ export function AcceptingCard({
   return (
     <section
       aria-labelledby="accepting-title"
-      className="flex items-center gap-4 rounded-xl border border-border bg-card p-4 md:p-5"
+      className="flex items-center gap-4 rounded-2xl border border-border bg-card shadow-sm p-4 md:p-5"
     >
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <h2 id="accepting-title" className="text-h3 text-foreground">
