@@ -3,6 +3,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { ChevronDown, ChevronRight, Search, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
 import { Badge } from "@/components/ui/badge";
@@ -45,10 +46,7 @@ export function EmployeesPage({ employeeId }: { employeeId?: string }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-h1 text-foreground">직원</h1>
-        <p className="text-body text-muted-foreground">부서·팀별로 직원을 보고, 소속·직위·담당을 바꿔요.</p>
-      </div>
+      <PageHeader icon={Users} title="직원" description="부서·팀별로 직원을 보고, 소속·직위·담당을 바꿔요." />
       {employees.isPending || options.isPending || access.isPending ? (
         <div className="flex justify-center py-10">
           <Spinner />

@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Building2, ChevronDown, ChevronRight } from "lucide-react";
+import { Building2, ChevronDown, ChevronRight, Network } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
+import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
 import { Button } from "@/components/ui/button";
@@ -152,10 +153,7 @@ export function DepartmentsPage({ search }: { search: DepartmentsSearch }) {
 function Frame({ children }: { children: ReactNode }) {
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-h1 text-foreground">부서</h1>
-        <p className="text-body text-muted-foreground">부서와 팀을 만들고, 팀이 담당하는 과정을 정해요.</p>
-      </div>
+      <PageHeader icon={Network} title="부서" description="부서와 팀을 만들고, 팀이 담당하는 과정을 정해요." />
       {children}
     </div>
   );

@@ -4,6 +4,7 @@ import { ChevronDown, ChevronRight, KeyRound } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { PageHeader } from "@/components/page-header";
 import { ApiError } from "@/api/errors";
 import { CollapsibleGroup, GroupItem } from "@/components/collapsible-group";
 import { EmptyState } from "@/components/empty-state";
@@ -63,12 +64,11 @@ export function PermissionsPage({ positionId }: { positionId: string | undefined
 
   return (
     <div className="flex h-[calc(100dvh-10rem)] min-h-120 flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-h1 text-foreground">권한</h1>
-        <p className="text-body text-muted-foreground">
-          직위마다 권한을 정해요. 직위가 곧 역할이고, 데이터 범위는 직위 설정과 담당 배정이 정해요.
-        </p>
-      </div>
+      <PageHeader
+        icon={KeyRound}
+        title="권한"
+        description="직위마다 권한을 정해요. 직위가 곧 역할이고, 데이터 범위는 직위 설정과 담당 배정이 정해요."
+      />
       {positions.isPending || defs.isPending ? (
         <div className="flex justify-center py-10">
           <Spinner />
