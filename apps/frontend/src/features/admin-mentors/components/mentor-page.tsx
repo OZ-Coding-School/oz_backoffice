@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
 import { ArrowLeft, Plus } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -7,7 +8,11 @@ import { ErrorState } from "@/components/error-state";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
+import { kstDateKey } from "@/features/apply/slots";
 import { assignmentPeriod } from "@/features/mentor-profile/labels";
+import { SchedulePage } from "@/features/mentor-schedule/components/schedule-page";
+import { monthOf } from "@/features/mentor-schedule/schedule";
+import { ScheduleScopeContext } from "@/features/mentor-schedule/scope";
 import { hasPermission, staffAccessQuery } from "@/features/staff/api";
 import { cn } from "@/lib/utils";
 
@@ -26,11 +31,12 @@ import { AssignmentSheet } from "./assignment-sheet";
 import { AcceptingBadge, StatusBadge } from "./mentors-page";
 import { ProfileTab } from "./profile-tab";
 
-export type MentorTab = "profile" | "assignments" | "contracts";
+export type MentorTab = "profile" | "assignments" | "schedule" | "contracts";
 
 const TABS: { value: MentorTab; label: string }[] = [
   { value: "profile", label: "프로필" },
   { value: "assignments", label: "배정" },
+  { value: "schedule", label: "일정" },
   { value: "contracts", label: "계약" },
 ];
 
@@ -39,18 +45,24 @@ export function MentorPage({
   mentorId,
   tab,
   assignment,
+  month,
 }: {
   mentorId: string;
   tab: MentorTab;
   /** 배정 패널: 배정 id 또는 new (F85) */
   assignment?: string;
+  /** 일정 탭의 주(그 주의 아무 날) */
+  month?: string;
 }) {
   const mentor = useQuery(mentorQuery(mentorId));
   const access = useQuery(staffAccessQuery);
   const canManage = !!access.data && hasPermission(access.data, "educator.mentor.manage");
   // 계약 탭은 계약 조회 권한이 있을 때만 (F83)
   const tabs = TABS.filter(
-    (t) => t.value !== "contracts" || (!!access.data && hasPermission(access.data, "educator.contract.read")),
+    (t) =>
+      (t.value !== "contracts" || (!!access.data && hasPermission(access.data, "educator.contract.read"))) &&
+      // 일정 대리는 가입한 멘토만 (가입 전 멘토는 일정이 없다)
+      (t.value !== "schedule" || !!mentor.data?.is_registered),
   );
   const m = mentor.data;
   return (
@@ -97,6 +109,8 @@ export function MentorPage({
             <ProfileTab mentor={m} canManage={canManage} />
           ) : tab === "contracts" ? (
             <ContractsTab mentorId={mentorId} />
+          ) : tab === "schedule" ? (
+            <ScheduleTab mentor={m} month={month} canManage={canManage} />
           ) : (
             <AssignmentsTab
               mentor={m}
@@ -299,5 +313,30 @@ function ContractsTab({ mentorId }: { mentorId: string }) {
         })}
       </ul>
     </div>
+  );
+}
+
+/** 일정 탭 (F85·A106): 멘토 일정 화면(FE-11)을 운영진 API로. 바꾸려면 멘토 관리 권한 */
+function ScheduleTab({ mentor, month, canManage }: { mentor: MentorItem; month?: string; canManage: boolean }) {
+  const navigate = useNavigate();
+  const [today] = useState(() => kstDateKey(new Date()));
+  const shown = month ?? monthOf(today);
+  const scope = useMemo(
+    () => ({
+      mentorId: mentor.id,
+      readOnly: !canManage,
+      onMonth: (next: string) =>
+        void navigate({
+          to: "/admin/educators/mentors/$mentorId",
+          params: { mentorId: mentor.id },
+          search: { tab: "schedule", month: next },
+        }),
+    }),
+    [mentor.id, navigate, canManage],
+  );
+  return (
+    <ScheduleScopeContext.Provider value={scope}>
+      <SchedulePage month={shown} embedded />
+    </ScheduleScopeContext.Provider>
   );
 }

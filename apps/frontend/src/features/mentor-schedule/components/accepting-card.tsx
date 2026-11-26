@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { Switch } from "@/components/ui/switch";
 
 import { useSetAccepting } from "../api";
+import { useScheduleScope } from "../scope";
 
 interface AcceptingSetter {
   mutateAsync: (next: boolean) => Promise<{ canceled_pending_requests?: number }>;
@@ -27,7 +28,8 @@ export function AcceptingCard({
   setter?: AcceptingSetter;
   readOnly?: boolean;
 }) {
-  const mine = useSetAccepting();
+  const scope = useScheduleScope();
+  const mine = useSetAccepting(scope.mentorId);
   const set: AcceptingSetter = setter ?? mine;
   const [confirming, setConfirming] = useState(false);
   const change = async (next: boolean) => {

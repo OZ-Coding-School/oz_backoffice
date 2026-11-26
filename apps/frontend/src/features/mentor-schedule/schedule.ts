@@ -116,3 +116,26 @@ export function periodLabel(period: UnavailablePeriod): string {
   }
   return `${formatKstDay(start)} ${range}`;
 }
+
+/** 달 키 "2026-11" */
+export function monthOf(key: string): string {
+  return key.slice(0, 7);
+}
+
+export function addMonths(month: string, n: number): string {
+  const [y = 0, m = 1] = month.split("-").map(Number);
+  const total = y * 12 + (m - 1) + n;
+  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, "0")}`;
+}
+
+/** "2026년 11월" */
+export function monthTitle(month: string): string {
+  const [y, m] = month.split("-");
+  return `${y}년 ${Number(m)}월`;
+}
+
+/** 달력 6주(42일): 그달 1일이 든 주의 월요일부터 */
+export function monthGridDays(month: string): string[] {
+  const first = weekStart(`${month}-01`);
+  return Array.from({ length: 42 }, (_, i) => addDays(first, i));
+}
