@@ -176,10 +176,9 @@ describe("불가 시간 추가·수정·삭제 (F53)", () => {
     await renderRoute("/mentor/schedule");
     const user = userEvent.setup();
     const list = await screen.findByRole("region", { name: "등록한 불가 시간" });
-    expect(within(list).queryByRole("button", { name: "강의 메뉴" })).not.toBeInTheDocument();
+    expect(within(list).queryByRole("button", { name: "강의 수정" })).not.toBeInTheDocument();
 
-    await user.click(within(list).getByRole("button", { name: "본업 메뉴" }));
-    await user.click(await screen.findByRole("menuitem", { name: "수정" }));
+    await user.click(within(list).getByRole("button", { name: "본업 수정" }));
     const dialog = await screen.findByRole("dialog", { name: "불가 시간 수정" });
     expect(within(dialog).getByRole("button", { name: "화" })).toHaveAttribute("aria-pressed", "true");
     expect(within(dialog).getByLabelText("반복 종료 (선택)")).toHaveValue("2026-12-31");
@@ -190,8 +189,7 @@ describe("불가 시간 추가·수정·삭제 (F53)", () => {
       body: { repeat: "WEEKLY", weekdays: [2, 3, 4, 5], repeat_until: "2026-12-31" },
     });
 
-    await user.click(within(list).getByRole("button", { name: "본업 메뉴" }));
-    await user.click(await screen.findByRole("menuitem", { name: "삭제" }));
+    await user.click(within(list).getByRole("button", { name: "본업 삭제" }));
     const confirm = await screen.findByRole("dialog", { name: "이 불가 시간을 지울까요?" });
     await user.click(within(confirm).getByRole("button", { name: "지우기" }));
     await waitFor(() => expect(deletes).toEqual(["p1"]));

@@ -1,17 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ChevronLeft, ChevronRight, Ellipsis, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
 import { useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 
 import { ErrorState } from "@/components/error-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Spinner } from "@/components/ui/spinner";
 import { kstDateKey } from "@/features/apply/slots";
 import { targetLabel } from "@/features/mentor-sessions/labels";
@@ -88,10 +82,6 @@ export function SchedulePage({ monday, embedded = false }: { monday: string; emb
               : "안 되는 시간만 등록해요. 나머지 시간은 기수 운영시간 안에서 수강생이 신청할 수 있어요."}
           </p>
         </div>
-        <Button className="max-md:w-full" onClick={() => setDialog({ open: true, period: null })}>
-          <Plus aria-hidden />
-          불가 시간 추가
-        </Button>
       </div>
       <UnavailableDialog
         open={dialog.open}
@@ -108,16 +98,29 @@ export function SchedulePage({ monday, embedded = false }: { monday: string; emb
         <ErrorState onRetry={() => void schedule.refetch()} />
       ) : (
         <>
-          <AcceptingCard accepting={schedule.data.accepting_requests} />
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_22.5rem] lg:items-start lg:gap-6">
-            <WeekCard
-              monday={monday}
-              now={now}
-              periods={schedule.data.unavailable_periods}
-              sessions={sessions.data?.items ?? []}
-              editor={editor}
-            />
-            <PeriodList periods={schedule.data.unavailable_periods} editor={editor} />
+            {/* 휴대폰은 신청 받기 → 시간표 → 불가 시간, 넓은 화면은 오른쪽 열에 신청 받기·불가 시간 (F87) */}
+            <div className="flex flex-col gap-4 max-lg:contents lg:order-2">
+              <div className="max-lg:order-1">
+                <AcceptingCard accepting={schedule.data.accepting_requests} />
+              </div>
+              <div className="max-lg:order-3">
+                <PeriodList
+                  periods={schedule.data.unavailable_periods}
+                  editor={editor}
+                  onAdd={() => setDialog({ open: true, period: null })}
+                />
+              </div>
+            </div>
+            <div className="max-lg:order-2 lg:order-1">
+              <WeekCard
+                monday={monday}
+                now={now}
+                periods={schedule.data.unavailable_periods}
+                sessions={sessions.data?.items ?? []}
+                editor={editor}
+              />
+            </div>
           </div>
         </>
       )}
@@ -349,15 +352,20 @@ function BlockView({ block, editor }: { block: Block; editor: Editor }) {
   );
 }
 
-function PeriodList({ periods, editor }: { periods: UnavailablePeriod[]; editor: Editor }) {
+function PeriodList({ periods, editor, onAdd }: { periods: UnavailablePeriod[]; editor: Editor; onAdd: () => void }) {
   return (
     <section
       aria-labelledby="periods-title"
       className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 md:p-5"
     >
-      <h2 id="periods-title" className="text-h3 text-foreground">
-        등록한 불가 시간
-      </h2>
+      <div className="flex items-center gap-2">
+        <h2 id="periods-title" className="flex-1 text-h3 text-foreground">
+          등록한 불가 시간
+        </h2>
+        <Button variant="outline" size="sm" className="size-8 px-0" aria-label="불가 시간 추가" onClick={onAdd}>
+          <Plus aria-hidden />
+        </Button>
+      </div>
       {periods.length === 0 ? (
         <p className="text-body-sm text-muted-foreground">
           등록한 불가 시간이 없어요. 나머지 시간은 모두 신청을 받아요.
@@ -375,24 +383,26 @@ function PeriodList({ periods, editor }: { periods: UnavailablePeriod[]; editor:
                 {p.reason ? <span className="text-caption text-muted-foreground">{p.reason}</span> : null}
               </span>
               {isLocked(p, editor.now) ? null : (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="size-8 px-0"
-                      aria-label={`${p.category ?? "불가 시간"} 메뉴`}
-                    >
-                      <Ellipsis aria-hidden />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onSelect={() => editor.edit(p)}>수정</DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive-text" onSelect={() => editor.remove(p)}>
-                      삭제
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <span className="flex shrink-0 gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="size-8 px-0 text-muted-foreground hover:text-foreground"
+                    aria-label={`${p.category ?? "불가 시간"} 수정`}
+                    onClick={() => editor.edit(p)}
+                  >
+                    <Pencil aria-hidden />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="size-8 px-0 text-muted-foreground hover:bg-destructive-subtle hover:text-destructive-text"
+                    aria-label={`${p.category ?? "불가 시간"} 삭제`}
+                    onClick={() => editor.remove(p)}
+                  >
+                    <Trash2 aria-hidden />
+                  </Button>
+                </span>
               )}
             </li>
           ))}

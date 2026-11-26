@@ -100,8 +100,7 @@ describe("강사·멘토 > 멘토 상세 > 일정 대리 (FE-18c-2)", () => {
 
     const user = userEvent.setup();
     const list = screen.getByRole("region", { name: "등록한 불가 시간" });
-    await user.click(within(list).getByRole("button", { name: "본업 메뉴" }));
-    await user.click(await screen.findByRole("menuitem", { name: "삭제" }));
+    await user.click(within(list).getByRole("button", { name: "본업 삭제" }));
     const confirm = await screen.findByRole("dialog", { name: "이 불가 시간을 지울까요?" });
     await user.click(within(confirm).getByRole("button", { name: "지우기" }));
     await waitFor(() => expect(calls).toContainEqual({ path: "delete", body: "p1" }));
