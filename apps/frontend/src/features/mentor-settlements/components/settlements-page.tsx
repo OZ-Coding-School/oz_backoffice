@@ -3,6 +3,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { ChevronRight, Wallet } from "lucide-react";
 import { useState } from "react";
 
+import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
 import { Spinner } from "@/components/ui/spinner";
@@ -24,16 +25,17 @@ export function SettlementsPage({ cohortId }: { cohortId: string | undefined }) 
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3 md:flex-row md:items-end">
-        <div className="flex flex-1 flex-col gap-1">
-          <h1 className="text-h1 text-foreground">정산</h1>
-          <p className="text-body text-muted-foreground">운영진이 마감한 정산만 보여 줘요.</p>
-        </div>
-        <CohortSelect
-          value={cohortId}
-          onChange={(cohort) => void navigate({ to: "/mentor/settlements", search: cohort ? { cohort } : {} })}
-        />
-      </div>
+      <PageHeader
+        icon={Wallet}
+        title="정산"
+        description="운영진이 마감한 정산만 보여 줘요."
+        actions={
+          <CohortSelect
+            value={cohortId}
+            onChange={(cohort) => void navigate({ to: "/mentor/settlements", search: cohort ? { cohort } : {} })}
+          />
+        }
+      />
       {list.isPending ? (
         <div className="flex justify-center py-10">
           <Spinner />
@@ -54,7 +56,12 @@ export function SettlementsPage({ cohortId }: { cohortId: string | undefined }) 
                 key={c.label}
                 className="flex flex-col gap-1 rounded-2xl border border-border bg-card shadow-sm p-4 md:p-5"
               >
-                <span className="text-caption text-muted-foreground">{c.label}</span>
+                <span className="flex items-center gap-2 text-caption text-muted-foreground">
+                  <span className="inline-flex size-6 items-center justify-center rounded-lg bg-sidebar-accent text-sidebar-accent-foreground">
+                    <Wallet aria-hidden className="size-3.5" />
+                  </span>
+                  {c.label}
+                </span>
                 <span className="text-h2 text-foreground">{won(c.amount)}</span>
                 <span className="text-caption text-muted-foreground">{c.note}</span>
               </li>

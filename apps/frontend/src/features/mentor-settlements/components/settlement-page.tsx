@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft, FileSearch } from "lucide-react";
+import { ArrowLeft, Clock, FileSearch, Video, Wallet } from "lucide-react";
 
 import { ApiError } from "@/api/errors";
 import { EmptyState } from "@/components/empty-state";
@@ -50,9 +50,9 @@ export function SettlementPage({ settlementId }: { settlementId: string }) {
 
 function Detail({ settlement: s }: { settlement: SettlementDetail }) {
   const stats = [
-    { label: "세션", value: `${s.session_count}회` },
-    { label: "정산 시간", value: formatMinutes(s.total_minutes) },
-    { label: "금액", value: won(s.total_amount) },
+    { icon: Video, label: "세션", value: `${s.session_count}회` },
+    { icon: Clock, label: "정산 시간", value: formatMinutes(s.total_minutes) },
+    { icon: Wallet, label: "금액", value: won(s.total_amount) },
   ];
   return (
     <>
@@ -73,7 +73,12 @@ function Detail({ settlement: s }: { settlement: SettlementDetail }) {
             key={stat.label}
             className="flex flex-col gap-1 rounded-2xl border border-border bg-card shadow-sm p-4 md:p-5"
           >
-            <dt className="text-caption text-muted-foreground">{stat.label}</dt>
+            <dt className="flex items-center gap-2 text-caption text-muted-foreground">
+              <span className="inline-flex size-6 items-center justify-center rounded-lg bg-sidebar-accent text-sidebar-accent-foreground">
+                <stat.icon aria-hidden className="size-3.5" />
+              </span>
+              {stat.label}
+            </dt>
             <dd className="text-h2 text-foreground">{stat.value}</dd>
           </div>
         ))}

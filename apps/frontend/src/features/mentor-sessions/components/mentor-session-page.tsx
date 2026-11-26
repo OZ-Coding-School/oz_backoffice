@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft, FileSearch, Video } from "lucide-react";
+import { ArrowLeft, FileSearch, FileText, Video } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { CardTitle } from "@/components/section-card";
 import { ApiError } from "@/api/errors";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
@@ -105,7 +106,7 @@ function RequestInfo({ session }: { session: MentoringSession }) {
       aria-label="신청 정보"
       className="flex flex-col gap-3 rounded-2xl border border-border bg-card shadow-sm p-5"
     >
-      <h2 className="text-h3 text-foreground">신청 정보</h2>
+      <CardTitle icon={FileText}>신청 정보</CardTitle>
       <dl className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-x-4 gap-y-2 text-body">
         <dt className="text-caption text-muted-foreground">신청 시간</dt>
         <dd className="text-foreground">{plannedMinutes(session)}분</dd>
