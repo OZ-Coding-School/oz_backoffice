@@ -1875,6 +1875,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/mentoring/holidays": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Calendar Holidays
+         * @description 기간 안 법정공휴일과 추가 휴일 (A107). 달력에 참고로 보여 줄 뿐 신청 가능 시간과는 무관하다.
+         *
+         *     `to`는 포함, 기간은 100일까지(넘거나 거꾸로면 422 `invalid_holiday_range`).
+         */
+        get: operations["list_calendar_holidays_api_v1_mentoring_holidays_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/cohorts/{cohort_id}/mentor-assignments": {
         parameters: {
             query?: never;
@@ -4380,6 +4402,22 @@ export interface components {
             reactivated: components["schemas"]["AssignmentResponse"][];
             /** Failed */
             failed: components["schemas"]["ReactivationFailureResponse"][];
+        };
+        /** CalendarHolidayListResponse */
+        CalendarHolidayListResponse: {
+            /** Items */
+            items: components["schemas"]["CalendarHolidayResponse"][];
+        };
+        /** CalendarHolidayResponse */
+        CalendarHolidayResponse: {
+            /**
+             * Holiday Date
+             * Format: date
+             */
+            holiday_date: string;
+            /** Name */
+            name: string;
+            source: components["schemas"]["HolidaySource"];
         };
         /** CancelBody */
         CancelBody: {
@@ -12283,6 +12321,38 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_calendar_holidays_api_v1_mentoring_holidays_get: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarHolidayListResponse"];
+                };
             };
             /** @description Validation Error */
             422: {

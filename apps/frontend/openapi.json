@@ -6397,6 +6397,65 @@
         }
       }
     },
+    "/api/v1/mentoring/holidays": {
+      "get": {
+        "tags": [
+          "mentoring-calendar"
+        ],
+        "summary": "List Calendar Holidays",
+        "description": "기간 안 법정공휴일과 추가 휴일 (A107). 달력에 참고로 보여 줄 뿐 신청 가능 시간과는 무관하다.\n\n`to`는 포함, 기간은 100일까지(넘거나 거꾸로면 422 `invalid_holiday_range`).",
+        "operationId": "list_calendar_holidays_api_v1_mentoring_holidays_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarHolidayListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/cohorts/{cohort_id}/mentor-assignments": {
       "get": {
         "tags": [
@@ -14874,6 +14933,45 @@
           "failed"
         ],
         "title": "BulkReactivateResponse"
+      },
+      "CalendarHolidayListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CalendarHolidayResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "CalendarHolidayListResponse"
+      },
+      "CalendarHolidayResponse": {
+        "properties": {
+          "holiday_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Holiday Date"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "source": {
+            "$ref": "#/components/schemas/HolidaySource"
+          }
+        },
+        "type": "object",
+        "required": [
+          "holiday_date",
+          "name",
+          "source"
+        ],
+        "title": "CalendarHolidayResponse"
       },
       "CancelBody": {
         "properties": {
