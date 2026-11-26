@@ -51,3 +51,4 @@
 | 47 | [가입 승인 멘토 탭: 가입 전 멘토 고르기 (FE-15a 보완)](47_approval_pending_mentors.md) | 완료 (#167) |
 | 48 | [멘토 기수 배정 관리, 계약 패널 F68 정리 (FE-18c-1)](48_mentor_assignments.md) | 완료 (#169) |
 | 49 | [멘토 일정 대리 (FE-18c-2)](49_mentor_schedule_admin.md) | 완료 (#171) |
+| 50 | [멘토링 > 멘토링 설정 (FE-19a)](50_mentoring_settings.md) | 완료 (#173) |

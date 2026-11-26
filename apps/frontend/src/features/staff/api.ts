@@ -17,3 +17,17 @@ export const staffAccessQuery = queryOptions({
 export function hasPermission(access: Pick<StaffAccess, "permissions">, code: string): boolean {
   return access.permissions.some((p) => p.code === code);
 }
+
+/** 그 권한이 이 기수에 미치는가 (최고 관리자·전체 범위·과정 범위·기수 범위). 최종 판정은 서버 403 */
+export function hasPermissionIn(
+  access: Pick<StaffAccess, "is_super_admin" | "permissions">,
+  code: string,
+  cohort: Pick<StaffCohort, "id" | "bootcamp_id">,
+): boolean {
+  if (access.is_super_admin) return true;
+  return access.permissions.some(
+    (p) =>
+      p.code === code &&
+      (p.is_global || p.cohort_ids.includes(cohort.id) || p.bootcamp_ids.includes(cohort.bootcamp_id)),
+  );
+}

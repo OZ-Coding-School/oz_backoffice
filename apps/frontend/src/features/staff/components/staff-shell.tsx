@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 
 import { hasPermission, staffAccessQuery } from "../api";
 import { roleLines } from "../labels";
+import { CohortPicker } from "./cohort-picker";
 import { currentStaffNav, staffModules, type StaffModule, type StaffNavItem } from "../nav";
 
 /**
@@ -106,6 +107,8 @@ export function StaffShell({ me, children }: { me: Me; children: ReactNode }) {
       ) : null}
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-10 flex h-15 items-center gap-2 border-b border-border bg-background px-6">
+          {/* 기수 단위 화면이면 현재 기수 선택기 (F59·F90) */}
+          <CohortPicker />
           <nav aria-label="위치" className="flex items-center gap-1.5 text-body-sm text-muted-foreground">
             {current ? (
               <>
