@@ -1,8 +1,9 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Search, Users } from "lucide-react";
+import { Search, UserRound, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
 import { LoadMore } from "@/components/load-more";
@@ -60,10 +61,11 @@ export function MembersPage({ search }: { search: MembersSearch }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-h1 text-foreground">전체 회원</h1>
-        <p className="text-body text-muted-foreground">승인된 계정을 보고, 계정을 비활성화하거나 다시 활성화해요.</p>
-      </div>
+      <PageHeader
+        icon={UserRound}
+        title="전체 회원"
+        description="승인된 계정을 보고, 계정을 비활성화하거나 다시 활성화해요."
+      />
       <div className="flex items-end gap-3">
         <nav aria-label="계정 종류" className="flex-1">
           <ul className="flex gap-1 border-b border-border">
