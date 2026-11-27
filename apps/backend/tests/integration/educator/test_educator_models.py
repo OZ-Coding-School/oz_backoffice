@@ -24,7 +24,7 @@ from app.contexts.educator.infrastructure.models import (
 )
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
 from app.shared.ids import new_id
-from tests.factories.educator import INSTRUCTOR_TERMS, mentor_contract_fields
+from tests.factories.educator import INSTRUCTOR_TERMS, create_mentor, mentor_contract_fields
 from tests.factories.identity import make_user
 from tests.factories.organization import create_employee
 
@@ -114,10 +114,17 @@ async def test_file_required_from_in_progress() -> None:
     )
     with pytest.raises(IntegrityError):  # 서명된 계약서는 계약 완료부터 필수 (A113)
         await _contract(status=ContractStatus.ACTIVE, contract_file_id=(await _file()).id)
+    with pytest.raises(IntegrityError):  # 멘토 계약은 계약 완료부터 멘토 필수 (A115)
+        await _contract(
+            status=ContractStatus.ACTIVE,
+            contract_file_id=(await _file()).id,
+            signed_contract_file_id=(await _file()).id,
+        )
     active = await _contract(
         status=ContractStatus.ACTIVE,
         contract_file_id=(await _file()).id,
         signed_contract_file_id=(await _file()).id,
+        mentor_id=(await create_mentor()).id,
     )
     assert active.status is ContractStatus.ACTIVE
 

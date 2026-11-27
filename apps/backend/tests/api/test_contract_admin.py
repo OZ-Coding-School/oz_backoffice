@@ -329,8 +329,13 @@ async def test_link_and_unlink(client: AsyncClient, admin: dict[str, str]) -> No
     mentor = await create_mentor()
     instructor = await create_instructor()
 
-    # 멘토 계약은 다른 멘토로 옮길 수 없다 (A114)
-    moved = await client.post(path, json={"mentor_id": str(mentor.id)}, headers=admin)
+    # 새 사람의 초안은 멘토가 없어 기존 멘토에 연결할 수 있다 (A115)
+    linked = await client.post(path, json={"mentor_id": str(mentor.id)}, headers=admin)
+    assert linked.status_code == 200, linked.text
+    assert linked.json()["mentor_id"] == str(mentor.id)
+    # 정해진 멘토는 다른 멘토로 옮길 수 없다 (A114)
+    other = await create_mentor()
+    moved = await client.post(path, json={"mentor_id": str(other.id)}, headers=admin)
     assert moved.status_code == 422, moved.text
     assert moved.json()["error"]["code"] == "mentor_contract_move_forbidden"
 

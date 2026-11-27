@@ -5099,7 +5099,7 @@ export interface components {
             contract_file_id?: string | null;
             /**
              * Mentor Id
-             * @description 멘토 계약이 속할 멘토 (A104). 없으면 이름·휴대폰이 같은 멘토, 그것도 없으면 가입 전 멘토를 만든다
+             * @description 기존 멘토의 추가 계약이면 그 멘토 (A104). 없으면(새 사람) 계약 완료 때 이름·휴대폰이 같은 멘토에 연결하거나 가입 전 멘토를 만든다 (A115)
              */
             mentor_id?: string | null;
         };

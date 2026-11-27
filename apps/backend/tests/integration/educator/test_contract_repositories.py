@@ -11,7 +11,7 @@ from app.contexts.educator.infrastructure.repositories import (
     TortoiseEducatorContractRepository,
 )
 from app.shared.ids import new_id
-from tests.factories.educator import INSTRUCTOR_TERMS, mentor_contract_fields
+from tests.factories.educator import INSTRUCTOR_TERMS, create_mentor, mentor_contract_fields
 from tests.factories.organization import create_employee
 
 pytestmark = pytest.mark.integration
@@ -51,6 +51,8 @@ async def _contract(**overrides: Any) -> EducatorContract:
         ContractStatus.TERMINATED,
     ):
         values.setdefault("signed_contract_file_id", (await _file()).id)
+        if values.get("contract_type", ContractType.MENTOR) is ContractType.MENTOR:
+            values.setdefault("mentor_id", (await create_mentor()).id)  # 완료부터 멘토 필수 (A115)
     contract = EducatorContract(**values)
     await contracts.add(contract)
     return contract

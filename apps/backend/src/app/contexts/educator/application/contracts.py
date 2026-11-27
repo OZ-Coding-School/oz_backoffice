@@ -7,8 +7,9 @@
   담당 직원은 언제나 바로 바꾼다. 삭제는 DRAFT만.
 - 계약서는 확정된 업로드(contract_files)만 붙일 수 있고, 다른 계약·변경 계약이 쓰는 파일은 붙일 수
   없다. 교체하거나 비우거나 계약을 지우면 이전 파일은 deleted_at만 채우고 객체는 남긴다(A25).
-- 멘토 계약은 항상 멘토에 속한다(A104): 만들 때 지정한 멘토, 없으면 이름·휴대폰이 같은 멘토
-  하나, 그것도 없으면 가입 전 멘토를 만든다. 연결 해제도, 다른 멘토로 옮기기도 없다(A114).
+- 멘토 계약의 멘토 (A104·A115): 기존 멘토를 고른 추가 계약은 만들 때 연결한다. 새 사람은
+  계약 완료 때 이름·휴대폰이 같은 멘토 하나에 연결하고, 없으면 가입 전 멘토를 만든다(둘 이상이면
+  409). 연결 해제도, 다른 멘토로 옮기기도 없다(A114).
   가입 전 멘토의 마지막 계약을 지우면 그 멘토도 지운다.
 - 기수 배정의 근거 계약(A110): 계약이 ENDED·TERMINATED가 되거나 기간이 바뀌면 listener가 같은
   트랜잭션에서 배정을 정리한다.
@@ -252,7 +253,8 @@ class ContractService:
             await self._require_manage(contract, actor_id)
             await self._ensure_employee(contract.manager_employee_id)
             file = await self._attachable_file(contract.contract_file_id)
-            if contract.contract_type is ContractType.MENTOR:
+            if contract.contract_type is ContractType.MENTOR and mentor_id is not None:
+                # 기존 멘토의 추가 계약은 만들 때 연결한다. 새 사람은 계약 완료 때 (A115)
                 mentor = await self._mentor_for(contract, mentor_id, actor_id=actor_id)
                 contract.link(mentor_id=mentor.id, instructor_id=None)
             elif mentor_id is not None:
@@ -355,6 +357,10 @@ class ContractService:
             if signed_contract_file_id != contract.contract_file_id:
                 await self._attachable_file(signed_contract_file_id, exclude=contract.id)
             contract.sign(today=today, signed_contract_file_id=signed_contract_file_id)
+            if contract.contract_type is ContractType.MENTOR and contract.mentor_id is None:
+                # 새 사람의 멘토 계약은 계약 완료 때 멘토에 연결하거나 가입 전 멘토를 만든다 (A115)
+                mentor = await self._mentor_for(contract, None, actor_id=actor_id)
+                contract.link(mentor_id=mentor.id, instructor_id=None)
             await self._contracts.save(contract)
             await self._record(actor_id, "sign", contract, before=before)
             await self._notify(before, contract, actor_id)
@@ -499,7 +505,8 @@ class ContractService:
         same = await self._mentors.find_same_person(contract.contractor_name, phone)
         if len(same) > 1:
             raise ConflictError(
-                "이름과 휴대폰이 같은 멘토가 여럿이에요. 멘토 상세에서 계약을 추가해 주세요.",
+                "이름과 휴대폰이 같은 멘토가 여럿이에요. 이 계약을 취소하고 "
+                "기존 멘토를 골라 다시 만들어 주세요.",
                 code="ambiguous_mentor",
             )
         if same:
