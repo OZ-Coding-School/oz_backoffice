@@ -1,6 +1,8 @@
 import type { StaffCohort } from "./api";
 
 const KEY = "oz.admin.current-cohort";
+const RECENT_KEY = "oz.admin.recent-cohorts";
+const RECENT_MAX = 3;
 
 /** 기수 단위 화면 주소 `/admin/cohorts/{id}/…`의 기수 id (F59·F90) */
 export function cohortIdOf(pathname: string): string | null {
@@ -24,8 +26,20 @@ export function rememberedCohortId(): string | null {
 export function rememberCohort(id: string): void {
   try {
     localStorage.setItem(KEY, id);
+    const recent = [id, ...recentCohortIds().filter((x) => x !== id)].slice(0, RECENT_MAX);
+    localStorage.setItem(RECENT_KEY, JSON.stringify(recent));
   } catch {
     // 저장소를 못 쓰면 기억하지 않는다
+  }
+}
+
+/** 최근에 고른 기수 (최신 먼저, 3개까지) */
+export function recentCohortIds(): string[] {
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]");
+    return Array.isArray(raw) ? raw.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
   }
 }
 
