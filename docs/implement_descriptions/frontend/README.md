@@ -63,4 +63,4 @@
 | 59 | [멘토링 > 팀 관리 (FE-19b)](59_mentoring_teams.md) | 완료 (#184) |
 | 60 | [두 칸 기수 선택기를 수강생·가입 승인에도 (F95)](60_cohort_chooser_reuse.md) | 완료 (#185) |
 | 61 | [행정 업무 › 계약 개편 화면 (F96)](61_contract_screens.md) | 완료 (#189) |
-| 62 | [계약 화면: 새 사람의 멘토는 계약 완료 때 (A115)](62_contract_mentor_on_sign.md) | PR 진행 중 |
+| 62 | [계약 화면: 새 사람의 멘토는 계약 완료 때 (A115)](62_contract_mentor_on_sign.md) | 완료 (#193) |
