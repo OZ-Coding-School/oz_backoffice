@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { useMemo } from "react";
 import { toast } from "sonner";
 
+import { PageHeader } from "@/components/page-header";
 import { ErrorState } from "@/components/error-state";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -39,10 +40,11 @@ export function HolidaysPage({ search }: { search: HolidaysSearch }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-h1 text-foreground">공휴일</h1>
-        <p className="text-body text-muted-foreground">법정공휴일은 자동으로 정해지고, 추가 휴일은 직접 등록해요.</p>
-      </div>
+      <PageHeader
+        icon={CalendarDays}
+        title="공휴일"
+        description="법정공휴일은 자동으로 정해지고, 추가 휴일은 직접 등록해요."
+      />
       <div className="flex items-center gap-3">
         <YearLink year={year - 1} label="이전 해" icon={ChevronLeft} />
         <h2 className="text-h2 text-foreground">{year}년</h2>

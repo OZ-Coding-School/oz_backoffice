@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { LayoutGrid, ShieldQuestion } from "lucide-react";
 
+import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Spinner } from "@/components/ui/spinner";
 import type { Me } from "@/features/auth/api";
@@ -12,10 +13,11 @@ export function StaffHome({ me }: { me: Me }) {
   const access = useQuery(staffAccessQuery);
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-h1 text-foreground">안녕하세요, {me.name}님</h1>
-        <p className="text-body text-muted-foreground">오늘 처리할 일을 모아 볼 수 있어요.</p>
-      </div>
+      <PageHeader
+        icon={LayoutGrid}
+        title={`안녕하세요, ${me.name}님`}
+        description="오늘 처리할 일을 모아 볼 수 있어요."
+      />
       {access.isPending ? (
         <div className="flex justify-center py-10">
           <Spinner />
