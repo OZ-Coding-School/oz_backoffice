@@ -54,3 +54,4 @@
 | 50 | [멘토링 > 멘토링 설정 (FE-19a)](50_mentoring_settings.md) | 완료 (#173) |
 | 51 | [디자인 다듬기 ① 공용 부품 (F92)](51_design_refresh_shared.md) | 완료 (#174) |
 | 52 | [디자인 다듬기 ② 학사 (F92)](52_design_refresh_academy.md) | 완료 (#182) |
+| 53 | [디자인 다듬기 ③ 강사·멘토·행정 (F92)](53_design_refresh_educators.md) | 완료 (#176) |
