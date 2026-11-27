@@ -3,14 +3,18 @@ from datetime import date
 import pytest
 
 from app.contexts.educator.domain.entities import EducatorContract
-from app.contexts.educator.domain.enums import EducatorType
 from app.contexts.educator.infrastructure.repositories import (
     TortoiseEducatorContractRepository,
     TortoiseInstructorRepository,
     TortoiseMentorRepository,
 )
 from app.shared.ids import new_id
-from tests.factories.educator import create_instructor, create_mentor, create_user
+from tests.factories.educator import (
+    create_instructor,
+    create_mentor,
+    create_user,
+    mentor_contract_fields,
+)
 from tests.factories.organization import create_employee
 
 pytestmark = pytest.mark.integration
@@ -58,7 +62,7 @@ async def test_round_trip_and_counts() -> None:
         await contracts.add(
             EducatorContract(
                 manager_employee_id=employee.id,
-                educator_type=EducatorType.MENTOR,
+                **(await mentor_contract_fields()),
                 contractor_name="김멘토",
                 contractor_phone="01012345678",
                 title="계약",

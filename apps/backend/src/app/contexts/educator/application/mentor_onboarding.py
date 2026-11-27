@@ -3,7 +3,7 @@
 다른 컨텍스트(가입)용 공개 서비스다. 트랜잭션은 호출하는 쪽이 연다.
 
 - 자동(A105): 연락처 이름 + 휴대폰이 같은 가입 전 멘토(A104)가 정확히 하나면 계정을 연결한다.
-  가입 때 고른 닉네임·표시 이름을 넣고, 진행 중(ACTIVE) 계약이 있으면 활성으로 둔다.
+  가입 때 고른 닉네임·표시 이름을 넣고, 서명된(SIGNED·ACTIVE) 계약이 있으면 활성으로 둔다(A109⑧).
   둘 이상이면 AMBIGUOUS, 없으면 NO_MATCH(운영진 승인 대기). 예전처럼 미연결 계약을 자동으로
   잇지는 않는다(기존 미연결 계약은 옮기지 않음, A104).
 - 운영진 승인: 가입 전 멘토 하나(선택)와 예전 미연결 계약(0건 이상)을 고른다. 가입 전 멘토를
@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from datetime import date
 
 from app.contexts.educator.domain.entities import EducatorContract
-from app.contexts.educator.domain.enums import ContractStatus, DisplayNamePreference, EducatorType
+from app.contexts.educator.domain.enums import ContractStatus, ContractType, DisplayNamePreference
 from app.contexts.educator.domain.profiles import Mentor
 from app.contexts.educator.domain.repositories import (
     ContractFilter,
@@ -51,8 +51,8 @@ class ContractCandidate:
     contractor_phone: str | None
     title: str
     status: str
-    start_date: date
-    end_date: date
+    start_date: date | None
+    end_date: date | None
 
 
 class MentorOnboarding:
@@ -147,7 +147,7 @@ class MentorOnboarding:
             contract = await self._contracts.get(contract_id)
             if contract is None:
                 raise NotFoundError("계약을 찾을 수 없습니다.", code="contract_not_found")
-            if contract.educator_type is not EducatorType.MENTOR or contract.mentor_id is not None:
+            if contract.contract_type is not ContractType.MENTOR or contract.mentor_id is not None:
                 raise BusinessRuleViolation(
                     "연결할 수 없는 계약입니다 (멘토 계약이 아니거나 이미 연결됨).",
                     code="contract_not_linkable",
@@ -167,9 +167,12 @@ class MentorOnboarding:
         nickname: str | None,
         display_name_preference: DisplayNamePreference,
     ) -> Mentor:
-        """가입 전 멘토에 계정을 연결한다. 진행 중 계약이 있으면 활성으로 둔다 (A105)."""
+        """가입 전 멘토에 계정을 연결한다. 서명된(SIGNED·ACTIVE) 계약이 있으면 활성 (A105·A109⑧)."""
         active, _ = await self._contracts.list_page(
-            ContractFilter(statuses=frozenset({ContractStatus.ACTIVE}), mentor_id=pending.id),
+            ContractFilter(
+                statuses=frozenset({ContractStatus.SIGNED, ContractStatus.ACTIVE}),
+                mentor_id=pending.id,
+            ),
             limit=1,
             offset=0,
         )

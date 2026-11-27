@@ -109,3 +109,4 @@
 | 105 | [운영진 멘토별 세션 조회 (BE-3y)](105_admin_mentor_sessions.md) | 완료 (#170) |
 | 106 | [달력 참고용 휴일 조회 (BE-3z)](106_calendar_holidays.md) | 완료 (#172) |
 | 107 | [운영진 팀 목록 집계 (BE-3z2)](107_admin_team_stats.md) | 완료 (#183) |
+| 108 | [계약 개편 (BE-4a)](108_contract_redesign.md) | 완료 (#186) |

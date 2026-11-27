@@ -1,5 +1,6 @@
-"""계약·계약서 관리 API (실제 DB + S3 에뮬레이터 floci)."""
+"""계약·계약서 관리 API (실제 DB + S3 에뮬레이터 floci, A109)."""
 
+import uuid
 from datetime import UTC, datetime
 from typing import Any
 
@@ -12,9 +13,8 @@ from app.contexts.identity.domain.entities import User
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
 from app.core.config import Settings
 from app.core.security import JWTService
-from tests.factories.academy import create_cohort
 from tests.factories.access import ASSISTANT, MANAGER, give_role
-from tests.factories.educator import create_instructor, create_mentor
+from tests.factories.educator import create_instructor, create_mentor, mentor_contract_fields
 from tests.factories.organization import create_employee
 from tests.factories.staff_review import create_applicant
 
@@ -35,11 +35,11 @@ async def admin(settings: Settings, s3_bucket: str) -> dict[str, str]:
     return bearer(settings, result.user)
 
 
-async def _staff(settings: Settings, role: str) -> dict[str, str]:
+async def _staff(settings: Settings, role: str, cohort_id: uuid.UUID) -> dict[str, str]:
     user = await create_applicant()
     user.approve(now=datetime.now(UTC))
     await TortoiseUserRepository().save(user)
-    await give_role(user.id, role, cohort_id=(await create_cohort()).id)
+    await give_role(user.id, role, cohort_id=cohort_id)
     return bearer(settings, user)
 
 
@@ -61,18 +61,46 @@ async def _upload(client: AsyncClient, h: dict[str, str], body: bytes = PDF) -> 
 
 
 async def _contract_body(**overrides: Any) -> dict[str, Any]:
+    fields = await mentor_contract_fields()
     body: dict[str, Any] = {
-        "educator_type": "MENTOR",
+        "contract_type": "MENTOR",
+        "bootcamp_id": str(fields["bootcamp_id"]),
+        "cohort_id": str(fields["cohort_id"]),
         "contractor_name": "김멘토",
         "contractor_phone": "010-1234-5678",
         "contractor_email": "Mentor@Example.com",
         "title": "2026 멘토 계약",
         "start_date": "2026-01-01",
         "end_date": "2099-12-31",
+        "settlement_type": "UNIT_PRICE",
+        "unit_price": 50000,
+        "price_unit": "HOURLY",
+        "no_show_pay_amount": 10000,
+        "mentoring_time_basis": "ACTUAL_DURATION",
         "manager_employee_id": str((await create_employee()).id),
     }
     body.update(overrides)
     return body
+
+
+def _vendor(body: dict[str, Any], **overrides: Any) -> dict[str, Any]:
+    vendor = {
+        **body,
+        "contract_type": "SW",
+        "contractor_name": "(주)오즈",
+        "contractor_phone": "02-123-4567",
+        "business_registration_number": "123-45-67890",
+        "settlement_type": "FIXED",
+        "total_amount": 1200000,
+        "unit_price": None,
+        "price_unit": None,
+        "no_show_pay_amount": None,
+        "mentoring_time_basis": None,
+        "vat_type": "EXCLUDED",
+        "cohort_id": None,
+    }
+    vendor.update(overrides)
+    return vendor
 
 
 async def test_contract_lifecycle(client: AsyncClient, admin: dict[str, str]) -> None:
@@ -84,9 +112,11 @@ async def test_contract_lifecycle(client: AsyncClient, admin: dict[str, str]) ->
         "01012345678",
         "mentor@example.com",
     )
+    assert contract["bootcamp_name"]
+    assert contract["cohort_number"] == 1
     path = f"{API}/contracts/{contract['id']}"
 
-    no_file = await client.post(f"{path}/confirm", headers=admin)
+    no_file = await client.post(f"{path}/progress", headers=admin)
     assert no_file.status_code == 422
     assert no_file.json()["error"]["code"] == "contract_file_required"
 
@@ -96,12 +126,36 @@ async def test_contract_lifecycle(client: AsyncClient, admin: dict[str, str]) ->
     attached = await client.patch(path, json={"contract_file_id": file.json()["id"]}, headers=admin)
     assert attached.json()["contract_file"]["id"] == file.json()["id"]
 
-    confirmed = await client.post(f"{path}/confirm", headers=admin)
-    assert confirmed.json()["status"] == "ACTIVE"
+    progressing = await client.post(f"{path}/progress", headers=admin)
+    assert progressing.json()["status"] == "IN_PROGRESS"
+    signed = await client.post(f"{path}/sign", headers=admin)
+    assert signed.json()["status"] == "ACTIVE"
     locked = await client.patch(path, json={"title": "변경"}, headers=admin)
     assert locked.status_code == 422
     assert locked.json()["error"]["code"] == "contract_not_editable"
     assert (await client.delete(path, headers=admin)).status_code == 422
+
+    amended = await client.post(
+        f"{path}/amendments",
+        json={"amended_on": "2026-11-09", "reason": "단가 인상", "changes": {"unit_price": 60000}},
+        headers=admin,
+    )
+    assert amended.status_code == 201, amended.text
+    assert (amended.json()["before"], amended.json()["after"]) == (
+        {"unit_price": 50000},
+        {"unit_price": 60000},
+    )
+    assert amended.json()["created_by_name"]
+    history = await client.get(f"{path}/amendments", headers=admin)
+    assert [a["reason"] for a in history.json()] == ["단가 인상"]
+    assert (await client.get(path, headers=admin)).json()["unit_price"] == 60000
+    not_amendable = await client.post(
+        f"{path}/amendments",
+        json={"amended_on": "2026-11-09", "reason": "기수", "changes": {"cohort_id": None}},
+        headers=admin,
+    )
+    # 기수는 변경 계약 항목이 아니라 받지 않는다 → 바뀐 것이 없음
+    assert not_amendable.json()["error"]["code"] == "amendment_no_changes"
 
     url = await client.get(f"{path}/file-url", headers=admin)
     assert url.status_code == 200
@@ -109,8 +163,35 @@ async def test_contract_lifecycle(client: AsyncClient, admin: dict[str, str]) ->
         downloaded = await s3.get(url.json()["url"])
     assert downloaded.content == PDF
 
-    terminated = await client.post(f"{path}/terminate", headers=admin)
+    terminated = await client.post(
+        f"{path}/terminate",
+        json={"reason": "TERMINATED_BY_MUTUAL_AGREEMENT", "detail": "합의 해지"},
+        headers=admin,
+    )
     assert terminated.json()["status"] == "TERMINATED"
+    assert terminated.json()["termination_reason"] == "TERMINATED_BY_MUTUAL_AGREEMENT"
+    assert terminated.json()["terminated_on"] is not None
+
+
+async def test_vendor_contract_and_cancel(client: AsyncClient, admin: dict[str, str]) -> None:
+    body = _vendor(await _contract_body())
+    created = await client.post(f"{API}/contracts", json=body, headers=admin)
+    assert created.status_code == 201, created.text
+    contract = created.json()
+    assert (contract["contract_type"], contract["mentor_id"], contract["cohort_id"]) == (
+        "SW",
+        None,
+        None,
+    )
+    assert (contract["contractor_phone"], contract["business_registration_number"]) == (
+        "021234567",
+        "1234567890",
+    )
+    canceled = await client.post(
+        f"{API}/contracts/{contract['id']}/cancel", json={"reason": "견적 불일치"}, headers=admin
+    )
+    assert canceled.json()["status"] == "CANCELED"
+    assert canceled.json()["cancel_reason"] == "견적 불일치"
 
 
 async def test_upload_rejects_non_pdf_content(client: AsyncClient, admin: dict[str, str]) -> None:
@@ -129,29 +210,64 @@ async def test_draft_delete_and_list(client: AsyncClient, admin: dict[str, str])
     first = (
         await client.post(f"{API}/contracts", json=await _contract_body(), headers=admin)
     ).json()
-    await client.post(
-        f"{API}/contracts",
-        json=await _contract_body(contractor_name="박강사", educator_type="INSTRUCTOR"),
-        headers=admin,
+    instructor = await _contract_body(
+        contractor_name="박강사",
+        contract_type="INSTRUCTOR",
+        no_show_pay_amount=None,
+        mentoring_time_basis=None,
     )
+    second = await client.post(f"{API}/contracts", json=instructor, headers=admin)
+    assert second.status_code == 201, second.text
 
     listed = await client.get(
         f"{API}/contracts", params={"q": "박강", "status": ["DRAFT"]}, headers=admin
     )
     assert listed.json()["total"] == 1
     assert listed.json()["items"][0]["contractor_name"] == "박강사"
+    by_type = await client.get(
+        f"{API}/contracts", params={"contract_type": ["INSTRUCTOR", "SW"]}, headers=admin
+    )
+    assert [c["id"] for c in by_type.json()["items"]] == [second.json()["id"]]
+    by_cohort = await client.get(
+        f"{API}/contracts", params={"cohort_id": first["cohort_id"]}, headers=admin
+    )
+    assert [c["id"] for c in by_cohort.json()["items"]] == [first["id"]]
 
     assert (await client.delete(f"{API}/contracts/{first['id']}", headers=admin)).status_code == 204
     assert (await client.get(f"{API}/contracts/{first['id']}", headers=admin)).status_code == 404
 
 
-async def test_permissions(client: AsyncClient, settings: Settings, s3_bucket: str) -> None:
+async def test_permissions_follow_assigned_scope(
+    client: AsyncClient, settings: Settings, admin: dict[str, str]
+) -> None:
+    """담당 범위 (A109⑦): 담당 기수의 계약만 보이고, 범위 밖은 404·403."""
     assert (await client.get(f"{API}/contracts")).status_code == 401
-    assistant = await _staff(settings, ASSISTANT)
+    mine_body = await _contract_body()
+    other_body = await _contract_body()
+    mine = (await client.post(f"{API}/contracts", json=mine_body, headers=admin)).json()
+    other = (await client.post(f"{API}/contracts", json=other_body, headers=admin)).json()
+    cohort_id = uuid.UUID(mine["cohort_id"])
+
+    assistant = await _staff(settings, ASSISTANT, cohort_id)
     assert (await client.get(f"{API}/contracts", headers=assistant)).status_code == 403
-    # 계약은 기수 범위가 없어 매니저 역할이 하나라도 있으면 허용한다 (A16)
-    manager = await _staff(settings, MANAGER)
-    assert (await client.get(f"{API}/contracts", headers=manager)).status_code == 200
+
+    manager = await _staff(settings, MANAGER, cohort_id)
+    listed = await client.get(f"{API}/contracts", headers=manager)
+    assert [c["id"] for c in listed.json()["items"]] == [mine["id"]]
+    assert (await client.get(f"{API}/contracts/{other['id']}", headers=manager)).status_code == 404
+    # 담당 기수가 아닌 곳에는 만들 수 없다
+    outside = await client.post(f"{API}/contracts", json=await _contract_body(), headers=manager)
+    assert outside.status_code == 403
+    inside = await client.post(
+        f"{API}/contracts",
+        json={
+            **await _contract_body(),
+            "bootcamp_id": mine["bootcamp_id"],
+            "cohort_id": mine["cohort_id"],
+        },
+        headers=manager,
+    )
+    assert inside.status_code == 201, inside.text
 
 
 async def test_validation_errors(client: AsyncClient, admin: dict[str, str]) -> None:
@@ -168,6 +284,18 @@ async def test_validation_errors(client: AsyncClient, admin: dict[str, str]) -> 
         headers=admin,
     )
     assert reversed_period.json()["error"]["code"] == "invalid_contract_period"
+    other = await _contract_body()
+    mismatch = await client.post(
+        f"{API}/contracts",
+        json=await _contract_body(cohort_id=other["cohort_id"]),
+        headers=admin,
+    )
+    assert mismatch.status_code == 422
+    assert mismatch.json()["error"]["code"] == "cohort_not_in_bootcamp"
+    monthly_mentor = await client.post(
+        f"{API}/contracts", json=await _contract_body(price_unit="MONTHLY"), headers=admin
+    )
+    assert monthly_mentor.json()["error"]["code"] == "invalid_mentor_contract_terms"
 
 
 async def test_link_and_unlink(client: AsyncClient, admin: dict[str, str]) -> None:

@@ -6,7 +6,9 @@ import { postPhoto } from "@/features/mentor-profile/api";
 
 export type Contract = components["schemas"]["ContractResponse"];
 export type ContractStatus = components["schemas"]["ContractStatus"];
-export type EducatorType = components["schemas"]["EducatorType"];
+export type ContractType = components["schemas"]["ContractType"];
+/** 이 화면이 아직 다루는 종류 (A109 화면 개편 전) */
+export type EducatorType = Extract<ContractType, "MENTOR" | "INSTRUCTOR">;
 export type ContractFile = components["schemas"]["ContractFileResponse"];
 export type ManagerCandidate = components["schemas"]["ManagerCandidateResponse"];
 export type ContractFields = components["schemas"]["ContractFields"];
@@ -42,7 +44,7 @@ export function contractsQuery(f: ContractFilter) {
               limit: PAGE_SIZE,
               offset: pageParam,
               ...(f.status ? { status: [f.status] } : {}),
-              ...(f.type ? { educator_type: f.type } : {}),
+              ...(f.type ? { contract_type: [f.type] } : {}),
               ...(f.q ? { q: f.q } : {}),
               ...(f.mentorId ? { mentor_id: f.mentorId } : {}),
             },
@@ -120,12 +122,19 @@ export type ContractAction = "confirm" | "terminate";
 export function useContractAction(id: string) {
   const refresh = useRefresh();
   return useMutation({
-    mutationFn: (action: ContractAction) =>
-      action === "confirm"
-        ? unwrap(api.POST("/api/v1/admin/contracts/{contract_id}/confirm", { params: { path: { contract_id: id } } }))
-        : unwrap(
-            api.POST("/api/v1/admin/contracts/{contract_id}/terminate", { params: { path: { contract_id: id } } }),
-          ),
+    // A109 화면 개편 전 임시: 확정 = 진행 → 완료, 해지는 합의 해지
+    mutationFn: async (action: ContractAction) => {
+      const params = { path: { contract_id: id } };
+      if (action === "terminate")
+        return unwrap(
+          api.POST("/api/v1/admin/contracts/{contract_id}/terminate", {
+            params,
+            body: { reason: "TERMINATED_BY_MUTUAL_AGREEMENT" },
+          }),
+        );
+      await unwrap(api.POST("/api/v1/admin/contracts/{contract_id}/progress", { params }));
+      return unwrap(api.POST("/api/v1/admin/contracts/{contract_id}/sign", { params }));
+    },
     onSuccess: refresh,
   });
 }

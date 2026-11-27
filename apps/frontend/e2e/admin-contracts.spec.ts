@@ -22,7 +22,26 @@ const ACCESS = {
   cohorts: [],
 };
 const base = {
-  educator_type: "MENTOR",
+  contract_type: "MENTOR",
+  bootcamp_id: "b1",
+  bootcamp_name: "백엔드 부트캠프",
+  cohort_id: "c12",
+  cohort_number: 12,
+  business_registration_number: null,
+  contact_person_name: null,
+  settlement_type: "UNIT_PRICE",
+  total_amount: null,
+  unit_price: 50000,
+  price_unit: "HOURLY",
+  vat_type: "NOT_APPLICABLE",
+  amount_note: null,
+  no_show_pay_amount: 0,
+  mentoring_time_basis: "ACTUAL_DURATION",
+  cancel_reason: null,
+  canceled_on: null,
+  termination_reason: null,
+  termination_detail: null,
+  terminated_on: null,
   contractor_email: null,
   manager_employee_id: "e1",
   manager_name: "김관리",
@@ -87,7 +106,7 @@ test("행정 업무 > 계약: 멘토 계약을 추가하고 패널에서 확정 
   await expect(form.getByRole("option", { name: /김관리 \(나\)/ })).toHaveAttribute("aria-selected", "true");
   await form.getByRole("button", { name: "추가" }).click();
   await expect(page.getByText("계약을 작성 중으로 저장했어요")).toBeVisible();
-  expect(created).toMatchObject({ contractor_name: "이멘토", manager_employee_id: "e1", educator_type: "MENTOR" });
+  expect(created).toMatchObject({ contractor_name: "이멘토", manager_employee_id: "e1", contract_type: "MENTOR" });
   const sheet = page.getByRole("dialog", { name: "2026 데이터 멘토 계약" });
   await expect(sheet.getByRole("button", { name: "확정" })).toBeVisible();
 });

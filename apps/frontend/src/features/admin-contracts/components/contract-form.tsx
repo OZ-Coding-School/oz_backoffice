@@ -59,7 +59,7 @@ const schema = z
 type Values = z.infer<typeof schema>;
 
 const valuesOf = (c?: Contract): Values => ({
-  educator_type: c?.educator_type ?? "MENTOR",
+  educator_type: c?.contract_type === "INSTRUCTOR" ? "INSTRUCTOR" : "MENTOR",
   contractor_name: c?.contractor_name ?? "",
   contractor_phone: c?.contractor_phone ?? "",
   contractor_email: c?.contractor_email ?? "",
@@ -151,8 +151,15 @@ export function ContractForm({
           setError("담당 직원을 골라 주세요.");
           return;
         }
+        // A109 화면 개편 전 임시: 과정·기수·금액 입력이 없어 서버가 받지 않는다(다음 FE PR에서 입력 추가)
         const saved = await create.mutateAsync({
-          educator_type: v.educator_type,
+          contract_type: v.educator_type,
+          bootcamp_id: "",
+          settlement_type: "UNIT_PRICE",
+          unit_price: 0,
+          price_unit: "HOURLY",
+          vat_type: "NOT_APPLICABLE",
+          ...(v.educator_type === "MENTOR" ? { no_show_pay_amount: 0, mentoring_time_basis: "ACTUAL_DURATION" } : {}),
           contractor_name: v.contractor_name.trim(),
           contractor_phone: v.contractor_phone.trim(),
           contractor_email: email,
@@ -305,8 +312,8 @@ export function ContractForm({
               </PanelSection>
             ) : null
           ) : (
-            <PanelSection title={contract.educator_type === "MENTOR" ? "멘토" : "강사"}>
-              <PanelRow label={contract.educator_type === "MENTOR" ? "멘토" : "강사"} help={MENTOR_HELP}>
+            <PanelSection title={contract.contract_type === "MENTOR" ? "멘토" : "강사"}>
+              <PanelRow label={contract.contract_type === "MENTOR" ? "멘토" : "강사"} help={MENTOR_HELP}>
                 {linked?.text}
               </PanelRow>
             </PanelSection>

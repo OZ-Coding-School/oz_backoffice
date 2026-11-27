@@ -185,8 +185,8 @@ class ContractCandidateResponse(BaseModel):
     contractor_phone: str | None
     title: str
     status: str
-    start_date: date
-    end_date: date
+    start_date: date | None
+    end_date: date | None
     name_match: bool
     phone_match: bool
 

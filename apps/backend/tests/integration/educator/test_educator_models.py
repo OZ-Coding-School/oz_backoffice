@@ -8,7 +8,14 @@ import pytest
 from tortoise import connections
 from tortoise.exceptions import IntegrityError
 
-from app.contexts.educator.domain.enums import ContractStatus, DisplayNamePreference, EducatorType
+from app.contexts.educator.domain.enums import (
+    ContractStatus,
+    ContractType,
+    DisplayNamePreference,
+    PriceUnit,
+    SettlementType,
+    TerminationReason,
+)
 from app.contexts.educator.infrastructure.models import (
     ContractFileModel,
     EducatorContractModel,
@@ -17,6 +24,7 @@ from app.contexts.educator.infrastructure.models import (
 )
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
 from app.shared.ids import new_id
+from tests.factories.educator import INSTRUCTOR_TERMS, mentor_contract_fields
 from tests.factories.identity import make_user
 from tests.factories.organization import create_employee
 
@@ -41,7 +49,7 @@ async def _file() -> ContractFileModel:
 async def _contract(**overrides: Any) -> EducatorContractModel:
     values: dict[str, Any] = {
         "manager_employee_id": (await create_employee()).id,
-        "educator_type": EducatorType.MENTOR,
+        **(await mentor_contract_fields()),
         "contractor_name": "김멘토",
         "contractor_phone": "01012345678",
         "title": "2026 멘토 계약",
@@ -93,13 +101,17 @@ async def test_one_profile_per_user() -> None:
         await MentorModel.create(user_id=user_id)
 
 
-async def test_draft_contract_without_file_but_active_requires_file() -> None:
+async def test_file_required_from_in_progress() -> None:
+    """계약서는 IN_PROGRESS부터 필수 (A109⑥). 초안에서 바로 취소한 계약은 없어도 된다."""
     draft = await _contract()
     assert draft.status is ContractStatus.DRAFT
     assert draft.contract_file_id is None  # type: ignore[attr-defined]  # Tortoise FK 컬럼 속성
 
     with pytest.raises(IntegrityError):
-        await _contract(status=ContractStatus.ACTIVE)
+        await _contract(status=ContractStatus.IN_PROGRESS)
+    await _contract(
+        status=ContractStatus.CANCELED, cancel_reason="취소", canceled_on=date(2026, 1, 2)
+    )
     active = await _contract(status=ContractStatus.ACTIVE, contract_file_id=(await _file()).id)
     assert active.status is ContractStatus.ACTIVE
 
@@ -111,38 +123,102 @@ async def test_contract_file_belongs_to_one_contract() -> None:
         await _contract(contract_file_id=file.id)
 
 
+_VENDOR: dict[str, Any] = {
+    "contract_type": ContractType.SW,
+    "settlement_type": SettlementType.FIXED,
+    "total_amount": 1000,
+    "unit_price": None,
+    "price_unit": None,
+    "no_show_pay_amount": None,
+    "mentoring_time_basis": None,
+    "contractor_phone": None,
+}
+
+
 @pytest.mark.parametrize(
     "overrides",
     [
         {"start_date": date(2026, 2, 1), "end_date": date(2026, 1, 31)},  # 기간 역전
         {"contractor_email": "Mentor@Example.com"},  # 소문자 정규화
+        {"price_unit": PriceUnit.MONTHLY},  # 멘토는 시간·회 단가만
+        {"no_show_pay_amount": None},  # 멘토 전용 칸 필수
+        {"unit_price": None},  # 단가 계약은 단가 필수
+        {"unit_price": -1},
+        {"contractor_phone": "021234567"},  # 멘토는 휴대폰
+        {"business_registration_number": "1234567890"},  # 멘토는 업체 칸 없음
+        {"status": ContractStatus.CANCELED},  # 취소 사유·일자 필요
+        {"cancel_reason": "취소", "canceled_on": date(2026, 1, 2)},  # 취소가 아닌데 사유
+        {
+            "status": ContractStatus.TERMINATED,
+            "termination_reason": TerminationReason.TERMINATED_BY_FAULT,
+        },  # 해지 일자 필요
+        {**_VENDOR, "total_amount": None},  # 정액은 총액 필수
+        {**_VENDOR, "no_show_pay_amount": 0},  # 멘토가 아니면 노쇼 금액 없음
+        {**_VENDOR, "business_registration_number": "123"},
+        {**_VENDOR, "contractor_phone": "123"},
     ],
 )
 async def test_contract_checks(overrides: dict[str, Any]) -> None:
+    if overrides.get("status") in (ContractStatus.TERMINATED,):
+        overrides = {**overrides, "contract_file_id": (await _file()).id}
     with pytest.raises(IntegrityError):
         await _contract(**overrides)
 
 
-async def test_contract_link_must_match_educator_type() -> None:
+async def test_vendor_contract_rows() -> None:
+    await _contract(**_VENDOR, cohort_id=None)
+    await _contract(
+        **{
+            **_VENDOR,
+            "settlement_type": SettlementType.ACTUAL_COST,
+            "total_amount": None,
+            "contractor_phone": "021234567",
+            "business_registration_number": "1234567890",
+        }
+    )
+    await _contract(
+        **{
+            **_VENDOR,
+            "settlement_type": SettlementType.UNIT_PRICE,
+            "unit_price": 10,
+            "price_unit": PriceUnit.MONTHLY,
+        }
+    )
+
+
+async def test_contract_link_must_match_contract_type() -> None:
     mentor = await MentorModel.create(user_id=await _user_id())
     instructor = await InstructorModel.create(user_id=await _user_id())
 
     await _contract(mentor_id=mentor.id)
-    await _contract(educator_type=EducatorType.INSTRUCTOR, instructor_id=instructor.id)
+    await _contract(**INSTRUCTOR_TERMS, instructor_id=instructor.id)
     with pytest.raises(IntegrityError):
-        await _contract(educator_type=EducatorType.INSTRUCTOR, mentor_id=mentor.id)
+        await _contract(**INSTRUCTOR_TERMS, mentor_id=mentor.id)
     with pytest.raises(IntegrityError):
         await _contract(instructor_id=instructor.id)
+
+
+async def test_contract_enum_checks() -> None:
+    conn = connections.get("default")
+    row = await _contract()
+    for column, value in (("status", "UNKNOWN"), ("contract_type", "CAR"), ("vat_type", "X")):
+        with pytest.raises(IntegrityError):
+            await conn.execute_query(
+                f'UPDATE "educator_contracts" SET "{column}" = $1 WHERE "id" = $2', [value, row.id]
+            )
 
 
 async def test_contract_db_defaults() -> None:
     conn = connections.get("default")
     contract_id = new_id()
+    fields = await mentor_contract_fields()
     await conn.execute_query(
-        'INSERT INTO "educator_contracts" ("id", "manager_employee_id", "educator_type",'
-        ' "contractor_name", "contractor_phone", "title", "start_date", "end_date")'
-        " VALUES ($1, $2, 'MENTOR', '김멘토', '01012345678', '계약', '2026-01-01', '2026-12-31')",
-        [contract_id, (await create_employee()).id],
+        'INSERT INTO "educator_contracts" ("id", "manager_employee_id", "contract_type",'
+        ' "bootcamp_id", "contractor_name", "contractor_phone", "title", "settlement_type",'
+        ' "unit_price", "price_unit", "vat_type", "no_show_pay_amount", "mentoring_time_basis")'
+        " VALUES ($1, $2, 'MENTOR', $3, '김멘토', '01012345678', '계약', 'UNIT_PRICE',"
+        " 50000, 'HOURLY', 'NOT_APPLICABLE', 0, 'ACTUAL_DURATION')",
+        [contract_id, (await create_employee()).id, fields["bootcamp_id"]],
     )
     _, rows = await conn.execute_query(
         'SELECT "status", "created_at" FROM "educator_contracts" WHERE "id" = $1', [contract_id]

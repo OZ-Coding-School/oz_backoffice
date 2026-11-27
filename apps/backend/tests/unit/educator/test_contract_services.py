@@ -5,6 +5,7 @@ from typing import Any
 import pytest
 from fakeredis import FakeAsyncRedis
 
+from app.contexts.access.application.permissions import PermissionScope
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.educator.application.contract_files import (
     CONTRACT_MAX_BYTES,
@@ -13,17 +14,32 @@ from app.contexts.educator.application.contract_files import (
 from app.contexts.educator.application.contracts import ContractService
 from app.contexts.educator.application.uploads import DirectUploads
 from app.contexts.educator.domain.entities import ContractFile
-from app.contexts.educator.domain.enums import ContractStatus, EducatorType
+from app.contexts.educator.domain.enums import (
+    ContractStatus,
+    ContractType,
+    MentoringTimeBasis,
+    PriceUnit,
+    SettlementType,
+    TerminationReason,
+)
 from app.contexts.educator.domain.profiles import Mentor
 from app.contexts.educator.domain.repositories import ContractFilter
 from app.contexts.educator.infrastructure.pending_uploads import RedisPendingUploadStore
 from app.core.clock import FixedClock
-from app.shared.errors import BusinessRuleViolation, ConflictError, NotFoundError
+from app.shared.errors import (
+    BusinessRuleViolation,
+    ConflictError,
+    NotFoundError,
+    PermissionDeniedError,
+)
 from app.shared.ids import new_id
 from tests.fakes.audit import InMemoryAuditLogRepository
 from tests.fakes.educator import (
+    FakeAcademyDirectory,
+    FakeContractPermissions,
     FakeEmployeeDirectory,
     FakeFileStorage,
+    InMemoryAmendmentRepository,
     InMemoryContractFileRepository,
     InMemoryContractRepository,
     InMemoryInstructorRepository,
@@ -59,8 +75,19 @@ class Harness:
         )
         self.mentors = InMemoryMentorRepository()
         self.instructors = InMemoryInstructorRepository()
+        self.bootcamp_id = new_id()
+        self.cohort_id = new_id()
+        self.other_bootcamp_id = new_id()
+        self.academy = FakeAcademyDirectory(
+            {self.bootcamp_id: [self.cohort_id], self.other_bootcamp_id: []}
+        )
+        self.permissions = FakeContractPermissions(self.academy)
+        self.amendments = InMemoryAmendmentRepository()
         self.service = ContractService(
             contracts=self.contracts,
+            amendments=self.amendments,
+            academy=self.academy,
+            permissions=self.permissions,
             files=self.files,
             mentors=self.mentors,
             instructors=self.instructors,
@@ -79,15 +106,46 @@ class Harness:
     def values(self, **overrides: Any) -> dict[str, Any]:
         values: dict[str, Any] = {
             "manager_employee_id": self.manager_id,
-            "educator_type": EducatorType.MENTOR,
+            "contract_type": ContractType.MENTOR,
+            "bootcamp_id": self.bootcamp_id,
+            "cohort_id": self.cohort_id,
             "contractor_name": "김멘토",
             "contractor_phone": "01012345678",
             "title": "2026 멘토 계약",
             "start_date": date(2026, 1, 1),
             "end_date": date(2026, 12, 31),
+            "settlement_type": SettlementType.UNIT_PRICE,
+            "unit_price": 50000,
+            "price_unit": PriceUnit.HOURLY,
+            "no_show_pay_amount": 0,
+            "mentoring_time_basis": MentoringTimeBasis.ACTUAL_DURATION,
         }
         values.update(overrides)
         return values
+
+    def vendor(self, **overrides: Any) -> dict[str, Any]:
+        return self.values(
+            contract_type=ContractType.SW,
+            contractor_name="(주)오즈",
+            contractor_phone=None,
+            settlement_type=SettlementType.FIXED,
+            total_amount=1_000_000,
+            unit_price=None,
+            price_unit=None,
+            no_show_pay_amount=None,
+            mentoring_time_basis=None,
+            cohort_id=None,
+            **overrides,
+        )
+
+    async def signed(self, **overrides: Any) -> uuid.UUID:
+        file = await self.uploaded_file()
+        view = await self.service.create(
+            self.values(contract_file_id=file.id, **overrides), actor_id=self.actor_id
+        )
+        await self.service.start_progress(view.contract.id, actor_id=self.actor_id)
+        await self.service.sign(view.contract.id, actor_id=self.actor_id)
+        return view.contract.id
 
     def actions(self) -> list[str]:
         return [log.action for log in self.audit_logs.logs]
@@ -164,43 +222,68 @@ async def test_invalid_upload_is_deleted(h: Harness, body: bytes, content_type: 
 
 
 # ---------------------------------------------------------------- 계약
-async def test_create_draft_without_file_then_attach_and_confirm(h: Harness) -> None:
+async def test_create_draft_then_progress_and_sign(h: Harness) -> None:
     created = await h.service.create(h.values(), actor_id=h.actor_id)
+    contract_id = created.contract.id
     assert (created.contract.status, created.file) == (ContractStatus.DRAFT, None)
 
     file = await h.uploaded_file()
     updated = await h.service.update(
-        created.contract.id, {"contract_file_id": file.id}, actor_id=h.actor_id
+        contract_id, {"contract_file_id": file.id}, actor_id=h.actor_id
     )
     assert updated.file is not None
     assert updated.file.id == file.id
 
-    confirmed = await h.service.confirm(created.contract.id, actor_id=h.actor_id)
-    assert confirmed.contract.status is ContractStatus.ACTIVE
-    url, _ = await h.service.file_url(created.contract.id)
+    progressing = await h.service.start_progress(contract_id, actor_id=h.actor_id)
+    assert progressing.contract.status is ContractStatus.IN_PROGRESS
+    changed = await h.service.update(contract_id, {"unit_price": 60000}, actor_id=h.actor_id)
+    assert changed.contract.unit_price == 60000  # 진행 중에도 고칠 수 있다
+    signed = await h.service.sign(contract_id, actor_id=h.actor_id)
+    assert signed.contract.status is ContractStatus.ACTIVE
+    url, _ = await h.service.file_url(contract_id, actor_id=h.actor_id)
     assert "download=계약서.pdf" in url
     assert h.actions() == [
         "educator.mentor.create_pending",
         "educator.contract.create",
         "educator.contract_file.upload",
         "educator.contract.update",
-        "educator.contract.confirm",
+        "educator.contract.start",
+        "educator.contract.update",
+        "educator.contract.sign",
     ]
 
 
-async def test_create_validates_employee_and_file(h: Harness) -> None:
+async def test_create_validates_employee_file_and_academy(h: Harness) -> None:
     with pytest.raises(NotFoundError) as employee:
         await h.service.create(h.values(manager_employee_id=new_id()), actor_id=h.actor_id)
     assert employee.value.code == "employee_not_found"
     with pytest.raises(NotFoundError) as missing:
         await h.service.create(h.values(contract_file_id=new_id()), actor_id=h.actor_id)
     assert missing.value.code == "contract_file_not_found"
+    with pytest.raises(NotFoundError) as bootcamp:
+        await h.service.create(h.values(bootcamp_id=new_id()), actor_id=h.actor_id)
+    assert bootcamp.value.code == "bootcamp_not_found"
+    with pytest.raises(NotFoundError) as cohort:
+        await h.service.create(h.values(cohort_id=new_id()), actor_id=h.actor_id)
+    assert cohort.value.code == "cohort_not_found"
+    with pytest.raises(BusinessRuleViolation) as other:
+        await h.service.create(h.values(bootcamp_id=h.other_bootcamp_id), actor_id=h.actor_id)
+    assert other.value.code == "cohort_not_in_bootcamp"
 
     file = await h.uploaded_file()
     await h.service.create(h.values(contract_file_id=file.id), actor_id=h.actor_id)
     with pytest.raises(ConflictError) as in_use:
         await h.service.create(h.values(contract_file_id=file.id), actor_id=h.actor_id)
     assert in_use.value.code == "contract_file_in_use"
+
+
+async def test_vendor_contract_has_no_mentor(h: Harness) -> None:
+    created = await h.service.create(h.vendor(), actor_id=h.actor_id)
+    assert (created.contract.contract_type, created.contract.mentor_id) == (ContractType.SW, None)
+    assert h.mentors.items == {}
+    with pytest.raises(BusinessRuleViolation) as kind:
+        await h.service.create(h.vendor(), actor_id=h.actor_id, mentor_id=new_id())
+    assert kind.value.code == "contract_type_mismatch"
 
 
 async def test_replacing_file_keeps_old_record(h: Harness) -> None:
@@ -216,11 +299,8 @@ async def test_replacing_file_keeps_old_record(h: Harness) -> None:
         await h.service.create(h.values(contract_file_id=old.id), actor_id=h.actor_id)
 
 
-async def test_confirmed_contract_rules(h: Harness) -> None:
-    file = await h.uploaded_file()
-    created = await h.service.create(h.values(contract_file_id=file.id), actor_id=h.actor_id)
-    contract_id = created.contract.id
-    await h.service.confirm(contract_id, actor_id=h.actor_id)
+async def test_signed_contract_rules(h: Harness) -> None:
+    contract_id = await h.signed()
 
     with pytest.raises(BusinessRuleViolation) as edit:
         await h.service.update(contract_id, {"title": "변경"}, actor_id=h.actor_id)
@@ -228,6 +308,9 @@ async def test_confirmed_contract_rules(h: Harness) -> None:
     with pytest.raises(BusinessRuleViolation) as delete:
         await h.service.delete(contract_id, actor_id=h.actor_id)
     assert delete.value.code == "contract_not_deletable"
+    with pytest.raises(BusinessRuleViolation) as cancel:
+        await h.service.cancel(contract_id, reason="취소", on=None, actor_id=h.actor_id)
+    assert cancel.value.code == "invalid_contract_transition"
 
     other_manager = new_id()
     h.employees.ids.add(other_manager)
@@ -236,8 +319,87 @@ async def test_confirmed_contract_rules(h: Harness) -> None:
     )
     assert changed.contract.manager_employee_id == other_manager
 
-    terminated = await h.service.terminate(contract_id, actor_id=h.actor_id)
-    assert terminated.contract.status is ContractStatus.TERMINATED
+    terminated = await h.service.terminate(
+        contract_id,
+        reason=TerminationReason.TERMINATED_BY_FAULT,
+        detail="연락 두절",
+        on=None,
+        actor_id=h.actor_id,
+    )
+    assert (terminated.contract.status, terminated.contract.terminated_on) == (
+        ContractStatus.TERMINATED,
+        date(2026, 11, 9),
+    )
+
+
+async def test_cancel_in_progress(h: Harness) -> None:
+    file = await h.uploaded_file()
+    created = await h.service.create(h.values(contract_file_id=file.id), actor_id=h.actor_id)
+    await h.service.start_progress(created.contract.id, actor_id=h.actor_id)
+    canceled = await h.service.cancel(
+        created.contract.id, reason="조건 불일치", on=date(2026, 11, 8), actor_id=h.actor_id
+    )
+    assert (canceled.contract.status, canceled.contract.canceled_on) == (
+        ContractStatus.CANCELED,
+        date(2026, 11, 8),
+    )
+
+
+async def test_amend_signed_contract(h: Harness) -> None:
+    contract_id = await h.signed(start_date=date(2026, 12, 1))
+    assert h.contracts.items[contract_id].status is ContractStatus.SIGNED
+    file = await h.uploaded_file()
+
+    view = await h.service.amend(
+        contract_id,
+        {"unit_price": 70000, "start_date": date(2026, 11, 1), "title": "2026 멘토 계약"},
+        amended_on=date(2026, 11, 9),
+        reason="단가 인상",
+        contract_file_id=file.id,
+        actor_id=h.actor_id,
+    )
+
+    # 바뀐 항목만 남는다 (같은 값인 제목은 빠진다)
+    assert view.amendment.before == {"unit_price": 50000, "start_date": "2026-12-01"}
+    assert view.amendment.after == {"unit_price": 70000, "start_date": "2026-11-01"}
+    assert view.file is not None
+    contract = h.contracts.items[contract_id]
+    # 시작일이 지나 바로 이행 중으로
+    assert (contract.unit_price, contract.status) == (70000, ContractStatus.ACTIVE)
+    assert [
+        v.amendment.id for v in await h.service.amendments(contract_id, actor_id=h.actor_id)
+    ] == [view.amendment.id]
+    url, _ = await h.service.amendment_file_url(contract_id, view.amendment.id, actor_id=h.actor_id)
+    assert "download=계약서.pdf" in url
+    assert h.actions()[-1] == "educator.contract.amend"
+
+    with pytest.raises(BusinessRuleViolation) as same:
+        await h.service.amend(
+            contract_id,
+            {"unit_price": 70000},
+            amended_on=date(2026, 11, 9),
+            reason="같은 값",
+            contract_file_id=None,
+            actor_id=h.actor_id,
+        )
+    assert same.value.code == "amendment_no_changes"
+    with pytest.raises(ConflictError) as reused:  # 변경 계약서는 다시 쓸 수 없다
+        await h.service.create(h.values(contract_file_id=file.id), actor_id=h.actor_id)
+    assert reused.value.code == "contract_file_in_use"
+
+
+async def test_amend_phone_updates_pending_mentor(h: Harness) -> None:
+    contract_id = await h.signed()
+    await h.service.amend(
+        contract_id,
+        {"contractor_phone": "010-2222-3333"},
+        amended_on=date(2026, 11, 9),
+        reason="번호 변경",
+        contract_file_id=None,
+        actor_id=h.actor_id,
+    )
+    mentor_id = h.contracts.items[contract_id].mentor_id or new_id()
+    assert h.mentors.items[mentor_id].contact_phone == "01022223333"
 
 
 async def test_delete_draft_discards_file(h: Harness) -> None:
@@ -253,27 +415,28 @@ async def test_delete_draft_discards_file(h: Harness) -> None:
     assert h.mentors.items == {}
 
 
-async def test_expire_ended_contracts(h: Harness) -> None:
-    async def active(end_date: date) -> uuid.UUID:
-        file = await h.uploaded_file()
-        view = await h.service.create(
-            h.values(contract_file_id=file.id, end_date=end_date), actor_id=h.actor_id
-        )
-        await h.service.confirm(view.contract.id, actor_id=h.actor_id)
-        return view.contract.id
-
-    yesterday = await active(date(2026, 11, 8))
-    today = await active(date(2026, 11, 9))
-    # 확정 시점에 이미 끝난 계약은 ENDED로 확정된다
-    assert h.contracts.items[yesterday].status is ContractStatus.ENDED
+async def test_advance_due_contracts(h: Harness) -> None:
+    ending = await h.signed(end_date=date(2026, 11, 9))
+    starting = await h.signed(start_date=date(2026, 11, 10))
+    finished = await h.signed(end_date=date(2026, 11, 8))
+    # 완료 시점에 이미 끝난 계약은 바로 ENDED
+    assert h.contracts.items[finished].status is ContractStatus.ENDED
+    assert h.contracts.items[starting].status is ContractStatus.SIGNED
 
     h.clock.set(NOW + timedelta(days=1))
 
-    assert await h.service.expire_ended() == 1
-    assert h.contracts.items[today].status is ContractStatus.ENDED
-    assert h.actions()[-1] == "educator.contract.expire"
+    assert await h.service.advance_due() == 2
+    assert h.contracts.items[ending].status is ContractStatus.ENDED
+    assert h.contracts.items[starting].status is ContractStatus.ACTIVE
+    assert h.actions()[-1] == "educator.contract.advance"
     assert h.audit_logs.logs[-1].actor_user_id is None
-    assert await h.service.expire_ended() == 0  # 멱등
+    assert await h.service.advance_due() == 0  # 멱등
+
+
+async def test_end_contract_without_end_date(h: Harness) -> None:
+    contract_id = await h.signed(start_date=None, end_date=None)
+    ended = await h.service.end(contract_id, actor_id=h.actor_id)
+    assert ended.contract.status is ContractStatus.ENDED
 
 
 async def test_list_returns_files(h: Harness) -> None:
@@ -281,10 +444,47 @@ async def test_list_returns_files(h: Harness) -> None:
     await h.service.create(h.values(contract_file_id=file.id), actor_id=h.actor_id)
     await h.service.create(h.values(), actor_id=h.actor_id)
 
-    views, total = await h.service.list_contracts(ContractFilter(), limit=20, offset=0)
+    views, total = await h.service.list_contracts(
+        ContractFilter(), actor_id=h.actor_id, limit=20, offset=0
+    )
 
     assert total == 2
     assert {v.file.id if v.file else None for v in views} == {file.id, None}
+
+
+async def test_scope_limits_contracts(h: Harness) -> None:
+    """담당 범위 (A109⑦): 조회 범위 밖은 404, 관리 범위 밖은 403."""
+    common = await h.service.create(h.vendor(), actor_id=h.actor_id)  # 과정 공통
+    cohort = await h.service.create(h.values(), actor_id=h.actor_id)  # 기수 계약
+    other = await h.service.create(h.vendor(bootcamp_id=h.other_bootcamp_id), actor_id=h.actor_id)
+
+    async def visible() -> set[uuid.UUID]:
+        views, _ = await h.service.list_contracts(
+            ContractFilter(), actor_id=h.actor_id, limit=20, offset=0
+        )
+        return {v.contract.id for v in views}
+
+    # 과정 담당: 그 과정의 공통 계약과 기수 계약
+    h.permissions.scopes = {
+        code: PermissionScope(bootcamp_ids=frozenset({h.bootcamp_id}))
+        for code in ("educator.contract.read", "educator.contract.manage")
+    }
+    assert await visible() == {common.contract.id, cohort.contract.id}
+    # 기수 담당: 그 기수 계약만
+    h.permissions.scopes = {
+        code: PermissionScope(cohort_ids=frozenset({h.cohort_id}))
+        for code in ("educator.contract.read", "educator.contract.manage")
+    }
+    assert await visible() == {cohort.contract.id}
+    with pytest.raises(NotFoundError):
+        await h.service.get(common.contract.id, actor_id=h.actor_id)
+    with pytest.raises(PermissionDeniedError):  # 범위 밖 과정에는 만들 수 없다
+        await h.service.create(h.vendor(), actor_id=h.actor_id)
+    # 조회만 넓으면 볼 수는 있지만 바꿀 수 없다
+    h.permissions.scopes["educator.contract.read"] = PermissionScope(is_global=True)
+    assert (await h.service.get(other.contract.id, actor_id=h.actor_id)).contract.id
+    with pytest.raises(PermissionDeniedError):
+        await h.service.update(other.contract.id, {"title": "변경"}, actor_id=h.actor_id)
 
 
 async def test_move_between_mentors_regardless_of_status(h: Harness) -> None:
@@ -292,12 +492,15 @@ async def test_move_between_mentors_regardless_of_status(h: Harness) -> None:
     other = Mentor(user_id=new_id())
     await h.mentors.save(mentor)
     await h.mentors.save(other)
-    file = await h.uploaded_file()
-    created = await h.service.create(h.values(contract_file_id=file.id), actor_id=h.actor_id)
-    contract_id = created.contract.id
-    pending_id = created.contract.mentor_id
-    await h.service.confirm(contract_id, actor_id=h.actor_id)
-    await h.service.terminate(contract_id, actor_id=h.actor_id)  # 끝난 계약도 옮길 수 있다
+    contract_id = await h.signed()
+    pending_id = h.contracts.items[contract_id].mentor_id
+    await h.service.terminate(  # 끝난 계약도 옮길 수 있다
+        contract_id,
+        reason=TerminationReason.TERMINATED_BY_UNILATERAL,
+        detail=None,
+        on=None,
+        actor_id=h.actor_id,
+    )
 
     linked = await h.service.link(contract_id, mentor_id=mentor.id, actor_id=h.actor_id)
     assert linked.contract.mentor_id == mentor.id
@@ -331,14 +534,6 @@ async def test_mentor_contract_belongs_to_a_mentor(h: Harness) -> None:
     assert chosen.contract.mentor_id == registered.id
     with pytest.raises(NotFoundError):
         await h.service.create(h.values(), actor_id=h.actor_id, mentor_id=new_id())
-    # 강사 계약에는 멘토를 지정할 수 없다
-    with pytest.raises(BusinessRuleViolation) as kind:
-        await h.service.create(
-            h.values(educator_type=EducatorType.INSTRUCTOR),
-            actor_id=h.actor_id,
-            mentor_id=registered.id,
-        )
-    assert kind.value.code == "contract_type_mismatch"
     # 같은 사람이 둘이면 고를 수 없다
     await h.mentors.add(Mentor.pending(name="이멘토", phone="01099998888"))
     await h.mentors.add(Mentor.pending(name="이멘토", phone="01099998888"))
@@ -361,7 +556,13 @@ async def test_editing_contractor_updates_pending_mentor(h: Harness) -> None:
     assert (pending.contact_name, pending.contact_phone) == ("김멘토2", "01011112222")
     with pytest.raises(BusinessRuleViolation) as kind:
         await h.service.update(
-            created.contract.id, {"educator_type": EducatorType.INSTRUCTOR}, actor_id=h.actor_id
+            created.contract.id,
+            {
+                "contract_type": ContractType.INSTRUCTOR,
+                "no_show_pay_amount": None,
+                "mentoring_time_basis": None,
+            },
+            actor_id=h.actor_id,
         )
     assert kind.value.code == "contract_type_mismatch"
 
@@ -380,7 +581,12 @@ async def test_link_requires_matching_existing_profile(h: Harness) -> None:
     assert missing.value.code == "mentor_not_found"
 
     instructor_contract = await h.service.create(
-        h.values(educator_type=EducatorType.INSTRUCTOR), actor_id=h.actor_id
+        h.values(
+            contract_type=ContractType.INSTRUCTOR,
+            no_show_pay_amount=None,
+            mentoring_time_basis=None,
+        ),
+        actor_id=h.actor_id,
     )
     linked = await h.service.link(
         instructor_contract.contract.id, instructor_id=instructor_id, actor_id=h.actor_id

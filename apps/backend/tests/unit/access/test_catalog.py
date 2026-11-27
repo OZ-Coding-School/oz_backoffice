@@ -24,6 +24,7 @@ def test_definitions_are_consistent() -> None:
         "academy.cohort",
         "academy.roster",
         "member.approval",
+        "educator.contract",  # 계약은 과정·기수에 속한다 (A109⑦)
         "mentoring.settings",
         "mentoring.assignment",
         "mentoring.team",

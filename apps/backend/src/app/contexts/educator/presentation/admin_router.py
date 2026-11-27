@@ -1,9 +1,11 @@
-"""교육 인력 계약·계약서 관리 API. 권한: contract.manage (범위 없음 → ANY, decisions A16).
+"""계약·계약서 관리 API. 권한: educator.contract.read·manage + 담당 범위 (decisions A109⑦).
 
 - 계약서 업로드: POST /contract-files/uploads → 브라우저가 S3로 직접 업로드
   → POST /contract-files/uploads/{upload_id}/confirm
-- 계약: 목록·생성·조회·수정(DRAFT만, 확정 후 담당 직원만)·삭제(DRAFT만)·확정·해지·계약서 URL
-- 응답에 담당 직원 이름·연결된 프로필 이름, 목록 `mentor_id` 필터, 담당 직원 후보 (A103)
+- 계약: 목록·생성·조회·수정(서명 전 전부, 서명 후 담당 직원만)·삭제(초안만)·계약서 URL
+- 상태: 진행(`/progress`)·완료(`/sign`)·종료(`/end`)·취소(`/cancel`)·해지(`/terminate`) (A109③)
+- 변경 계약: `/amendments` 등록·이력 (A109⑨)
+- 응답에 담당 직원·연결된 프로필·과정·기수 이름, 담당 직원 후보 (A103)
 """
 
 import uuid
@@ -13,7 +15,10 @@ from typing import Annotated, Any, cast
 from fastapi import APIRouter, Depends, Query, Request, Response, status
 from pydantic import BaseModel, Field
 
-from app.contexts.access.presentation.dependencies import require_permission
+from app.contexts.access.presentation.dependencies import (
+    PermissionCheckerDep,
+    require_permission,
+)
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.educator.application.contract_files import ContractFileUploadService
 from app.contexts.educator.application.contract_people import (
@@ -21,14 +26,27 @@ from app.contexts.educator.application.contract_people import (
     ContractPeopleReader,
     LinkedPerson,
 )
-from app.contexts.educator.application.contracts import ContractService, ContractView
-from app.contexts.educator.application.ports import EmployeeDirectory
+from app.contexts.educator.application.contracts import (
+    AmendmentView,
+    ContractService,
+    ContractView,
+)
+from app.contexts.educator.application.ports import AcademyDirectory, EmployeeDirectory
 from app.contexts.educator.application.uploads import DirectUploads
 from app.contexts.educator.domain.entities import ContractFile
-from app.contexts.educator.domain.enums import ContractStatus, EducatorType
+from app.contexts.educator.domain.enums import (
+    ContractStatus,
+    ContractType,
+    MentoringTimeBasis,
+    PriceUnit,
+    SettlementType,
+    TerminationReason,
+    VatType,
+)
 from app.contexts.educator.domain.repositories import ContractFilter
 from app.contexts.educator.infrastructure.pending_uploads import RedisPendingUploadStore
 from app.contexts.educator.infrastructure.repositories import (
+    TortoiseContractAmendmentRepository,
     TortoiseContractFileRepository,
     TortoiseEducatorContractRepository,
     TortoiseInstructorRepository,
@@ -53,17 +71,21 @@ def get_contract_service(
     request: Request,
     storage: Annotated[S3Storage, Depends(get_file_storage)],
     clock: Annotated[Clock, Depends(get_clock)],
+    checker: PermissionCheckerDep,
 ) -> ContractService:
     return ContractService(
         contracts=TortoiseEducatorContractRepository(),
+        amendments=TortoiseContractAmendmentRepository(),
         files=TortoiseContractFileRepository(),
         mentors=TortoiseMentorRepository(),
         instructors=TortoiseInstructorRepository(),
         employees=cast("EmployeeDirectory", request.app.state.employee_queries),
+        academy=cast("AcademyDirectory", request.app.state.academy_catalog),
         storage=storage,
         audit=cast("AuditRecorder", request.app.state.audit_recorder),
         uow=UnitOfWork(),
         clock=clock,
+        permissions=checker,
     )
 
 
@@ -126,14 +148,43 @@ class ContractFileResponse(BaseModel):
         )
 
 
-class ContractFields(BaseModel):
-    educator_type: EducatorType
-    contractor_name: str = Field(min_length=1, max_length=50)
-    contractor_phone: str = Field(min_length=1, max_length=20)
+class ContractTerms(BaseModel):
+    """계약 내용 (A109④⑤). 변경 계약에서도 같은 이름으로 보낸다."""
+
+    title: str = Field(min_length=1, max_length=100, description="계약 명칭")
+    contractor_name: str = Field(min_length=1, max_length=50, description="당사자 이름·업체명")
+    contractor_phone: str | None = Field(
+        default=None, max_length=20, description="멘토·강사는 휴대폰 필수, 그 밖은 일반 번호 가능"
+    )
     contractor_email: str | None = Field(default=None, max_length=255)
-    title: str = Field(min_length=1, max_length=100)
-    start_date: date
-    end_date: date
+    business_registration_number: str | None = Field(
+        default=None, max_length=20, description="사업자등록번호 10자리 (SW·장비·기타만)"
+    )
+    contact_person_name: str | None = Field(
+        default=None, max_length=50, description="업체 담당자 이름 (SW·장비·기타만)"
+    )
+    start_date: date | None = None
+    end_date: date | None = None
+    settlement_type: SettlementType
+    total_amount: int | None = Field(
+        default=None, ge=0, description="정액: 총액(필수), 단가: 예상 총액, 실비: 한도액"
+    )
+    unit_price: int | None = Field(default=None, ge=0, description="단가 계약만 필수")
+    price_unit: PriceUnit | None = Field(default=None, description="단가 계약만 필수")
+    vat_type: VatType = VatType.NOT_APPLICABLE
+    amount_note: str | None = Field(default=None, max_length=500)
+    no_show_pay_amount: int | None = Field(
+        default=None, ge=0, description="멘토 계약만 필수: 노쇼 1건 금액"
+    )
+    mentoring_time_basis: MentoringTimeBasis | None = Field(
+        default=None, description="멘토 계약만 필수: 멘토링 정산 시간 기준"
+    )
+
+
+class ContractFields(ContractTerms):
+    contract_type: ContractType
+    bootcamp_id: uuid.UUID
+    cohort_id: uuid.UUID | None = Field(default=None, description="없으면 과정 공통 계약")
     manager_employee_id: uuid.UUID
     contract_file_id: uuid.UUID | None = None
     mentor_id: uuid.UUID | None = Field(
@@ -144,21 +195,88 @@ class ContractFields(BaseModel):
 
 
 class ContractUpdate(BaseModel):
-    """보낸 필드만 바꾼다. 확정된 계약은 manager_employee_id만 바꿀 수 있다."""
+    """보낸 필드만 바꾼다. 서명 전(DRAFT·IN_PROGRESS)은 모든 항목, 서명 후는 담당 직원만."""
 
-    educator_type: EducatorType | None = None
-    contractor_name: str | None = Field(default=None, min_length=1, max_length=50)
-    contractor_phone: str | None = Field(default=None, min_length=1, max_length=20)
-    contractor_email: str | None = Field(default=None, max_length=255)
+    contract_type: ContractType | None = None
+    bootcamp_id: uuid.UUID | None = None
+    cohort_id: uuid.UUID | None = None
     title: str | None = Field(default=None, min_length=1, max_length=100)
+    contractor_name: str | None = Field(default=None, min_length=1, max_length=50)
+    contractor_phone: str | None = Field(default=None, max_length=20)
+    contractor_email: str | None = Field(default=None, max_length=255)
+    business_registration_number: str | None = Field(default=None, max_length=20)
+    contact_person_name: str | None = Field(default=None, max_length=50)
     start_date: date | None = None
     end_date: date | None = None
+    settlement_type: SettlementType | None = None
+    total_amount: int | None = Field(default=None, ge=0)
+    unit_price: int | None = Field(default=None, ge=0)
+    price_unit: PriceUnit | None = None
+    vat_type: VatType | None = None
+    amount_note: str | None = Field(default=None, max_length=500)
+    no_show_pay_amount: int | None = Field(default=None, ge=0)
+    mentoring_time_basis: MentoringTimeBasis | None = None
     manager_employee_id: uuid.UUID | None = None
     contract_file_id: uuid.UUID | None = None
 
 
-# null을 보내면 비우는 필드 (나머지는 null이면 무시하지 않고 422)
-_NULLABLE = frozenset({"contractor_email", "contract_file_id"})
+# null을 보내면 비우는 필드 (나머지는 null이면 바꾸지 않는다)
+_NULLABLE = frozenset(
+    {
+        "cohort_id",
+        "contractor_phone",
+        "contractor_email",
+        "business_registration_number",
+        "contact_person_name",
+        "start_date",
+        "end_date",
+        "total_amount",
+        "unit_price",
+        "price_unit",
+        "amount_note",
+        "no_show_pay_amount",
+        "mentoring_time_basis",
+        "contract_file_id",
+    }
+)
+
+
+class AmendmentChanges(BaseModel):
+    """변경 계약으로 바꿀 항목 (A109⑨). 보낸 필드만 바꾸고 null은 비운다(필수 칸 제외)."""
+
+    title: str | None = Field(default=None, min_length=1, max_length=100)
+    contractor_phone: str | None = Field(default=None, max_length=20)
+    contractor_email: str | None = Field(default=None, max_length=255)
+    business_registration_number: str | None = Field(default=None, max_length=20)
+    contact_person_name: str | None = Field(default=None, max_length=50)
+    start_date: date | None = None
+    end_date: date | None = None
+    settlement_type: SettlementType | None = None
+    total_amount: int | None = Field(default=None, ge=0)
+    unit_price: int | None = Field(default=None, ge=0)
+    price_unit: PriceUnit | None = None
+    vat_type: VatType | None = None
+    amount_note: str | None = Field(default=None, max_length=500)
+    no_show_pay_amount: int | None = Field(default=None, ge=0)
+    mentoring_time_basis: MentoringTimeBasis | None = None
+
+
+class AmendmentRequest(BaseModel):
+    amended_on: date = Field(description="변경 일자")
+    reason: str = Field(min_length=1, max_length=500, description="변경 사유")
+    changes: AmendmentChanges
+    contract_file_id: uuid.UUID | None = Field(default=None, description="변경 계약서 (선택)")
+
+
+class CancelRequest(BaseModel):
+    reason: str = Field(min_length=1, max_length=500, description="취소 사유")
+    canceled_on: date | None = Field(default=None, description="없으면 오늘")
+
+
+class TerminateRequest(BaseModel):
+    reason: TerminationReason
+    detail: str | None = Field(default=None, max_length=500, description="해지 사유 상세")
+    terminated_on: date | None = Field(default=None, description="없으면 오늘")
 
 
 class LinkedProfileResponse(BaseModel):
@@ -172,14 +290,28 @@ class LinkedProfileResponse(BaseModel):
 
 class ContractResponse(BaseModel):
     id: uuid.UUID
-    educator_type: EducatorType
+    contract_type: ContractType
     status: ContractStatus
-    contractor_name: str
-    contractor_phone: str
-    contractor_email: str | None
     title: str
-    start_date: date
-    end_date: date
+    contractor_name: str
+    contractor_phone: str | None
+    contractor_email: str | None
+    business_registration_number: str | None
+    contact_person_name: str | None
+    start_date: date | None
+    end_date: date | None
+    settlement_type: SettlementType
+    total_amount: int | None
+    unit_price: int | None
+    price_unit: PriceUnit | None
+    vat_type: VatType
+    amount_note: str | None
+    no_show_pay_amount: int | None
+    mentoring_time_basis: MentoringTimeBasis | None
+    bootcamp_id: uuid.UUID
+    bootcamp_name: str | None = Field(description="과정 이름")
+    cohort_id: uuid.UUID | None
+    cohort_number: int | None = Field(description="기수 번호 (과정 공통 계약이면 null)")
     manager_employee_id: uuid.UUID
     manager_name: str | None = Field(description="담당 직원 이름 (A103)")
     mentor_id: uuid.UUID | None
@@ -188,6 +320,11 @@ class ContractResponse(BaseModel):
         description="연결된 멘토·강사 프로필 이름 (A103)"
     )
     contract_file: ContractFileResponse | None
+    cancel_reason: str | None
+    canceled_on: date | None
+    termination_reason: TerminationReason | None
+    termination_detail: str | None
+    terminated_on: date | None
     created_at: datetime | None
     updated_at: datetime | None
 
@@ -203,22 +340,70 @@ class ContractResponse(BaseModel):
         )
         return cls(
             id=c.id,
-            educator_type=c.educator_type,
+            contract_type=c.contract_type,
             status=c.status,
+            bootcamp_id=c.bootcamp_id,
+            bootcamp_name=people.bootcamps.get(c.bootcamp_id),
+            cohort_id=c.cohort_id,
+            cohort_number=people.cohorts.get(c.cohort_id) if c.cohort_id else None,
+            title=c.title,
             contractor_name=c.contractor_name,
             contractor_phone=c.contractor_phone,
             contractor_email=c.contractor_email,
-            title=c.title,
+            business_registration_number=c.business_registration_number,
+            contact_person_name=c.contact_person_name,
             start_date=c.start_date,
             end_date=c.end_date,
+            settlement_type=c.settlement_type,
+            total_amount=c.total_amount,
+            unit_price=c.unit_price,
+            price_unit=c.price_unit,
+            vat_type=c.vat_type,
+            amount_note=c.amount_note,
+            no_show_pay_amount=c.no_show_pay_amount,
+            mentoring_time_basis=c.mentoring_time_basis,
             manager_employee_id=c.manager_employee_id,
             manager_name=people.managers.get(c.manager_employee_id),
             mentor_id=c.mentor_id,
             instructor_id=c.instructor_id,
             linked_profile=LinkedProfileResponse.of(linked),
             contract_file=ContractFileResponse.of(view.file) if view.file else None,
+            cancel_reason=c.cancel_reason,
+            canceled_on=c.canceled_on,
+            termination_reason=c.termination_reason,
+            termination_detail=c.termination_detail,
+            terminated_on=c.terminated_on,
             created_at=c.created_at,
             updated_at=c.updated_at,
+        )
+
+
+class AmendmentResponse(BaseModel):
+    id: uuid.UUID
+    contract_id: uuid.UUID
+    amended_on: date
+    reason: str
+    before: dict[str, Any] = Field(description="바뀐 항목의 변경 전 값")
+    after: dict[str, Any] = Field(description="바뀐 항목의 변경 후 값")
+    contract_file: ContractFileResponse | None
+    created_by_user_id: uuid.UUID
+    created_by_name: str | None
+    created_at: datetime | None
+
+    @classmethod
+    def of(cls, view: AmendmentView, names: dict[uuid.UUID, str]) -> "AmendmentResponse":
+        a = view.amendment
+        return cls(
+            id=a.id,
+            contract_id=a.contract_id,
+            amended_on=a.amended_on,
+            reason=a.reason,
+            before=a.before,
+            after=a.after,
+            contract_file=ContractFileResponse.of(view.file) if view.file else None,
+            created_by_user_id=a.created_by_user_id,
+            created_by_name=names.get(a.created_by_user_id),
+            created_at=a.created_at,
         )
 
 
@@ -281,23 +466,32 @@ async def confirm_contract_upload(
 # ---------------------------------------------------------------- 계약
 @router.get("/contracts", response_model=Page[ContractResponse])
 async def list_contracts(
-    _: Reader,
+    user: Reader,
     contracts: ContractsDep,
     people: PeopleDep,
     status_: Annotated[list[ContractStatus] | None, Query(alias="status")] = None,
-    educator_type: EducatorType | None = None,
-    q: Annotated[str | None, Query(max_length=50, description="계약자 이름·제목·휴대폰")] = None,
+    contract_type: Annotated[list[ContractType] | None, Query()] = None,
+    bootcamp_id: uuid.UUID | None = None,
+    cohort_id: uuid.UUID | None = None,
+    q: Annotated[
+        str | None, Query(max_length=50, description="당사자 이름·계약 명칭·전화번호")
+    ] = None,
     mentor_id: Annotated[uuid.UUID | None, Query(description="연결된 멘토 (A103)")] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> Page[ContractResponse]:
+    """담당 범위 안의 계약만 (A109⑦). 최근에 만든 계약이 먼저."""
     contract_filter = ContractFilter(
         statuses=frozenset(status_ or ()),
-        educator_type=educator_type,
+        contract_types=frozenset(contract_type or ()),
+        bootcamp_id=bootcamp_id,
+        cohort_id=cohort_id,
         query=q.strip() if q and q.strip() else None,
         mentor_id=mentor_id,
     )
-    views, total = await contracts.list_contracts(contract_filter, limit=limit, offset=offset)
+    views, total = await contracts.list_contracts(
+        contract_filter, actor_id=user.id, limit=limit, offset=offset
+    )
     found = await people.people([v.contract for v in views])
     return Page(
         items=[ContractResponse.of(v, found) for v in views],
@@ -342,9 +536,9 @@ async def create_contract(
 
 @router.get("/contracts/{contract_id}", response_model=ContractResponse)
 async def get_contract(
-    contract_id: uuid.UUID, _: Reader, contracts: ContractsDep, people: PeopleDep
+    contract_id: uuid.UUID, user: Reader, contracts: ContractsDep, people: PeopleDep
 ) -> ContractResponse:
-    return await _one(await contracts.get(contract_id), people)
+    return await _one(await contracts.get(contract_id, actor_id=user.id), people)
 
 
 @router.patch("/contracts/{contract_id}", response_model=ContractResponse)
@@ -365,24 +559,115 @@ async def update_contract(
 async def delete_contract(
     contract_id: uuid.UUID, user: Manager, contracts: ContractsDep
 ) -> Response:
+    """초안(DRAFT)만 지운다."""
     await contracts.delete(contract_id, actor_id=user.id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.post("/contracts/{contract_id}/confirm", response_model=ContractResponse)
-async def confirm_contract(
+@router.post("/contracts/{contract_id}/progress", response_model=ContractResponse)
+async def start_contract_progress(
     contract_id: uuid.UUID, user: Manager, contracts: ContractsDep, people: PeopleDep
 ) -> ContractResponse:
-    """DRAFT → ACTIVE (계약서 필요). 종료일이 이미 지났으면 ENDED로 확정한다."""
-    return await _one(await contracts.confirm(contract_id, actor_id=user.id), people)
+    """DRAFT → IN_PROGRESS (계약서 필요)."""
+    return await _one(await contracts.start_progress(contract_id, actor_id=user.id), people)
+
+
+@router.post("/contracts/{contract_id}/sign", response_model=ContractResponse)
+async def sign_contract(
+    contract_id: uuid.UUID, user: Manager, contracts: ContractsDep, people: PeopleDep
+) -> ContractResponse:
+    """IN_PROGRESS → 계약 완료. 시작일이 없거나 지났으면 ACTIVE, 아니면 SIGNED
+    (종료일이 이미 지났으면 ENDED)."""
+    return await _one(await contracts.sign(contract_id, actor_id=user.id), people)
+
+
+@router.post("/contracts/{contract_id}/end", response_model=ContractResponse)
+async def end_contract(
+    contract_id: uuid.UUID, user: Manager, contracts: ContractsDep, people: PeopleDep
+) -> ContractResponse:
+    """종료일이 없는 ACTIVE 계약을 끝낸다 (ENDED)."""
+    return await _one(await contracts.end(contract_id, actor_id=user.id), people)
+
+
+@router.post("/contracts/{contract_id}/cancel", response_model=ContractResponse)
+async def cancel_contract(
+    contract_id: uuid.UUID,
+    body: CancelRequest,
+    user: Manager,
+    contracts: ContractsDep,
+    people: PeopleDep,
+) -> ContractResponse:
+    """DRAFT·IN_PROGRESS → CANCELED (취소 사유 필수)."""
+    view = await contracts.cancel(
+        contract_id, reason=body.reason, on=body.canceled_on, actor_id=user.id
+    )
+    return await _one(view, people)
 
 
 @router.post("/contracts/{contract_id}/terminate", response_model=ContractResponse)
 async def terminate_contract(
-    contract_id: uuid.UUID, user: Manager, contracts: ContractsDep, people: PeopleDep
+    contract_id: uuid.UUID,
+    body: TerminateRequest,
+    user: Manager,
+    contracts: ContractsDep,
+    people: PeopleDep,
 ) -> ContractResponse:
-    """ACTIVE → TERMINATED (중도 해지)."""
-    return await _one(await contracts.terminate(contract_id, actor_id=user.id), people)
+    """SIGNED·ACTIVE → TERMINATED (해지 사유·상세·일자)."""
+    view = await contracts.terminate(
+        contract_id,
+        reason=body.reason,
+        detail=body.detail,
+        on=body.terminated_on,
+        actor_id=user.id,
+    )
+    return await _one(view, people)
+
+
+@router.post(
+    "/contracts/{contract_id}/amendments",
+    response_model=AmendmentResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def amend_contract(
+    contract_id: uuid.UUID,
+    body: AmendmentRequest,
+    user: Manager,
+    contracts: ContractsDep,
+    people: PeopleDep,
+) -> AmendmentResponse:
+    """서명 후(SIGNED·ACTIVE) 변경 계약 (A109⑨): 명칭·금액·기간·당사자 연락처."""
+    view = await contracts.amend(
+        contract_id,
+        body.changes.model_dump(exclude_unset=True),
+        amended_on=body.amended_on,
+        reason=body.reason,
+        contract_file_id=body.contract_file_id,
+        actor_id=user.id,
+    )
+    names = await people.user_names([view.amendment.created_by_user_id])
+    return AmendmentResponse.of(view, names)
+
+
+@router.get("/contracts/{contract_id}/amendments", response_model=list[AmendmentResponse])
+async def list_contract_amendments(
+    contract_id: uuid.UUID, user: Reader, contracts: ContractsDep, people: PeopleDep
+) -> list[AmendmentResponse]:
+    """변경 이력, 최근 변경이 먼저."""
+    views = await contracts.amendments(contract_id, actor_id=user.id)
+    names = await people.user_names([v.amendment.created_by_user_id for v in views])
+    return [AmendmentResponse.of(v, names) for v in views]
+
+
+@router.get(
+    "/contracts/{contract_id}/amendments/{amendment_id}/file-url",
+    response_model=FileUrlResponse,
+)
+async def amendment_file_url(
+    contract_id: uuid.UUID, amendment_id: uuid.UUID, user: Reader, contracts: ContractsDep
+) -> FileUrlResponse:
+    """변경 계약서 다운로드 presigned GET URL."""
+    url, file = await contracts.amendment_file_url(contract_id, amendment_id, actor_id=user.id)
+    return FileUrlResponse(url=url, file=ContractFileResponse.of(file))
 
 
 @router.post("/contracts/{contract_id}/link", response_model=ContractResponse)
@@ -413,8 +698,8 @@ async def unlink_contract(
 
 @router.get("/contracts/{contract_id}/file-url", response_model=FileUrlResponse)
 async def contract_file_url(
-    contract_id: uuid.UUID, _: Reader, contracts: ContractsDep
+    contract_id: uuid.UUID, user: Reader, contracts: ContractsDep
 ) -> FileUrlResponse:
     """계약서 다운로드 presigned GET URL (만료 10분, 원본 파일 이름으로 저장)."""
-    url, file = await contracts.file_url(contract_id)
+    url, file = await contracts.file_url(contract_id, actor_id=user.id)
     return FileUrlResponse(url=url, file=ContractFileResponse.of(file))

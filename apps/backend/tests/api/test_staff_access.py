@@ -161,8 +161,9 @@ async def test_assigned_scope_unions_bootcamp_and_cohort(world: World, client: A
         "bootcamp_ids": [str(OTHER_BOOTCAMP)],
         "cohort_ids": [str(C12.id)],
     }
-    # 기수와 무관한 엔터티는 전체
-    assert perms["educator.contract.manage"]["is_global"] is True
+    # 계약도 담당 범위를 따른다 (A109⑦), 기수와 무관한 엔터티는 전체
+    assert perms["educator.contract.manage"]["is_global"] is False
+    assert perms["educator.mentor.manage"]["is_global"] is True
     assert "org.department.manage" not in perms  # 직위에 없는 권한
     assert "staff.assignment.manage" not in perms
     assert {c["id"] for c in body["cohorts"]} == {str(C12.id), str(C9.id), str(C8.id)}

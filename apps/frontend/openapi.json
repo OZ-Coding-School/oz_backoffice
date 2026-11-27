@@ -4649,6 +4649,7 @@
           "admin-contracts"
         ],
         "summary": "List Contracts",
+        "description": "담당 범위 안의 계약만 (A109⑦). 최근에 만든 계약이 먼저.",
         "operationId": "list_contracts_api_v1_admin_contracts_get",
         "security": [
           {
@@ -4676,19 +4677,56 @@
             }
           },
           {
-            "name": "educator_type",
+            "name": "contract_type",
             "in": "query",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "$ref": "#/components/schemas/EducatorType"
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ContractType"
+                  }
                 },
                 {
                   "type": "null"
                 }
               ],
-              "title": "Educator Type"
+              "title": "Contract Type"
+            }
+          },
+          {
+            "name": "bootcamp_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bootcamp Id"
+            }
+          },
+          {
+            "name": "cohort_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cohort Id"
             }
           },
           {
@@ -4705,10 +4743,10 @@
                   "type": "null"
                 }
               ],
-              "description": "계약자 이름·제목·휴대폰",
+              "description": "당사자 이름·계약 명칭·전화번호",
               "title": "Q"
             },
-            "description": "계약자 이름·제목·휴대폰"
+            "description": "당사자 이름·계약 명칭·전화번호"
           },
           {
             "name": "mentor_id",
@@ -4991,6 +5029,7 @@
           "admin-contracts"
         ],
         "summary": "Delete Contract",
+        "description": "초안(DRAFT)만 지운다.",
         "operationId": "delete_contract_api_v1_admin_contracts__contract_id__delete",
         "security": [
           {
@@ -5026,14 +5065,14 @@
         }
       }
     },
-    "/api/v1/admin/contracts/{contract_id}/confirm": {
+    "/api/v1/admin/contracts/{contract_id}/progress": {
       "post": {
         "tags": [
           "admin-contracts"
         ],
-        "summary": "Confirm Contract",
-        "description": "DRAFT → ACTIVE (계약서 필요). 종료일이 이미 지났으면 ENDED로 확정한다.",
-        "operationId": "confirm_contract_api_v1_admin_contracts__contract_id__confirm_post",
+        "summary": "Start Contract Progress",
+        "description": "DRAFT → IN_PROGRESS (계약서 필요).",
+        "operationId": "start_contract_progress_api_v1_admin_contracts__contract_id__progress_post",
         "security": [
           {
             "HTTPBearer": []
@@ -5075,14 +5114,14 @@
         }
       }
     },
-    "/api/v1/admin/contracts/{contract_id}/terminate": {
+    "/api/v1/admin/contracts/{contract_id}/sign": {
       "post": {
         "tags": [
           "admin-contracts"
         ],
-        "summary": "Terminate Contract",
-        "description": "ACTIVE → TERMINATED (중도 해지).",
-        "operationId": "terminate_contract_api_v1_admin_contracts__contract_id__terminate_post",
+        "summary": "Sign Contract",
+        "description": "IN_PROGRESS → 계약 완료. 시작일이 없거나 지났으면 ACTIVE, 아니면 SIGNED\n(종료일이 이미 지났으면 ENDED).",
+        "operationId": "sign_contract_api_v1_admin_contracts__contract_id__sign_post",
         "security": [
           {
             "HTTPBearer": []
@@ -5107,6 +5146,342 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ContractResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/contracts/{contract_id}/end": {
+      "post": {
+        "tags": [
+          "admin-contracts"
+        ],
+        "summary": "End Contract",
+        "description": "종료일이 없는 ACTIVE 계약을 끝낸다 (ENDED).",
+        "operationId": "end_contract_api_v1_admin_contracts__contract_id__end_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "contract_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Contract Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContractResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/contracts/{contract_id}/cancel": {
+      "post": {
+        "tags": [
+          "admin-contracts"
+        ],
+        "summary": "Cancel Contract",
+        "description": "DRAFT·IN_PROGRESS → CANCELED (취소 사유 필수).",
+        "operationId": "cancel_contract_api_v1_admin_contracts__contract_id__cancel_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "contract_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Contract Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContractResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/contracts/{contract_id}/terminate": {
+      "post": {
+        "tags": [
+          "admin-contracts"
+        ],
+        "summary": "Terminate Contract",
+        "description": "SIGNED·ACTIVE → TERMINATED (해지 사유·상세·일자).",
+        "operationId": "terminate_contract_api_v1_admin_contracts__contract_id__terminate_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "contract_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Contract Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TerminateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContractResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/contracts/{contract_id}/amendments": {
+      "post": {
+        "tags": [
+          "admin-contracts"
+        ],
+        "summary": "Amend Contract",
+        "description": "서명 후(SIGNED·ACTIVE) 변경 계약 (A109⑨): 명칭·금액·기간·당사자 연락처.",
+        "operationId": "amend_contract_api_v1_admin_contracts__contract_id__amendments_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "contract_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Contract Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AmendmentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AmendmentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "admin-contracts"
+        ],
+        "summary": "List Contract Amendments",
+        "description": "변경 이력, 최근 변경이 먼저.",
+        "operationId": "list_contract_amendments_api_v1_admin_contracts__contract_id__amendments_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "contract_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Contract Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AmendmentResponse"
+                  },
+                  "title": "Response List Contract Amendments Api V1 Admin Contracts  Contract Id  Amendments Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/contracts/{contract_id}/amendments/{amendment_id}/file-url": {
+      "get": {
+        "tags": [
+          "admin-contracts"
+        ],
+        "summary": "Amendment File Url",
+        "description": "변경 계약서 다운로드 presigned GET URL.",
+        "operationId": "amendment_file_url_api_v1_admin_contracts__contract_id__amendments__amendment_id__file_url_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "contract_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Contract Id"
+            }
+          },
+          {
+            "name": "amendment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Amendment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileUrlResponse"
                 }
               }
             }
@@ -13606,6 +13981,313 @@
         ],
         "title": "AggregateResponse"
       },
+      "AmendmentChanges": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "contractor_phone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contractor Phone"
+          },
+          "contractor_email": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contractor Email"
+          },
+          "business_registration_number": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Business Registration Number"
+          },
+          "contact_person_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Person Name"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "settlement_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SettlementType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "total_amount": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Amount"
+          },
+          "unit_price": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit Price"
+          },
+          "price_unit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PriceUnit"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "vat_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VatType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "amount_note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Note"
+          },
+          "no_show_pay_amount": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "No Show Pay Amount"
+          },
+          "mentoring_time_basis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MentoringTimeBasis"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "AmendmentChanges",
+        "description": "변경 계약으로 바꿀 항목 (A109⑨). 보낸 필드만 바꾸고 null은 비운다(필수 칸 제외)."
+      },
+      "AmendmentRequest": {
+        "properties": {
+          "amended_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Amended On",
+            "description": "변경 일자"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "description": "변경 사유"
+          },
+          "changes": {
+            "$ref": "#/components/schemas/AmendmentChanges"
+          },
+          "contract_file_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contract File Id",
+            "description": "변경 계약서 (선택)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "amended_on",
+          "reason",
+          "changes"
+        ],
+        "title": "AmendmentRequest"
+      },
+      "AmendmentResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "contract_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Contract Id"
+          },
+          "amended_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Amended On"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "before": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Before",
+            "description": "바뀐 항목의 변경 전 값"
+          },
+          "after": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "After",
+            "description": "바뀐 항목의 변경 후 값"
+          },
+          "contract_file": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ContractFileResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_by_user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Created By User Id"
+          },
+          "created_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Name"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "contract_id",
+          "amended_on",
+          "reason",
+          "before",
+          "after",
+          "contract_file",
+          "created_by_user_id",
+          "created_by_name",
+          "created_at"
+        ],
+        "title": "AmendmentResponse"
+      },
       "ApplicantResponse": {
         "properties": {
           "user_id": {
@@ -15074,6 +15756,35 @@
         ],
         "title": "CancelBody"
       },
+      "CancelRequest": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "description": "취소 사유"
+          },
+          "canceled_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canceled On",
+            "description": "없으면 오늘"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "CancelRequest"
+      },
       "CandidatesResponse": {
         "properties": {
           "signup_type": {
@@ -15701,13 +16412,27 @@
             "title": "Status"
           },
           "start_date": {
-            "type": "string",
-            "format": "date",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Start Date"
           },
           "end_date": {
-            "type": "string",
-            "format": "date",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "End Date"
           },
           "name_match": {
@@ -15735,20 +16460,32 @@
       },
       "ContractFields": {
         "properties": {
-          "educator_type": {
-            "$ref": "#/components/schemas/EducatorType"
+          "title": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Title",
+            "description": "계약 명칭"
           },
           "contractor_name": {
             "type": "string",
             "maxLength": 50,
             "minLength": 1,
-            "title": "Contractor Name"
+            "title": "Contractor Name",
+            "description": "당사자 이름·업체명"
           },
           "contractor_phone": {
-            "type": "string",
-            "maxLength": 20,
-            "minLength": 1,
-            "title": "Contractor Phone"
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contractor Phone",
+            "description": "멘토·강사는 휴대폰 필수, 그 밖은 일반 번호 가능"
           },
           "contractor_email": {
             "anyOf": [
@@ -15762,21 +16499,156 @@
             ],
             "title": "Contractor Email"
           },
-          "title": {
-            "type": "string",
-            "maxLength": 100,
-            "minLength": 1,
-            "title": "Title"
+          "business_registration_number": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Business Registration Number",
+            "description": "사업자등록번호 10자리 (SW·장비·기타만)"
+          },
+          "contact_person_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Person Name",
+            "description": "업체 담당자 이름 (SW·장비·기타만)"
           },
           "start_date": {
-            "type": "string",
-            "format": "date",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Start Date"
           },
           "end_date": {
-            "type": "string",
-            "format": "date",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "End Date"
+          },
+          "settlement_type": {
+            "$ref": "#/components/schemas/SettlementType"
+          },
+          "total_amount": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Amount",
+            "description": "정액: 총액(필수), 단가: 예상 총액, 실비: 한도액"
+          },
+          "unit_price": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit Price",
+            "description": "단가 계약만 필수"
+          },
+          "price_unit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PriceUnit"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "단가 계약만 필수"
+          },
+          "vat_type": {
+            "$ref": "#/components/schemas/VatType",
+            "default": "NOT_APPLICABLE"
+          },
+          "amount_note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Note"
+          },
+          "no_show_pay_amount": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "No Show Pay Amount",
+            "description": "멘토 계약만 필수: 노쇼 1건 금액"
+          },
+          "mentoring_time_basis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MentoringTimeBasis"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "멘토 계약만 필수: 멘토링 정산 시간 기준"
+          },
+          "contract_type": {
+            "$ref": "#/components/schemas/ContractType"
+          },
+          "bootcamp_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Bootcamp Id"
+          },
+          "cohort_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cohort Id",
+            "description": "없으면 과정 공통 계약"
           },
           "manager_employee_id": {
             "type": "string",
@@ -15811,12 +16683,11 @@
         },
         "type": "object",
         "required": [
-          "educator_type",
-          "contractor_name",
-          "contractor_phone",
           "title",
-          "start_date",
-          "end_date",
+          "contractor_name",
+          "settlement_type",
+          "contract_type",
+          "bootcamp_id",
           "manager_employee_id"
         ],
         "title": "ContractFields"
@@ -15896,18 +16767,29 @@
             "format": "uuid",
             "title": "Id"
           },
-          "educator_type": {
-            "$ref": "#/components/schemas/EducatorType"
+          "contract_type": {
+            "$ref": "#/components/schemas/ContractType"
           },
           "status": {
             "$ref": "#/components/schemas/ContractStatus"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
           },
           "contractor_name": {
             "type": "string",
             "title": "Contractor Name"
           },
           "contractor_phone": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Contractor Phone"
           },
           "contractor_email": {
@@ -15921,19 +16803,162 @@
             ],
             "title": "Contractor Email"
           },
-          "title": {
-            "type": "string",
-            "title": "Title"
+          "business_registration_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Business Registration Number"
+          },
+          "contact_person_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Person Name"
           },
           "start_date": {
-            "type": "string",
-            "format": "date",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Start Date"
           },
           "end_date": {
-            "type": "string",
-            "format": "date",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "End Date"
+          },
+          "settlement_type": {
+            "$ref": "#/components/schemas/SettlementType"
+          },
+          "total_amount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Amount"
+          },
+          "unit_price": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit Price"
+          },
+          "price_unit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PriceUnit"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "vat_type": {
+            "$ref": "#/components/schemas/VatType"
+          },
+          "amount_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Note"
+          },
+          "no_show_pay_amount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "No Show Pay Amount"
+          },
+          "mentoring_time_basis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MentoringTimeBasis"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bootcamp_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Bootcamp Id"
+          },
+          "bootcamp_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bootcamp Name",
+            "description": "과정 이름"
+          },
+          "cohort_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cohort Id"
+          },
+          "cohort_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cohort Number",
+            "description": "기수 번호 (과정 공통 계약이면 null)"
           },
           "manager_employee_id": {
             "type": "string",
@@ -15997,6 +17022,62 @@
               }
             ]
           },
+          "cancel_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancel Reason"
+          },
+          "canceled_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canceled On"
+          },
+          "termination_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TerminationReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "termination_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Termination Detail"
+          },
+          "terminated_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Terminated On"
+          },
           "created_at": {
             "anyOf": [
               {
@@ -16025,20 +17106,39 @@
         "type": "object",
         "required": [
           "id",
-          "educator_type",
+          "contract_type",
           "status",
+          "title",
           "contractor_name",
           "contractor_phone",
           "contractor_email",
-          "title",
+          "business_registration_number",
+          "contact_person_name",
           "start_date",
           "end_date",
+          "settlement_type",
+          "total_amount",
+          "unit_price",
+          "price_unit",
+          "vat_type",
+          "amount_note",
+          "no_show_pay_amount",
+          "mentoring_time_basis",
+          "bootcamp_id",
+          "bootcamp_name",
+          "cohort_id",
+          "cohort_number",
           "manager_employee_id",
           "manager_name",
           "mentor_id",
           "instructor_id",
           "linked_profile",
           "contract_file",
+          "cancel_reason",
+          "canceled_on",
+          "termination_reason",
+          "termination_detail",
+          "terminated_on",
           "created_at",
           "updated_at"
         ],
@@ -16048,23 +17148,76 @@
         "type": "string",
         "enum": [
           "DRAFT",
+          "IN_PROGRESS",
+          "SIGNED",
           "ACTIVE",
           "ENDED",
+          "CANCELED",
           "TERMINATED"
         ],
-        "title": "ContractStatus"
+        "title": "ContractStatus",
+        "description": "계약 상태 (A109③)."
+      },
+      "ContractType": {
+        "type": "string",
+        "enum": [
+          "MENTOR",
+          "INSTRUCTOR",
+          "SW",
+          "EQUIPMENT",
+          "OTHER"
+        ],
+        "title": "ContractType",
+        "description": "계약 종류 (A109①). 멘토 FK는 멘토 계약, 강사 FK는 강사 계약만 쓴다."
       },
       "ContractUpdate": {
         "properties": {
-          "educator_type": {
+          "contract_type": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/EducatorType"
+                "$ref": "#/components/schemas/ContractType"
               },
               {
                 "type": "null"
               }
             ]
+          },
+          "bootcamp_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bootcamp Id"
+          },
+          "cohort_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cohort Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
           },
           "contractor_name": {
             "anyOf": [
@@ -16083,8 +17236,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "maxLength": 20,
-                "minLength": 1
+                "maxLength": 20
               },
               {
                 "type": "null"
@@ -16104,18 +17256,29 @@
             ],
             "title": "Contractor Email"
           },
-          "title": {
+          "business_registration_number": {
             "anyOf": [
               {
                 "type": "string",
-                "maxLength": 100,
-                "minLength": 1
+                "maxLength": 20
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Title"
+            "title": "Business Registration Number"
+          },
+          "contact_person_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Person Name"
           },
           "start_date": {
             "anyOf": [
@@ -16140,6 +17303,94 @@
               }
             ],
             "title": "End Date"
+          },
+          "settlement_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SettlementType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "total_amount": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Amount"
+          },
+          "unit_price": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit Price"
+          },
+          "price_unit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PriceUnit"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "vat_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VatType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "amount_note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Note"
+          },
+          "no_show_pay_amount": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "No Show Pay Amount"
+          },
+          "mentoring_time_basis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MentoringTimeBasis"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "manager_employee_id": {
             "anyOf": [
@@ -16168,7 +17419,7 @@
         },
         "type": "object",
         "title": "ContractUpdate",
-        "description": "보낸 필드만 바꾼다. 확정된 계약은 manager_employee_id만 바꿀 수 있다."
+        "description": "보낸 필드만 바꾼다. 서명 전(DRAFT·IN_PROGRESS)은 모든 항목, 서명 후는 담당 직원만."
       },
       "DataScope": {
         "type": "string",
@@ -16348,14 +17599,6 @@
         ],
         "title": "DisplayNamePreference",
         "description": "수강생에게 보일 이름 (A22). NICKNAME은 닉네임이 있을 때만 고를 수 있다."
-      },
-      "EducatorType": {
-        "type": "string",
-        "enum": [
-          "MENTOR",
-          "INSTRUCTOR"
-        ],
-        "title": "EducatorType"
       },
       "EmailCodeRequest": {
         "properties": {
@@ -19163,6 +20406,15 @@
         ],
         "title": "MentoringSettlementStatus"
       },
+      "MentoringTimeBasis": {
+        "type": "string",
+        "enum": [
+          "STUDENT_REQUEST",
+          "ACTUAL_DURATION"
+        ],
+        "title": "MentoringTimeBasis",
+        "description": "멘토 계약의 멘토링 정산 시간 기준 (A109④, 배정의 정산 기준과 같은 뜻)."
+      },
       "MessagePage": {
         "properties": {
           "items": {
@@ -20332,6 +21584,18 @@
         },
         "type": "object",
         "title": "PositionUpdateRequest"
+      },
+      "PriceUnit": {
+        "type": "string",
+        "enum": [
+          "HOURLY",
+          "PER_SESSION",
+          "DAILY",
+          "MONTHLY",
+          "PER_ITEM"
+        ],
+        "title": "PriceUnit",
+        "description": "단가 기준 (A109④)."
       },
       "ProfileUpdate": {
         "properties": {
@@ -22390,6 +23654,16 @@
         ],
         "title": "SettlementSummary"
       },
+      "SettlementType": {
+        "type": "string",
+        "enum": [
+          "FIXED",
+          "UNIT_PRICE",
+          "ACTUAL_COST"
+        ],
+        "title": "SettlementType",
+        "description": "계약 정산 유형 (A109④)."
+      },
       "SignupCohortResponse": {
         "properties": {
           "cohort_id": {
@@ -23946,6 +25220,54 @@
         "type": "object",
         "title": "TeamUpdateRequest"
       },
+      "TerminateRequest": {
+        "properties": {
+          "reason": {
+            "$ref": "#/components/schemas/TerminationReason"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail",
+            "description": "해지 사유 상세"
+          },
+          "terminated_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Terminated On",
+            "description": "없으면 오늘"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "TerminateRequest"
+      },
+      "TerminationReason": {
+        "type": "string",
+        "enum": [
+          "TERMINATED_BY_FAULT",
+          "TERMINATED_BY_MUTUAL_AGREEMENT",
+          "TERMINATED_BY_UNILATERAL"
+        ],
+        "title": "TerminationReason",
+        "description": "해지 사유 (A109③)."
+      },
       "ThreadResponse": {
         "properties": {
           "id": {
@@ -24552,6 +25874,15 @@
           "valid_until"
         ],
         "title": "ValidityRequest"
+      },
+      "VatType": {
+        "type": "string",
+        "enum": [
+          "INCLUDED",
+          "EXCLUDED",
+          "NOT_APPLICABLE"
+        ],
+        "title": "VatType"
       },
       "WeekendSeType": {
         "type": "string",

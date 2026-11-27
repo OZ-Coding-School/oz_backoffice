@@ -234,9 +234,8 @@ async def test_candidates_for_mentor_are_unlinked_mentor_contracts(
     from datetime import date
 
     from app.contexts.educator.domain.entities import EducatorContract
-    from app.contexts.educator.domain.enums import EducatorType
     from app.contexts.educator.infrastructure.repositories import TortoiseEducatorContractRepository
-    from tests.factories.educator import create_mentor
+    from tests.factories.educator import INSTRUCTOR_TERMS, create_mentor, mentor_contract_fields
     from tests.factories.organization import create_employee
 
     employee = await create_employee()
@@ -245,7 +244,7 @@ async def test_candidates_for_mentor_are_unlinked_mentor_contracts(
     async def contract(**overrides: object) -> EducatorContract:
         values: dict[str, object] = {
             "manager_employee_id": employee.id,
-            "educator_type": EducatorType.MENTOR,
+            **(await mentor_contract_fields()),
             "contractor_name": "김멘토",
             "contractor_phone": "01077778888",
             "title": "멘토 계약",
@@ -262,7 +261,7 @@ async def test_candidates_for_mentor_are_unlinked_mentor_contracts(
     )
     match = await contract()
     phone = await contract(contractor_name="김멘투")
-    await contract(educator_type=EducatorType.INSTRUCTOR)  # 강사 계약 제외
+    await contract(**INSTRUCTOR_TERMS)  # 강사 계약 제외
     await contract(mentor_id=(await create_mentor()).id)  # 이미 연결 제외
     other = await contract(contractor_name="이멘토", contractor_phone="01011112222")
 
