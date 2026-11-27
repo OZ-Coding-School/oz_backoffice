@@ -11,7 +11,7 @@ mentoring.team.manage (기수 범위):
 """
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends, Request, Response, status
@@ -29,8 +29,11 @@ from app.contexts.mentoring.application.team_service import (
     MentorOfUser,
     StudentLookup,
 )
+from app.contexts.mentoring.application.team_stats import TeamStats as TeamListStats
+from app.contexts.mentoring.application.team_stats import TeamStatsQueries
 from app.contexts.mentoring.domain.team import NAME_MAX_LENGTH, MentoringTeam, TeamActivity
 from app.contexts.mentoring.infrastructure.repositories import (
+    TortoiseBalanceAccountRepository,
     TortoiseCohortMentoringSettingsRepository,
     TortoiseCohortMentorRepository,
     TortoiseMentoringRequestRepository,
@@ -41,6 +44,7 @@ from app.contexts.mentoring.presentation.cleanup import build_cleanup
 from app.core.clock import Clock
 from app.core.dependencies import get_clock
 from app.core.uow import UnitOfWork
+from app.shared.time import business_date
 
 admin_router = APIRouter(
     prefix="/admin/cohorts/{cohort_id}/mentoring-teams", tags=["admin-mentoring-teams"]
@@ -117,6 +121,48 @@ class TeamResponse(BaseModel):
     label: str = Field(description="팀 이름, 없으면 'N팀'")
     mentor: MentorSummary
     members: list[StudentSummary]
+
+
+class TeamAccount(BaseModel):
+    id: uuid.UUID
+    valid_from: date
+    valid_until: date
+    is_expired: bool
+    total_minutes: int
+    held_minutes: int
+    used_minutes: int
+    remaining_minutes: int
+
+
+class AdminTeamResponse(TeamResponse):
+    """운영진 팀 관리 목록 항목 (A108): 팀 계좌·대기 신청·세션 수를 함께."""
+
+    account: TeamAccount | None = Field(description="팀 시간 계좌 (지급 전이면 없음)")
+    pending_request_count: int = Field(description="팀 대기 신청 수")
+    upcoming_session_count: int = Field(description="팀 예정·진행 중 세션 수")
+    completed_session_count: int = Field(description="팀 완료 세션 수")
+
+    @classmethod
+    def of(cls, team: TeamResponse, stats: TeamListStats, today: date) -> "AdminTeamResponse":
+        a = stats.account
+        return cls(
+            **team.model_dump(),
+            account=TeamAccount(
+                id=a.id,
+                valid_from=a.valid_from,
+                valid_until=a.valid_until,
+                is_expired=a.is_expired(today),
+                total_minutes=a.total_minutes,
+                held_minutes=a.held_minutes,
+                used_minutes=a.used_minutes,
+                remaining_minutes=a.remaining_minutes,
+            )
+            if a
+            else None,
+            pending_request_count=stats.pending_requests,
+            upcoming_session_count=stats.upcoming_sessions,
+            completed_session_count=stats.completed_sessions,
+        )
 
 
 class StudentTeamMentor(BaseModel):
@@ -262,15 +308,31 @@ PresenterDep = Annotated[Presenter, Depends(Presenter)]
 
 
 # ---------------------------------------------------------------- 운영진
-@admin_router.get("", response_model=list[TeamResponse])
+def get_team_stats() -> TeamStatsQueries:
+    return TeamStatsQueries(
+        accounts=TortoiseBalanceAccountRepository(),
+        requests=TortoiseMentoringRequestRepository(),
+        sessions=TortoiseMentoringSessionRepository(),
+    )
+
+
+StatsDep = Annotated[TeamStatsQueries, Depends(get_team_stats)]
+
+
+@admin_router.get("", response_model=list[AdminTeamResponse])
 async def list_teams(
     cohort_id: uuid.UUID,
     _: TeamReader,
     service: ServiceDep,
     presenter: PresenterDep,
-) -> list[TeamResponse]:
-    """기수의 팀 전체 (페이징 없음, A39). 팀 번호 순."""
-    return await presenter.teams(await service.list_by_cohort(cohort_id))
+    stats: StatsDep,
+    clock: Annotated[Clock, Depends(get_clock)],
+) -> list[AdminTeamResponse]:
+    """기수의 팀 전체 (페이징 없음, A39). 팀 번호 순. 팀 계좌·대기 신청·세션 수를 함께 (A108)."""
+    teams = await presenter.teams(await service.list_by_cohort(cohort_id))
+    by_team = await stats.of([t.id for t in teams])
+    today = business_date(clock.now())
+    return [AdminTeamResponse.of(t, by_team[t.id], today) for t in teams]
 
 
 @admin_router.get("/unassigned-students", response_model=list[StudentSummary])

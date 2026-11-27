@@ -341,6 +341,13 @@ class InMemoryRequestRepository:
                 result[r.requester_id] = result.get(r.requester_id, 0) + 1
         return result
 
+    async def count_pending_by_teams(self, team_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
+        result: dict[uuid.UUID, int] = {}
+        for r in self.items.values():
+            if r.status is MentoringRequestStatus.PENDING and r.team_id in team_ids:
+                result[r.team_id] = result.get(r.team_id, 0) + 1
+        return result
+
     def _page(
         self, found: list[MentoringRequest], limit: int, offset: int
     ) -> tuple[list[MentoringRequest], int]:
@@ -666,6 +673,17 @@ class InMemorySessionRepository:
             r = self._requests.items[s.request_id]
             if r.team_id is None and r.requester_id in requester_ids:
                 by_status = result.setdefault(r.requester_id, {})
+                by_status[s.status] = by_status.get(s.status, 0) + 1
+        return result
+
+    async def count_by_teams(
+        self, team_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, dict[MentoringSessionStatus, int]]:
+        result: dict[uuid.UUID, dict[MentoringSessionStatus, int]] = {}
+        for s in self.items.values():
+            r = self._requests.items[s.request_id]
+            if r.team_id is not None and r.team_id in team_ids:
+                by_status = result.setdefault(r.team_id, {})
                 by_status[s.status] = by_status.get(s.status, 0) + 1
         return result
 

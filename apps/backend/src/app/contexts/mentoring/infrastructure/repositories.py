@@ -716,6 +716,19 @@ class TortoiseMentoringRequestRepository:
         )
         return {row["requester_id"]: row["n"] for row in rows}
 
+    async def count_pending_by_teams(self, team_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
+        if not team_ids:
+            return {}
+        rows = (
+            await MentoringRequestModel.filter(
+                team_id__in=team_ids, status=MentoringRequestStatus.PENDING
+            )
+            .annotate(n=Count("id"))
+            .group_by("team_id")
+            .values("team_id", "n")
+        )
+        return {row["team_id"]: row["n"] for row in rows}
+
     async def _page(
         self, query: Any, limit: int, offset: int
     ) -> tuple[list[MentoringRequest], int]:
@@ -1158,6 +1171,23 @@ class TortoiseMentoringSessionRepository:
         result: dict[uuid.UUID, dict[MentoringSessionStatus, int]] = {}
         for row in rows:
             by_status = result.setdefault(row["request__requester_id"], {})
+            by_status[MentoringSessionStatus(row["status"])] = row["n"]
+        return result
+
+    async def count_by_teams(
+        self, team_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, dict[MentoringSessionStatus, int]]:
+        if not team_ids:
+            return {}
+        rows = (
+            await MentoringSessionModel.filter(request__team_id__in=team_ids)
+            .annotate(n=Count("id"))
+            .group_by("request__team_id", "status")
+            .values("request__team_id", "status", "n")
+        )
+        result: dict[uuid.UUID, dict[MentoringSessionStatus, int]] = {}
+        for row in rows:
+            by_status = result.setdefault(row["request__team_id"], {})
             by_status[MentoringSessionStatus(row["status"])] = row["n"]
         return result
 

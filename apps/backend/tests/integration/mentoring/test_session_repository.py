@@ -161,6 +161,11 @@ async def test_session_round_trip_overlap_and_lists() -> None:
         student.id: {MentoringSessionStatus.SCHEDULED: 2}
     }
     assert await sessions.count_by_requesters([]) == {}
+    # 팀별 세션 수 (A108)
+    assert await sessions.count_by_teams([team.id]) == {
+        team.id: {MentoringSessionStatus.SCHEDULED: 1}
+    }
+    assert await sessions.count_by_teams([]) == {}
     # 상태별 세션 수: 참여자 기준·멘토 기준, 없는 상태는 0 (A68)
     zero = dict.fromkeys(MentoringSessionStatus, 0)
     assert await sessions.count_statuses_for_participants(
