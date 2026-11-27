@@ -189,6 +189,30 @@ describe("멘토링 > 멘토링 설정 (FE-19a)", () => {
     expect(localStorage.getItem("oz.admin.current-cohort")).toBe("c3");
   });
 
+  it("기수 선택기: 왼쪽 과정 · 오른쪽 기수, 종료 기수는 켜야 보이고 최근 고른 기수는 칩으로 (F94)", async () => {
+    mockApi();
+    localStorage.setItem("oz.admin.recent-cohorts", JSON.stringify(["c3"]));
+    await renderRoute("/admin/cohorts/c12/mentoring/settings");
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "현재 기수" }));
+    const popover = await screen.findByRole("dialog", { name: "기수 고르기" });
+    const backend = within(popover).getByRole("group", { name: "백엔드 부트캠프 기수" });
+    expect(within(backend).getByRole("button", { name: "백엔드 부트캠프 12기" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(within(backend).queryByRole("button", { name: "백엔드 부트캠프 11기" })).not.toBeInTheDocument();
+    await user.click(within(popover).getByRole("switch", { name: "종료된 기수도 보기" }));
+    expect(within(popover).getByRole("button", { name: "백엔드 부트캠프 11기" })).toBeInTheDocument();
+    expect(within(popover).getByRole("button", { name: "최근 데이터 분석 부트캠프 3기" })).toBeInTheDocument();
+    await user.click(within(popover).getByRole("button", { name: /데이터 분석 부트캠프/, pressed: false }));
+    expect(
+      within(within(popover).getByRole("group", { name: "데이터 분석 부트캠프 기수" })).getByRole("button", {
+        name: "데이터 분석 부트캠프 3기",
+      }),
+    ).toBeInTheDocument();
+  });
+
   it("금지 시간대: 점선 카드로 추가하고(겹치면 안내), 항목 패널에서 지운다", async () => {
     const calls = mockApi();
     await renderRoute("/admin/cohorts/c12/mentoring/settings");

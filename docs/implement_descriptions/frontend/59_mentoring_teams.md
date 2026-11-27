@@ -2,7 +2,7 @@
 
 - 상태: PR 진행 중
 - 관련 PR: #184
-- 관련 결정: `docs/decisions.md` F93·A108 (F90·F91·F92, A39·A40)
+- 관련 결정: `docs/decisions.md` F93·F94·A108 (F90·F91·F92, A39·A40)
 - 이전 기록: [58. 디자인 다듬기 ⑧ 멘토 화면](58_design_refresh_mentor.md)
 
 ## 배경
@@ -18,11 +18,13 @@ FE-19의 두 번째 PR(F90). 현재 기수의 팀 목록·팀 만들기·팀 시
 | `components/create-team-sheet.tsx` | 팀 만들기 패널(F68): 이름(선택)·담당 멘토(활성 배정)·팀원(팀 없는 수강 중 수강생 체크) |
 | `components/grant-teams-sheet.tsx` | 팀 시간 지급 패널: 시간(비우면 기수 기본)·사용 기간(새 계좌만)·사유 필수, 결과(지급·건너뜀 사유) |
 | `components/empty-state.tsx` | 설명에 링크를 넣을 수 있게 |
+| `features/staff/components/cohort-picker.tsx`, `current-cohort.ts` (F94) | 현재 기수 선택기를 왼쪽 과정 · 오른쪽 기수 두 칸으로, 검색(여러 단어)·최근 기수 칩 3개·종료 기수 스위치 |
 
 ## 주요 결정 (사용자 결정, F93·A108)
 - 신청·세션 수는 백엔드 보완 후 표시.
 - 행은 팀 상세(19c)로, 19b에서는 팀 만들기만 패널. 19c 전까지 행은 누를 수 없다.
 - 일괄 지급은 체크 → 떠오르는 막대 → 패널, 전체 팀 지급은 머리 버튼.
+- 화면 확인 중 요청: 기수가 많아지면 선택기가 너무 길어 두 칸(과정 | 기수)·검색·최근·종료 스위치로 바꿈(F94). 9개 과정 × 6기수로 확인.
 
 ## 검증
 - `npm run lint`, `format:check`, `typecheck`, `test`(UTC·Asia/Seoul 425개), `build`, `e2e`(51개)
