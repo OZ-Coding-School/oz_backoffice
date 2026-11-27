@@ -122,6 +122,9 @@ export function amountSub(c: Pick<Contract, "contract_type" | "no_show_pay_amoun
 /** 연결: 멘토 이름(닉네임) · 가입 전 · 미연결 */
 export function linkedText(c: Contract): { text: string; muted: boolean } {
   const p = c.linked_profile;
+  // 새 사람의 멘토 계약은 계약 완료 때 멘토가 정해진다 (A115)
+  if (!p && c.contract_type === "MENTOR" && ["DRAFT", "IN_PROGRESS"].includes(c.status))
+    return { text: "계약 완료 때 연결", muted: true };
   if (!p) return { text: "미연결", muted: true };
   const name = p.display_name && p.display_name !== p.name ? `${p.name}(${p.display_name})` : p.name;
   return { text: name, muted: false };
@@ -166,7 +169,8 @@ export function fieldValue(key: string, value: unknown): string {
 }
 
 const ERRORS: Record<string, string> = {
-  ambiguous_mentor: "이름과 휴대폰이 같은 멘토가 여럿이에요. 기존 멘토에서 골라 주세요.",
+  ambiguous_mentor:
+    "이름과 휴대폰이 같은 멘토가 여럿이라 계약 완료를 할 수 없어요. 이 계약을 취소하고 기존 멘토를 골라 다시 만들어 주세요.",
   contract_file_required: "계약서 원본을 올린 뒤 진행할 수 있어요.",
   signed_contract_file_required: "서명된 계약서를 올려 주세요.",
   mentor_contract_move_forbidden: "멘토 계약은 다른 멘토로 옮길 수 없어요.",
@@ -210,4 +214,5 @@ export const FILE_HELP =
   "상대방에게 보낼 서명 전 계약서예요. PDF 10MB까지, 진행을 시작하려면 있어야 해요. 서명된 계약서는 [계약 완료]에서 올려요.";
 export const MENTOR_HELP =
   "멘토 계약은 만들 때 정한 멘토에 속하고 바꿀 수 없어요. 잘못 만들었으면 초안은 삭제, 진행 중이면 취소한 뒤 새로 만들어요.";
-export const NEW_MENTOR_HELP = "이름·휴대폰이 같은 멘토가 있으면 그 멘토에 붙고, 없으면 가입 전 멘토가 생겨요.";
+export const NEW_MENTOR_HELP =
+  "멘토는 계약 완료 때 정해져요. 이름·휴대폰이 같은 멘토가 있으면 그 멘토에 붙고, 없으면 가입 전 멘토가 생겨요.";

@@ -77,7 +77,7 @@ const STEP_FILE: Partial<Record<StepAction, { label: string; help: string; missi
   },
   sign: {
     label: "서명된 계약서",
-    help: "원본과 다른, 서명을 마친 PDF를 올려 주세요.",
+    help: "원본과 다른, 서명을 마친 PDF를 올려 주세요. 새 사람의 멘토 계약은 이때 멘토가 정해져요.",
     missing: "서명된 계약서를 올려 주세요.",
   },
 };

@@ -152,7 +152,8 @@ export function valuesOf(c: Contract): ContractValues {
     bootcamp_id: c.bootcamp_id,
     cohort_id: c.cohort_id ?? "",
     title: c.title,
-    mentor_choice: "existing",
+    // 새 사람의 멘토 계약은 계약 완료 전까지 멘토가 없다 (A115)
+    mentor_choice: c.mentor_id ? "existing" : "new",
     mentor_id: c.mentor_id ?? "",
     mentor_label: "",
     contractor_name: c.contractor_name,
