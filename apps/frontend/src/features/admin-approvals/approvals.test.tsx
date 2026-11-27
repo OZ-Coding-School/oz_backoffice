@@ -202,8 +202,10 @@ describe("회원 가입 승인 (FE-15a)", () => {
     expect(row).toHaveTextContent("11/16");
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole("combobox", { name: "기수" }));
-    await user.click(await screen.findByRole("option", { name: "백엔드 12기" }));
+    await user.click(screen.getByRole("button", { name: "기수" }));
+    const popover = await screen.findByRole("dialog", { name: "기수 고르기" });
+    expect(within(popover).getByRole("button", { name: "전체 기수" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(within(popover).getByRole("button", { name: "백엔드 12기" }));
     await waitFor(() => expect(router.state.location.search).toEqual({ cohort: "c12" }));
     await waitFor(() => expect(calls.cohort).toContain("c12"));
   });

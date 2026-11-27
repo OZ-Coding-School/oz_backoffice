@@ -216,13 +216,15 @@ describe("학사 > 수강생 (FE-17c)", () => {
     );
   });
 
-  it("과정을 바꾸면 그 과정의 첫 기수", async () => {
+  it("기수 선택기(F94)에서 과정을 고르고 그 과정의 기수를 고른다", async () => {
     const { rosters } = mockApi();
     const { router } = await renderRoute("/admin/academy/students?cohort=c12");
     await screen.findByRole("table", { name: "수강생" });
     const user = userEvent.setup();
-    await user.click(screen.getByRole("combobox", { name: "과정" }));
-    await user.click(await screen.findByRole("option", { name: "프론트엔드 부트캠프" }));
+    await user.click(screen.getByRole("button", { name: "기수" }));
+    const popover = await screen.findByRole("dialog", { name: "기수 고르기" });
+    await user.click(within(popover).getByRole("button", { name: /프론트엔드 부트캠프/, pressed: false }));
+    await user.click(within(popover).getByRole("button", { name: "프론트엔드 부트캠프 3기" }));
     await waitFor(() => expect(router.state.location.search).toEqual({ cohort: "f3" }));
     expect(await screen.findByText("수강생이 없어요")).toBeInTheDocument();
     expect(rosters.at(-1)).toBe("f3");

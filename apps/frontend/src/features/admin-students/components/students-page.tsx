@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
+import { CohortChooser } from "@/features/staff/components/cohort-picker";
 import { maskPhone } from "@/features/profile/mask";
 import { staffAccessQuery, type StaffCohort } from "@/features/staff/api";
 import { formatKst } from "@/lib/datetime";
@@ -33,13 +34,6 @@ export interface StudentsSearch {
 
 const NO_GROUP = "none";
 const COLUMNS = "grid grid-cols-[140px_150px_minmax(0,1fr)_80px_96px] items-center gap-3";
-const COHORT_STATUS: Record<string, string> = {
-  PLANNED: "개강 전",
-  ONGOING: "진행 중",
-  ENDED: "종료",
-  INACTIVE: "비활성",
-  ARCHIVED: "보관",
-};
 
 /** 학사 > 수강생 (F76): 과정·기수 선택(필수)·검색·수강 상태 탭 + 명단 표 */
 export function StudentsPage({ search }: { search: StudentsSearch }) {
@@ -119,15 +113,6 @@ function CohortStudents({
   const roster = useQuery(rosterQuery(cohort.id));
   const [q, setQ] = useState(search.q ?? "");
   const debounced = useDebounced(q.trim());
-  const bootcamps = useMemo(() => {
-    const seen = new Map<string, string>();
-    for (const c of cohorts) if (!seen.has(c.bootcamp_id)) seen.set(c.bootcamp_id, c.bootcamp_name);
-    return [...seen.entries()].map(([id, name]) => ({ id, name }));
-  }, [cohorts]);
-  const sameBootcamp = cohorts
-    .filter((c) => c.bootcamp_id === cohort.bootcamp_id)
-    .sort((a, b) => b.cohort_number - a.cohort_number);
-
   // 검색어는 입력이 멈추면 주소에 반영한다
   useEffect(() => {
     if ((search.q ?? "") === debounced) return;
@@ -151,36 +136,15 @@ function CohortStudents({
   return (
     <>
       <div className="flex items-center gap-2">
-        <Select
-          value={cohort.bootcamp_id}
-          onValueChange={(bootcampId) => {
-            const first = cohorts.find((c) => c.bootcamp_id === bootcampId);
-            if (first) onChange({ cohort: first.id, group: search.group });
+        <CohortChooser
+          variant="field"
+          label="기수"
+          cohorts={cohorts}
+          value={cohort.id}
+          onPick={(c) => {
+            if (c) onChange({ cohort: c.id, group: search.group });
           }}
-        >
-          <SelectTrigger aria-label="과정" className="w-60">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {bootcamps.map((b) => (
-              <SelectItem key={b.id} value={b.id}>
-                {b.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={cohort.id} onValueChange={(id) => onChange({ cohort: id, group: search.group })}>
-          <SelectTrigger aria-label="기수" className="w-44">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {sameBootcamp.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.cohort_number}기 · {COHORT_STATUS[c.status] ?? c.status}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        />
         <div className="flex-1" />
         <Select
           value={search.group ?? NO_GROUP}
