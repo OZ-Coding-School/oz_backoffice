@@ -71,6 +71,7 @@ class TortoiseEducatorContractRepository(
         "no_show_pay_amount",
         "mentoring_time_basis",
         "contract_file_id",
+        "signed_contract_file_id",
         "mentor_id",
         "instructor_id",
         "status",
@@ -88,7 +89,9 @@ class TortoiseEducatorContractRepository(
         return entity
 
     async def get_by_file(self, file_id: uuid.UUID) -> EducatorContract | None:
-        row = await EducatorContractModel.get_or_none(contract_file_id=file_id)
+        row = await EducatorContractModel.get_or_none(
+            Q(contract_file_id=file_id) | Q(signed_contract_file_id=file_id)
+        )
         return self.to_entity(row) if row else None
 
     async def list_page(

@@ -144,7 +144,10 @@ class Harness:
             self.values(contract_file_id=file.id, **overrides), actor_id=self.actor_id
         )
         await self.service.start_progress(view.contract.id, actor_id=self.actor_id)
-        await self.service.sign(view.contract.id, actor_id=self.actor_id)
+        signed_file = await self.uploaded_file()
+        await self.service.sign(
+            view.contract.id, actor_id=self.actor_id, signed_contract_file_id=signed_file.id
+        )
         return view.contract.id
 
     def actions(self) -> list[str]:
@@ -238,10 +241,23 @@ async def test_create_draft_then_progress_and_sign(h: Harness) -> None:
     assert progressing.contract.status is ContractStatus.IN_PROGRESS
     changed = await h.service.update(contract_id, {"unit_price": 60000}, actor_id=h.actor_id)
     assert changed.contract.unit_price == 60000  # 진행 중에도 고칠 수 있다
-    signed = await h.service.sign(contract_id, actor_id=h.actor_id)
+    with pytest.raises(BusinessRuleViolation) as same:  # 원본을 서명본으로 쓸 수 없다 (A113)
+        await h.service.sign(contract_id, actor_id=h.actor_id, signed_contract_file_id=file.id)
+    assert same.value.code == "signed_contract_file_same"
+    signed_file = await h.uploaded_file()
+    signed = await h.service.sign(
+        contract_id, actor_id=h.actor_id, signed_contract_file_id=signed_file.id
+    )
     assert signed.contract.status is ContractStatus.ACTIVE
+    assert signed.signed_file is not None
+    assert signed.signed_file.id == signed_file.id
     url, _ = await h.service.file_url(contract_id, actor_id=h.actor_id)
     assert "download=계약서.pdf" in url
+    signed_url, signed_meta = await h.service.file_url(
+        contract_id, actor_id=h.actor_id, signed=True
+    )
+    assert signed_meta.id == signed_file.id
+    assert signed_url
     assert h.actions() == [
         "educator.mentor.create_pending",
         "educator.contract.create",
@@ -249,6 +265,7 @@ async def test_create_draft_then_progress_and_sign(h: Harness) -> None:
         "educator.contract.update",
         "educator.contract.start",
         "educator.contract.update",
+        "educator.contract_file.upload",
         "educator.contract.sign",
     ]
 

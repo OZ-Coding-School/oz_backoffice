@@ -47,6 +47,7 @@ const base = {
   manager_name: "김관리",
   instructor_id: null,
   contract_file: null,
+  signed_contract_file: null,
   created_at: "2026-11-25T01:00:00Z",
   updated_at: null,
 };

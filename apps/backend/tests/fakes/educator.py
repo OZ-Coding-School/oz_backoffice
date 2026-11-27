@@ -41,7 +41,14 @@ class InMemoryContractRepository:
         return dataclasses.replace(found) if found else None
 
     async def get_by_file(self, file_id: uuid.UUID) -> EducatorContract | None:
-        return next((c for c in self.items.values() if c.contract_file_id == file_id), None)
+        return next(
+            (
+                c
+                for c in self.items.values()
+                if file_id in (c.contract_file_id, c.signed_contract_file_id)
+            ),
+            None,
+        )
 
     async def list_by_ids(self, contract_ids: list[uuid.UUID]) -> list[EducatorContract]:
         return [dataclasses.replace(self.items[i]) for i in contract_ids if i in self.items]

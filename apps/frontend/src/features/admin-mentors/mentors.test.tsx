@@ -154,6 +154,7 @@ const CONTRACTS: Contract[] = [
     instructor_id: null,
     linked_profile: { name: "김멘토", display_name: "멘토K" },
     contract_file: { id: "f1", file_name: "멘토 계약서.pdf", file_size: 186_000, created_at: "2026-10-28T01:00:00Z" },
+    signed_contract_file: null,
     created_at: "2026-10-28T01:00:00Z",
     updated_at: null,
   },

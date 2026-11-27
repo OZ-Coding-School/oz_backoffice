@@ -1,9 +1,10 @@
 """계약과 계약서 (decisions A109, 이전 A23~A27).
 
 상태 전이 (A109③):
-- DRAFT → IN_PROGRESS: 계약 진행. 계약서가 있어야 한다.
-- IN_PROGRESS → SIGNED·ACTIVE: 계약 완료. 시작일이 없거나 오늘 이전이면 바로 ACTIVE,
-  아니면 SIGNED. 종료일이 이미 지났으면 바로 ENDED(뒤늦게 등록한 끝난 계약).
+- DRAFT → IN_PROGRESS: 계약 진행. 계약서 원본(미서명)이 있어야 한다.
+- IN_PROGRESS → SIGNED·ACTIVE: 계약 완료. 서명된 계약서를 함께 받는다(A113).
+  시작일이 없거나 오늘 이전이면 바로 ACTIVE, 아니면 SIGNED.
+  종료일이 이미 지났으면 바로 ENDED(뒤늦게 등록한 끝난 계약).
 - SIGNED → ACTIVE: 시작일에 자동(매일 00:05 KST 작업).
 - ACTIVE → ENDED: 종료일이 지난 다음 날 자동. 종료일이 없으면 운영진이 [종료].
 - DRAFT·IN_PROGRESS → CANCELED (취소 사유·일자), SIGNED·ACTIVE → TERMINATED (해지 사유·상세·일자).
@@ -93,6 +94,15 @@ EDITABLE_STATUSES = frozenset({ContractStatus.DRAFT, ContractStatus.IN_PROGRESS}
 AMENDABLE_STATUSES = frozenset({ContractStatus.SIGNED, ContractStatus.ACTIVE})
 # 계약서가 없어도 되는 상태 (A109⑥: IN_PROGRESS부터 필수, 초안에서 바로 취소한 계약은 없음)
 FILE_OPTIONAL_STATUSES = frozenset({ContractStatus.DRAFT, ContractStatus.CANCELED})
+# 서명된 계약서가 있어야 하는 상태 (A113: 계약 완료부터)
+SIGNED_FILE_STATUSES = frozenset(
+    {
+        ContractStatus.SIGNED,
+        ContractStatus.ACTIVE,
+        ContractStatus.ENDED,
+        ContractStatus.TERMINATED,
+    }
+)
 
 
 @dataclass(kw_only=True, eq=False)
@@ -168,6 +178,7 @@ class EducatorContract(AggregateRoot):
     no_show_pay_amount: int | None = None
     mentoring_time_basis: MentoringTimeBasis | None = None
     contract_file_id: uuid.UUID | None = None
+    signed_contract_file_id: uuid.UUID | None = None
     mentor_id: uuid.UUID | None = None
     instructor_id: uuid.UUID | None = None
     status: ContractStatus = ContractStatus.DRAFT
@@ -289,18 +300,29 @@ class EducatorContract(AggregateRoot):
     def ensure_file_for_status(self) -> None:
         if self.status not in FILE_OPTIONAL_STATUSES and self.contract_file_id is None:
             raise _invalid("계약서를 올려 주세요.", "contract_file_required")
+        if self.status in SIGNED_FILE_STATUSES and self.signed_contract_file_id is None:
+            raise _invalid("서명된 계약서를 올려 주세요.", "signed_contract_file_required")
 
-    def start_progress(self) -> None:
+    def start_progress(self, *, contract_file_id: uuid.UUID | None = None) -> None:
+        """계약 진행: 계약서 원본(미서명)을 함께 받으면 붙인다(A113)."""
         if self.status is not ContractStatus.DRAFT:
             raise _invalid_transition()
+        if contract_file_id is not None:
+            self.contract_file_id = contract_file_id
         if self.contract_file_id is None:
             raise _invalid("계약서를 올린 뒤 진행할 수 있습니다.", "contract_file_required")
         self.status = ContractStatus.IN_PROGRESS
 
-    def sign(self, *, today: date) -> None:
-        """계약 완료: 시작일이 없거나 지났으면 ACTIVE, 아니면 SIGNED. 이미 끝났으면 ENDED."""
+    def sign(self, *, today: date, signed_contract_file_id: uuid.UUID) -> None:
+        """계약 완료: 서명된 계약서를 붙이고(A113), 시작일이 없거나 지났으면 ACTIVE, 아니면 SIGNED.
+        이미 끝났으면 ENDED."""
         if self.status is not ContractStatus.IN_PROGRESS:
             raise _invalid_transition()
+        if signed_contract_file_id == self.contract_file_id:
+            raise _invalid(
+                "서명된 계약서는 원본과 다른 파일이어야 합니다.", "signed_contract_file_same"
+            )
+        self.signed_contract_file_id = signed_contract_file_id
         self.status = ContractStatus.SIGNED
         self.advance(today=today)
 

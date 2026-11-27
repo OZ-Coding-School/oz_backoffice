@@ -67,6 +67,7 @@ MANAGE = "educator.contract.manage"
 class ContractView:
     contract: EducatorContract
     file: ContractFile | None
+    signed_file: ContractFile | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -168,23 +169,36 @@ class ContractService:
             contract_filter, limit=limit, offset=offset
         )
         counts = await self._contracts.count_by_types(contract_filter)
-        file_ids = [c.contract_file_id for c in contracts if c.contract_file_id]
+        file_ids = [
+            f for c in contracts for f in (c.contract_file_id, c.signed_contract_file_id) if f
+        ]
         files = {f.id: f for f in await self._files.list_by_ids(file_ids)}
         views = [
-            ContractView(c, files.get(c.contract_file_id) if c.contract_file_id else None)
+            ContractView(
+                c,
+                files.get(c.contract_file_id) if c.contract_file_id else None,
+                files.get(c.signed_contract_file_id) if c.signed_contract_file_id else None,
+            )
             for c in contracts
         ]
         return ContractList(views=views, total=total, counts=counts)
 
     async def get(self, contract_id: uuid.UUID, *, actor_id: uuid.UUID) -> ContractView:
         contract = await self._readable(contract_id, actor_id)
-        return ContractView(contract, await self._file_of(contract.contract_file_id))
+        return ContractView(
+            contract,
+            await self._file_of(contract.contract_file_id),
+            await self._file_of(contract.signed_contract_file_id),
+        )
 
     async def file_url(
-        self, contract_id: uuid.UUID, *, actor_id: uuid.UUID
+        self, contract_id: uuid.UUID, *, actor_id: uuid.UUID, signed: bool = False
     ) -> tuple[str, ContractFile]:
-        """계약서 다운로드 presigned GET URL (원본 파일 이름으로 저장)."""
-        file = await self._file_of((await self._readable(contract_id, actor_id)).contract_file_id)
+        """계약서(원본 또는 서명본, A113) 다운로드 presigned GET URL (원본 파일 이름으로 저장)."""
+        contract = await self._readable(contract_id, actor_id)
+        file = await self._file_of(
+            contract.signed_contract_file_id if signed else contract.contract_file_id
+        )
         if file is None:
             raise NotFoundError("계약서가 없습니다.", code="contract_file_not_found")
         url = await self._storage.presign_get(file.storage_key, download_name=file.file_name)
@@ -311,12 +325,40 @@ class ContractService:
             await self._notify(current, updated, actor_id)
         return AmendmentView(amendment, file)
 
-    async def start_progress(self, contract_id: uuid.UUID, *, actor_id: uuid.UUID) -> ContractView:
-        return await self._transition(contract_id, "start", actor_id, lambda c: c.start_progress())
+    async def start_progress(
+        self,
+        contract_id: uuid.UUID,
+        *,
+        actor_id: uuid.UUID,
+        contract_file_id: uuid.UUID | None = None,
+    ) -> ContractView:
+        """계약 진행. 계약서 원본(미서명)을 함께 주면 붙이고 이전 파일은 지운다 (A113)."""
+        async with self._uow:
+            contract = await self._manageable(contract_id, actor_id)
+            before = dataclasses.replace(contract)
+            if contract_file_id is not None and contract_file_id != contract.contract_file_id:
+                await self._attachable_file(contract_file_id, exclude=contract.id)
+                await self._discard_file(contract.contract_file_id)
+            contract.start_progress(contract_file_id=contract_file_id)
+            await self._contracts.save(contract)
+            await self._record(actor_id, "start", contract, before=before)
+        return await self.get(contract_id, actor_id=actor_id)
 
-    async def sign(self, contract_id: uuid.UUID, *, actor_id: uuid.UUID) -> ContractView:
+    async def sign(
+        self, contract_id: uuid.UUID, *, actor_id: uuid.UUID, signed_contract_file_id: uuid.UUID
+    ) -> ContractView:
+        """계약 완료. 서명된 계약서를 함께 받는다 (A113)."""
         today = business_date(self._clock.now())
-        return await self._transition(contract_id, "sign", actor_id, lambda c: c.sign(today=today))
+        async with self._uow:
+            contract = await self._manageable(contract_id, actor_id)
+            before = dataclasses.replace(contract)
+            if signed_contract_file_id != contract.contract_file_id:
+                await self._attachable_file(signed_contract_file_id, exclude=contract.id)
+            contract.sign(today=today, signed_contract_file_id=signed_contract_file_id)
+            await self._contracts.save(contract)
+            await self._record(actor_id, "sign", contract, before=before)
+            await self._notify(before, contract, actor_id)
+        return await self.get(contract_id, actor_id=actor_id)
 
     async def end(self, contract_id: uuid.UUID, *, actor_id: uuid.UUID) -> ContractView:
         return await self._transition(contract_id, "end", actor_id, lambda c: c.end())
