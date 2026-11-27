@@ -8,11 +8,16 @@ from typing import cast
 from tortoise.expressions import Q
 from tortoise.functions import Count
 
-from app.contexts.educator.domain.entities import ContractFile, EducatorContract
-from app.contexts.educator.domain.enums import ContractStatus, EducatorType
+from app.contexts.educator.domain.entities import (
+    ContractAmendment,
+    ContractFile,
+    EducatorContract,
+)
+from app.contexts.educator.domain.enums import ContractStatus, ContractType
 from app.contexts.educator.domain.profiles import Mentor
 from app.contexts.educator.domain.repositories import ContractFilter
 from app.contexts.educator.infrastructure.models import (
+    ContractAmendmentModel,
     ContractFileModel,
     EducatorContractModel,
     InstructorModel,
@@ -45,17 +50,34 @@ class TortoiseEducatorContractRepository(
     entity = EducatorContract
     fields = (
         "manager_employee_id",
-        "educator_type",
+        "contract_type",
+        "bootcamp_id",
+        "cohort_id",
         "contractor_name",
         "contractor_phone",
+        "contractor_email",
+        "business_registration_number",
+        "contact_person_name",
         "title",
         "start_date",
         "end_date",
-        "contractor_email",
+        "settlement_type",
+        "total_amount",
+        "unit_price",
+        "price_unit",
+        "vat_type",
+        "amount_note",
+        "no_show_pay_amount",
+        "mentoring_time_basis",
         "contract_file_id",
         "mentor_id",
         "instructor_id",
         "status",
+        "cancel_reason",
+        "canceled_on",
+        "termination_reason",
+        "termination_detail",
+        "terminated_on",
     )
 
     def to_entity(self, row: EducatorContractModel) -> EducatorContract:
@@ -74,8 +96,20 @@ class TortoiseEducatorContractRepository(
         query = EducatorContractModel.all()
         if contract_filter.statuses:
             query = query.filter(status__in=list(contract_filter.statuses))
-        if contract_filter.educator_type is not None:
-            query = query.filter(educator_type=contract_filter.educator_type)
+        if contract_filter.contract_types:
+            query = query.filter(contract_type__in=list(contract_filter.contract_types))
+        if contract_filter.bootcamp_id is not None:
+            query = query.filter(bootcamp_id=contract_filter.bootcamp_id)
+        if contract_filter.cohort_id is not None:
+            query = query.filter(cohort_id=contract_filter.cohort_id)
+        if contract_filter.visible is not None:
+            visible = contract_filter.visible
+            if not (visible.bootcamp_ids or visible.cohort_ids):
+                return [], 0
+            query = query.filter(
+                Q(bootcamp_id__in=list(visible.bootcamp_ids))
+                | Q(cohort_id__in=list(visible.cohort_ids))
+            )
         if contract_filter.query:
             query = query.filter(_search(contract_filter.query))
         if contract_filter.mentor_id is not None:
@@ -84,17 +118,19 @@ class TortoiseEducatorContractRepository(
         rows = await query.order_by("-created_at", "-id").offset(offset).limit(limit)
         return [self.to_entity(row) for row in rows], total
 
-    async def list_active_ended_before(self, today: date) -> list[EducatorContract]:
+    async def list_due(self, today: date) -> list[EducatorContract]:
         rows = await EducatorContractModel.filter(
-            status=ContractStatus.ACTIVE, end_date__lt=today
-        ).order_by("end_date", "id")
+            Q(status=ContractStatus.SIGNED, start_date__isnull=True)
+            | Q(status=ContractStatus.SIGNED, start_date__lte=today)
+            | Q(status=ContractStatus.ACTIVE, end_date__lt=today)
+        ).order_by("created_at", "id")
         return [self.to_entity(row) for row in rows]
 
     async def search_unlinked_mentor_contracts(
         self, *, name: str, phone_number: str | None, query: str | None, limit: int
     ) -> list[EducatorContract]:
         rows = EducatorContractModel.filter(
-            educator_type=EducatorType.MENTOR, mentor_id__isnull=True
+            contract_type=ContractType.MENTOR, mentor_id__isnull=True
         )
         if query:
             cond = Q(contractor_name__icontains=query)
@@ -115,7 +151,7 @@ class TortoiseEducatorContractRepository(
         rows = await EducatorContractModel.filter(
             contractor_name=contractor_name,
             contractor_phone=contractor_phone,
-            educator_type=EducatorType.MENTOR,
+            contract_type=ContractType.MENTOR,
             mentor_id__isnull=True,
         ).order_by("created_at", "id")
         return [self.to_entity(row) for row in rows]
@@ -130,6 +166,36 @@ class TortoiseEducatorContractRepository(
             .values("mentor_id", "count")
         )
         return {row["mentor_id"]: row["count"] for row in rows}
+
+
+class TortoiseContractAmendmentRepository(
+    TortoiseRepository[ContractAmendment, ContractAmendmentModel]
+):
+    model = ContractAmendmentModel
+    entity = ContractAmendment
+    fields = (
+        "contract_id",
+        "amended_on",
+        "reason",
+        "before",
+        "after",
+        "created_by_user_id",
+        "contract_file_id",
+    )
+
+    def to_entity(self, row: ContractAmendmentModel) -> ContractAmendment:
+        entity = super().to_entity(row)
+        entity.created_at = row.created_at
+        return entity
+
+    async def list_by_contract(self, contract_id: uuid.UUID) -> list[ContractAmendment]:
+        rows = await ContractAmendmentModel.filter(contract_id=contract_id).order_by(
+            "-created_at", "-id"
+        )
+        return [self.to_entity(row) for row in rows]
+
+    async def file_in_use(self, file_id: uuid.UUID) -> bool:
+        return await ContractAmendmentModel.filter(contract_file_id=file_id).exists()
 
 
 class TortoiseMentorRepository(TortoiseRepository[Mentor, MentorModel]):

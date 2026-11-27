@@ -1,6 +1,6 @@
 """educator 컨텍스트 Tortoise 모델 (단일 app `models`).
 
-DBML: mentors, instructors, educator_contracts, contract_files.
+DBML: mentors, instructors, educator_contracts, contract_amendments, contract_files.
 check 제약·enum 값·DB 기본값은 마이그레이션 raw SQL로 추가한다.
 """
 
@@ -10,8 +10,13 @@ from tortoise import fields, models
 
 from app.contexts.educator.domain.enums import (
     ContractStatus,
+    ContractType,
     DisplayNamePreference,
-    EducatorType,
+    MentoringTimeBasis,
+    PriceUnit,
+    SettlementType,
+    TerminationReason,
+    VatType,
 )
 from app.shared.ids import new_id
 
@@ -76,9 +81,17 @@ class ContractFileModel(models.Model):
 
 
 class EducatorContractModel(models.Model):
+    """계약 (A109). 종류·과정·기수·상태·금액·당사자·취소/해지."""
+
     id = fields.UUIDField(primary_key=True, default=new_id)
     manager_employee: fields.ForeignKeyRelation[Any] = fields.ForeignKeyField(
         "models.EmployeeModel", related_name=False, on_delete=fields.RESTRICT
+    )
+    bootcamp: fields.ForeignKeyRelation[Any] = fields.ForeignKeyField(
+        "models.BootcampModel", related_name=False, on_delete=fields.RESTRICT
+    )
+    cohort: fields.ForeignKeyNullableRelation[Any] = fields.ForeignKeyField(
+        "models.CohortModel", related_name=False, null=True, on_delete=fields.RESTRICT
     )
     mentor: fields.ForeignKeyNullableRelation[MentorModel] = fields.ForeignKeyField(
         "models.MentorModel", related_name="contracts", null=True, on_delete=fields.RESTRICT
@@ -86,21 +99,66 @@ class EducatorContractModel(models.Model):
     instructor: fields.ForeignKeyNullableRelation[InstructorModel] = fields.ForeignKeyField(
         "models.InstructorModel", related_name="contracts", null=True, on_delete=fields.RESTRICT
     )
-    # DRAFT는 계약서 없이 만들 수 있다 (A23)
+    # IN_PROGRESS부터 필수 (A109⑥, check_contract_file_required)
     contract_file: fields.OneToOneNullableRelation[ContractFileModel] = fields.OneToOneField(
         "models.ContractFileModel", related_name="contract", null=True, on_delete=fields.RESTRICT
     )
-    educator_type = fields.CharEnumField(EducatorType, max_length=20)
+    contract_type = fields.CharEnumField(ContractType, max_length=20)
+    title = fields.CharField(max_length=100)
     contractor_name = fields.CharField(max_length=50)
     contractor_email = fields.CharField(max_length=255, null=True)
-    contractor_phone = fields.CharField(max_length=11)
-    title = fields.CharField(max_length=100)
-    start_date = fields.DateField()
-    end_date = fields.DateField()
+    contractor_phone = fields.CharField(max_length=11, null=True)
+    business_registration_number = fields.CharField(max_length=10, null=True)
+    contact_person_name = fields.CharField(max_length=50, null=True)
+    start_date = fields.DateField(null=True)
+    end_date = fields.DateField(null=True)
+    settlement_type = fields.CharEnumField(SettlementType, max_length=20)
+    total_amount = fields.BigIntField(null=True)
+    unit_price = fields.BigIntField(null=True)
+    price_unit = fields.CharEnumField(PriceUnit, max_length=20, null=True)
+    vat_type = fields.CharEnumField(VatType, max_length=20)
+    amount_note = fields.CharField(max_length=500, null=True)
+    no_show_pay_amount = fields.BigIntField(null=True)
+    mentoring_time_basis = fields.CharEnumField(MentoringTimeBasis, max_length=20, null=True)
     status = fields.CharEnumField(ContractStatus, max_length=20, default=ContractStatus.DRAFT)
+    cancel_reason = fields.CharField(max_length=500, null=True)
+    canceled_on = fields.DateField(null=True)
+    termination_reason = fields.CharEnumField(TerminationReason, max_length=40, null=True)
+    termination_detail = fields.CharField(max_length=500, null=True)
+    terminated_on = fields.DateField(null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
 
     class Meta:
         table = "educator_contracts"
-        indexes = (("contractor_name", "contractor_phone"), ("mentor",), ("instructor",))
+        indexes = (
+            ("contractor_name", "contractor_phone"),
+            ("mentor",),
+            ("instructor",),
+            ("bootcamp", "cohort"),
+            ("status", "start_date"),
+        )
+
+
+class ContractAmendmentModel(models.Model):
+    """서명 후 변경 계약 이력 (A109⑨)."""
+
+    id = fields.UUIDField(primary_key=True, default=new_id)
+    contract: fields.ForeignKeyRelation[EducatorContractModel] = fields.ForeignKeyField(
+        "models.EducatorContractModel", related_name="amendments", on_delete=fields.RESTRICT
+    )
+    amended_on = fields.DateField()
+    reason = fields.CharField(max_length=500)
+    before = fields.JSONField[dict[str, Any]]()
+    after = fields.JSONField[dict[str, Any]]()
+    contract_file: fields.OneToOneNullableRelation[ContractFileModel] = fields.OneToOneField(
+        "models.ContractFileModel", related_name="amendment", null=True, on_delete=fields.RESTRICT
+    )
+    created_by_user: fields.ForeignKeyRelation[Any] = fields.ForeignKeyField(
+        "models.UserModel", related_name=False, on_delete=fields.RESTRICT
+    )
+    created_at = fields.DatetimeField(auto_now_add=True)
+
+    class Meta:
+        table = "contract_amendments"
+        indexes = (("contract", "created_at"),)

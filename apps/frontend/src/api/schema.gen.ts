@@ -1450,7 +1450,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Contracts */
+        /**
+         * List Contracts
+         * @description 담당 범위 안의 계약만 (A109⑦). 최근에 만든 계약이 먼저.
+         */
         get: operations["list_contracts_api_v1_admin_contracts_get"];
         put?: never;
         /** Create Contract */
@@ -1493,7 +1496,10 @@ export interface paths {
         get: operations["get_contract_api_v1_admin_contracts__contract_id__get"];
         put?: never;
         post?: never;
-        /** Delete Contract */
+        /**
+         * Delete Contract
+         * @description 초안(DRAFT)만 지운다.
+         */
         delete: operations["delete_contract_api_v1_admin_contracts__contract_id__delete"];
         options?: never;
         head?: never;
@@ -1501,7 +1507,7 @@ export interface paths {
         patch: operations["update_contract_api_v1_admin_contracts__contract_id__patch"];
         trace?: never;
     };
-    "/api/v1/admin/contracts/{contract_id}/confirm": {
+    "/api/v1/admin/contracts/{contract_id}/progress": {
         parameters: {
             query?: never;
             header?: never;
@@ -1511,10 +1517,71 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Confirm Contract
-         * @description DRAFT → ACTIVE (계약서 필요). 종료일이 이미 지났으면 ENDED로 확정한다.
+         * Start Contract Progress
+         * @description DRAFT → IN_PROGRESS (계약서 필요).
          */
-        post: operations["confirm_contract_api_v1_admin_contracts__contract_id__confirm_post"];
+        post: operations["start_contract_progress_api_v1_admin_contracts__contract_id__progress_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/contracts/{contract_id}/sign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign Contract
+         * @description IN_PROGRESS → 계약 완료. 시작일이 없거나 지났으면 ACTIVE, 아니면 SIGNED
+         *     (종료일이 이미 지났으면 ENDED).
+         */
+        post: operations["sign_contract_api_v1_admin_contracts__contract_id__sign_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/contracts/{contract_id}/end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * End Contract
+         * @description 종료일이 없는 ACTIVE 계약을 끝낸다 (ENDED).
+         */
+        post: operations["end_contract_api_v1_admin_contracts__contract_id__end_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/contracts/{contract_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Contract
+         * @description DRAFT·IN_PROGRESS → CANCELED (취소 사유 필수).
+         */
+        post: operations["cancel_contract_api_v1_admin_contracts__contract_id__cancel_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1532,9 +1599,53 @@ export interface paths {
         put?: never;
         /**
          * Terminate Contract
-         * @description ACTIVE → TERMINATED (중도 해지).
+         * @description SIGNED·ACTIVE → TERMINATED (해지 사유·상세·일자).
          */
         post: operations["terminate_contract_api_v1_admin_contracts__contract_id__terminate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/contracts/{contract_id}/amendments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Contract Amendments
+         * @description 변경 이력, 최근 변경이 먼저.
+         */
+        get: operations["list_contract_amendments_api_v1_admin_contracts__contract_id__amendments_get"];
+        put?: never;
+        /**
+         * Amend Contract
+         * @description 서명 후(SIGNED·ACTIVE) 변경 계약 (A109⑨): 명칭·금액·기간·당사자 연락처.
+         */
+        post: operations["amend_contract_api_v1_admin_contracts__contract_id__amendments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/contracts/{contract_id}/amendments/{amendment_id}/file-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Amendment File Url
+         * @description 변경 계약서 다운로드 presigned GET URL.
+         */
+        get: operations["amendment_file_url_api_v1_admin_contracts__contract_id__amendments__amendment_id__file_url_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3849,6 +3960,102 @@ export interface components {
              */
             closed: string[];
         };
+        /**
+         * AmendmentChanges
+         * @description 변경 계약으로 바꿀 항목 (A109⑨). 보낸 필드만 바꾸고 null은 비운다(필수 칸 제외).
+         */
+        AmendmentChanges: {
+            /** Title */
+            title?: string | null;
+            /** Contractor Phone */
+            contractor_phone?: string | null;
+            /** Contractor Email */
+            contractor_email?: string | null;
+            /** Business Registration Number */
+            business_registration_number?: string | null;
+            /** Contact Person Name */
+            contact_person_name?: string | null;
+            /** Start Date */
+            start_date?: string | null;
+            /** End Date */
+            end_date?: string | null;
+            settlement_type?: components["schemas"]["SettlementType"] | null;
+            /** Total Amount */
+            total_amount?: number | null;
+            /** Unit Price */
+            unit_price?: number | null;
+            price_unit?: components["schemas"]["PriceUnit"] | null;
+            vat_type?: components["schemas"]["VatType"] | null;
+            /** Amount Note */
+            amount_note?: string | null;
+            /** No Show Pay Amount */
+            no_show_pay_amount?: number | null;
+            mentoring_time_basis?: components["schemas"]["MentoringTimeBasis"] | null;
+        };
+        /** AmendmentRequest */
+        AmendmentRequest: {
+            /**
+             * Amended On
+             * Format: date
+             * @description 변경 일자
+             */
+            amended_on: string;
+            /**
+             * Reason
+             * @description 변경 사유
+             */
+            reason: string;
+            changes: components["schemas"]["AmendmentChanges"];
+            /**
+             * Contract File Id
+             * @description 변경 계약서 (선택)
+             */
+            contract_file_id?: string | null;
+        };
+        /** AmendmentResponse */
+        AmendmentResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Contract Id
+             * Format: uuid
+             */
+            contract_id: string;
+            /**
+             * Amended On
+             * Format: date
+             */
+            amended_on: string;
+            /** Reason */
+            reason: string;
+            /**
+             * Before
+             * @description 바뀐 항목의 변경 전 값
+             */
+            before: {
+                [key: string]: unknown;
+            };
+            /**
+             * After
+             * @description 바뀐 항목의 변경 후 값
+             */
+            after: {
+                [key: string]: unknown;
+            };
+            contract_file: components["schemas"]["ContractFileResponse"] | null;
+            /**
+             * Created By User Id
+             * Format: uuid
+             */
+            created_by_user_id: string;
+            /** Created By Name */
+            created_by_name: string | null;
+            /** Created At */
+            created_at: string | null;
+        };
         /** ApplicantResponse */
         ApplicantResponse: {
             /**
@@ -4469,6 +4676,19 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** CancelRequest */
+        CancelRequest: {
+            /**
+             * Reason
+             * @description 취소 사유
+             */
+            reason: string;
+            /**
+             * Canceled On
+             * @description 없으면 오늘
+             */
+            canceled_on?: string | null;
+        };
         /** CandidatesResponse */
         CandidatesResponse: {
             signup_type: components["schemas"]["MemberSignupType"];
@@ -4766,16 +4986,10 @@ export interface components {
             title: string;
             /** Status */
             status: string;
-            /**
-             * Start Date
-             * Format: date
-             */
-            start_date: string;
-            /**
-             * End Date
-             * Format: date
-             */
-            end_date: string;
+            /** Start Date */
+            start_date: string | null;
+            /** End Date */
+            end_date: string | null;
             /** Name Match */
             name_match: boolean;
             /** Phone Match */
@@ -4783,25 +4997,72 @@ export interface components {
         };
         /** ContractFields */
         ContractFields: {
-            educator_type: components["schemas"]["EducatorType"];
-            /** Contractor Name */
-            contractor_name: string;
-            /** Contractor Phone */
-            contractor_phone: string;
-            /** Contractor Email */
-            contractor_email?: string | null;
-            /** Title */
+            /**
+             * Title
+             * @description 계약 명칭
+             */
             title: string;
             /**
-             * Start Date
-             * Format: date
+             * Contractor Name
+             * @description 당사자 이름·업체명
              */
-            start_date: string;
+            contractor_name: string;
             /**
-             * End Date
-             * Format: date
+             * Contractor Phone
+             * @description 멘토·강사는 휴대폰 필수, 그 밖은 일반 번호 가능
              */
-            end_date: string;
+            contractor_phone?: string | null;
+            /** Contractor Email */
+            contractor_email?: string | null;
+            /**
+             * Business Registration Number
+             * @description 사업자등록번호 10자리 (SW·장비·기타만)
+             */
+            business_registration_number?: string | null;
+            /**
+             * Contact Person Name
+             * @description 업체 담당자 이름 (SW·장비·기타만)
+             */
+            contact_person_name?: string | null;
+            /** Start Date */
+            start_date?: string | null;
+            /** End Date */
+            end_date?: string | null;
+            settlement_type: components["schemas"]["SettlementType"];
+            /**
+             * Total Amount
+             * @description 정액: 총액(필수), 단가: 예상 총액, 실비: 한도액
+             */
+            total_amount?: number | null;
+            /**
+             * Unit Price
+             * @description 단가 계약만 필수
+             */
+            unit_price?: number | null;
+            /** @description 단가 계약만 필수 */
+            price_unit?: components["schemas"]["PriceUnit"] | null;
+            /** @default NOT_APPLICABLE */
+            vat_type: components["schemas"]["VatType"];
+            /** Amount Note */
+            amount_note?: string | null;
+            /**
+             * No Show Pay Amount
+             * @description 멘토 계약만 필수: 노쇼 1건 금액
+             */
+            no_show_pay_amount?: number | null;
+            /** @description 멘토 계약만 필수: 멘토링 정산 시간 기준 */
+            mentoring_time_basis?: components["schemas"]["MentoringTimeBasis"] | null;
+            contract_type: components["schemas"]["ContractType"];
+            /**
+             * Bootcamp Id
+             * Format: uuid
+             */
+            bootcamp_id: string;
+            /**
+             * Cohort Id
+             * @description 없으면 과정 공통 계약
+             */
+            cohort_id?: string | null;
             /**
              * Manager Employee Id
              * Format: uuid
@@ -4846,26 +5107,53 @@ export interface components {
              * Format: uuid
              */
             id: string;
-            educator_type: components["schemas"]["EducatorType"];
+            contract_type: components["schemas"]["ContractType"];
             status: components["schemas"]["ContractStatus"];
+            /** Title */
+            title: string;
             /** Contractor Name */
             contractor_name: string;
             /** Contractor Phone */
-            contractor_phone: string;
+            contractor_phone: string | null;
             /** Contractor Email */
             contractor_email: string | null;
-            /** Title */
-            title: string;
+            /** Business Registration Number */
+            business_registration_number: string | null;
+            /** Contact Person Name */
+            contact_person_name: string | null;
+            /** Start Date */
+            start_date: string | null;
+            /** End Date */
+            end_date: string | null;
+            settlement_type: components["schemas"]["SettlementType"];
+            /** Total Amount */
+            total_amount: number | null;
+            /** Unit Price */
+            unit_price: number | null;
+            price_unit: components["schemas"]["PriceUnit"] | null;
+            vat_type: components["schemas"]["VatType"];
+            /** Amount Note */
+            amount_note: string | null;
+            /** No Show Pay Amount */
+            no_show_pay_amount: number | null;
+            mentoring_time_basis: components["schemas"]["MentoringTimeBasis"] | null;
             /**
-             * Start Date
-             * Format: date
+             * Bootcamp Id
+             * Format: uuid
              */
-            start_date: string;
+            bootcamp_id: string;
             /**
-             * End Date
-             * Format: date
+             * Bootcamp Name
+             * @description 과정 이름
              */
-            end_date: string;
+            bootcamp_name: string | null;
+            /** Cohort Id */
+            cohort_id: string | null;
+            /**
+             * Cohort Number
+             * @description 기수 번호 (과정 공통 계약이면 null)
+             */
+            cohort_number: number | null;
             /**
              * Manager Employee Id
              * Format: uuid
@@ -4883,6 +5171,15 @@ export interface components {
             /** @description 연결된 멘토·강사 프로필 이름 (A103) */
             linked_profile: components["schemas"]["LinkedProfileResponse"] | null;
             contract_file: components["schemas"]["ContractFileResponse"] | null;
+            /** Cancel Reason */
+            cancel_reason: string | null;
+            /** Canceled On */
+            canceled_on: string | null;
+            termination_reason: components["schemas"]["TerminationReason"] | null;
+            /** Termination Detail */
+            termination_detail: string | null;
+            /** Terminated On */
+            terminated_on: string | null;
             /** Created At */
             created_at: string | null;
             /** Updated At */
@@ -4890,27 +5187,54 @@ export interface components {
         };
         /**
          * ContractStatus
+         * @description 계약 상태 (A109③).
          * @enum {string}
          */
-        ContractStatus: "DRAFT" | "ACTIVE" | "ENDED" | "TERMINATED";
+        ContractStatus: "DRAFT" | "IN_PROGRESS" | "SIGNED" | "ACTIVE" | "ENDED" | "CANCELED" | "TERMINATED";
+        /**
+         * ContractType
+         * @description 계약 종류 (A109①). 멘토 FK는 멘토 계약, 강사 FK는 강사 계약만 쓴다.
+         * @enum {string}
+         */
+        ContractType: "MENTOR" | "INSTRUCTOR" | "SW" | "EQUIPMENT" | "OTHER";
         /**
          * ContractUpdate
-         * @description 보낸 필드만 바꾼다. 확정된 계약은 manager_employee_id만 바꿀 수 있다.
+         * @description 보낸 필드만 바꾼다. 서명 전(DRAFT·IN_PROGRESS)은 모든 항목, 서명 후는 담당 직원만.
          */
         ContractUpdate: {
-            educator_type?: components["schemas"]["EducatorType"] | null;
+            contract_type?: components["schemas"]["ContractType"] | null;
+            /** Bootcamp Id */
+            bootcamp_id?: string | null;
+            /** Cohort Id */
+            cohort_id?: string | null;
+            /** Title */
+            title?: string | null;
             /** Contractor Name */
             contractor_name?: string | null;
             /** Contractor Phone */
             contractor_phone?: string | null;
             /** Contractor Email */
             contractor_email?: string | null;
-            /** Title */
-            title?: string | null;
+            /** Business Registration Number */
+            business_registration_number?: string | null;
+            /** Contact Person Name */
+            contact_person_name?: string | null;
             /** Start Date */
             start_date?: string | null;
             /** End Date */
             end_date?: string | null;
+            settlement_type?: components["schemas"]["SettlementType"] | null;
+            /** Total Amount */
+            total_amount?: number | null;
+            /** Unit Price */
+            unit_price?: number | null;
+            price_unit?: components["schemas"]["PriceUnit"] | null;
+            vat_type?: components["schemas"]["VatType"] | null;
+            /** Amount Note */
+            amount_note?: string | null;
+            /** No Show Pay Amount */
+            no_show_pay_amount?: number | null;
+            mentoring_time_basis?: components["schemas"]["MentoringTimeBasis"] | null;
             /** Manager Employee Id */
             manager_employee_id?: string | null;
             /** Contract File Id */
@@ -4986,11 +5310,6 @@ export interface components {
          * @enum {string}
          */
         DisplayNamePreference: "NAME" | "NICKNAME";
-        /**
-         * EducatorType
-         * @enum {string}
-         */
-        EducatorType: "MENTOR" | "INSTRUCTOR";
         /** EmailCodeRequest */
         EmailCodeRequest: {
             /** Email */
@@ -6115,6 +6434,12 @@ export interface components {
          * @enum {string}
          */
         MentoringSettlementStatus: "DRAFT" | "CLOSED";
+        /**
+         * MentoringTimeBasis
+         * @description 멘토 계약의 멘토링 정산 시간 기준 (A109④, 배정의 정산 기준과 같은 뜻).
+         * @enum {string}
+         */
+        MentoringTimeBasis: "STUDENT_REQUEST" | "ACTUAL_DURATION";
         /** MessagePage */
         MessagePage: {
             /**
@@ -6586,6 +6911,12 @@ export interface components {
             assignment_scope?: components["schemas"]["AssignmentScope"] | null;
             data_scope?: components["schemas"]["DataScope"] | null;
         };
+        /**
+         * PriceUnit
+         * @description 단가 기준 (A109④).
+         * @enum {string}
+         */
+        PriceUnit: "HOURLY" | "PER_SESSION" | "DAILY" | "MONTHLY" | "PER_ITEM";
         /**
          * ProfileUpdate
          * @description 보낸 필드만 바꾼다. 닉네임·한 줄 소개·소개·전문 분야는 null(또는 빈 값)로 비운다.
@@ -7396,6 +7727,12 @@ export interface components {
             /** Closed At */
             closed_at: string | null;
         };
+        /**
+         * SettlementType
+         * @description 계약 정산 유형 (A109④).
+         * @enum {string}
+         */
+        SettlementType: "FIXED" | "UNIT_PRICE" | "ACTUAL_COST";
         /** SignupCohortResponse */
         SignupCohortResponse: {
             /**
@@ -8050,6 +8387,26 @@ export interface components {
             /** Description */
             description?: string | null;
         };
+        /** TerminateRequest */
+        TerminateRequest: {
+            reason: components["schemas"]["TerminationReason"];
+            /**
+             * Detail
+             * @description 해지 사유 상세
+             */
+            detail?: string | null;
+            /**
+             * Terminated On
+             * @description 없으면 오늘
+             */
+            terminated_on?: string | null;
+        };
+        /**
+         * TerminationReason
+         * @description 해지 사유 (A109③).
+         * @enum {string}
+         */
+        TerminationReason: "TERMINATED_BY_FAULT" | "TERMINATED_BY_MUTUAL_AGREEMENT" | "TERMINATED_BY_UNILATERAL";
         /** ThreadResponse */
         ThreadResponse: {
             /**
@@ -8298,6 +8655,11 @@ export interface components {
              */
             valid_until: string;
         };
+        /**
+         * VatType
+         * @enum {string}
+         */
+        VatType: "INCLUDED" | "EXCLUDED" | "NOT_APPLICABLE";
         /**
          * WeekendSeType
          * @enum {string}
@@ -11373,8 +11735,10 @@ export interface operations {
         parameters: {
             query?: {
                 status?: components["schemas"]["ContractStatus"][] | null;
-                educator_type?: components["schemas"]["EducatorType"] | null;
-                /** @description 계약자 이름·제목·휴대폰 */
+                contract_type?: components["schemas"]["ContractType"][] | null;
+                bootcamp_id?: string | null;
+                cohort_id?: string | null;
+                /** @description 당사자 이름·계약 명칭·전화번호 */
                 q?: string | null;
                 /** @description 연결된 멘토 (A103) */
                 mentor_id?: string | null;
@@ -11567,7 +11931,7 @@ export interface operations {
             };
         };
     };
-    confirm_contract_api_v1_admin_contracts__contract_id__confirm_post: {
+    start_contract_progress_api_v1_admin_contracts__contract_id__progress_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -11598,7 +11962,7 @@ export interface operations {
             };
         };
     };
-    terminate_contract_api_v1_admin_contracts__contract_id__terminate_post: {
+    sign_contract_api_v1_admin_contracts__contract_id__sign_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -11616,6 +11980,205 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ContractResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    end_contract_api_v1_admin_contracts__contract_id__end_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contract_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_contract_api_v1_admin_contracts__contract_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contract_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    terminate_contract_api_v1_admin_contracts__contract_id__terminate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contract_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TerminateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_contract_amendments_api_v1_admin_contracts__contract_id__amendments_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contract_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AmendmentResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    amend_contract_api_v1_admin_contracts__contract_id__amendments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contract_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AmendmentRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AmendmentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    amendment_file_url_api_v1_admin_contracts__contract_id__amendments__amendment_id__file_url_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contract_id: string;
+                amendment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FileUrlResponse"];
                 };
             };
             /** @description Validation Error */

@@ -1,6 +1,7 @@
 """가입 전 멘토 (decisions A104): 계약을 만들면 생기고, 목록·단건에 '가입 전'으로 보인다."""
 
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 from httpx import AsyncClient
@@ -9,7 +10,7 @@ from app.cli import create_super_admin
 from app.contexts.educator.infrastructure.models import MentorModel
 from app.core.config import Settings
 from app.core.security import JWTService
-from tests.factories.educator import create_mentor, create_user
+from tests.factories.educator import create_mentor, create_user, mentor_contract_json
 from tests.factories.organization import create_employee
 
 API = "/api/v1/admin"
@@ -22,9 +23,11 @@ async def admin(settings: Settings, s3_bucket: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def _body(manager_id: str, name: str = "새멘토", phone: str = "010-5555-6666") -> dict[str, str]:
+async def _body(
+    manager_id: str, name: str = "새멘토", phone: str = "010-5555-6666"
+) -> dict[str, Any]:
     return {
-        "educator_type": "MENTOR",
+        **(await mentor_contract_json()),
         "contractor_name": name,
         "contractor_phone": phone,
         "title": "2026 멘토 계약",
@@ -36,7 +39,7 @@ def _body(manager_id: str, name: str = "새멘토", phone: str = "010-5555-6666"
 
 async def test_pending_mentor_lifecycle(client: AsyncClient, admin: dict[str, str]) -> None:
     manager = str((await create_employee()).id)
-    created = await client.post(f"{API}/contracts", json=_body(manager), headers=admin)
+    created = await client.post(f"{API}/contracts", json=await _body(manager), headers=admin)
     assert created.status_code == 201, created.text
     mentor_id = created.json()["mentor_id"]
     assert created.json()["linked_profile"] == {"name": "새멘토", "display_name": "새멘토"}
@@ -61,7 +64,7 @@ async def test_pending_mentor_lifecycle(client: AsyncClient, admin: dict[str, st
     assert [m["name"] for m in found.json()["items"]] == ["새멘토"]
 
     # 같은 사람이면 같은 가입 전 멘토에 붙는다
-    again = await client.post(f"{API}/contracts", json=_body(manager), headers=admin)
+    again = await client.post(f"{API}/contracts", json=await _body(manager), headers=admin)
     assert again.json()["mentor_id"] == mentor_id
 
     # 가입 전 멘토는 활성화·신청 받기를 할 수 없다

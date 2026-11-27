@@ -15,7 +15,6 @@ from app.contexts.educator.domain.entities import EducatorContract
 from app.contexts.educator.domain.enums import (
     ContractStatus,
     DisplayNamePreference,
-    EducatorType,
 )
 from app.contexts.educator.domain.profiles import Mentor
 from app.contexts.educator.infrastructure.models import ContractFileModel
@@ -25,7 +24,7 @@ from app.contexts.educator.infrastructure.repositories import (
 )
 from app.shared.ids import new_id
 from tests.factories.academy import create_cohort, make_student
-from tests.factories.educator import create_user
+from tests.factories.educator import INSTRUCTOR_TERMS, create_user, mentor_contract_fields
 from tests.factories.organization import create_employee
 
 pytestmark = pytest.mark.integration
@@ -79,7 +78,7 @@ async def _mentor_contract(
 ) -> EducatorContract:
     values: dict[str, Any] = {
         "manager_employee_id": employee_id,
-        "educator_type": EducatorType.MENTOR,
+        **(await mentor_contract_fields()),
         "contractor_name": "김멘토",
         "contractor_phone": "01077778888",
         "title": "계약",
@@ -98,13 +97,14 @@ async def _mentor_contract(
     return entity
 
 
-async def test_signup_registers_the_pending_mentor() -> None:
-    """가입 전 멘토(A104)가 하나면 계정을 연결한다. 진행 중 계약이 있으면 활성 (A105)."""
+@pytest.mark.parametrize("status", [ContractStatus.SIGNED, ContractStatus.ACTIVE])
+async def test_signup_registers_the_pending_mentor(status: ContractStatus) -> None:
+    """가입 전 멘토(A104)가 하나면 계정을 연결한다. 서명된 계약이 있으면 활성 (A105·A109⑧)."""
     mentors = TortoiseMentorRepository()
     employee = await create_employee()
     pending = Mentor.pending(name="김멘토", phone="01077778888")
     await mentors.add(pending)
-    active = await _mentor_contract(employee.id, pending.id, status=ContractStatus.ACTIVE)
+    active = await _mentor_contract(employee.id, pending.id, status=status)
     draft = await _mentor_contract(employee.id, pending.id)
     # 예전 미연결 계약은 자동으로 잇지 않는다
     legacy = await _mentor_contract(employee.id, None)
@@ -240,7 +240,7 @@ async def test_mentor_approval_validates_selected_contracts() -> None:
     employee = await create_employee()
     instructor_contract = EducatorContract(
         manager_employee_id=employee.id,
-        educator_type=EducatorType.INSTRUCTOR,
+        **(await mentor_contract_fields(**INSTRUCTOR_TERMS)),
         contractor_name="박강사",
         contractor_phone="01011112222",
         title="강의",

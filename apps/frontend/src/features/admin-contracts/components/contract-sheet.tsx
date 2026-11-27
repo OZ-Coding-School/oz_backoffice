@@ -112,7 +112,7 @@ function ContractView({
     );
   const status = STATUS[c.status];
   const draft = c.status === "DRAFT";
-  const description = `${c.contractor_name} · ${TYPE_LABELS[c.educator_type]} 계약`;
+  const description = `${c.contractor_name} · ${TYPE_LABELS[c.contract_type]} 계약`;
   if (editing)
     return (
       <ContractForm
@@ -158,10 +158,10 @@ function ContractView({
       <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-6">
         <PanelSection title="계약 정보">
           <PanelRow label="계약자">{c.contractor_name}</PanelRow>
-          <PanelRow label="휴대폰">{maskPhone(c.contractor_phone) ?? c.contractor_phone}</PanelRow>
+          <PanelRow label="휴대폰">{maskPhone(c.contractor_phone) ?? c.contractor_phone ?? "—"}</PanelRow>
           <PanelRow label="이메일">{c.contractor_email ?? "—"}</PanelRow>
-          <PanelRow label="시작일">{c.start_date.replaceAll("-", ".")}</PanelRow>
-          <PanelRow label="종료일">{c.end_date.replaceAll("-", ".")}</PanelRow>
+          <PanelRow label="시작일">{c.start_date?.replaceAll("-", ".") ?? "—"}</PanelRow>
+          <PanelRow label="종료일">{c.end_date?.replaceAll("-", ".") ?? "—"}</PanelRow>
           <PanelRow label="등록">{c.created_at ? formatKst(c.created_at, "yyyy.MM.dd") : "—"}</PanelRow>
         </PanelSection>
         <PanelSection title="계약서">
@@ -169,7 +169,7 @@ function ContractView({
             <FileRow contract={c} />
           </PanelRow>
         </PanelSection>
-        <PanelSection title={c.educator_type === "MENTOR" ? "멘토" : "강사"}>
+        <PanelSection title={c.contract_type === "MENTOR" ? "멘토" : "강사"}>
           <LinkRow contract={c} canMove={canManage && canPickMentor} onMove={() => setPicker("mentor")} />
         </PanelSection>
         <PanelSection title="담당">
@@ -221,7 +221,7 @@ function FileRow({ contract: c }: { contract: Contract }) {
 
 function LinkRow({ contract: c, canMove, onMove }: { contract: Contract; canMove: boolean; onMove: () => void }) {
   const linked = linkedText(c);
-  if (c.educator_type === "INSTRUCTOR")
+  if (c.contract_type !== "MENTOR")
     return (
       <PanelRow label="강사" help="강사 연결은 강사 화면을 만들 때 더해요.">
         <span className={linked.muted ? "font-normal text-muted-foreground" : ""}>{linked.text}</span>

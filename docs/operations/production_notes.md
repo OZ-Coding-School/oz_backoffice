@@ -71,7 +71,7 @@
 새 작업 모듈이 생기면 여기에 추가한다. 빠지면 그 작업이 등록되지 않는다.
 ```text
 app.workers.tasks.roster          # 명단 동기화 (매시간), 수동 동기화 실행
-app.workers.tasks.contracts       # 계약 만료 (매일 00:05 KST)
+app.workers.tasks.contracts       # 계약 날짜 처리 (매일 00:05 KST)
 app.workers.tasks.notifications   # 메일 발송 (재시도 3회)
 app.workers.tasks.mentoring       # 배정 만료(매일 00:00 KST), 대기 신청 만료·Meet 공간 보완(10분마다), 수강 종료 처리, Meet 공간 생성,
                                   # Meet 이벤트 구독 갱신(6시간마다)·처리, worker 시작 시 Meet 이벤트 실시간 수신
@@ -153,7 +153,7 @@ app.workers.tasks.mentoring       # 배정 만료(매일 00:00 KST), 대기 신�
 | 작업 | 시각 | 비고 |
 | --- | --- | --- |
 | `mentoring.assignments.expire` | 매일 00:00 | 종료일이 지난 기수 멘토 배정 비활성화 |
-| `educator.contracts.expire` | 매일 00:05 | 종료일이 지난 계약 ENDED |
+| `educator.contracts.expire` | 매일 00:05 | 시작일이 된 SIGNED 계약 ACTIVE, 종료일이 지난 ACTIVE 계약 ENDED (A109) |
 | `academy.roster_sync.scheduled` | 매시간 | Airtable 설정이 없으면 건너뜀 |
 | `mentoring.requests.expire` | 10분마다 | 승인 가능한 희망 일시가 남지 않은 대기 신청 취소·보류 시간 반환 |
 | `mentoring.meet.artifacts.sync` | 매시 정각 | 종료 7일 이내 세션 녹화·전사·요약 보완 수집·남은 정리(M20). 설정이 없으면 건너뜀 |

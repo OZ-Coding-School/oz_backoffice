@@ -192,7 +192,7 @@ function ContractRow({
         </Link>
       </span>
       <span role="cell" className="text-body text-foreground">
-        {TYPE_LABELS[c.educator_type]}
+        {TYPE_LABELS[c.contract_type]}
       </span>
       <span role="cell" className="truncate text-body text-foreground">
         {c.title}

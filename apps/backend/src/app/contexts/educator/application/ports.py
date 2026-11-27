@@ -1,12 +1,14 @@
-"""educator 응용 서비스가 쓰는 외부 의존 (파일 저장소, 직원 조회).
+"""educator 응용 서비스가 쓰는 외부 의존 (파일 저장소, 직원·과정 조회, 권한 범위).
 
 업로드 대기 저장소 Protocol은 인프라가 구현하므로 `domain.uploads`에 둔다.
 """
 
 import uuid
+from collections.abc import Iterable
 from datetime import datetime
 from typing import Protocol
 
+from app.contexts.access.application.permissions import PermissionScope, PermissionTarget
 from app.integrations.s3 import ObjectInfo, PresignedPost
 
 
@@ -26,3 +28,19 @@ class EmployeeDirectory(Protocol):
     """organization 공개 조회 (`EmployeeQueries`, app.state.employee_queries)."""
 
     async def exists(self, employee_id: uuid.UUID) -> bool: ...
+
+
+class AcademyDirectory(Protocol):
+    """academy 공개 조회 (`AcademyCatalog`, app.state.academy_catalog).
+
+    계약의 과정·기수 확인 (A109②)."""
+
+    async def bootcamp_id_of(self, cohort_id: uuid.UUID) -> uuid.UUID | None: ...
+    async def bootcamp_names(self, bootcamp_ids: Iterable[uuid.UUID]) -> dict[uuid.UUID, str]: ...
+
+
+class ContractPermissions(Protocol):
+    """access 권한 판정 (`PermissionChecker`). 계약의 담당 범위 (A109⑦)."""
+
+    async def has(self, user_id: uuid.UUID, code: str, target: PermissionTarget) -> bool: ...
+    async def scope_of(self, user_id: uuid.UUID, code: str) -> PermissionScope: ...

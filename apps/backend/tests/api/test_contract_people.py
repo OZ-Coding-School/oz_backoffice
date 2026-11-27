@@ -1,6 +1,7 @@
 """계약 응답의 사람 이름·멘토 필터·담당 직원 후보 (decisions A103)."""
 
 from datetime import UTC, datetime
+from typing import Any
 
 from httpx import AsyncClient
 
@@ -8,7 +9,12 @@ from app.cli import create_super_admin
 from app.contexts.educator.domain.enums import DisplayNamePreference
 from app.core.config import Settings
 from app.core.security import JWTService
-from tests.factories.educator import create_instructor, create_mentor, create_user
+from tests.factories.educator import (
+    create_instructor,
+    create_mentor,
+    create_user,
+    mentor_contract_json,
+)
 from tests.factories.organization import create_employee
 
 API = "/api/v1/admin"
@@ -22,9 +28,9 @@ async def _admin(settings: Settings) -> tuple[dict[str, str], str]:
     return {"Authorization": f"Bearer {token}"}, str(employee.id)
 
 
-def _body(manager_id: str, **overrides: str) -> dict[str, str]:
-    body = {
-        "educator_type": "MENTOR",
+async def _body(manager_id: str, **overrides: Any) -> dict[str, Any]:
+    body: dict[str, Any] = {
+        **(await mentor_contract_json()),
         "contractor_name": "김멘토",
         "contractor_phone": "010-1234-5678",
         "title": "2026 멘토 계약",
@@ -48,7 +54,7 @@ async def test_names_and_mentor_filter(
     instructor = await create_instructor(await create_user(name="박강사"))
 
     created = await client.post(
-        f"{API}/contracts", json=_body(me, mentor_id=str(mentor.id)), headers=admin
+        f"{API}/contracts", json=await _body(me, mentor_id=str(mentor.id)), headers=admin
     )
     assert created.status_code == 201, created.text
     assert created.json()["manager_name"] == "김관리"
@@ -57,7 +63,13 @@ async def test_names_and_mentor_filter(
 
     other = await client.post(
         f"{API}/contracts",
-        json=_body(me, educator_type="INSTRUCTOR", contractor_name="박강사"),
+        json=await _body(
+            me,
+            contract_type="INSTRUCTOR",
+            no_show_pay_amount=None,
+            mentoring_time_basis=None,
+            contractor_name="박강사",
+        ),
         headers=admin,
     )
     await client.post(

@@ -1,18 +1,27 @@
 import type { BadgeProps } from "@/components/ui/badge";
 import { ApiError } from "@/api/errors";
 
-import type { Contract, ContractStatus, EducatorType } from "./api";
+import type { Contract, ContractStatus, ContractType } from "./api";
 
 export const STATUS: Record<ContractStatus, { label: string; badge: NonNullable<BadgeProps["variant"]> }> = {
   DRAFT: { label: "작성 중", badge: "outline" },
+  IN_PROGRESS: { label: "계약 진행 중", badge: "info" },
+  SIGNED: { label: "계약 완료", badge: "primary" },
   ACTIVE: { label: "진행 중", badge: "success" },
+  CANCELED: { label: "취소", badge: "secondary" },
   ENDED: { label: "종료", badge: "secondary" },
   TERMINATED: { label: "해지", badge: "destructive" },
 };
 
-export const TYPE_LABELS: Record<EducatorType, string> = { MENTOR: "멘토", INSTRUCTOR: "강사" };
+export const TYPE_LABELS: Record<ContractType, string> = {
+  MENTOR: "멘토",
+  INSTRUCTOR: "강사",
+  SW: "SW",
+  EQUIPMENT: "장비",
+  OTHER: "기타",
+};
 
-const dot = (date: string) => date.replaceAll("-", ".");
+const dot = (date: string | null | undefined) => (date ? date.replaceAll("-", ".") : "—");
 
 /** "2026.11.01 ~ 2027.04.30" */
 export const period = (c: Pick<Contract, "start_date" | "end_date">) => `${dot(c.start_date)} ~ ${dot(c.end_date)}`;

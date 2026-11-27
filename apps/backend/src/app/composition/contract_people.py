@@ -1,4 +1,6 @@
-"""계약 화면의 사람 이름 (decisions A103): 담당 직원·연결된 멘토·강사 이름, 담당 직원 후보.
+"""계약 화면의 사람·과정 이름 (decisions A103·A109).
+
+담당 직원·연결된 멘토·강사 이름, 과정·기수 이름, 담당 직원 후보.
 
 조직(직원·부서·팀·직위)과 회원(이름·이메일), 강사·멘토 프로필을 모은다.
 """
@@ -6,6 +8,11 @@
 import uuid
 from collections.abc import Sequence
 
+from app.contexts.academy.application.catalog import AcademyCatalog
+from app.contexts.academy.infrastructure.repositories import (
+    TortoiseBootcampRepository,
+    TortoiseCohortRepository,
+)
 from app.contexts.educator.application.contract_people import (
     ContractPeople,
     LinkedPerson,
@@ -49,7 +56,11 @@ class ContractPeopleComposer:
             | set(instructors.values())
         )
         names = {u.id: u.name for u in await TortoiseUserRepository().list_by_ids(list(user_ids))}
+        academy = AcademyCatalog(TortoiseBootcampRepository(), TortoiseCohortRepository())
+        labels = await academy.cohort_labels({c.cohort_id for c in contracts if c.cohort_id})
         return ContractPeople(
+            bootcamps=await academy.bootcamp_names({c.bootcamp_id for c in contracts}),
+            cohorts={cohort_id: label.cohort_number for cohort_id, label in labels.items()},
             managers={e.id: names[e.user_id] for e in employees if e.user_id in names},
             mentors={
                 m.id: _person(m, names.get(m.user_id) if m.user_id else m.contact_name)
@@ -59,6 +70,10 @@ class ContractPeopleComposer:
                 i: LinkedPerson(names[u], names[u]) for i, u in instructors.items() if u in names
             },
         )
+
+    async def user_names(self, user_ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, str]:
+        users = await TortoiseUserRepository().list_by_ids(list(set(user_ids)))
+        return {u.id: u.name for u in users}
 
     async def manager_candidates(
         self, *, query: str | None, limit: int, me: uuid.UUID

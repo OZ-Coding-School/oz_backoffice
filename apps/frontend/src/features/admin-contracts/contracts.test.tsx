@@ -15,7 +15,26 @@ const ADMIN = makeMe({ name: "김관리", account_type: "STAFF", is_super_admin:
 function contract(id: string, extra: Partial<Contract> = {}): Contract {
   return {
     id,
-    educator_type: "MENTOR",
+    contract_type: "MENTOR",
+    bootcamp_id: "b1",
+    bootcamp_name: "백엔드 부트캠프",
+    cohort_id: "c12",
+    cohort_number: 12,
+    business_registration_number: null,
+    contact_person_name: null,
+    settlement_type: "UNIT_PRICE",
+    total_amount: null,
+    unit_price: 50000,
+    price_unit: "HOURLY",
+    vat_type: "NOT_APPLICABLE",
+    amount_note: null,
+    no_show_pay_amount: 0,
+    mentoring_time_basis: "ACTUAL_DURATION",
+    cancel_reason: null,
+    canceled_on: null,
+    termination_reason: null,
+    termination_detail: null,
+    terminated_on: null,
     status: "ACTIVE",
     contractor_name: "김멘토",
     contractor_phone: "01011111234",
@@ -45,7 +64,9 @@ const DRAFT = contract("k2", {
   contract_file: null,
 });
 const INSTRUCTOR = contract("k3", {
-  educator_type: "INSTRUCTOR",
+  contract_type: "INSTRUCTOR",
+  no_show_pay_amount: null,
+  mentoring_time_basis: null,
   status: "ENDED",
   contractor_name: "박강사",
   title: "2026 하반기 강의 계약",
@@ -96,7 +117,7 @@ function mockApi({ codes }: { codes?: string[] } = {}) {
       const items = all.filter(
         (c) =>
           (!p.get("status") || c.status === p.get("status")) &&
-          (!p.get("educator_type") || c.educator_type === p.get("educator_type")),
+          (!p.get("contract_type") || c.contract_type === p.get("contract_type")),
       );
       return HttpResponse.json({ items, total: items.length, limit: 20, offset: 0 });
     }),
@@ -104,7 +125,10 @@ function mockApi({ codes }: { codes?: string[] } = {}) {
     http.get(apiUrl("/api/v1/admin/contracts/{contract_id}"), ({ params }) =>
       HttpResponse.json(byId(params.contract_id)),
     ),
-    http.post(apiUrl("/api/v1/admin/contracts/{contract_id}/confirm"), ({ params }) => {
+    http.post(apiUrl("/api/v1/admin/contracts/{contract_id}/progress"), ({ params }) =>
+      HttpResponse.json({ ...byId(params.contract_id), status: "IN_PROGRESS" }),
+    ),
+    http.post(apiUrl("/api/v1/admin/contracts/{contract_id}/sign"), ({ params }) => {
       calls.push({ path: "confirm", body: params.contract_id });
       return HttpResponse.json({ ...byId(params.contract_id), status: "ACTIVE" });
     }),
@@ -184,7 +208,7 @@ describe("행정 업무 > 계약 (FE-18b)", () => {
     await user.click(screen.getByRole("combobox", { name: "유형" }));
     await user.click(await screen.findByRole("option", { name: "강사" }));
     await waitFor(() => expect(router.state.location.search).toEqual({ type: "INSTRUCTOR" }));
-    await waitFor(() => expect(calls.at(-1)?.body).toContain("educator_type=INSTRUCTOR"));
+    await waitFor(() => expect(calls.at(-1)?.body).toContain("contract_type=INSTRUCTOR"));
   });
 
   it("진행 중 계약 패널: 정보·계약서·멘토·담당, [해지]는 확인 후", async () => {
@@ -264,7 +288,14 @@ describe("행정 업무 > 계약 (FE-18b)", () => {
     expect(calls).toContainEqual({
       path: "create",
       body: {
-        educator_type: "MENTOR",
+        contract_type: "MENTOR",
+        bootcamp_id: "",
+        settlement_type: "UNIT_PRICE",
+        unit_price: 0,
+        price_unit: "HOURLY",
+        vat_type: "NOT_APPLICABLE",
+        no_show_pay_amount: 0,
+        mentoring_time_basis: "ACTUAL_DURATION",
         contractor_name: "이멘토",
         contractor_phone: "010-2222-5678",
         contractor_email: null,
