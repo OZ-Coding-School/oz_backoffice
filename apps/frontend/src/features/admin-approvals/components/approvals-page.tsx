@@ -3,6 +3,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { UserCheck } from "lucide-react";
 import { useState } from "react";
 
+import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
 import { LoadMore } from "@/components/load-more";
@@ -51,12 +52,11 @@ export function ApprovalsPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-h1 text-foreground">가입 승인</h1>
-        <p className="text-body text-muted-foreground">
-          수강생·멘토·강사·운영진의 가입 신청을 확인하고 승인하거나 반려해요.
-        </p>
-      </div>
+      <PageHeader
+        icon={UserCheck}
+        title="가입 승인"
+        description="수강생·멘토·강사·운영진의 가입 신청을 확인하고 승인하거나 반려해요."
+      />
       <div className="flex items-end gap-3">
         <nav aria-label="가입 유형" className="flex-1">
           <ul className="flex gap-1 border-b border-border">
