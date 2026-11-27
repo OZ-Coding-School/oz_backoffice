@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useBlocker, useNavigate } from "@tanstack/react-router";
-import { GripVertical, KeyRound } from "lucide-react";
+import { BadgeCheck, GripVertical, KeyRound } from "lucide-react";
 import { useMemo, useState, type DragEvent, type KeyboardEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 
+import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
 import { Badge } from "@/components/ui/badge";
@@ -79,12 +80,11 @@ export function PositionsPage({ positionId }: { positionId?: string }) {
 function Frame({ children }: { children: ReactNode }) {
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-h1 text-foreground">직위</h1>
-        <p className="text-body text-muted-foreground">
-          직위의 담당 방식과 데이터 범위를 정하고, 끌어서 순서를 바꿔요. 권한은 권한 메뉴에서 정해요.
-        </p>
-      </div>
+      <PageHeader
+        icon={BadgeCheck}
+        title="직위"
+        description="직위의 담당 방식과 데이터 범위를 정하고, 끌어서 순서를 바꿔요. 권한은 권한 메뉴에서 정해요."
+      />
       {children}
     </div>
   );
