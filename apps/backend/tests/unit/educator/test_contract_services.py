@@ -259,13 +259,13 @@ async def test_create_draft_then_progress_and_sign(h: Harness) -> None:
     assert signed_meta.id == signed_file.id
     assert signed_url
     assert h.actions() == [
-        "educator.mentor.create_pending",
         "educator.contract.create",
         "educator.contract_file.upload",
         "educator.contract.update",
         "educator.contract.start",
         "educator.contract.update",
         "educator.contract_file.upload",
+        "educator.mentor.create_pending",  # 새 사람의 멘토는 계약 완료 때 만든다 (A115)
         "educator.contract.sign",
     ]
 
@@ -427,6 +427,16 @@ async def test_delete_draft_discards_file(h: Harness) -> None:
 
     assert h.contracts.items == {}
     assert h.files.items[file.id].deleted_at == NOW
+    # 새 사람의 초안은 멘토가 없어 가입 전 멘토도 생기지 않는다 (A115)
+    assert h.actions()[-1] == "educator.contract.delete"
+    assert h.mentors.items == {}
+
+
+async def test_delete_draft_drops_empty_pending_mentor(h: Harness) -> None:
+    pending = Mentor.pending(name="김멘토", phone="01012345678")
+    await h.mentors.add(pending)
+    created = await h.service.create(h.values(), actor_id=h.actor_id, mentor_id=pending.id)
+    await h.service.delete(created.contract.id, actor_id=h.actor_id)
     # 계약이 하나도 남지 않은 가입 전 멘토는 함께 지운다 (A104)
     assert h.actions()[-2:] == ["educator.contract.delete", "educator.mentor.delete_pending"]
     assert h.mentors.items == {}
@@ -521,38 +531,40 @@ async def test_mentor_contract_cannot_move_to_other_mentor(h: Harness) -> None:
 
 
 async def test_mentor_contract_belongs_to_a_mentor(h: Harness) -> None:
-    """만들 때 지정한 멘토 → 이름·휴대폰이 같은 멘토 하나 → 새 가입 전 멘토 (A104)."""
-    first = await h.service.create(h.values(), actor_id=h.actor_id)
-    pending = h.mentors.items[first.contract.mentor_id or new_id()]
+    """기존 멘토는 만들 때, 새 사람은 계약 완료 때 같은 사람 하나 → 새 가입 전 멘토 (A104·A115)."""
+    draft = await h.service.create(h.values(), actor_id=h.actor_id)
+    assert draft.contract.mentor_id is None
+    assert h.mentors.items == {}  # 초안에는 멘토가 생기지 않는다
+    first = await h.signed()
+    pending = h.mentors.items[h.contracts.items[first].mentor_id or new_id()]
     assert (pending.user_id, pending.contact_name, pending.contact_phone, pending.is_active) == (
         None,
         "김멘토",
         "01012345678",
         False,
     )
-    # 같은 사람이면 같은 가입 전 멘토에 붙는다
-    second = await h.service.create(h.values(title="재계약"), actor_id=h.actor_id)
-    assert second.contract.mentor_id == pending.id
-    # 지정하면 그 멘토
+    # 같은 사람이면 계약 완료 때 같은 가입 전 멘토에 붙는다
+    second = await h.signed(title="재계약")
+    assert h.contracts.items[second].mentor_id == pending.id
+    # 기존 멘토를 고르면 만들 때 연결한다
     registered = Mentor(user_id=new_id())
     await h.mentors.save(registered)
     chosen = await h.service.create(h.values(), actor_id=h.actor_id, mentor_id=registered.id)
     assert chosen.contract.mentor_id == registered.id
     with pytest.raises(NotFoundError):
         await h.service.create(h.values(), actor_id=h.actor_id, mentor_id=new_id())
-    # 같은 사람이 둘이면 고를 수 없다
+    # 같은 사람이 둘이면 계약 완료를 할 수 없다
     await h.mentors.add(Mentor.pending(name="이멘토", phone="01099998888"))
     await h.mentors.add(Mentor.pending(name="이멘토", phone="01099998888"))
     with pytest.raises(ConflictError) as ambiguous:
-        await h.service.create(
-            h.values(contractor_name="이멘토", contractor_phone="01099998888"),
-            actor_id=h.actor_id,
-        )
+        await h.signed(contractor_name="이멘토", contractor_phone="01099998888")
     assert ambiguous.value.code == "ambiguous_mentor"
 
 
 async def test_editing_contractor_updates_pending_mentor(h: Harness) -> None:
-    created = await h.service.create(h.values(), actor_id=h.actor_id)
+    pending = Mentor.pending(name="김멘토", phone="01012345678")
+    await h.mentors.add(pending)
+    created = await h.service.create(h.values(), actor_id=h.actor_id, mentor_id=pending.id)
     await h.service.update(
         created.contract.id,
         {"contractor_name": "김멘토2", "contractor_phone": "010-1111-2222"},
@@ -582,9 +594,9 @@ async def test_link_requires_matching_existing_profile(h: Harness) -> None:
     with pytest.raises(BusinessRuleViolation) as kind:
         await h.service.link(contract_id, instructor_id=instructor_id, actor_id=h.actor_id)
     assert kind.value.code == "contract_type_mismatch"
-    with pytest.raises(BusinessRuleViolation) as move:  # 멘토 계약은 옮길 수 없다 (A114)
+    with pytest.raises(NotFoundError) as missing:
         await h.service.link(contract_id, mentor_id=new_id(), actor_id=h.actor_id)
-    assert move.value.code == "mentor_contract_move_forbidden"
+    assert missing.value.code == "mentor_not_found"
 
     instructor_contract = await h.service.create(
         h.values(

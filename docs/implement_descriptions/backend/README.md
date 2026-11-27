@@ -114,3 +114,4 @@
 | 110 | [계약 목록 종류별 건수·과정 공통 함께 보기 (BE-4c)](110_contract_list_counts.md) | 완료 (#188) |
 | 111 | [계약서 원본과 서명본 나눠 보관 (BE-4d)](111_signed_contract_file.md) | 완료 (#190) |
 | 112 | [멘토 계약은 다른 멘토로 옮기지 않음 (BE-4e)](112_mentor_contract_no_move.md) | 완료 (#191) |
+| 113 | [새 사람의 멘토는 계약 완료 때 (BE-4f)](113_mentor_on_sign.md) | 완료 (#192) |

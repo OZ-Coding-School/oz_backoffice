@@ -1,4 +1,7 @@
-"""가입 전 멘토 (decisions A104): 계약을 만들면 생기고, 목록·단건에 '가입 전'으로 보인다."""
+"""가입 전 멘토 (decisions A104·A115).
+
+새 사람의 계약을 완료하면 생기고, 목록·단건에 '가입 전'으로 보인다.
+"""
 
 from datetime import UTC, datetime
 from typing import Any
@@ -7,9 +10,10 @@ import pytest
 from httpx import AsyncClient
 
 from app.cli import create_super_admin
-from app.contexts.educator.infrastructure.models import MentorModel
+from app.contexts.educator.infrastructure.models import ContractFileModel, MentorModel
 from app.core.config import Settings
 from app.core.security import JWTService
+from app.shared.ids import new_id
 from tests.factories.educator import create_mentor, create_user, mentor_contract_json
 from tests.factories.organization import create_employee
 
@@ -37,12 +41,33 @@ async def _body(
     }
 
 
+async def _file_id() -> str:
+    file = await ContractFileModel.create(
+        file_name="a.pdf", file_ext="pdf", file_size=1, storage_key=f"contracts/{new_id()}"
+    )
+    return str(file.id)
+
+
+async def _create_and_sign(client: AsyncClient, admin: dict[str, str], manager: str) -> Any:
+    """새 사람의 멘토 계약을 만들고 진행 → 계약 완료한다 (멘토는 완료 때 정해진다, A115)."""
+    body = {**(await _body(manager)), "contract_file_id": await _file_id()}
+    created = await client.post(f"{API}/contracts", json=body, headers=admin)
+    assert created.status_code == 201, created.text
+    assert created.json()["mentor_id"] is None  # 초안에는 멘토가 없다
+    path = f"{API}/contracts/{created.json()['id']}"
+    assert (await client.post(f"{path}/progress", headers=admin)).status_code == 200
+    signed = await client.post(
+        f"{path}/sign", json={"signed_contract_file_id": await _file_id()}, headers=admin
+    )
+    assert signed.status_code == 200, signed.text
+    return signed
+
+
 async def test_pending_mentor_lifecycle(client: AsyncClient, admin: dict[str, str]) -> None:
     manager = str((await create_employee()).id)
-    created = await client.post(f"{API}/contracts", json=await _body(manager), headers=admin)
-    assert created.status_code == 201, created.text
-    mentor_id = created.json()["mentor_id"]
-    assert created.json()["linked_profile"] == {"name": "새멘토", "display_name": "새멘토"}
+    signed = await _create_and_sign(client, admin, manager)
+    mentor_id = signed.json()["mentor_id"]
+    assert signed.json()["linked_profile"] == {"name": "새멘토", "display_name": "새멘토"}
 
     one = (await client.get(f"{API}/mentors/{mentor_id}", headers=admin)).json()
     assert {k: one[k] for k in ("user_id", "name", "email", "phone_number", "is_active")} == {
@@ -63,8 +88,8 @@ async def test_pending_mentor_lifecycle(client: AsyncClient, admin: dict[str, st
     found = await client.get(f"{API}/mentors", params={"q": "5555"}, headers=admin)
     assert [m["name"] for m in found.json()["items"]] == ["새멘토"]
 
-    # 같은 사람이면 같은 가입 전 멘토에 붙는다
-    again = await client.post(f"{API}/contracts", json=await _body(manager), headers=admin)
+    # 같은 사람이면 계약 완료 때 같은 가입 전 멘토에 붙는다
+    again = await _create_and_sign(client, admin, manager)
     assert again.json()["mentor_id"] == mentor_id
 
     # 가입 전 멘토는 활성화·신청 받기를 할 수 없다
@@ -77,11 +102,14 @@ async def test_pending_mentor_lifecycle(client: AsyncClient, admin: dict[str, st
     )
     assert accepting.status_code == 422
 
-    # 계약을 모두 지우면 가입 전 멘토도 사라진다
-    for contract_id in (created.json()["id"], again.json()["id"]):
-        deleted = await client.delete(f"{API}/contracts/{contract_id}", headers=admin)
-        assert deleted.status_code == 204
-    assert not await MentorModel.exists(id=mentor_id)
+    # 가입 전 멘토에 추가한 초안을 지우면, 다른 계약이 남아 있어 멘토는 남는다
+    draft = await client.post(
+        f"{API}/contracts", json={**(await _body(manager)), "mentor_id": mentor_id}, headers=admin
+    )
+    assert draft.json()["mentor_id"] == mentor_id
+    deleted = await client.delete(f"{API}/contracts/{draft.json()['id']}", headers=admin)
+    assert deleted.status_code == 204
+    assert await MentorModel.exists(id=mentor_id)
 
 
 async def test_pending_mentor_needs_contact(client: AsyncClient, admin: dict[str, str]) -> None:
