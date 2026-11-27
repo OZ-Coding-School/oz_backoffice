@@ -1,7 +1,7 @@
 # 62. 계약 화면: 새 사람의 멘토는 계약 완료 때 (A115)
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #193
 - 관련 결정: `docs/decisions.md` A115 (A104 변경), F97
 - 이전 기록: [61. 행정 업무 › 계약 개편 화면 (F96)](61_contract_screens.md), 백엔드 [113](../backend/113_mentor_on_sign.md)
 
