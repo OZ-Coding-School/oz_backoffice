@@ -53,17 +53,40 @@ class InMemoryContractRepository:
             if c.mentor_id == mentor_id and c.contract_type is ContractType.MENTOR
         ]
 
+    def _matched(self, f: ContractFilter, *, with_types: bool) -> list[EducatorContract]:
+        def in_cohort(c: EducatorContract) -> bool:
+            if f.cohort_id is None:
+                return True
+            if c.cohort_id == f.cohort_id:
+                return True
+            return (
+                f.common_bootcamp_id is not None
+                and c.cohort_id is None
+                and c.bootcamp_id == f.common_bootcamp_id
+            )
+
+        return [
+            c
+            for c in self.items.values()
+            if (not f.statuses or c.status in f.statuses)
+            and (not with_types or not f.contract_types or c.contract_type in f.contract_types)
+            and (f.bootcamp_id is None or c.bootcamp_id == f.bootcamp_id)
+            and in_cohort(c)
+            and (f.mentor_id is None or c.mentor_id == f.mentor_id)
+            and (f.visible is None or f.visible.allows(c))
+        ]
+
     async def list_page(
         self, contract_filter: ContractFilter, *, limit: int, offset: int
     ) -> tuple[list[EducatorContract], int]:
-        matched = [
-            c
-            for c in self.items.values()
-            if (not contract_filter.statuses or c.status in contract_filter.statuses)
-            and (contract_filter.mentor_id is None or c.mentor_id == contract_filter.mentor_id)
-            and (contract_filter.visible is None or contract_filter.visible.allows(c))
-        ]
+        matched = self._matched(contract_filter, with_types=True)
         return matched[offset : offset + limit], len(matched)
+
+    async def count_by_types(self, contract_filter: ContractFilter) -> dict[ContractType, int]:
+        counts = dict.fromkeys(ContractType, 0)
+        for c in self._matched(contract_filter, with_types=False):
+            counts[c.contract_type] += 1
+        return counts
 
     async def list_due(self, today: date) -> list[EducatorContract]:
         def due(c: EducatorContract) -> bool:

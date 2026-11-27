@@ -4649,7 +4649,7 @@
           "admin-contracts"
         ],
         "summary": "List Contracts",
-        "description": "담당 범위 안의 계약만 (A109⑦). 최근에 만든 계약이 먼저.",
+        "description": "담당 범위 안의 계약만 (A109⑦). 최근에 만든 계약이 먼저.\n\n`counts`는 종류 필터만 빼고 같은 조건의 종류별 건수다 (A112).",
         "operationId": "list_contracts_api_v1_admin_contracts_get",
         "security": [
           {
@@ -4768,6 +4768,18 @@
             "description": "연결된 멘토 (A103)"
           },
           {
+            "name": "include_bootcamp_common",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "cohort_id와 함께: 그 기수가 속한 과정의 과정 공통 계약도 함께 (A112)",
+              "default": false,
+              "title": "Include Bootcamp Common"
+            },
+            "description": "cohort_id와 함께: 그 기수가 속한 과정의 과정 공통 계약도 함께 (A112)"
+          },
+          {
             "name": "limit",
             "in": "query",
             "required": false,
@@ -4797,7 +4809,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_ContractResponse_"
+                  "$ref": "#/components/schemas/ContractListPage"
                 }
               }
             }
@@ -16866,6 +16878,41 @@
         "title": "ContractLink",
         "description": "멘토 계약이면 mentor_id, 강사 계약이면 instructor_id 하나만 보낸다."
       },
+      "ContractListPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ContractResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/ContractTypeCounts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset",
+          "counts"
+        ],
+        "title": "ContractListPage"
+      },
       "ContractResponse": {
         "properties": {
           "id": {
@@ -17275,6 +17322,40 @@
         ],
         "title": "ContractType",
         "description": "계약 종류 (A109①). 멘토 FK는 멘토 계약, 강사 FK는 강사 계약만 쓴다."
+      },
+      "ContractTypeCounts": {
+        "properties": {
+          "MENTOR": {
+            "type": "integer",
+            "title": "Mentor"
+          },
+          "INSTRUCTOR": {
+            "type": "integer",
+            "title": "Instructor"
+          },
+          "SW": {
+            "type": "integer",
+            "title": "Sw"
+          },
+          "EQUIPMENT": {
+            "type": "integer",
+            "title": "Equipment"
+          },
+          "OTHER": {
+            "type": "integer",
+            "title": "Other"
+          }
+        },
+        "type": "object",
+        "required": [
+          "MENTOR",
+          "INSTRUCTOR",
+          "SW",
+          "EQUIPMENT",
+          "OTHER"
+        ],
+        "title": "ContractTypeCounts",
+        "description": "종류 필터와 무관한 그 목록 대상 전체의 종류별 건수 (A112)."
       },
       "ContractUpdate": {
         "properties": {
@@ -21046,37 +21127,6 @@
           "offset"
         ],
         "title": "Page[ApplicantResponse]"
-      },
-      "Page_ContractResponse_": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/ContractResponse"
-            },
-            "type": "array",
-            "title": "Items"
-          },
-          "total": {
-            "type": "integer",
-            "title": "Total"
-          },
-          "limit": {
-            "type": "integer",
-            "title": "Limit"
-          },
-          "offset": {
-            "type": "integer",
-            "title": "Offset"
-          }
-        },
-        "type": "object",
-        "required": [
-          "items",
-          "total",
-          "limit",
-          "offset"
-        ],
-        "title": "Page[ContractResponse]"
       },
       "Page_MenteeResponse_": {
         "properties": {

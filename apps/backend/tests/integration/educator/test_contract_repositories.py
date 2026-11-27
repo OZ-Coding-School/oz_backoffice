@@ -135,3 +135,13 @@ async def test_list_filters_by_academy_and_visibility() -> None:
     by_cohort = ContractVisibility(cohort_ids=frozenset({other.cohort_id}))
     assert await ids(visible=by_cohort) == {other.id}
     assert await ids(visible=ContractVisibility()) == set()
+    # A112: 기수 + 같은 과정의 과정 공통
+    assert await ids(cohort_id=cohort.cohort_id, common_bootcamp_id=cohort.bootcamp_id) == {
+        cohort.id,
+        common.id,
+    }
+    counts = await contracts.count_by_types(ContractFilter(bootcamp_id=cohort.bootcamp_id))
+    assert sum(counts.values()) == 2
+    assert await contracts.count_by_types(
+        ContractFilter(visible=ContractVisibility())
+    ) == dict.fromkeys(counts, 0)

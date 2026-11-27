@@ -70,6 +70,13 @@ class ContractView:
 
 
 @dataclass(frozen=True, slots=True)
+class ContractList:
+    views: list[ContractView]
+    total: int
+    counts: dict[ContractType, int]
+
+
+@dataclass(frozen=True, slots=True)
 class AmendmentView:
     amendment: ContractAmendment
     file: ContractFile | None
@@ -140,20 +147,34 @@ class ContractService:
 
     # ------------------------------------------------------------------ 조회
     async def list_contracts(
-        self, contract_filter: ContractFilter, *, actor_id: uuid.UUID, limit: int, offset: int
-    ) -> tuple[list[ContractView], int]:
+        self,
+        contract_filter: ContractFilter,
+        *,
+        actor_id: uuid.UUID,
+        limit: int,
+        offset: int,
+        include_bootcamp_common: bool = False,
+    ) -> ContractList:
+        """담당 범위 안의 계약과 종류별 건수 (A109⑦·A112).
+
+        `include_bootcamp_common`이면 기수 필터에 그 기수가 속한 과정의 과정 공통 계약을 더한다.
+        """
         visible = await self._visibility(actor_id)
         contract_filter = dataclasses.replace(contract_filter, visible=visible)
+        if include_bootcamp_common and contract_filter.cohort_id is not None:
+            bootcamp_id = await self._academy.bootcamp_id_of(contract_filter.cohort_id)
+            contract_filter = dataclasses.replace(contract_filter, common_bootcamp_id=bootcamp_id)
         contracts, total = await self._contracts.list_page(
             contract_filter, limit=limit, offset=offset
         )
+        counts = await self._contracts.count_by_types(contract_filter)
         file_ids = [c.contract_file_id for c in contracts if c.contract_file_id]
         files = {f.id: f for f in await self._files.list_by_ids(file_ids)}
         views = [
             ContractView(c, files.get(c.contract_file_id) if c.contract_file_id else None)
             for c in contracts
         ]
-        return views, total
+        return ContractList(views=views, total=total, counts=counts)
 
     async def get(self, contract_id: uuid.UUID, *, actor_id: uuid.UUID) -> ContractView:
         contract = await self._readable(contract_id, actor_id)

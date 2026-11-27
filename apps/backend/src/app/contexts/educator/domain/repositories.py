@@ -24,6 +24,9 @@ class ContractFilter:
     mentor_id: uuid.UUID | None = None
     # 담당 범위 (A109⑦): None이면 전부, 아니면 이 과정의 계약이나 이 기수의 계약만
     visible: "ContractVisibility | None" = None
+    # 기수 필터와 함께 쓰면 이 과정의 과정 공통 계약(cohort_id NULL)도 함께 (A112).
+    # 서비스가 기수의 과정을 찾아 채운다.
+    common_bootcamp_id: uuid.UUID | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +49,10 @@ class EducatorContractRepository(Protocol):
     async def list_page(
         self, contract_filter: ContractFilter, *, limit: int, offset: int
     ) -> tuple[list[EducatorContract], int]: ...
+    async def count_by_types(self, contract_filter: ContractFilter) -> dict[ContractType, int]:
+        """종류 필터만 빼고 같은 조건의 종류별 건수 (A112)."""
+        ...
+
     async def list_by_ids(self, contract_ids: list[uuid.UUID]) -> list[EducatorContract]: ...
     async def list_mentor_contracts(self, mentor_id: uuid.UUID) -> list[EducatorContract]:
         """그 멘토의 멘토 계약 전체 (최근 것부터, 배정의 근거 계약 후보 A110)."""

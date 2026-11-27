@@ -469,7 +469,21 @@ async def confirm_contract_upload(
 
 
 # ---------------------------------------------------------------- 계약
-@router.get("/contracts", response_model=Page[ContractResponse])
+class ContractTypeCounts(BaseModel):
+    """종류 필터와 무관한 그 목록 대상 전체의 종류별 건수 (A112)."""
+
+    MENTOR: int
+    INSTRUCTOR: int
+    SW: int
+    EQUIPMENT: int
+    OTHER: int
+
+
+class ContractListPage(Page[ContractResponse]):
+    counts: ContractTypeCounts
+
+
+@router.get("/contracts", response_model=ContractListPage)
 async def list_contracts(
     user: Reader,
     contracts: ContractsDep,
@@ -482,10 +496,16 @@ async def list_contracts(
         str | None, Query(max_length=50, description="당사자 이름·계약 명칭·전화번호")
     ] = None,
     mentor_id: Annotated[uuid.UUID | None, Query(description="연결된 멘토 (A103)")] = None,
+    include_bootcamp_common: Annotated[
+        bool,
+        Query(description="cohort_id와 함께: 그 기수가 속한 과정의 과정 공통 계약도 함께 (A112)"),
+    ] = False,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
-) -> Page[ContractResponse]:
-    """담당 범위 안의 계약만 (A109⑦). 최근에 만든 계약이 먼저."""
+) -> ContractListPage:
+    """담당 범위 안의 계약만 (A109⑦). 최근에 만든 계약이 먼저.
+
+    `counts`는 종류 필터만 빼고 같은 조건의 종류별 건수다 (A112)."""
     contract_filter = ContractFilter(
         statuses=frozenset(status_ or ()),
         contract_types=frozenset(contract_type or ()),
@@ -494,15 +514,20 @@ async def list_contracts(
         query=q.strip() if q and q.strip() else None,
         mentor_id=mentor_id,
     )
-    views, total = await contracts.list_contracts(
-        contract_filter, actor_id=user.id, limit=limit, offset=offset
-    )
-    found = await people.people([v.contract for v in views])
-    return Page(
-        items=[ContractResponse.of(v, found) for v in views],
-        total=total,
+    listed = await contracts.list_contracts(
+        contract_filter,
+        actor_id=user.id,
         limit=limit,
         offset=offset,
+        include_bootcamp_common=include_bootcamp_common,
+    )
+    found = await people.people([v.contract for v in listed.views])
+    return ContractListPage(
+        items=[ContractResponse.of(v, found) for v in listed.views],
+        total=listed.total,
+        limit=limit,
+        offset=offset,
+        counts=ContractTypeCounts(**{t.value: n for t, n in listed.counts.items()}),
     )
 
 
