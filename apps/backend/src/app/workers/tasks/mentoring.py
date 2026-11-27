@@ -45,8 +45,12 @@ from app.contexts.academy.infrastructure.repositories import (
 )
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.audit.infrastructure.repositories import TortoiseAuditLogRepository
+from app.contexts.educator.application.mentor_contracts import MentorContractQueries
 from app.contexts.educator.application.mentor_queries import MentorQueries
-from app.contexts.educator.infrastructure.repositories import TortoiseMentorRepository
+from app.contexts.educator.infrastructure.repositories import (
+    TortoiseEducatorContractRepository,
+    TortoiseMentorRepository,
+)
 from app.contexts.identity.application.auth_service import UserQueries
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
 from app.contexts.mentoring.application.artifact_service import ArtifactService
@@ -151,6 +155,7 @@ def build_assignment_service(notices: MentoringNotices | None = None) -> CohortM
         assignments=TortoiseCohortMentorRepository(),
         mentors=MentorQueries(TortoiseMentorRepository()),
         cohorts=AcademyCatalog(TortoiseBootcampRepository(), TortoiseCohortRepository()),
+        contracts=MentorContractQueries(TortoiseEducatorContractRepository()),
         audit=AuditRecorder(TortoiseAuditLogRepository(), clock),
         uow=UnitOfWork(),
         clock=clock,

@@ -14,14 +14,12 @@ from app.contexts.identity.infrastructure.repositories import TortoiseUserReposi
 from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.enums import (
     CohortMentorDeactivationReason,
-    MentoringSettlementPolicy,
-    PayUnit,
 )
 from app.contexts.mentoring.infrastructure.repositories import TortoiseCohortMentorRepository
 from app.core.config import Settings
 from app.core.security import JWTService
 from tests.factories.academy import create_cohort
-from tests.factories.educator import create_mentor, create_user
+from tests.factories.educator import create_mentor, create_mentor_contract, create_user
 
 pytestmark = pytest.mark.api
 
@@ -129,13 +127,14 @@ async def test_admin_lists_and_edits_mentors(client: AsyncClient, admin: dict[st
     cohort, old = await create_cohort(cohort_number=12), await create_cohort(cohort_number=11)
     repo = TortoiseCohortMentorRepository()
     for c, active in ((cohort, True), (old, False)):
+        contract = await create_mentor_contract(
+            mentor.id, bootcamp_id=c.bootcamp_id, cohort_id=c.id
+        )
         assignment = CohortMentor(
             cohort_id=c.id,
             mentor_id=mentor.id,
+            contract_id=contract.id,
             start_date=date(2026, 11, 2),
-            cost_settlement_policy=MentoringSettlementPolicy.ACTUAL_DURATION,
-            pay_unit=PayUnit.HOURLY,
-            pay_rate=30000,
         )
         if not active:
             assignment.deactivate(CohortMentorDeactivationReason.MANUAL, now=datetime.now(UTC))

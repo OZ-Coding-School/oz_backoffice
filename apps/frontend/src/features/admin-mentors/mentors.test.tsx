@@ -66,6 +66,21 @@ const PROFILE: MentorProfile = {
   is_active: true,
 };
 
+// 배정의 근거 계약 요약 (A110)
+const CONTRACT: MentorAssignment["contract"] & object = {
+  id: "k1",
+  title: "2026 백엔드 멘토 계약",
+  status: "ACTIVE",
+  bootcamp_id: "b1",
+  cohort_id: null,
+  start_date: null,
+  end_date: null,
+  unit_price: 30000,
+  price_unit: "HOURLY",
+  no_show_pay_amount: 10000,
+  mentoring_time_basis: "ACTUAL_DURATION",
+};
+
 function assignment(id: string, extra: Partial<MentorAssignment> = {}): MentorAssignment {
   return {
     id,
@@ -77,10 +92,8 @@ function assignment(id: string, extra: Partial<MentorAssignment> = {}): MentorAs
     is_active: true,
     deactivated_at: null,
     deactivation_reason: null,
-    cost_settlement_policy: "ACTUAL_DURATION",
-    pay_unit: "HOURLY",
-    pay_rate: 30000,
-    no_show_pay_amount: 10000,
+    contract_id: "k1",
+    contract: CONTRACT,
     ...extra,
   };
 }
@@ -91,9 +104,7 @@ const ASSIGNMENTS = [
     cohort_id: "c-d3",
     bootcamp_name: "데이터 분석 부트캠프",
     cohort_number: 3,
-    pay_unit: "PER_SESSION",
-    pay_rate: 50000,
-    no_show_pay_amount: 0,
+    contract: { ...CONTRACT, price_unit: "PER_SESSION", unit_price: 50000, no_show_pay_amount: 0 },
     start_date: "2026-11-16",
     end_date: "2027-02-28",
   }),
@@ -462,7 +473,7 @@ describe("강사·멘토 > 멘토 (FE-18a)", () => {
     expect(screen.getByRole("switch", { name: "신청 받기" })).toBeDisabled();
   });
 
-  it("배정 패널: 기수·기간·정산 조건 조회, [수정]은 같은 구성에서 저장", async () => {
+  it("배정 패널: 기수·기간·근거 계약의 정산 조건 조회, [수정]은 기간만 저장 (A110)", async () => {
     const calls = mockApi();
     await renderRoute("/admin/educators/mentors/m1?tab=assignments&assignment=a1");
     const sheet = await screen.findByRole("dialog", { name: "백엔드 부트캠프 12기" });
@@ -470,28 +481,18 @@ describe("강사·멘토 > 멘토 (FE-18a)", () => {
       "과정백엔드 부트캠프기수12기기수 기간2026.06.02 ~ 2026.11.30기수 상태진행 중",
     );
     expect(within(sheet).getByRole("region", { name: "정산 조건" })).toHaveTextContent(
-      "실제 진행 시간단가 기준시간당단가30,000원노쇼 단가10,000원",
+      "근거 계약2026 백엔드 멘토 계약정산 기준실제 진행 시간단가 기준시간당단가30,000원노쇼 단가10,000원",
     );
     const user = userEvent.setup();
     await user.click(within(sheet).getByRole("button", { name: "수정" }));
     const form = await within(sheet).findByRole("form", { name: "배정 수정" });
     expect(within(sheet).getByText("수정 중")).toBeInTheDocument();
-    await user.click(within(form).getByRole("radio", { name: "세션당" }));
-    const rate = within(form).getByLabelText("단가");
-    await user.clear(rate);
-    await user.type(rate, "50,000");
+    await user.type(within(form).getByLabelText("종료일"), "2027-03-31");
     await user.click(within(form).getByRole("button", { name: "저장" }));
     expect(await screen.findByText("백엔드 부트캠프 12기 배정을 저장했어요")).toBeInTheDocument();
     expect(calls).toContainEqual({
       path: "update:a1",
-      body: {
-        start_date: "2026-11-02",
-        end_date: null,
-        cost_settlement_policy: "ACTUAL_DURATION",
-        pay_unit: "PER_SESSION",
-        pay_rate: 50000,
-        no_show_pay_amount: 10000,
-      },
+      body: { start_date: "2026-11-02", end_date: "2027-03-31" },
     });
   });
 
@@ -517,7 +518,7 @@ describe("강사·멘토 > 멘토 (FE-18a)", () => {
     expect(calls).toContainEqual({ path: "reactivate:a3", body: null });
   });
 
-  it("배정 추가: 과정 → 기수(이미 배정 중인 기수는 막힘) → 기간·정산 조건", async () => {
+  it("배정 추가: 과정 → 기수(이미 배정 중인 기수는 막힘) → 기간 (근거 계약 고르기는 배정 패널 PR)", async () => {
     const calls = mockApi();
     const { router } = await renderRoute("/admin/educators/mentors/m1?tab=assignments");
     const user = userEvent.setup();
@@ -533,19 +534,15 @@ describe("강사·멘토 > 멘토 (FE-18a)", () => {
     );
     await user.click(screen.getByRole("option", { name: "4기 · 2027.05.01 ~ 2027.10.31" }));
     await user.type(within(form).getByLabelText("시작일"), "2027-05-01");
-    await user.type(within(form).getByLabelText("단가"), "40000");
     await user.click(within(form).getByRole("button", { name: "추가" }));
     expect(await screen.findByText("데이터 분석 부트캠프 4기에 배정했어요")).toBeInTheDocument();
     expect(calls).toContainEqual({
       path: "create:c-d4",
       body: {
         mentor_id: "m1",
+        contract_id: "",
         start_date: "2027-05-01",
         end_date: null,
-        cost_settlement_policy: "ACTUAL_DURATION",
-        pay_unit: "HOURLY",
-        pay_rate: 40000,
-        no_show_pay_amount: 0,
       },
     });
     await waitFor(() => expect(router.state.location.search).toEqual({ tab: "assignments", assignment: "a9" }));

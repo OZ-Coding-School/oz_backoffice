@@ -2,6 +2,8 @@
 
 mentoring.assignment.manage (기수 범위):
   GET/POST       /admin/cohorts/{cohort_id}/mentor-assignments          (목록은 페이징 없음)
+  GET            /admin/cohorts/{cohort_id}/mentor-assignments/contract-candidates?mentor_id=
+                 (근거 계약 후보, A110)
   PATCH/DELETE   /admin/cohorts/{cohort_id}/mentor-assignments/{id}     (DELETE = 비활성화)
   POST           /admin/cohorts/{cohort_id}/mentor-assignments/{id}/reactivate
 mentor.manage (범위가 하나라도 있으면):
@@ -9,18 +11,20 @@ mentor.manage (범위가 하나라도 있으면):
   POST /admin/mentors/{mentor_id}/activate     (응답에 복구 후보 배정)
   POST /admin/mentors/{mentor_id}/mentor-assignments/reactivate   (가능한 것만)
 멘토 본인:
-  GET /me/mentor-assignments?include_inactive=   (정산 조건 포함)
+  GET /me/mentor-assignments?include_inactive=   (근거 계약의 정산 조건 포함, A110)
 """
 
 import uuid
 from datetime import date, datetime
-from typing import Annotated, Literal, cast
+from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends, Request, status
 from pydantic import BaseModel, Field
 
 from app.contexts.access.presentation.dependencies import ApprovedUser, require_permission
 from app.contexts.audit.application.recorder import AuditRecorder
+from app.contexts.educator.domain.entities import EducatorContract
+from app.contexts.educator.domain.enums import ContractStatus, MentoringTimeBasis, PriceUnit
 from app.contexts.identity.application.auth_service import UserQueries
 from app.contexts.identity.domain.entities import User
 from app.contexts.mentoring.application.assignment_service import (
@@ -28,13 +32,10 @@ from app.contexts.mentoring.application.assignment_service import (
     CohortMentorService,
     MentorDirectory,
 )
+from app.contexts.mentoring.application.contract_basis import ContractLookup
 from app.contexts.mentoring.application.mentor_activation import MentorActivationService
 from app.contexts.mentoring.domain.assignment import CohortMentor
-from app.contexts.mentoring.domain.enums import (
-    CohortMentorDeactivationReason,
-    MentoringSettlementPolicy,
-    PayUnit,
-)
+from app.contexts.mentoring.domain.enums import CohortMentorDeactivationReason
 from app.contexts.mentoring.infrastructure.repositories import TortoiseCohortMentorRepository
 from app.contexts.mentoring.presentation.cleanup import build_cleanup
 from app.core.clock import Clock
@@ -54,7 +55,6 @@ MentorManager = Annotated[
     User, Depends(require_permission("educator.mentor.manage", any_scope=True))
 ]
 MentorReader = Annotated[User, Depends(require_permission("educator.mentor.read", any_scope=True))]
-AssignmentPayUnit = Literal[PayUnit.HOURLY, PayUnit.PER_SESSION]
 
 
 class CohortLabels:
@@ -72,6 +72,10 @@ def _mentors(request: Request) -> MentorDirectory:
     return cast("MentorDirectory", request.app.state.mentor_queries)
 
 
+def _contracts(request: Request) -> ContractLookup:
+    return cast("ContractLookup", request.app.state.mentor_contracts)
+
+
 def get_assignment_service(
     request: Request, clock: Annotated[Clock, Depends(get_clock)]
 ) -> CohortMentorService:
@@ -79,6 +83,7 @@ def get_assignment_service(
         assignments=TortoiseCohortMentorRepository(),
         mentors=_mentors(request),
         cohorts=cast("CohortLookup", request.app.state.academy_catalog),
+        contracts=_contracts(request),
         cleanup=build_cleanup(request, clock),
         audit=cast("AuditRecorder", request.app.state.audit_recorder),
         uow=UnitOfWork(),
@@ -92,6 +97,7 @@ def get_activation_service(
     return MentorActivationService(
         mentors=_mentors(request),
         assignments=TortoiseCohortMentorRepository(),
+        contracts=_contracts(request),
         cleanup=build_cleanup(request, clock),
         audit=cast("AuditRecorder", request.app.state.audit_recorder),
         uow=UnitOfWork(),
@@ -105,17 +111,24 @@ class Presenter:
     def __init__(self, request: Request) -> None:
         self._mentors = _mentors(request)
         self._users = cast("UserQueries", request.app.state.user_queries)
+        self._contracts = _contracts(request)
 
     async def many(self, assignments: list[CohortMentor]) -> list["AssignmentResponse"]:
         mentors = await self._mentors.get_many(list({a.mentor_id for a in assignments}))
         users = await self._users.get_many([m.account_id for m in mentors.values()])
+        contracts = await self._contracts.get_many([a.contract_id for a in assignments])
         items = []
         for a in assignments:
             mentor = mentors.get(a.mentor_id)
             user = users.get(mentor.account_id) if mentor else None
             name = user.name if user else ""
             items.append(
-                AssignmentResponse.of(a, name, mentor.display_name(name) if mentor else name)
+                AssignmentResponse.of(
+                    a,
+                    name,
+                    mentor.display_name(name) if mentor else name,
+                    contracts.get(a.contract_id),
+                )
             )
         return items
 
@@ -127,36 +140,66 @@ ServiceDep = Annotated[CohortMentorService, Depends(get_assignment_service)]
 ActivationDep = Annotated[MentorActivationService, Depends(get_activation_service)]
 PresenterDep = Annotated[Presenter, Depends(Presenter)]
 LabelsDep = Annotated[CohortLabels, Depends(CohortLabels)]
+ContractsDep = Annotated[ContractLookup, Depends(_contracts)]
 
 
 # ---------------------------------------------------------------- 스키마
-class PayTerms(BaseModel):
-    cost_settlement_policy: MentoringSettlementPolicy
-    pay_unit: AssignmentPayUnit = Field(description="HOURLY / PER_SESSION")
-    pay_rate: int = Field(ge=0, description="단가 (원)")
-    no_show_pay_amount: int = Field(default=0, ge=0, description="노쇼 1건당 정산 금액 (원)")
+class AssignmentContract(BaseModel):
+    """근거 계약 요약 (A110). 정산은 이 값으로 계산한다."""
+
+    id: uuid.UUID
+    title: str
+    status: ContractStatus
+    bootcamp_id: uuid.UUID
+    cohort_id: uuid.UUID | None = Field(description="없으면 과정 공통 계약")
+    start_date: date | None
+    end_date: date | None
+    unit_price: int | None = Field(description="단가 (원)")
+    price_unit: PriceUnit | None = Field(description="멘토 계약은 HOURLY / PER_SESSION")
+    no_show_pay_amount: int | None = Field(description="노쇼 1건당 정산 금액 (원)")
+    mentoring_time_basis: MentoringTimeBasis | None = Field(
+        description="정산 시간 기준: 신청 시간 / 실제 진행 시간"
+    )
+
+    @classmethod
+    def of(cls, c: EducatorContract) -> "AssignmentContract":
+        return cls(
+            id=c.id,
+            title=c.title,
+            status=c.status,
+            bootcamp_id=c.bootcamp_id,
+            cohort_id=c.cohort_id,
+            start_date=c.start_date,
+            end_date=c.end_date,
+            unit_price=c.unit_price,
+            price_unit=c.price_unit,
+            no_show_pay_amount=c.no_show_pay_amount,
+            mentoring_time_basis=c.mentoring_time_basis,
+        )
 
 
-class AssignmentCreate(PayTerms):
+class AssignmentCreate(BaseModel):
     mentor_id: uuid.UUID
-    start_date: date = Field(description="기수 기간 안")
-    end_date: date | None = Field(default=None, description="없으면 기한 없음, 기수 밖도 가능")
+    contract_id: uuid.UUID = Field(description="근거 계약 (그 멘토의 계약 완료·이행 중 멘토 계약)")
+    start_date: date = Field(description="기수 기간 안, 계약 기간 안")
+    end_date: date | None = Field(
+        default=None, description="없으면 기한 없음(계약이 끝나면 비활성), 기수 밖도 가능"
+    )
 
 
 class AssignmentUpdate(BaseModel):
     """보낸 필드만 바꾼다. 종료일은 null로 비운다(기한 없음)."""
 
+    contract_id: uuid.UUID | None = None
     start_date: date | None = None
     end_date: date | None = None
-    cost_settlement_policy: MentoringSettlementPolicy | None = None
-    pay_unit: AssignmentPayUnit | None = None
-    pay_rate: int | None = Field(default=None, ge=0)
-    no_show_pay_amount: int | None = Field(default=None, ge=0)
 
 
-class AssignmentFields(PayTerms):
+class AssignmentFields(BaseModel):
     id: uuid.UUID
     cohort_id: uuid.UUID
+    contract_id: uuid.UUID
+    contract: AssignmentContract | None = Field(description="근거 계약 요약")
     start_date: date
     end_date: date | None
     is_active: bool
@@ -172,9 +215,11 @@ class AssignmentResponse(AssignmentFields):
     updated_at: datetime | None
 
     @classmethod
-    def of(cls, a: CohortMentor, name: str, display: str) -> "AssignmentResponse":
+    def of(
+        cls, a: CohortMentor, name: str, display: str, contract: EducatorContract | None
+    ) -> "AssignmentResponse":
         return cls(
-            **_fields(a),
+            **_fields(a, contract),
             mentor_id=a.mentor_id,
             mentor_name=name,
             mentor_display_name=display,
@@ -188,16 +233,14 @@ class MyAssignmentResponse(AssignmentFields):
     cohort_number: int
 
 
-def _fields(a: CohortMentor) -> dict[str, object]:
+def _fields(a: CohortMentor, contract: EducatorContract | None) -> dict[str, object]:
     return {
         "id": a.id,
         "cohort_id": a.cohort_id,
+        "contract_id": a.contract_id,
+        "contract": AssignmentContract.of(contract) if contract else None,
         "start_date": a.start_date,
         "end_date": a.end_date,
-        "cost_settlement_policy": a.cost_settlement_policy,
-        "pay_unit": a.pay_unit,
-        "pay_rate": a.pay_rate,
-        "no_show_pay_amount": a.no_show_pay_amount,
         "is_active": a.is_active,
         "deactivated_at": a.deactivated_at,
         "deactivation_reason": a.deactivation_reason,
@@ -264,6 +307,19 @@ async def list_assignments(
     """한 기수의 배정 전체 (페이징 없음, A36). 기본은 활성 배정만."""
     assignments = await service.list_by_cohort(cohort_id, include_inactive=include_inactive)
     return await presenter.many(assignments)
+
+
+@admin_router.get(
+    "/cohorts/{cohort_id}/mentor-assignments/contract-candidates",
+    response_model=list[AssignmentContract],
+)
+async def list_contract_candidates(
+    cohort_id: uuid.UUID, mentor_id: uuid.UUID, _: CohortManager, service: ServiceDep
+) -> list[AssignmentContract]:
+    """배정의 근거 계약 후보 (A110): 그 멘토의 계약 완료·이행 중 멘토 계약 중 이 기수의 계약 또는
+    같은 과정의 과정 공통 계약. 기간은 저장할 때 확인한다."""
+    contracts = await service.contract_candidates(cohort_id, mentor_id)
+    return [AssignmentContract.of(c) for c in contracts]
 
 
 @admin_router.post(
@@ -399,14 +455,19 @@ async def reactivate_mentor_assignments(
     "/mentors/{mentor_id}/mentor-assignments", response_model=list[MyAssignmentResponse]
 )
 async def list_mentor_assignments(
-    mentor_id: uuid.UUID, _: MentorReader, service: ServiceDep, labels: LabelsDep
+    mentor_id: uuid.UUID,
+    _: MentorReader,
+    service: ServiceDep,
+    labels: LabelsDep,
+    contracts: ContractsDep,
 ) -> list[MyAssignmentResponse]:
     """한 멘토의 배정 전체 (비활성 포함, 활성 먼저·최근 시작부터, A101). 없는 멘토는 404."""
     assignments = await service.list_by_mentor(mentor_id)
     found = await labels.of([a.cohort_id for a in assignments])
+    basis = await contracts.get_many([a.contract_id for a in assignments])
     return [
         MyAssignmentResponse(
-            **_fields(a),
+            **_fields(a, basis.get(a.contract_id)),
             bootcamp_name=found.get(a.cohort_id, ("", 0))[0],
             cohort_number=found.get(a.cohort_id, ("", 0))[1],
         )
@@ -416,14 +477,19 @@ async def list_mentor_assignments(
 
 @me_router.get("", response_model=list[MyAssignmentResponse])
 async def list_my_assignments(
-    user: ApprovedUser, service: ServiceDep, labels: LabelsDep, include_inactive: bool = False
+    user: ApprovedUser,
+    service: ServiceDep,
+    labels: LabelsDep,
+    contracts: ContractsDep,
+    include_inactive: bool = False,
 ) -> list[MyAssignmentResponse]:
-    """본인 배정 (정산 조건 포함, A35). 기본은 활성 배정만."""
+    """본인 배정 (근거 계약의 정산 조건 포함, A35·A110). 기본은 활성 배정만."""
     assignments = await service.list_mine(user.id, include_inactive=include_inactive)
     found = await labels.of([a.cohort_id for a in assignments])
+    basis = await contracts.get_many([a.contract_id for a in assignments])
     return [
         MyAssignmentResponse(
-            **_fields(a),
+            **_fields(a, basis.get(a.contract_id)),
             bootcamp_name=found.get(a.cohort_id, ("", 0))[0],
             cohort_number=found.get(a.cohort_id, ("", 0))[1],
         )

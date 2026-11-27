@@ -17,7 +17,7 @@ from app.core.config import Settings
 from app.core.security import JWTService
 from app.shared.ids import new_id
 from tests.factories.academy import create_cohort, make_student
-from tests.factories.educator import create_mentor, create_user
+from tests.factories.educator import create_mentor, create_mentor_contract, create_user
 
 pytestmark = pytest.mark.api
 
@@ -42,9 +42,13 @@ async def _assign(
         json={
             "mentor_id": str(mentor.id),
             "start_date": "2026-11-01",
-            "cost_settlement_policy": "ACTUAL_DURATION",
-            "pay_unit": "HOURLY",
-            "pay_rate": 30000,
+            "contract_id": str(
+                (
+                    await create_mentor_contract(
+                        mentor.id, bootcamp_id=cohort.bootcamp_id, cohort_id=cohort.id
+                    )
+                ).id
+            ),
         },
         headers=admin,
     )

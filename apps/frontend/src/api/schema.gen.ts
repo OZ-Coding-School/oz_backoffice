@@ -2029,6 +2029,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/cohorts/{cohort_id}/mentor-assignments/contract-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Contract Candidates
+         * @description 배정의 근거 계약 후보 (A110): 그 멘토의 계약 완료·이행 중 멘토 계약 중 이 기수의 계약 또는
+         *     같은 과정의 과정 공통 계약. 기간은 저장할 때 확인한다.
+         */
+        get: operations["list_contract_candidates_api_v1_admin_cohorts__cohort_id__mentor_assignments_contract_candidates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/cohorts/{cohort_id}/mentor-assignments/{assignment_id}": {
         parameters: {
             query?: never;
@@ -2150,7 +2171,7 @@ export interface paths {
         };
         /**
          * List My Assignments
-         * @description 본인 배정 (정산 조건 포함, A35). 기본은 활성 배정만.
+         * @description 본인 배정 (근거 계약의 정산 조건 포함, A35·A110). 기본은 활성 배정만.
          */
         get: operations["list_my_assignments_api_v1_me_mentor_assignments_get"];
         put?: never;
@@ -4224,63 +4245,75 @@ export interface components {
              */
             employee_id: string;
         };
-        /** AssignmentCreate */
-        AssignmentCreate: {
-            cost_settlement_policy: components["schemas"]["MentoringSettlementPolicy"];
+        /**
+         * AssignmentContract
+         * @description 근거 계약 요약 (A110). 정산은 이 값으로 계산한다.
+         */
+        AssignmentContract: {
             /**
-             * Pay Unit
-             * @description HOURLY / PER_SESSION
-             * @enum {string}
+             * Id
+             * Format: uuid
              */
-            pay_unit: "HOURLY" | "PER_SESSION";
+            id: string;
+            /** Title */
+            title: string;
+            status: components["schemas"]["ContractStatus"];
             /**
-             * Pay Rate
+             * Bootcamp Id
+             * Format: uuid
+             */
+            bootcamp_id: string;
+            /**
+             * Cohort Id
+             * @description 없으면 과정 공통 계약
+             */
+            cohort_id: string | null;
+            /** Start Date */
+            start_date: string | null;
+            /** End Date */
+            end_date: string | null;
+            /**
+             * Unit Price
              * @description 단가 (원)
              */
-            pay_rate: number;
+            unit_price: number | null;
+            /** @description 멘토 계약은 HOURLY / PER_SESSION */
+            price_unit: components["schemas"]["PriceUnit"] | null;
             /**
              * No Show Pay Amount
              * @description 노쇼 1건당 정산 금액 (원)
-             * @default 0
              */
-            no_show_pay_amount: number;
+            no_show_pay_amount: number | null;
+            /** @description 정산 시간 기준: 신청 시간 / 실제 진행 시간 */
+            mentoring_time_basis: components["schemas"]["MentoringTimeBasis"] | null;
+        };
+        /** AssignmentCreate */
+        AssignmentCreate: {
             /**
              * Mentor Id
              * Format: uuid
              */
             mentor_id: string;
             /**
+             * Contract Id
+             * Format: uuid
+             * @description 근거 계약 (그 멘토의 계약 완료·이행 중 멘토 계약)
+             */
+            contract_id: string;
+            /**
              * Start Date
              * Format: date
-             * @description 기수 기간 안
+             * @description 기수 기간 안, 계약 기간 안
              */
             start_date: string;
             /**
              * End Date
-             * @description 없으면 기한 없음, 기수 밖도 가능
+             * @description 없으면 기한 없음(계약이 끝나면 비활성), 기수 밖도 가능
              */
             end_date?: string | null;
         };
         /** AssignmentDeactivateResponse */
         AssignmentDeactivateResponse: {
-            cost_settlement_policy: components["schemas"]["MentoringSettlementPolicy"];
-            /**
-             * Pay Unit
-             * @description HOURLY / PER_SESSION
-             * @enum {string}
-             */
-            pay_unit: "HOURLY" | "PER_SESSION";
-            /**
-             * Pay Rate
-             * @description 단가 (원)
-             */
-            pay_rate: number;
-            /**
-             * No Show Pay Amount
-             * @description 노쇼 1건당 정산 금액 (원)
-             * @default 0
-             */
-            no_show_pay_amount: number;
             /**
              * Id
              * Format: uuid
@@ -4291,6 +4324,13 @@ export interface components {
              * Format: uuid
              */
             cohort_id: string;
+            /**
+             * Contract Id
+             * Format: uuid
+             */
+            contract_id: string;
+            /** @description 근거 계약 요약 */
+            contract: components["schemas"]["AssignmentContract"] | null;
             /**
              * Start Date
              * Format: date
@@ -4350,24 +4390,6 @@ export interface components {
         };
         /** AssignmentResponse */
         AssignmentResponse: {
-            cost_settlement_policy: components["schemas"]["MentoringSettlementPolicy"];
-            /**
-             * Pay Unit
-             * @description HOURLY / PER_SESSION
-             * @enum {string}
-             */
-            pay_unit: "HOURLY" | "PER_SESSION";
-            /**
-             * Pay Rate
-             * @description 단가 (원)
-             */
-            pay_rate: number;
-            /**
-             * No Show Pay Amount
-             * @description 노쇼 1건당 정산 금액 (원)
-             * @default 0
-             */
-            no_show_pay_amount: number;
             /**
              * Id
              * Format: uuid
@@ -4378,6 +4400,13 @@ export interface components {
              * Format: uuid
              */
             cohort_id: string;
+            /**
+             * Contract Id
+             * Format: uuid
+             */
+            contract_id: string;
+            /** @description 근거 계약 요약 */
+            contract: components["schemas"]["AssignmentContract"] | null;
             /**
              * Start Date
              * Format: date
@@ -4421,17 +4450,12 @@ export interface components {
          * @description 보낸 필드만 바꾼다. 종료일은 null로 비운다(기한 없음).
          */
         AssignmentUpdate: {
+            /** Contract Id */
+            contract_id?: string | null;
             /** Start Date */
             start_date?: string | null;
             /** End Date */
             end_date?: string | null;
-            cost_settlement_policy?: components["schemas"]["MentoringSettlementPolicy"] | null;
-            /** Pay Unit */
-            pay_unit?: ("HOURLY" | "PER_SESSION") | null;
-            /** Pay Rate */
-            pay_rate?: number | null;
-            /** No Show Pay Amount */
-            no_show_pay_amount?: number | null;
         };
         /** AvailableTimesResponse */
         AvailableTimesResponse: {
@@ -4790,7 +4814,7 @@ export interface components {
          * CohortMentorDeactivationReason
          * @enum {string}
          */
-        CohortMentorDeactivationReason: "EXPIRED" | "MANUAL" | "MENTOR_DEACTIVATED";
+        CohortMentorDeactivationReason: "EXPIRED" | "MANUAL" | "MENTOR_DEACTIVATED" | "CONTRACT_ENDED";
         /** CohortOption */
         CohortOption: {
             /**
@@ -6500,24 +6524,6 @@ export interface components {
         };
         /** MyAssignmentResponse */
         MyAssignmentResponse: {
-            cost_settlement_policy: components["schemas"]["MentoringSettlementPolicy"];
-            /**
-             * Pay Unit
-             * @description HOURLY / PER_SESSION
-             * @enum {string}
-             */
-            pay_unit: "HOURLY" | "PER_SESSION";
-            /**
-             * Pay Rate
-             * @description 단가 (원)
-             */
-            pay_rate: number;
-            /**
-             * No Show Pay Amount
-             * @description 노쇼 1건당 정산 금액 (원)
-             * @default 0
-             */
-            no_show_pay_amount: number;
             /**
              * Id
              * Format: uuid
@@ -6528,6 +6534,13 @@ export interface components {
              * Format: uuid
              */
             cohort_id: string;
+            /**
+             * Contract Id
+             * Format: uuid
+             */
+            contract_id: string;
+            /** @description 근거 계약 요약 */
+            contract: components["schemas"]["AssignmentContract"] | null;
             /**
              * Start Date
              * Format: date
@@ -13056,6 +13069,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AssignmentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_contract_candidates_api_v1_admin_cohorts__cohort_id__mentor_assignments_contract_candidates_get: {
+        parameters: {
+            query: {
+                mentor_id: string;
+            };
+            header?: never;
+            path: {
+                cohort_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignmentContract"][];
                 };
             };
             /** @description Validation Error */

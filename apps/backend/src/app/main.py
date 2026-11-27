@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from tortoise.contrib.fastapi import RegisterTortoise
 
 from app.api import health, v1
+from app.composition.assignment_contracts import AssignmentContractListener
 from app.composition.cohort_summary import CohortSummaryComposer
 from app.composition.contract_people import ContractPeopleComposer
 from app.composition.member_links import MemberLinksComposer
@@ -26,6 +27,7 @@ from app.contexts.access.application.grant_source import StaffGrantSource
 from app.contexts.audit.application.queries import AuditQueries
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.audit.infrastructure.repositories import TortoiseAuditLogRepository
+from app.contexts.educator.application.mentor_contracts import MentorContractQueries
 from app.contexts.educator.application.mentor_onboarding import MentorOnboarding
 from app.contexts.educator.application.mentor_queries import MentorQueries
 from app.contexts.educator.infrastructure.repositories import (
@@ -119,6 +121,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     # 기수 멘토 배정·멘토 활성화(A35·A36): 멘토링이 educator 멘토를 조회·잠금·활성 변경한다
     app.state.mentor_queries = MentorQueries(TortoiseMentorRepository())
+    # 기수 배정의 근거 계약(A110): 배정 확인·정산이 계약을 읽고, 계약 변화가 배정을 정리한다
+    app.state.mentor_contracts = MentorContractQueries(TortoiseEducatorContractRepository())
+    app.state.contract_listener = AssignmentContractListener(
+        audit=app.state.audit_recorder, clock=clock
+    )
     # 신청 가능 시간 조회(A37): 그 기수 수강 중인지 확인
     app.state.student_queries = StudentQueries(TortoiseStudentRepository())
     # 전체 회원(A94): 종류별 연결 정보와 비활성화 이력

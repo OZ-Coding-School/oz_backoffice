@@ -85,6 +85,13 @@ class InMemoryCohortMentorRepository:
             if a.is_active and a.end_date is not None and a.end_date < today
         ]
 
+    async def list_active_by_contract(self, contract_id: uuid.UUID) -> list[CohortMentor]:
+        return [
+            dataclasses.replace(a)
+            for a in self.items.values()
+            if a.is_active and a.contract_id == contract_id
+        ]
+
 
 class InMemoryUnavailablePeriodRepository:
     def __init__(self) -> None:

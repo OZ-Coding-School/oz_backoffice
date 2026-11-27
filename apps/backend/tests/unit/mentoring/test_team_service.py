@@ -14,8 +14,6 @@ from app.contexts.mentoring.application.team_service import MentoringTeamService
 from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.enums import (
     MentoringRequestStatus,
-    MentoringSettlementPolicy,
-    PayUnit,
 )
 from app.contexts.mentoring.domain.settings import CohortMentoringSettings
 from app.core.clock import FixedClock
@@ -74,9 +72,7 @@ def _assignment(mentor: Mentor, cohort_id: uuid.UUID) -> CohortMentor:
         cohort_id=cohort_id,
         mentor_id=mentor.id,
         start_date=date(2026, 11, 1),
-        cost_settlement_policy=MentoringSettlementPolicy.ACTUAL_DURATION,
-        pay_unit=PayUnit.HOURLY,
-        pay_rate=30000,
+        contract_id=new_id(),
     )
 
 

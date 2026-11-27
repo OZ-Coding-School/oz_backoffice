@@ -8,8 +8,6 @@ import { mentorKeys } from "./api";
 
 export type AssignmentCreate = components["schemas"]["AssignmentCreate"];
 export type AssignmentUpdate = components["schemas"]["AssignmentUpdate"];
-export type SettlementPolicy = components["schemas"]["MentoringSettlementPolicy"];
-export type PayUnit = AssignmentCreate["pay_unit"];
 
 /** 배정이 바뀌면 그 멘토의 배정·단건(활성 배정 기수)·목록을 다시 읽는다 */
 function useRefresh(mentorId: string) {

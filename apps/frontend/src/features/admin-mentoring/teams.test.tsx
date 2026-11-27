@@ -89,10 +89,8 @@ const ASSIGNMENT: CohortAssignment = {
   is_active: true,
   deactivated_at: null,
   deactivation_reason: null,
-  cost_settlement_policy: "ACTUAL_DURATION",
-  pay_unit: "HOURLY",
-  pay_rate: 30000,
-  no_show_pay_amount: 0,
+  contract_id: "k1",
+  contract: null,
   created_at: "2026-09-01T00:00:00Z",
   updated_at: "2026-09-01T00:00:00Z",
 };

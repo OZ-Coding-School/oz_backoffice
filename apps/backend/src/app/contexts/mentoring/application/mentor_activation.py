@@ -19,6 +19,7 @@ from app.contexts.mentoring.application.assignment_service import (
     record_change,
     snapshot,
 )
+from app.contexts.mentoring.application.contract_basis import EFFECTIVE, ContractLookup
 from app.contexts.mentoring.application.request_cleanup import (
     MENTOR_DEACTIVATED,
     RequestCleanup,
@@ -82,6 +83,7 @@ class MentorActivationService:
         *,
         mentors: MentorDirectory,
         assignments: CohortMentorRepository,
+        contracts: ContractLookup,
         cleanup: RequestCleanup,
         audit: AuditRecorder,
         uow: UnitOfWork,
@@ -89,6 +91,7 @@ class MentorActivationService:
     ) -> None:
         self._mentors = mentors
         self._assignments = assignments
+        self._contracts = contracts
         self._cleanup = cleanup
         self._audit = audit
         self._uow = uow
@@ -133,7 +136,12 @@ class MentorActivationService:
         today = business_date(self._clock.now())
         assignments = await self._assignments.list_by_mentor(mentor_id, include_inactive=True)
         active_keys = {_key(a) for a in assignments if a.is_active}
-        candidates = [a for a in assignments if _restorable(a, today, active_keys)]
+        effective = await self._effective_contracts(assignments)
+        candidates = [
+            a
+            for a in assignments
+            if _restorable(a, today, active_keys) and a.contract_id in effective
+        ]
         # 같은 기수 후보가 여럿이면 가장 최근에 꺼진 것만 보여 준다
         latest: dict[tuple[object, ...], CohortMentor] = {}
         for candidate in sorted(candidates, key=lambda a: a.deactivated_at or datetime.min):
@@ -149,6 +157,7 @@ class MentorActivationService:
         async with self._uow:
             ensure_mentor_active(await self._mentors.lock(mentor_id))
             found = {a.id: a for a in await self._assignments.list_by_ids(assignment_ids)}
+            effective = await self._effective_contracts(list(found.values()))
             active_keys = {
                 _key(a)
                 for a in await self._assignments.list_by_mentor(mentor_id, include_inactive=False)
@@ -165,6 +174,11 @@ class MentorActivationService:
                     )
                     continue
                 failure = self._why_not(assignment, today, active_keys)
+                if failure is None and assignment.contract_id not in effective:
+                    failure = (
+                        "assignment_contract_not_effective",
+                        "근거 계약이 끝났습니다. 새 계약으로 배정해 주세요.",
+                    )
                 if failure is not None:
                     result.failed.append(ReactivationFailure(assignment_id, *failure))
                     continue
@@ -177,6 +191,11 @@ class MentorActivationService:
         return result
 
     # ------------------------------------------------------------------ 내부
+    async def _effective_contracts(self, assignments: list[CohortMentor]) -> set[uuid.UUID]:
+        """근거 계약이 SIGNED·ACTIVE인 계약 id (A110: 끝난 계약의 배정은 다시 켜지 않는다)."""
+        found = await self._contracts.get_many([a.contract_id for a in assignments])
+        return {cid for cid, c in found.items() if c.status in EFFECTIVE}
+
     @staticmethod
     def _why_not(
         assignment: CohortMentor, today: date, active_keys: set[tuple[object, ...]]

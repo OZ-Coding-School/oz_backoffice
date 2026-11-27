@@ -5,7 +5,7 @@
 
 import uuid
 from collections.abc import Iterable
-from datetime import datetime
+from datetime import date, datetime
 from typing import Protocol
 
 from app.contexts.access.application.permissions import PermissionScope, PermissionTarget
@@ -44,3 +44,28 @@ class ContractPermissions(Protocol):
 
     async def has(self, user_id: uuid.UUID, code: str, target: PermissionTarget) -> bool: ...
     async def scope_of(self, user_id: uuid.UUID, code: str) -> PermissionScope: ...
+
+
+class ContractLifecycleListener(Protocol):
+    """계약 변화에 따른 기수 배정 정리 (A110). composition이 멘토링 쪽을 조립해 넣는다.
+
+    계약 서비스의 트랜잭션 안에서 부른다(UoW를 열지 않는다)."""
+
+    async def has_active_assignments(self, contract_id: uuid.UUID) -> bool:
+        """이 계약을 근거로 한 활성 배정이 있는지 (다른 멘토로 옮기기 전 확인)."""
+        ...
+
+    async def contract_closed(self, contract_id: uuid.UUID, *, actor_id: uuid.UUID | None) -> None:
+        """계약이 ENDED·TERMINATED가 됐다: 이 계약을 근거로 한 활성 배정을 끈다."""
+        ...
+
+    async def contract_period_changed(
+        self,
+        contract_id: uuid.UUID,
+        *,
+        start_date: date | None,
+        end_date: date | None,
+        actor_id: uuid.UUID | None,
+    ) -> None:
+        """계약 기간이 바뀌었다: 활성 배정 기간을 계약 기간으로 줄인다(남는 기간이 없으면 끈다)."""
+        ...

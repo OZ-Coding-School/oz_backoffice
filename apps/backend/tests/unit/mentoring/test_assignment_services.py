@@ -1,5 +1,6 @@
 """기수 멘토 배정·멘토 활성화 서비스 (인메모리 리포지토리 + 고정 시계)."""
 
+import dataclasses
 import uuid
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
@@ -8,22 +9,25 @@ import pytest
 
 from app.contexts.academy.domain.entities import Cohort
 from app.contexts.audit.application.recorder import AuditRecorder
+from app.contexts.educator.application.mentor_contracts import MentorContractQueries
 from app.contexts.educator.application.mentor_queries import MentorQueries
+from app.contexts.educator.domain.entities import EducatorContract
+from app.contexts.educator.domain.enums import ContractStatus
 from app.contexts.educator.domain.profiles import Mentor
 from app.contexts.mentoring.application.assignment_service import CohortMentorService
+from app.contexts.mentoring.application.contract_sync import AssignmentContractSync
 from app.contexts.mentoring.application.mentor_activation import MentorActivationService
 from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.enums import (
     CohortMentorDeactivationReason,
     MentoringRequestStatus,
-    MentoringSettlementPolicy,
-    PayUnit,
 )
 from app.core.clock import FixedClock
 from app.shared.errors import BusinessRuleViolation, ConflictError, NotFoundError
 from app.shared.ids import new_id
+from tests.factories.educator import make_mentor_contract
 from tests.fakes.audit import InMemoryAuditLogRepository
-from tests.fakes.educator import InMemoryMentorRepository
+from tests.fakes.educator import InMemoryContractRepository, InMemoryMentorRepository
 from tests.fakes.mentoring import CleanupStores, InMemoryCohortMentorRepository
 from tests.fakes.uow import FakeUnitOfWork
 
@@ -51,14 +55,12 @@ def _cohort() -> Cohort:
     )
 
 
-def _values(mentor: Mentor, **overrides: Any) -> dict[str, Any]:
+def _values(mentor: Mentor, contract: EducatorContract, **overrides: Any) -> dict[str, Any]:
     values: dict[str, Any] = {
         "mentor_id": mentor.id,
+        "contract_id": contract.id,
         "start_date": date(2026, 11, 1),
         "end_date": None,
-        "cost_settlement_policy": MentoringSettlementPolicy.ACTUAL_DURATION,
-        "pay_unit": PayUnit.HOURLY,
-        "pay_rate": 30000,
     }
     values.update(overrides)
     return values
@@ -76,10 +78,26 @@ class Harness:
         audit = AuditRecorder(self.audit_logs, self.clock)
         mentors = MentorQueries(self.mentor_repo)
         self.stores = CleanupStores(audit, self.clock)
+        self.contract_repo = InMemoryContractRepository()
+        # 기수마다 근거 계약 하나 (A110)
+        self.contract = make_mentor_contract(
+            self.mentor.id, bootcamp_id=self.cohort.bootcamp_id, cohort_id=self.cohort.id
+        )
+        self.other_contract = make_mentor_contract(
+            self.mentor.id,
+            bootcamp_id=self.other_cohort.bootcamp_id,
+            cohort_id=self.other_cohort.id,
+        )
+        self.contract_repo.items = {c.id: c for c in (self.contract, self.other_contract)}
+        contracts = MentorContractQueries(self.contract_repo)
+        self.sync = AssignmentContractSync(
+            assignments=self.repo, cleanup=self.stores.cleanup, audit=audit, clock=self.clock
+        )
         self.service = CohortMentorService(
             cleanup=self.stores.cleanup,
             assignments=self.repo,
             mentors=mentors,
+            contracts=contracts,
             cohorts=Cohorts(self.cohort, self.other_cohort),
             audit=audit,
             uow=FakeUnitOfWork(),
@@ -89,6 +107,7 @@ class Harness:
             cleanup=self.stores.cleanup,
             mentors=mentors,
             assignments=self.repo,
+            contracts=contracts,
             audit=audit,
             uow=FakeUnitOfWork(),
             clock=self.clock,
@@ -96,9 +115,14 @@ class Harness:
 
     async def assign(self, *, other: bool = False, **overrides: Any) -> CohortMentor:
         cohort = self.other_cohort if other else self.cohort
+        contract = self.other_contract if other else self.contract
         return await self.service.create(
-            cohort.id, _values(self.mentor, **overrides), actor_id=ACTOR
+            cohort.id, _values(self.mentor, contract, **overrides), actor_id=ACTOR
         )
+
+    def put_contract(self, contract: EducatorContract) -> EducatorContract:
+        self.contract_repo.items[contract.id] = contract
+        return contract
 
 
 @pytest.fixture
@@ -119,7 +143,7 @@ async def test_create_rules(h: Harness) -> None:
     with pytest.raises(BusinessRuleViolation) as outside:
         await h.service.create(
             h.cohort.id,
-            _values(h.mentor, start_date=date(2026, 10, 31)),
+            _values(h.mentor, h.contract, start_date=date(2026, 10, 31)),
             actor_id=ACTOR,
         )
     assert outside.value.code == "assignment_start_outside_cohort"
@@ -131,9 +155,11 @@ async def test_create_rules(h: Harness) -> None:
 
 async def test_create_rejects_missing_or_inactive_mentor(h: Harness) -> None:
     with pytest.raises(NotFoundError):
-        await h.service.create(h.cohort.id, _values(Mentor(user_id=new_id())), actor_id=ACTOR)
+        await h.service.create(
+            h.cohort.id, _values(Mentor(user_id=new_id()), h.contract), actor_id=ACTOR
+        )
     with pytest.raises(NotFoundError) as no_cohort:
-        await h.service.create(new_id(), _values(h.mentor), actor_id=ACTOR)
+        await h.service.create(new_id(), _values(h.mentor, h.contract), actor_id=ACTOR)
     assert no_cohort.value.code == "cohort_not_found"
     h.mentor.deactivate()
     await h.mentor_repo.save(h.mentor)
@@ -145,13 +171,13 @@ async def test_create_rejects_missing_or_inactive_mentor(h: Harness) -> None:
 async def test_update_deactivate_reactivate(h: Harness) -> None:
     created = await h.assign()
     updated = await h.service.update(
-        h.cohort.id, created.id, {"pay_rate": 40000, "end_date": date(2026, 12, 31)}, actor_id=ACTOR
+        h.cohort.id, created.id, {"end_date": date(2026, 12, 31)}, actor_id=ACTOR
     )
-    assert (updated.pay_rate, updated.end_date) == (40000, date(2026, 12, 31))
+    assert updated.end_date == date(2026, 12, 31)
     with pytest.raises(BusinessRuleViolation):
         await h.service.update(h.cohort.id, created.id, {"mentor_id": new_id()}, actor_id=ACTOR)
     with pytest.raises(NotFoundError):
-        await h.service.update(new_id(), created.id, {"pay_rate": 1}, actor_id=ACTOR)
+        await h.service.update(new_id(), created.id, {"end_date": None}, actor_id=ACTOR)
 
     off, _ = await h.service.deactivate(h.cohort.id, created.id, actor_id=ACTOR)
     assert off.deactivation_reason is CohortMentorDeactivationReason.MANUAL
@@ -277,3 +303,93 @@ async def test_mentor_deactivation_counts_and_cancels_pending(h: Harness) -> Non
     done = await h.activation.deactivate(h.mentor.id, confirm=True, actor_id=ACTOR)
     assert (done.applied, done.pending_requests) == (True, 1)
     assert h.stores.status(request) is MentoringRequestStatus.CANCELED
+
+
+async def test_contract_basis_rules(h: Harness) -> None:
+    """근거 계약 (A110): 그 멘토의 SIGNED·ACTIVE 멘토 계약, 그 기수 또는 같은 과정 공통, 기간 안."""
+    common = h.put_contract(
+        make_mentor_contract(
+            h.mentor.id,
+            bootcamp_id=h.cohort.bootcamp_id,
+            start_date=date(2026, 11, 1),
+            end_date=date(2027, 1, 31),
+        )
+    )
+    created = await h.assign(contract_id=common.id, end_date=date(2027, 1, 31))
+    assert created.contract_id == common.id
+    await h.service.deactivate(h.cohort.id, created.id, actor_id=ACTOR)
+
+    cases: list[tuple[EducatorContract, dict[str, Any], str]] = [
+        (
+            make_mentor_contract(new_id(), bootcamp_id=h.cohort.bootcamp_id),
+            {},
+            "assignment_contract_mismatch",
+        ),
+        (
+            make_mentor_contract(
+                h.mentor.id, bootcamp_id=h.cohort.bootcamp_id, status=ContractStatus.IN_PROGRESS
+            ),
+            {},
+            "assignment_contract_not_effective",
+        ),
+        (h.other_contract, {}, "assignment_contract_other_cohort"),
+        (
+            common,
+            {"end_date": None, "start_date": date(2027, 2, 1)},
+            "assignment_outside_contract_period",
+        ),
+        (common, {"end_date": date(2027, 2, 28)}, "assignment_outside_contract_period"),
+    ]
+    for contract, overrides, code in cases:
+        h.put_contract(contract)
+        with pytest.raises(BusinessRuleViolation) as rule:
+            await h.assign(contract_id=contract.id, **overrides)
+        assert rule.value.code == code
+    with pytest.raises(NotFoundError) as missing:
+        await h.assign(contract_id=new_id())
+    assert missing.value.code == "contract_not_found"
+
+    candidates = await h.service.contract_candidates(h.cohort.id, h.mentor.id)
+    assert {c.id for c in candidates} == {h.contract.id, common.id}
+
+
+async def test_contract_closed_and_trimmed(h: Harness) -> None:
+    """계약이 끝나면 배정을 끄고, 기간이 줄면 배정 기간도 줄인다 (A110)."""
+    here = new_id()
+    h.stores.requests.cohort_of_student = {here: h.cohort.id}
+    long = await h.assign(end_date=None)
+    short = await h.assign(other=True, start_date=date(2026, 11, 1))
+    request = await h.stores.pending(mentor_id=h.mentor.id, requester_id=here)
+
+    await h.sync.contract_period_changed(
+        h.contract.id, start_date=date(2026, 11, 5), end_date=date(2026, 12, 31), actor_id=ACTOR
+    )
+    trimmed = await h.repo.get(long.id)
+    assert trimmed is not None
+    assert (trimmed.start_date, trimmed.end_date, trimmed.is_active) == (
+        date(2026, 11, 5),
+        date(2026, 12, 31),
+        True,
+    )
+    assert await h.sync.has_active_assignments(h.other_contract.id)
+
+    # 남는 기간이 없으면 끈다
+    await h.sync.contract_period_changed(
+        h.other_contract.id, start_date=None, end_date=date(2026, 10, 31), actor_id=None
+    )
+    gone = await h.repo.get(short.id)
+    assert gone is not None
+    assert gone.deactivation_reason is CohortMentorDeactivationReason.CONTRACT_ENDED
+
+    await h.sync.contract_closed(h.contract.id, actor_id=None)
+    closed = await h.repo.get(long.id)
+    assert closed is not None
+    assert closed.deactivation_reason is CohortMentorDeactivationReason.CONTRACT_ENDED
+    assert h.stores.status(request) is MentoringRequestStatus.CANCELED
+    assert not await h.sync.has_active_assignments(h.contract.id)
+
+    # 끝난 계약의 배정은 다시 켜지 않는다
+    h.put_contract(dataclasses.replace(h.contract, status=ContractStatus.ENDED))
+    with pytest.raises(BusinessRuleViolation) as ended:
+        await h.service.reactivate(h.cohort.id, long.id, actor_id=ACTOR)
+    assert ended.value.code == "assignment_contract_not_effective"
