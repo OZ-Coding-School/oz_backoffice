@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { FileText } from "lucide-react";
 import { useMemo } from "react";
 
+import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
 import { LoadMore } from "@/components/load-more";
@@ -24,12 +25,11 @@ export function RequestsPage({ tab }: { tab: RequestTab }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-h1 text-foreground">신청 내역</h1>
-        <p className="text-body text-muted-foreground">
-          보낸 멘토링 신청과 처리 결과예요. 승인되면 진행 기록에 세션이 생겨요.
-        </p>
-      </div>
+      <PageHeader
+        icon={FileText}
+        title="신청 내역"
+        description="보낸 멘토링 신청과 처리 결과예요. 승인되면 진행 기록에 세션이 생겨요."
+      />
       <nav aria-label="신청 상태" className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
         <ul className="flex min-w-max gap-1 border-b border-border">
           {REQUEST_TABS.map((t) => {

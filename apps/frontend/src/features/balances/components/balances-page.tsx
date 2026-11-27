@@ -2,6 +2,7 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Wallet } from "lucide-react";
 
+import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
 import { LoadMore } from "@/components/load-more";
@@ -22,10 +23,11 @@ export function BalancesPage({ accountId }: { accountId: string | undefined }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-h1 text-foreground">시간 지급·차감 내역</h1>
-        <p className="text-body text-muted-foreground">멘토링 시간이 언제 지급되고 쓰였는지 보여 줘요.</p>
-      </div>
+      <PageHeader
+        icon={Wallet}
+        title="시간 지급·차감 내역"
+        description="멘토링 시간이 언제 지급되고 쓰였는지 보여 줘요."
+      />
       {balances.isPending ? (
         <div className="flex justify-center py-10">
           <Spinner />

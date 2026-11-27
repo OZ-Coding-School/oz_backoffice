@@ -24,7 +24,7 @@ export function PageHeader({
   hideTitle?: boolean;
 }) {
   return (
-    <header className="flex flex-wrap items-start gap-4">
+    <div className="flex flex-wrap items-start gap-4">
       {Icon && !hideTitle ? (
         <span className="hidden size-12 shrink-0 items-center justify-center rounded-2xl bg-linear-to-br from-primary to-primary/70 text-primary-foreground shadow-md md:inline-flex">
           <Icon aria-hidden className="size-6" />
@@ -38,7 +38,7 @@ export function PageHeader({
         {description ? <p className="text-body text-muted-foreground">{description}</p> : null}
       </div>
       {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
-    </header>
+    </div>
   );
 }
 
