@@ -2,6 +2,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ChevronRight, FileText } from "lucide-react";
 
+import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
 import { LoadMore } from "@/components/load-more";
@@ -23,10 +24,11 @@ export function ReceivedRequestsPage({ tab, cohortId }: { tab: ReceivedTab; coho
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-h1 text-foreground">받은 신청</h1>
-        <p className="text-body text-muted-foreground">희망 일시 중 하나를 골라 승인하거나 사유와 함께 반려해요.</p>
-      </div>
+      <PageHeader
+        icon={FileText}
+        title="받은 신청"
+        description="희망 일시 중 하나를 골라 승인하거나 사유와 함께 반려해요."
+      />
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
         <nav aria-label="신청 상태" className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0 lg:flex-1">
           <ul className="flex min-w-max gap-1 border-b border-border">

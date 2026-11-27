@@ -59,3 +59,4 @@
 | 55 | [디자인 다듬기 ⑤ 조직 설정 (F92)](55_design_refresh_org.md) | 완료 (#178) |
 | 56 | [디자인 다듬기 ⑥ 설정·운영진 홈 (F92)](56_design_refresh_settings.md) | 완료 (#179) |
 | 57 | [디자인 다듬기 ⑦ 수강생 화면 (F92)](57_design_refresh_student.md) | 완료 (#180) |
+| 58 | [디자인 다듬기 ⑧ 멘토 화면 (F92)](58_design_refresh_mentor.md) | 완료 (#181) |

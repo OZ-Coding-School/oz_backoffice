@@ -1,9 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { useBlocker } from "@tanstack/react-router";
-import { Eye, Lock, LogOut, User } from "lucide-react";
+import { Eye, Layers, Lock, LogOut, User } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { CardTitle } from "@/components/section-card";
+import { PageHeader } from "@/components/page-header";
 import { ErrorState } from "@/components/error-state";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -65,16 +67,17 @@ function ProfileEditor({ me, profile }: { me: Me; profile: MentorProfile }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3 md:flex-row md:items-start">
-        <div className="flex flex-1 flex-col gap-1">
-          <h1 className="text-h1 text-foreground">내 프로필</h1>
-          <p className="text-body text-muted-foreground">수강생에게 보이는 정보예요.</p>
-        </div>
-        <Button variant="outline" onClick={() => setPreview(true)} className="max-md:w-full">
-          <Eye aria-hidden />
-          수강생에게 보이는 모습
-        </Button>
-      </div>
+      <PageHeader
+        icon={User}
+        title="내 프로필"
+        description="수강생에게 보이는 정보예요."
+        actions={
+          <Button variant="outline" onClick={() => setPreview(true)} className="max-md:w-full">
+            <Eye aria-hidden />
+            수강생에게 보이는 모습
+          </Button>
+        }
+      />
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-6">
         <form
           aria-label="프로필 편집"
@@ -142,9 +145,9 @@ function AssignmentsCard() {
       aria-labelledby="assignments-title"
       className="flex flex-col gap-3 rounded-2xl border border-border bg-card shadow-sm p-4 md:p-5"
     >
-      <h2 id="assignments-title" className="text-h3 text-foreground">
+      <CardTitle icon={Layers} id="assignments-title">
         배정된 기수
-      </h2>
+      </CardTitle>
       {assignments.isPending ? (
         <Spinner />
       ) : items.length === 0 ? (

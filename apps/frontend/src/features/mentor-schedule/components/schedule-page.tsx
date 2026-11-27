@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ChevronLeft, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
 import { Popover as PopoverPrimitive } from "radix-ui";
 import { useState, type CSSProperties, type ReactNode } from "react";
 
+import { PageHeader } from "@/components/page-header";
 import { ErrorState } from "@/components/error-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -82,14 +83,16 @@ export function SchedulePage({ month, embedded = false }: { month: string; embed
 
   return (
     <div className="flex flex-col gap-4 md:gap-6">
-      <div className="flex flex-col gap-1">
-        {embedded ? null : <h1 className="text-h1 text-foreground">일정</h1>}
-        <p className="text-body text-muted-foreground">
-          {embedded
+      <PageHeader
+        icon={CalendarDays}
+        title="일정"
+        hideTitle={embedded}
+        description={
+          embedded
             ? "멘토 대신 개인 일정을 등록해요. 나머지 시간은 기수 운영시간 안에서 수강생이 신청할 수 있어요."
-            : "개인 일정만 등록해요. 나머지 시간은 기수 운영시간 안에서 수강생이 신청할 수 있어요."}
-        </p>
-      </div>
+            : "개인 일정만 등록해요. 나머지 시간은 기수 운영시간 안에서 수강생이 신청할 수 있어요."
+        }
+      />
       <UnavailablePanel state={panel} now={now} onChange={setPanel} onDelete={setDeleting} />
       <DeleteUnavailableDialog period={deleting} onClose={() => setDeleting(null)} onDeleted={() => setPanel(null)} />
       {schedule.isPending ? (

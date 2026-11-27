@@ -1,8 +1,10 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { CalendarDays, FileText, MessageSquare, PencilLine, Video, type LucideIcon } from "lucide-react";
+import { CalendarDays, FileText, LayoutGrid, MessageSquare, PencilLine, Video, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 
+import { CardTitle } from "@/components/section-card";
+import { PageHeader } from "@/components/page-header";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,10 +40,7 @@ export function MentorHome({ me }: { me: Me }) {
 
   return (
     <div className="flex flex-col gap-4 md:gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-h1 text-foreground">안녕하세요, {me.name}님</h1>
-        <p className="text-body text-muted-foreground">오늘 확인할 일을 모아 봤어요.</p>
-      </div>
+      <PageHeader icon={LayoutGrid} title={`안녕하세요, ${me.name}님`} description="오늘 확인할 일을 모아 봤어요." />
       <ul aria-label="할 일 요약" className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
         <li>
           <Link to="/mentor/requests" className={SUMMARY}>
@@ -179,9 +178,9 @@ function CardHead({
 }) {
   return (
     <div className="flex items-center gap-2">
-      <h2 id={id} className="flex-1 text-h3 text-foreground">
+      <CardTitle icon={to === "/mentor/sessions" ? Video : FileText} id={id} className="flex-1">
         {title}
-      </h2>
+      </CardTitle>
       <Link to={to} className="text-body-sm text-primary-text hover:underline">
         {more}
       </Link>

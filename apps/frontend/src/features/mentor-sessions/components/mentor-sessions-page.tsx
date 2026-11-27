@@ -3,6 +3,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { CalendarDays, Pencil, Video } from "lucide-react";
 import { useState } from "react";
 
+import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
 import { LoadMore } from "@/components/load-more";
@@ -28,10 +29,7 @@ export function MentorSessionsPage({ tab, cohortId }: { tab: MentorSessionTab; c
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-h1 text-foreground">세션</h1>
-        <p className="text-body text-muted-foreground">예정된 세션과 지난 세션, 기록 제출 상태를 함께 보여 줘요.</p>
-      </div>
+      <PageHeader icon={Video} title="세션" description="예정된 세션과 지난 세션, 기록 제출 상태를 함께 보여 줘요." />
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
         <nav aria-label="세션 구분" className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0 lg:flex-1">
           <ul className="flex min-w-max gap-1 border-b border-border">
