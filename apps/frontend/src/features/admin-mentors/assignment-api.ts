@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { api, unwrap } from "@/api/client";
 import type { components } from "@/api/schema.gen";
@@ -8,6 +8,20 @@ import { mentorKeys } from "./api";
 
 export type AssignmentCreate = components["schemas"]["AssignmentCreate"];
 export type AssignmentUpdate = components["schemas"]["AssignmentUpdate"];
+export type AssignmentContract = components["schemas"]["AssignmentContract"];
+
+/** 배정의 근거 계약 후보 (A110·F98): 그 멘토의 계약 완료·이행 중 계약 중 그 기수 또는 과정 공통 */
+export function contractCandidatesQuery(cohortId: string, mentorId: string) {
+  return queryOptions({
+    queryKey: ["admin-mentors", "contract-candidates", cohortId, mentorId],
+    queryFn: () =>
+      unwrap(
+        api.GET("/api/v1/admin/cohorts/{cohort_id}/mentor-assignments/contract-candidates", {
+          params: { path: { cohort_id: cohortId }, query: { mentor_id: mentorId } },
+        }),
+      ),
+  });
+}
 
 /** 배정이 바뀌면 그 멘토의 배정·단건(활성 배정 기수)·목록을 다시 읽는다 */
 function useRefresh(mentorId: string) {
@@ -77,6 +91,11 @@ const ERRORS: Record<string, string> = {
   invalid_pay_unit: "단가 기준을 확인해 주세요.",
   mentor_inactive: "비활성 멘토는 배정할 수 없어요.",
   cohort_not_found: "기수를 찾을 수 없어요.",
+  contract_not_found: "근거 계약을 찾을 수 없어요.",
+  assignment_contract_mismatch: "이 멘토의 멘토 계약만 근거로 고를 수 있어요.",
+  assignment_contract_not_effective: "계약 완료·이행 중인 계약만 근거로 고를 수 있어요.",
+  assignment_contract_other_cohort: "이 기수의 계약이나 같은 과정의 공통 계약만 고를 수 있어요.",
+  assignment_outside_contract_period: "배정 기간은 근거 계약 기간 안이어야 해요.",
 };
 
 export function assignmentError(e: unknown): string {

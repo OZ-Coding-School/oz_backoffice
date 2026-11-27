@@ -19,17 +19,25 @@ import { Spinner } from "@/components/ui/spinner";
 import { DiscardDialog } from "@/features/admin-org/components/shared";
 import { COHORT_STATUS } from "@/features/admin-academy/labels";
 import { staffAccessQuery, type StaffCohort } from "@/features/staff/api";
+import { kstDateKey } from "@/features/apply/slots";
 import { formatKst } from "@/lib/datetime";
 
 import { mentorAssignmentsQuery, type MentorAssignment, type MentorItem } from "../api";
-import { assignmentError, useAssignmentActive, useCreateAssignment, useUpdateAssignment } from "../assignment-api";
+import {
+  assignmentError,
+  useAssignmentActive,
+  useCreateAssignment,
+  useUpdateAssignment,
+  type AssignmentContract,
+} from "../assignment-api";
 import { endText } from "../labels";
+import { ContractPicker } from "./contract-picker";
 
 const dot = (d: string) => d.replaceAll("-", ".");
 const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
 
 const POLICIES = { ACTUAL_DURATION: "실제 진행 시간", STUDENT_REQUEST: "신청 시간" } as const;
-const UNITS: Record<string, string> = { HOURLY: "시간당", PER_SESSION: "세션당" };
+const UNITS: Record<string, string> = { HOURLY: "시간당", PER_SESSION: "회당" };
 
 const HELP = {
   start: "기수 기간 안의 날짜여야 해요.",
@@ -195,7 +203,7 @@ function AssignmentView({
             {a.end_date ? dot(a.end_date) : "종료일 없음"}
           </PanelRow>
         </PanelSection>
-        <ContractTerms assignment={a} />
+        <ContractTerms contract={a.contract} />
         {end ? (
           <PanelSection title="종료">
             <PanelRow label="사유">{end.split(" · ")[0]}</PanelRow>
@@ -257,10 +265,24 @@ function EndDialog({
 }
 
 // ------------------------------------------------------------------ 폼
+/** 근거 계약을 고르면 배정 기간을 계약·기수에 맞춰 채운다 (F98) */
+function periodFor(cohort: StaffCohort | undefined, c: AssignmentContract): { start: string; end: string } {
+  const today = kstDateKey(new Date());
+  const floor =
+    [cohort?.start_date, c.start_date]
+      .filter((d): d is string => !!d)
+      .sort()
+      .at(-1) ?? today;
+  let start = today > floor ? today : floor;
+  if (cohort && start > cohort.end_date) start = floor;
+  return { start, end: c.end_date ?? "" };
+}
+
 const schema = z
   .object({
     bootcamp: z.string(),
     cohort: z.string(),
+    contract: z.string().min(1, "근거 계약을 골라 주세요"),
     start_date: z.string().min(1, "시작일을 골라 주세요"),
     end_date: z.string(),
   })
@@ -271,11 +293,10 @@ const schema = z
 type Values = z.infer<typeof schema>;
 
 /** 정산 조건은 근거 계약에서 읽는다 (A110) */
-function ContractTerms({ assignment: a }: { assignment: MentorAssignment }) {
-  const c = a.contract;
+function ContractTerms({ contract: c, picker }: { contract?: AssignmentContract | null; picker?: boolean }) {
   return (
     <PanelSection title="정산 조건">
-      <PanelRow label="근거 계약">{c?.title ?? "—"}</PanelRow>
+      {picker ? null : <PanelRow label="근거 계약">{c?.title ?? "—"}</PanelRow>}
       {c ? (
         <>
           <PanelRow label="정산 기준" help={HELP.policy}>
@@ -360,11 +381,13 @@ function AssignmentEdit({
     defaultValues: {
       bootcamp: "",
       cohort: a.cohort_id,
+      contract: a.contract_id,
       start_date: a.start_date,
       end_date: a.end_date ?? "",
     },
   });
   const save = useUpdateAssignment(mentor.id, a.cohort_id, a.id);
+  const [chosen, setChosen] = useState<AssignmentContract | null>(a.contract ?? null);
   const [error, setError] = useState<string | null>(null);
   const dirty = form.formState.isDirty;
   const blocker = useBlocker({
@@ -376,6 +399,7 @@ function AssignmentEdit({
     setError(null);
     try {
       await save.mutateAsync({
+        ...(v.contract !== a.contract_id ? { contract_id: v.contract } : {}),
         start_date: v.start_date,
         end_date: v.end_date || null,
       });
@@ -407,8 +431,29 @@ function AssignmentEdit({
       >
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-6">
           <CohortRows assignment={a} cohort={cohort} />
+          <PanelSection title="근거 계약">
+            <p className="text-caption font-normal text-muted-foreground">
+              잘못 연결했을 때만 바꿔요. 바꾸면 마감하지 않은 정산부터 새 계약 값으로 계산해요.
+            </p>
+            <Controller
+              control={form.control}
+              name="contract"
+              render={({ field }) => (
+                <ContractPicker
+                  cohortId={a.cohort_id}
+                  mentorId={mentor.id}
+                  value={field.value}
+                  onChange={(c) => {
+                    if (c.id === field.value) return;
+                    field.onChange(c.id);
+                    setChosen(c);
+                  }}
+                />
+              )}
+            />
+          </PanelSection>
           <Fields form={form} id={id} />
-          <ContractTerms assignment={a} />
+          <ContractTerms contract={chosen} picker />
           {error ? <Alert variant="error" title={error} /> : null}
         </div>
         <Footer onCancel={onDone} submitLabel="저장" pending={save.isPending} />
@@ -437,11 +482,13 @@ function AssignmentForm({
     defaultValues: {
       bootcamp: "",
       cohort: "",
+      contract: "",
       start_date: "",
       end_date: "",
     },
   });
   const create = useCreateAssignment(mentor.id);
+  const [chosen, setChosen] = useState<AssignmentContract | null>(null);
   const [error, setError] = useState<string | null>(null);
   const bootcamp = useWatch({ control: form.control, name: "bootcamp" });
   const cohortId = useWatch({ control: form.control, name: "cohort" });
@@ -463,8 +510,7 @@ function AssignmentForm({
         cohortId: v.cohort,
         body: {
           mentor_id: mentor.id,
-          // 근거 계약 고르기는 배정 패널 PR에서 더한다 (A110). 지금은 서버가 받지 않는다
-          contract_id: "",
+          contract_id: v.contract,
           start_date: v.start_date,
           end_date: v.end_date || null,
         },
@@ -497,6 +543,8 @@ function AssignmentForm({
                     onValueChange={(v) => {
                       field.onChange(v);
                       form.setValue("cohort", "", { shouldDirty: true });
+                      form.setValue("contract", "");
+                      setChosen(null);
                     }}
                   >
                     <SelectTrigger id={`${id}-bootcamp`} aria-label="과정" className="font-normal">
@@ -519,7 +567,14 @@ function AssignmentForm({
                   control={form.control}
                   name="cohort"
                   render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    <Select
+                      value={field.value}
+                      onValueChange={(v) => {
+                        field.onChange(v);
+                        form.setValue("contract", "");
+                        setChosen(null);
+                      }}
+                    >
                       <SelectTrigger id={`${id}-cohort`} aria-label="기수" className="font-normal">
                         <SelectValue placeholder="기수 고르기" />
                       </SelectTrigger>
@@ -539,7 +594,35 @@ function AssignmentForm({
               </PanelRow>
             ) : null}
           </PanelSection>
+          {cohortId ? (
+            <PanelSection title="근거 계약">
+              <Controller
+                control={form.control}
+                name="contract"
+                render={({ field }) => (
+                  <ContractPicker
+                    key={cohortId}
+                    cohortId={cohortId}
+                    mentorId={mentor.id}
+                    value={field.value}
+                    onChange={(c) => {
+                      if (c.id === field.value) return;
+                      field.onChange(c.id);
+                      setChosen(c);
+                      const period = periodFor(picked, c);
+                      form.setValue("start_date", period.start, { shouldDirty: true });
+                      form.setValue("end_date", period.end, { shouldDirty: true });
+                    }}
+                  />
+                )}
+              />
+              {errors.contract ? (
+                <p className="text-caption font-normal text-destructive-text">{errors.contract.message}</p>
+              ) : null}
+            </PanelSection>
+          ) : null}
           <Fields form={form} id={id} />
+          {chosen ? <ContractTerms contract={chosen} picker /> : null}
           {error ? <Alert variant="error" title={error} /> : null}
         </div>
         <Footer onCancel={onClose} submitLabel="추가" pending={create.isPending} />
