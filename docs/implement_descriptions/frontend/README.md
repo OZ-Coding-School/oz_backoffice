@@ -52,4 +52,4 @@
 | 48 | [멘토 기수 배정 관리, 계약 패널 F68 정리 (FE-18c-1)](48_mentor_assignments.md) | 완료 (#169) |
 | 49 | [멘토 일정 대리 (FE-18c-2)](49_mentor_schedule_admin.md) | 완료 (#171) |
 | 50 | [멘토링 > 멘토링 설정 (FE-19a)](50_mentoring_settings.md) | 완료 (#173) |
-| 51 | [디자인 다듬기 ① 공용 부품 (F92)](51_design_refresh_shared.md) | PR 진행 중 |
+| 51 | [디자인 다듬기 ① 공용 부품 (F92)](51_design_refresh_shared.md) | 완료 (#174) |
