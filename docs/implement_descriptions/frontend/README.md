@@ -55,3 +55,4 @@
 | 51 | [디자인 다듬기 ① 공용 부품 (F92)](51_design_refresh_shared.md) | 완료 (#174) |
 | 52 | [디자인 다듬기 ② 학사 (F92)](52_design_refresh_academy.md) | 완료 (#182) |
 | 53 | [디자인 다듬기 ③ 강사·멘토·행정 (F92)](53_design_refresh_educators.md) | 완료 (#176) |
+| 54 | [디자인 다듬기 ④ 회원 관리 (F92)](54_design_refresh_members.md) | 완료 (#177) |
