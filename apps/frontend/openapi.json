@@ -7701,7 +7701,7 @@
           "admin-mentoring-teams"
         ],
         "summary": "List Teams",
-        "description": "기수의 팀 전체 (페이징 없음, A39). 팀 번호 순.",
+        "description": "기수의 팀 전체 (페이징 없음, A39). 팀 번호 순. 팀 계좌·대기 신청·세션 수를 함께 (A108).",
         "operationId": "list_teams_api_v1_admin_cohorts__cohort_id__mentoring_teams_get",
         "security": [
           {
@@ -7728,7 +7728,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/app__contexts__mentoring__presentation__team_router__TeamResponse"
+                    "$ref": "#/components/schemas/AdminTeamResponse"
                   },
                   "title": "Response List Teams Api V1 Admin Cohorts  Cohort Id  Mentoring Teams Get"
                 }
@@ -13363,6 +13363,92 @@
           "applicant"
         ],
         "title": "AdminStaffRegistrationResponse"
+      },
+      "AdminTeamResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "cohort_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Cohort Id"
+          },
+          "team_number": {
+            "type": "integer",
+            "title": "Team Number"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "팀 이름, 없으면 'N팀'"
+          },
+          "mentor": {
+            "$ref": "#/components/schemas/MentorSummary"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/StudentSummary"
+            },
+            "type": "array",
+            "title": "Members"
+          },
+          "account": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TeamAccount"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "팀 시간 계좌 (지급 전이면 없음)"
+          },
+          "pending_request_count": {
+            "type": "integer",
+            "title": "Pending Request Count",
+            "description": "팀 대기 신청 수"
+          },
+          "upcoming_session_count": {
+            "type": "integer",
+            "title": "Upcoming Session Count",
+            "description": "팀 예정·진행 중 세션 수"
+          },
+          "completed_session_count": {
+            "type": "integer",
+            "title": "Completed Session Count",
+            "description": "팀 완료 세션 수"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "cohort_id",
+          "team_number",
+          "name",
+          "label",
+          "mentor",
+          "members",
+          "account",
+          "pending_request_count",
+          "upcoming_session_count",
+          "completed_session_count"
+        ],
+        "title": "AdminTeamResponse",
+        "description": "운영진 팀 관리 목록 항목 (A108): 팀 계좌·대기 신청·세션 수를 함께."
       },
       "AdminThreadResponse": {
         "properties": {
@@ -23521,6 +23607,57 @@
           "is_super_admin"
         ],
         "title": "SuperAdminResponse"
+      },
+      "TeamAccount": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "valid_from": {
+            "type": "string",
+            "format": "date",
+            "title": "Valid From"
+          },
+          "valid_until": {
+            "type": "string",
+            "format": "date",
+            "title": "Valid Until"
+          },
+          "is_expired": {
+            "type": "boolean",
+            "title": "Is Expired"
+          },
+          "total_minutes": {
+            "type": "integer",
+            "title": "Total Minutes"
+          },
+          "held_minutes": {
+            "type": "integer",
+            "title": "Held Minutes"
+          },
+          "used_minutes": {
+            "type": "integer",
+            "title": "Used Minutes"
+          },
+          "remaining_minutes": {
+            "type": "integer",
+            "title": "Remaining Minutes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "valid_from",
+          "valid_until",
+          "is_expired",
+          "total_minutes",
+          "held_minutes",
+          "used_minutes",
+          "remaining_minutes"
+        ],
+        "title": "TeamAccount"
       },
       "TeamChangeResponse": {
         "properties": {

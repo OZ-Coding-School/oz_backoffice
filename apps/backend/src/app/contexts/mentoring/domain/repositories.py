@@ -182,6 +182,10 @@ class MentoringRequestRepository(Protocol):
         """수강 등록별 1:1 대기 신청 수 (0이면 빠짐, A59)."""
         ...
 
+    async def count_pending_by_teams(self, team_ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
+        """팀별 대기 신청 수 (0이면 빠짐, A108)."""
+        ...
+
     async def list_for_participants(
         self,
         *,
@@ -320,6 +324,12 @@ class MentoringSessionRepository(Protocol):
         self, requester_ids: list[uuid.UUID]
     ) -> dict[uuid.UUID, dict[MentoringSessionStatus, int]]:
         """수강 등록별 1:1 세션 수를 상태별로 (없는 상태는 빠짐, A59)."""
+        ...
+
+    async def count_by_teams(
+        self, team_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, dict[MentoringSessionStatus, int]]:
+        """팀별 세션 수를 상태별로 (없는 상태는 빠짐, A108)."""
         ...
 
     async def list_for_mentor(

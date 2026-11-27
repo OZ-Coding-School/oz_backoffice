@@ -94,6 +94,9 @@ async def test_request_round_trip_queries_and_constraints() -> None:
         other.id: 1,
     }
     assert await repo.count_pending_by_requesters([]) == {}
+    # 팀별 대기 신청 수 (A108)
+    assert await repo.count_pending_by_teams([team.id, new_id()]) == {team.id: 1}
+    assert await repo.count_pending_by_teams([]) == {}
     _, mentor_total = await repo.list_for_mentor(mentor.id, statuses=None, limit=10, offset=0)
     assert mentor_total == 3
     # 상태 여러 개 필터와 상태별 건수 (A67)

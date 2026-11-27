@@ -2220,7 +2220,7 @@ export interface paths {
         };
         /**
          * List Teams
-         * @description 기수의 팀 전체 (페이징 없음, A39). 팀 번호 순.
+         * @description 기수의 팀 전체 (페이징 없음, A39). 팀 번호 순. 팀 계좌·대기 신청·세션 수를 함께 (A108).
          */
         get: operations["list_teams_api_v1_admin_cohorts__cohort_id__mentoring_teams_get"];
         put?: never;
@@ -3746,6 +3746,51 @@ export interface components {
             /** Created At */
             created_at: string | null;
             applicant: components["schemas"]["ApplicantSummary"] | null;
+        };
+        /**
+         * AdminTeamResponse
+         * @description 운영진 팀 관리 목록 항목 (A108): 팀 계좌·대기 신청·세션 수를 함께.
+         */
+        AdminTeamResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Cohort Id
+             * Format: uuid
+             */
+            cohort_id: string;
+            /** Team Number */
+            team_number: number;
+            /** Name */
+            name: string | null;
+            /**
+             * Label
+             * @description 팀 이름, 없으면 'N팀'
+             */
+            label: string;
+            mentor: components["schemas"]["MentorSummary"];
+            /** Members */
+            members: components["schemas"]["StudentSummary"][];
+            /** @description 팀 시간 계좌 (지급 전이면 없음) */
+            account: components["schemas"]["TeamAccount"] | null;
+            /**
+             * Pending Request Count
+             * @description 팀 대기 신청 수
+             */
+            pending_request_count: number;
+            /**
+             * Upcoming Session Count
+             * @description 팀 예정·진행 중 세션 수
+             */
+            upcoming_session_count: number;
+            /**
+             * Completed Session Count
+             * @description 팀 완료 세션 수
+             */
+            completed_session_count: number;
         };
         /** AdminThreadResponse */
         AdminThreadResponse: {
@@ -7856,6 +7901,34 @@ export interface components {
             user_id: string;
             /** Is Super Admin */
             is_super_admin: boolean;
+        };
+        /** TeamAccount */
+        TeamAccount: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Valid From
+             * Format: date
+             */
+            valid_from: string;
+            /**
+             * Valid Until
+             * Format: date
+             */
+            valid_until: string;
+            /** Is Expired */
+            is_expired: boolean;
+            /** Total Minutes */
+            total_minutes: number;
+            /** Held Minutes */
+            held_minutes: number;
+            /** Used Minutes */
+            used_minutes: number;
+            /** Remaining Minutes */
+            remaining_minutes: number;
         };
         /** TeamChangeResponse */
         TeamChangeResponse: {
@@ -13094,7 +13167,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["app__contexts__mentoring__presentation__team_router__TeamResponse"][];
+                    "application/json": components["schemas"]["AdminTeamResponse"][];
                 };
             };
             /** @description Validation Error */

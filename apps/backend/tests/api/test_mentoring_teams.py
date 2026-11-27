@@ -127,6 +127,14 @@ async def test_team_lifecycle(client: AsyncClient, settings: Settings) -> None:
     assert [m["name"] for m in removed.json()["members"]] == ["가수강"]
     listed = await client.get(path, headers=admin)
     assert [t["id"] for t in listed.json()] == [team["id"]]
+    # 팀 관리 목록 집계 (A108): 지급 전에는 계좌 없음, 건수 0
+    first = listed.json()[0]
+    assert first["account"] is None
+    assert (
+        first["pending_request_count"],
+        first["upcoming_session_count"],
+        first["completed_session_count"],
+    ) == (0, 0, 0)
 
     mine = (await client.get("/api/v1/me/mentoring-teams", headers=ctx["student_h"])).json()
     (my_team,) = mine["as_student"]
@@ -154,6 +162,27 @@ async def test_team_lifecycle(client: AsyncClient, settings: Settings) -> None:
 
     assert (await client.delete(team_url, headers=admin)).status_code == 204
     assert (await client.get(path, headers=admin)).json() == []
+
+
+async def test_admin_team_list_includes_account(client: AsyncClient, settings: Settings) -> None:
+    """팀 관리 목록의 팀 계좌 (A108): 지급하면 잔여가 보인다."""
+    ctx = await _setup(client, settings)
+    path, admin = ctx["path"], ctx["admin"]
+    created = await client.post(
+        path,
+        json={"mentor_id": str(ctx["mentor"].id), "student_ids": [str(ctx["signed"].id)]},
+        headers=admin,
+    )
+    assert created.status_code == 201, created.text
+    granted = await client.post(
+        f"/api/v1/admin/cohorts/{ctx['cohort'].id}/mentoring-balances/grants",
+        json={"target": "ALL_TEAMS", "minutes": 120, "reason": "팀 기본 지급"},
+        headers={**admin, "Idempotency-Key": "team-grant-1"},
+    )
+    assert granted.status_code == 200, granted.text
+    (team,) = (await client.get(path, headers=admin)).json()
+    assert (team["account"]["total_minutes"], team["account"]["remaining_minutes"]) == (120, 120)
+    assert team["pending_request_count"] == 0
 
 
 async def test_team_rules_and_permissions(client: AsyncClient, settings: Settings) -> None:
