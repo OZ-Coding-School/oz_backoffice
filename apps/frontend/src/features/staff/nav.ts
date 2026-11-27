@@ -94,6 +94,13 @@ const MODULES: StaffModule[] = [
     // F90: 기수 단위 화면은 `/admin/cohorts/{id}/mentoring/…`. 메뉴 주소는 현재 기수로 보낸다
     items: [
       {
+        to: "/admin/mentoring/teams",
+        label: "팀 관리",
+        icon: Users,
+        permissions: ["mentoring.team.read"],
+        match: /^\/admin\/cohorts\/[^/]+\/mentoring\/teams(\/|$)/,
+      },
+      {
         to: "/admin/mentoring/settings",
         label: "멘토링 설정",
         icon: SlidersHorizontal,

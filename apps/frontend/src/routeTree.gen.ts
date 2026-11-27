@@ -45,6 +45,7 @@ import { Route as StaffAdminAdministrationContractsRouteImport } from './routes/
 import { Route as StaffAdminMembersApprovalsRouteImport } from './routes/_staff/admin/members/approvals'
 import { Route as StaffAdminMembersUsersRouteImport } from './routes/_staff/admin/members/users'
 import { Route as StaffAdminMentoringSettingsRouteImport } from './routes/_staff/admin/mentoring/settings'
+import { Route as StaffAdminMentoringTeamsRouteImport } from './routes/_staff/admin/mentoring/teams'
 import { Route as StaffAdminOrgDepartmentsRouteImport } from './routes/_staff/admin/org/departments'
 import { Route as StaffAdminOrgEmployeesRouteImport } from './routes/_staff/admin/org/employees'
 import { Route as StaffAdminOrgPermissionsRouteImport } from './routes/_staff/admin/org/permissions'
@@ -56,6 +57,7 @@ import { Route as StaffAdminAcademyStudentsStudentIdRouteImport } from './routes
 import { Route as StaffAdminEducatorsMentorsIndexRouteImport } from './routes/_staff/admin/educators/mentors/index'
 import { Route as StaffAdminEducatorsMentorsMentorIdRouteImport } from './routes/_staff/admin/educators/mentors/$mentorId'
 import { Route as StaffAdminCohortsCohortIdMentoringSettingsRouteImport } from './routes/_staff/admin/cohorts/$cohortId/mentoring/settings'
+import { Route as StaffAdminCohortsCohortIdMentoringTeamsRouteImport } from './routes/_staff/admin/cohorts/$cohortId/mentoring/teams'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/_auth',
@@ -252,6 +254,12 @@ const StaffAdminMentoringSettingsRoute =
     path: '/admin/mentoring/settings',
     getParentRoute: () => StaffRoute,
   } as any)
+const StaffAdminMentoringTeamsRoute =
+  StaffAdminMentoringTeamsRouteImport.update({
+    id: '/admin/mentoring/teams',
+    path: '/admin/mentoring/teams',
+    getParentRoute: () => StaffRoute,
+  } as any)
 const StaffAdminOrgDepartmentsRoute =
   StaffAdminOrgDepartmentsRouteImport.update({
     id: '/admin/org/departments',
@@ -316,6 +324,12 @@ const StaffAdminCohortsCohortIdMentoringSettingsRoute =
     path: '/admin/cohorts/$cohortId/mentoring/settings',
     getParentRoute: () => StaffRoute,
   } as any)
+const StaffAdminCohortsCohortIdMentoringTeamsRoute =
+  StaffAdminCohortsCohortIdMentoringTeamsRouteImport.update({
+    id: '/admin/cohorts/$cohortId/mentoring/teams',
+    path: '/admin/cohorts/$cohortId/mentoring/teams',
+    getParentRoute: () => StaffRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof MemberIndexRoute
@@ -343,6 +357,7 @@ export interface FileRoutesByFullPath {
   '/admin/members/approvals': typeof StaffAdminMembersApprovalsRoute
   '/admin/members/users': typeof StaffAdminMembersUsersRoute
   '/admin/mentoring/settings': typeof StaffAdminMentoringSettingsRoute
+  '/admin/mentoring/teams': typeof StaffAdminMentoringTeamsRoute
   '/admin/org/departments': typeof StaffAdminOrgDepartmentsRoute
   '/admin/org/employees': typeof StaffAdminOrgEmployeesRoute
   '/admin/org/permissions': typeof StaffAdminOrgPermissionsRoute
@@ -361,6 +376,7 @@ export interface FileRoutesByFullPath {
   '/admin/academy/students/': typeof StaffAdminAcademyStudentsIndexRoute
   '/admin/educators/mentors/': typeof StaffAdminEducatorsMentorsIndexRoute
   '/admin/cohorts/$cohortId/mentoring/settings': typeof StaffAdminCohortsCohortIdMentoringSettingsRoute
+  '/admin/cohorts/$cohortId/mentoring/teams': typeof StaffAdminCohortsCohortIdMentoringTeamsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof MemberIndexRoute
@@ -388,6 +404,7 @@ export interface FileRoutesByTo {
   '/admin/members/approvals': typeof StaffAdminMembersApprovalsRoute
   '/admin/members/users': typeof StaffAdminMembersUsersRoute
   '/admin/mentoring/settings': typeof StaffAdminMentoringSettingsRoute
+  '/admin/mentoring/teams': typeof StaffAdminMentoringTeamsRoute
   '/admin/org/departments': typeof StaffAdminOrgDepartmentsRoute
   '/admin/org/employees': typeof StaffAdminOrgEmployeesRoute
   '/admin/org/permissions': typeof StaffAdminOrgPermissionsRoute
@@ -406,6 +423,7 @@ export interface FileRoutesByTo {
   '/admin/academy/students': typeof StaffAdminAcademyStudentsIndexRoute
   '/admin/educators/mentors': typeof StaffAdminEducatorsMentorsIndexRoute
   '/admin/cohorts/$cohortId/mentoring/settings': typeof StaffAdminCohortsCohortIdMentoringSettingsRoute
+  '/admin/cohorts/$cohortId/mentoring/teams': typeof StaffAdminCohortsCohortIdMentoringTeamsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -438,6 +456,7 @@ export interface FileRoutesById {
   '/_staff/admin/members/approvals': typeof StaffAdminMembersApprovalsRoute
   '/_staff/admin/members/users': typeof StaffAdminMembersUsersRoute
   '/_staff/admin/mentoring/settings': typeof StaffAdminMentoringSettingsRoute
+  '/_staff/admin/mentoring/teams': typeof StaffAdminMentoringTeamsRoute
   '/_staff/admin/org/departments': typeof StaffAdminOrgDepartmentsRoute
   '/_staff/admin/org/employees': typeof StaffAdminOrgEmployeesRoute
   '/_staff/admin/org/permissions': typeof StaffAdminOrgPermissionsRoute
@@ -456,6 +475,7 @@ export interface FileRoutesById {
   '/_staff/admin/academy/students/': typeof StaffAdminAcademyStudentsIndexRoute
   '/_staff/admin/educators/mentors/': typeof StaffAdminEducatorsMentorsIndexRoute
   '/_staff/admin/cohorts/$cohortId/mentoring/settings': typeof StaffAdminCohortsCohortIdMentoringSettingsRoute
+  '/_staff/admin/cohorts/$cohortId/mentoring/teams': typeof StaffAdminCohortsCohortIdMentoringTeamsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -485,6 +505,7 @@ export interface FileRouteTypes {
     | '/admin/members/approvals'
     | '/admin/members/users'
     | '/admin/mentoring/settings'
+    | '/admin/mentoring/teams'
     | '/admin/org/departments'
     | '/admin/org/employees'
     | '/admin/org/permissions'
@@ -503,6 +524,7 @@ export interface FileRouteTypes {
     | '/admin/academy/students/'
     | '/admin/educators/mentors/'
     | '/admin/cohorts/$cohortId/mentoring/settings'
+    | '/admin/cohorts/$cohortId/mentoring/teams'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -530,6 +552,7 @@ export interface FileRouteTypes {
     | '/admin/members/approvals'
     | '/admin/members/users'
     | '/admin/mentoring/settings'
+    | '/admin/mentoring/teams'
     | '/admin/org/departments'
     | '/admin/org/employees'
     | '/admin/org/permissions'
@@ -548,6 +571,7 @@ export interface FileRouteTypes {
     | '/admin/academy/students'
     | '/admin/educators/mentors'
     | '/admin/cohorts/$cohortId/mentoring/settings'
+    | '/admin/cohorts/$cohortId/mentoring/teams'
   id:
     | '__root__'
     | '/_auth'
@@ -579,6 +603,7 @@ export interface FileRouteTypes {
     | '/_staff/admin/members/approvals'
     | '/_staff/admin/members/users'
     | '/_staff/admin/mentoring/settings'
+    | '/_staff/admin/mentoring/teams'
     | '/_staff/admin/org/departments'
     | '/_staff/admin/org/employees'
     | '/_staff/admin/org/permissions'
@@ -597,6 +622,7 @@ export interface FileRouteTypes {
     | '/_staff/admin/academy/students/'
     | '/_staff/admin/educators/mentors/'
     | '/_staff/admin/cohorts/$cohortId/mentoring/settings'
+    | '/_staff/admin/cohorts/$cohortId/mentoring/teams'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -861,6 +887,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StaffAdminMentoringSettingsRouteImport
       parentRoute: typeof StaffRoute
     }
+    '/_staff/admin/mentoring/teams': {
+      id: '/_staff/admin/mentoring/teams'
+      path: '/admin/mentoring/teams'
+      fullPath: '/admin/mentoring/teams'
+      preLoaderRoute: typeof StaffAdminMentoringTeamsRouteImport
+      parentRoute: typeof StaffRoute
+    }
     '/_staff/admin/org/departments': {
       id: '/_staff/admin/org/departments'
       path: '/admin/org/departments'
@@ -936,6 +969,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/cohorts/$cohortId/mentoring/settings'
       fullPath: '/admin/cohorts/$cohortId/mentoring/settings'
       preLoaderRoute: typeof StaffAdminCohortsCohortIdMentoringSettingsRouteImport
+      parentRoute: typeof StaffRoute
+    }
+    '/_staff/admin/cohorts/$cohortId/mentoring/teams': {
+      id: '/_staff/admin/cohorts/$cohortId/mentoring/teams'
+      path: '/admin/cohorts/$cohortId/mentoring/teams'
+      fullPath: '/admin/cohorts/$cohortId/mentoring/teams'
+      preLoaderRoute: typeof StaffAdminCohortsCohortIdMentoringTeamsRouteImport
       parentRoute: typeof StaffRoute
     }
   }
@@ -1014,6 +1054,7 @@ interface StaffRouteChildren {
   StaffAdminMembersApprovalsRoute: typeof StaffAdminMembersApprovalsRoute
   StaffAdminMembersUsersRoute: typeof StaffAdminMembersUsersRoute
   StaffAdminMentoringSettingsRoute: typeof StaffAdminMentoringSettingsRoute
+  StaffAdminMentoringTeamsRoute: typeof StaffAdminMentoringTeamsRoute
   StaffAdminOrgDepartmentsRoute: typeof StaffAdminOrgDepartmentsRoute
   StaffAdminOrgEmployeesRoute: typeof StaffAdminOrgEmployeesRoute
   StaffAdminOrgPermissionsRoute: typeof StaffAdminOrgPermissionsRoute
@@ -1024,6 +1065,7 @@ interface StaffRouteChildren {
   StaffAdminAcademyStudentsIndexRoute: typeof StaffAdminAcademyStudentsIndexRoute
   StaffAdminEducatorsMentorsIndexRoute: typeof StaffAdminEducatorsMentorsIndexRoute
   StaffAdminCohortsCohortIdMentoringSettingsRoute: typeof StaffAdminCohortsCohortIdMentoringSettingsRoute
+  StaffAdminCohortsCohortIdMentoringTeamsRoute: typeof StaffAdminCohortsCohortIdMentoringTeamsRoute
 }
 
 const StaffRouteChildren: StaffRouteChildren = {
@@ -1035,6 +1077,7 @@ const StaffRouteChildren: StaffRouteChildren = {
   StaffAdminMembersApprovalsRoute: StaffAdminMembersApprovalsRoute,
   StaffAdminMembersUsersRoute: StaffAdminMembersUsersRoute,
   StaffAdminMentoringSettingsRoute: StaffAdminMentoringSettingsRoute,
+  StaffAdminMentoringTeamsRoute: StaffAdminMentoringTeamsRoute,
   StaffAdminOrgDepartmentsRoute: StaffAdminOrgDepartmentsRoute,
   StaffAdminOrgEmployeesRoute: StaffAdminOrgEmployeesRoute,
   StaffAdminOrgPermissionsRoute: StaffAdminOrgPermissionsRoute,
@@ -1048,6 +1091,8 @@ const StaffRouteChildren: StaffRouteChildren = {
   StaffAdminEducatorsMentorsIndexRoute: StaffAdminEducatorsMentorsIndexRoute,
   StaffAdminCohortsCohortIdMentoringSettingsRoute:
     StaffAdminCohortsCohortIdMentoringSettingsRoute,
+  StaffAdminCohortsCohortIdMentoringTeamsRoute:
+    StaffAdminCohortsCohortIdMentoringTeamsRoute,
 }
 
 const StaffRouteWithChildren = StaffRoute._addFileChildren(StaffRouteChildren)
