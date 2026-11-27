@@ -1,7 +1,7 @@
 # 108. 계약 개편 (BE-4a)
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #186
 - 관련 결정: `docs/decisions.md` A109 (A110은 BE-4b)
 - 이전 기록: [107. 운영진 팀 목록 집계 (BE-3z2)](107_admin_team_stats.md)
 
