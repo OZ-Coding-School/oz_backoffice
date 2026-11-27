@@ -381,11 +381,20 @@ class EducatorContract(AggregateRoot):
         )
         if wrong_kind:
             raise _invalid("계약 종류와 연결할 프로필 종류가 다릅니다.", "contract_type_mismatch")
-        # 멘토 계약은 항상 멘토에 속한다. 다른 멘토로 옮길 수만 있다 (A104)
+        # 멘토 계약은 만들 때 정한 멘토에 속하고 바꿀 수 없다 (A104·A114)
         if self.contract_type is ContractType.MENTOR and mentor_id is None:
             raise _invalid(
-                "멘토 계약은 연결을 해제할 수 없습니다. 다른 멘토로 옮겨 주세요.",
-                "mentor_contract_unlink_forbidden",
+                "멘토 계약은 연결을 해제할 수 없습니다.", "mentor_contract_unlink_forbidden"
+            )
+        if (
+            self.contract_type is ContractType.MENTOR
+            and self.mentor_id is not None
+            and mentor_id != self.mentor_id
+        ):
+            raise _invalid(
+                "멘토 계약은 다른 멘토로 옮길 수 없습니다. 잘못 만든 계약은 초안이면 삭제, "
+                "진행 중이면 취소한 뒤 새로 만들어 주세요.",
+                "mentor_contract_move_forbidden",
             )
         self.mentor_id = mentor_id
         self.instructor_id = instructor_id

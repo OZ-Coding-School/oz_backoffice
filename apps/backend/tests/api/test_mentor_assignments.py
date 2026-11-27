@@ -314,7 +314,7 @@ async def test_contract_candidates_and_contract_end(
         json={"mentor_id": str((await _mentor()).id)},
         headers=admin,
     )
-    assert moved.json()["error"]["code"] == "contract_in_use_by_assignment"
+    assert moved.json()["error"]["code"] == "mentor_contract_move_forbidden"
     ended = await client.post(
         f"{API}/contracts/{common.id}/terminate",
         json={"reason": "TERMINATED_BY_MUTUAL_AGREEMENT"},
