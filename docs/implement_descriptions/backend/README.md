@@ -110,4 +110,4 @@
 | 106 | [달력 참고용 휴일 조회 (BE-3z)](106_calendar_holidays.md) | 완료 (#172) |
 | 107 | [운영진 팀 목록 집계 (BE-3z2)](107_admin_team_stats.md) | 완료 (#183) |
 | 108 | [계약 개편 (BE-4a)](108_contract_redesign.md) | 완료 (#186) |
-| 109 | [배정의 근거 계약 (BE-4b)](109_assignment_contract_basis.md) | PR 진행 중 |
+| 109 | [배정의 근거 계약 (BE-4b)](109_assignment_contract_basis.md) | 완료 (#187) |
