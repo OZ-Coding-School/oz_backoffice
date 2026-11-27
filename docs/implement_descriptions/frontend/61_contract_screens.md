@@ -55,3 +55,11 @@
 ## 남은 작업
 - 사용자 로컬 확인 후 병합, 실제 화면으로 Figma 시안 갱신.
 - 배정 패널에서 근거 계약 고르기(A110 화면 PR).
+
+## 상태 변경 창·종류 색·상태 배지 (2026-11-27, decisions F97·A113)
+- develop의 BE-4d(#190, 계약서 원본·서명본 나눠 보관) 위로 rebase하고 생성 타입을 따른다.
+- `components/dialogs.tsx` `StepDialog`: [진행]은 계약서 원본(이미 있으면 그대로, 바꾸면 `contract_file_id`), [계약 완료]는 서명된 계약서(필수, `signed_contract_file_id`)를 창 안에서 올린다. `api.ts` `useStepContract`는 `{action, fileId|signedFileId}`, `signedContractFileUrl`.
+- 패널 '계약서 · 담당'에 '계약서 원본'·'서명된 계약서' 두 줄(각 [보기]), 안내 문구, 위저드·수정의 계약서 칸 이름 '원본 (서명 전)'.
+- 목록 이름 칸의 아이콘·첫 글자 원(`PartyMark`) 제거, 종류 배지 색을 종류마다 다르게.
+- 공용 `components/ui/badge.tsx`: 상태 색 변형을 진한 파스텔 바탕 + 같은 색 테두리로, `violet`·`dashed` 추가. 겹치던 상태 색 정리(계약 취소, 수강생 조기 취업, 세션 예정, 멘토 세션 예정, 시간 내역 차감 예정 취소, 받은 신청 취소). `badge.test.tsx` 기대값 갱신.
+- 검사: lint, format:check, typecheck, vitest 429개(UTC·Asia/Seoul), build, e2e 51개 통과.

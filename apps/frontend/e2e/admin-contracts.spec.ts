@@ -60,6 +60,7 @@ const base = {
   instructor_id: null,
   linked_profile: null,
   contract_file: null,
+  signed_contract_file: null,
   start_date: null,
   end_date: null,
   created_at: "2026-11-25T01:00:00Z",

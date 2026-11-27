@@ -166,7 +166,7 @@ export function ContractEditForm({
           <PeriodSection form={form} />
           {mode === "edit" ? (
             <PanelSection title="계약서" icon={FileText}>
-              <PanelRow label="파일" help={FILE_HELP}>
+              <PanelRow label="원본 (서명 전)" help={FILE_HELP}>
                 <FilePicker
                   value={file}
                   onChange={setFile}

@@ -18,7 +18,7 @@ export const STATUS: Record<ContractStatus, { label: string; badge: NonNullable<
   SIGNED: { label: "계약 완료", badge: "info" },
   ACTIVE: { label: "이행 중", badge: "success" },
   ENDED: { label: "종료", badge: "secondary" },
-  CANCELED: { label: "취소", badge: "secondary" },
+  CANCELED: { label: "취소", badge: "dashed" },
   TERMINATED: { label: "해지", badge: "destructive" },
 };
 
@@ -167,7 +167,9 @@ export function fieldValue(key: string, value: unknown): string {
 
 const ERRORS: Record<string, string> = {
   ambiguous_mentor: "이름과 휴대폰이 같은 멘토가 여럿이에요. 기존 멘토에서 골라 주세요.",
-  contract_file_required: "계약서를 올린 뒤 진행할 수 있어요.",
+  contract_file_required: "계약서 원본을 올린 뒤 진행할 수 있어요.",
+  signed_contract_file_required: "서명된 계약서를 올려 주세요.",
+  signed_contract_file_same: "서명된 계약서는 원본과 다른 파일이어야 해요.",
   contract_not_deletable: "초안인 계약만 지울 수 있어요.",
   contract_not_editable: "서명한 계약은 변경 등록으로 바꿔요.",
   contract_field_not_amendable: "변경 계약으로 바꿀 수 없는 항목이에요.",
@@ -204,7 +206,8 @@ export function contractError(e: unknown): string {
   return (code && ERRORS[code]) ?? "처리하지 못했어요. 잠시 후 다시 시도해 주세요.";
 }
 
-export const FILE_HELP = "PDF 10MB까지 올릴 수 있어요. 진행을 시작하려면 계약서가 있어야 해요.";
+export const FILE_HELP =
+  "상대방에게 보낼 서명 전 계약서예요. PDF 10MB까지, 진행을 시작하려면 있어야 해요. 서명된 계약서는 [계약 완료]에서 올려요.";
 export const MENTOR_HELP =
   "멘토 계약은 항상 멘토에 속해요. 잘못 만든 계약은 다른 멘토로 옮길 수 있고, 연결 해제는 없어요.";
 export const NEW_MENTOR_HELP = "이름·휴대폰이 같은 멘토가 있으면 그 멘토에 붙고, 없으면 가입 전 멘토가 생겨요.";

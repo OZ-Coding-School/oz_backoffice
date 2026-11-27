@@ -36,6 +36,7 @@ import {
   amendmentFileUrl,
   amendmentsQuery,
   contractFileUrl,
+  signedContractFileUrl,
   contractQuery,
   type Amendment,
   type Contract,
@@ -107,9 +108,9 @@ function nextStep(c: Contract): { action: StepAction; label: string } | null {
 function flowHint(c: Contract): string {
   switch (c.status) {
     case "DRAFT":
-      return "계약서를 올리고 [진행]을 누르면 '진행 중'이 돼요.";
+      return "[진행]에서 서명 전 계약서(원본)를 올리면 '진행 중'이 돼요.";
     case "IN_PROGRESS":
-      return "서명을 마치면 [계약 완료]를 눌러요. 시작일이 오면 '이행 중'으로 바뀌어요.";
+      return "서명을 받으면 [계약 완료]에서 서명된 계약서를 올려요. 시작일이 오면 '이행 중'으로 바뀌어요.";
     case "SIGNED":
       return `시작일(${dotDate(c.start_date)})이 오면 자동으로 '이행 중'이 돼요.`;
     case "ACTIVE":
@@ -230,8 +231,15 @@ function ContractView({
           onMove={() => setDialog("move")}
         />
         <PanelSection title="계약서 · 담당" icon={FileText}>
-          <PanelRow label="계약서">
-            <FileRow contract={c} />
+          <PanelRow label="계약서 원본">
+            <FileRow file={c.contract_file} empty="없음 · [진행]에서 올려요" onOpen={() => contractFileUrl(c.id)} />
+          </PanelRow>
+          <PanelRow label="서명된 계약서">
+            <FileRow
+              file={c.signed_contract_file}
+              empty={c.status === "IN_PROGRESS" ? "없음 · [계약 완료]에서 올려요" : "없음"}
+              onOpen={() => signedContractFileUrl(c.id)}
+            />
           </PanelRow>
           <PanelRow label="담당 직원">
             <div className="flex items-center gap-2">
@@ -471,11 +479,17 @@ function useOpenUrl() {
   return { opening, open };
 }
 
-function FileRow({ contract: c }: { contract: Contract }) {
+function FileRow({
+  file,
+  empty,
+  onOpen,
+}: {
+  file: Contract["contract_file"];
+  empty: string;
+  onOpen: () => Promise<string>;
+}) {
   const { opening, open } = useOpenUrl();
-  if (!c.contract_file)
-    return <p className="text-body font-normal text-muted-foreground">없음 · 진행하려면 계약서가 필요해요</p>;
-  const file = c.contract_file;
+  if (!file) return <p className="text-body font-normal text-muted-foreground">{empty}</p>;
   return (
     <div className="flex items-center gap-3">
       <div className="flex min-w-0 flex-1 flex-col">
@@ -485,7 +499,7 @@ function FileRow({ contract: c }: { contract: Contract }) {
           {file.created_at ? ` · ${formatKst(file.created_at, "yyyy.MM.dd")} 올림` : ""}
         </span>
       </div>
-      <Button variant="outline" size="sm" disabled={opening} onClick={() => void open(() => contractFileUrl(c.id))}>
+      <Button variant="outline" size="sm" disabled={opening} onClick={() => void open(onOpen)}>
         보기
       </Button>
     </div>

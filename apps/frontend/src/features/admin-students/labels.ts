@@ -9,7 +9,7 @@ export const ENROLLMENT: Record<EnrollmentStatus, { label: string; badge: Tone; 
   ENROLLED: { label: "수강 중", badge: "info", tint: "bg-info/20" },
   COMPLETED: { label: "수료", badge: "success", tint: "bg-success/20" },
   DROPPED: { label: "중도 포기", badge: "destructive", tint: "bg-destructive/20" },
-  EARLY_EMPLOYED: { label: "조기 취업", badge: "success", tint: "bg-success/20" },
+  EARLY_EMPLOYED: { label: "조기 취업", badge: "violet", tint: "bg-primary/20" },
   TRANSFERRED: { label: "기수 이동", badge: "warning", tint: "bg-warning/25" },
 };
 

@@ -69,6 +69,12 @@ function contract(id: string, extra: Partial<Contract> = {}): Contract {
     instructor_id: null,
     linked_profile: { name: "김멘토", display_name: "멘토K" },
     contract_file: { id: "f1", file_name: "멘토 계약서.pdf", file_size: 186_000, created_at: "2026-08-28T01:00:00Z" },
+    signed_contract_file: {
+      id: "f9",
+      file_name: "멘토 계약서_서명.pdf",
+      file_size: 190_000,
+      created_at: "2026-08-30T01:00:00Z",
+    },
     created_at: "2026-08-28T01:00:00Z",
     updated_at: null,
     ...extra,
@@ -83,6 +89,7 @@ const DRAFT = contract("k2", {
   mentor_id: "m3",
   linked_profile: { name: "박새멘토", display_name: "박새멘토" },
   contract_file: null,
+  signed_contract_file: null,
 });
 const VENDOR = contract("k3", {
   contract_type: "SW",
@@ -166,14 +173,27 @@ function mockApi({ codes }: { codes?: string[] } = {}) {
     http.get(apiUrl("/api/v1/admin/contracts/{contract_id}/amendments"), ({ params }) =>
       HttpResponse.json(params.contract_id === "k1" ? [AMENDMENT] : []),
     ),
-    http.post(apiUrl("/api/v1/admin/contracts/{contract_id}/progress"), ({ params }) => {
-      calls.push({ path: "progress", body: params.contract_id });
+    http.post(apiUrl("/api/v1/admin/contracts/{contract_id}/progress"), async ({ request, params }) => {
+      const text = await request.text();
+      calls.push({ path: "progress", body: { id: params.contract_id, ...(text ? JSON.parse(text) : {}) } });
       return HttpResponse.json({ ...byId(params.contract_id), status: "IN_PROGRESS" });
     }),
-    http.post(apiUrl("/api/v1/admin/contracts/{contract_id}/sign"), ({ params }) => {
-      calls.push({ path: "sign", body: params.contract_id });
+    http.post(apiUrl("/api/v1/admin/contracts/{contract_id}/sign"), async ({ request, params }) => {
+      calls.push({ path: "sign", body: { id: params.contract_id, ...((await request.json()) as object) } });
       return HttpResponse.json({ ...byId(params.contract_id), status: "ACTIVE" });
     }),
+    http.post(apiUrl("/api/v1/admin/contract-files/uploads"), () =>
+      HttpResponse.json({
+        upload_id: "up1",
+        url: "http://s3.test/contracts",
+        fields: {},
+        expires_at: "2026-11-27T02:00:00Z",
+      }),
+    ),
+    http.post("http://s3.test/contracts", () => new HttpResponse(null, { status: 204 })),
+    http.post(apiUrl("/api/v1/admin/contract-files/uploads/{upload_id}/confirm"), () =>
+      HttpResponse.json({ id: "f-new", file_name: "서명.pdf", file_size: 1200, created_at: "2026-11-27T01:00:00Z" }),
+    ),
     http.post(apiUrl("/api/v1/admin/contracts/{contract_id}/cancel"), async ({ request, params }) => {
       calls.push({ path: "cancel", body: await request.json() });
       return HttpResponse.json({ ...byId(params.contract_id), status: "CANCELED" });
@@ -457,7 +477,7 @@ describe("계약 패널 (F96)", () => {
     });
   });
 
-  it("초안: [진행]은 확인 후, ⋯에서 취소(사유 필수)·삭제", async () => {
+  it("초안: [진행]은 계약서 원본을 올려야 하고, ⋯에서 취소(사유 필수)·삭제", async () => {
     const calls = mockApi();
     await renderRoute("/admin/administration/contracts?cohort=c12&contract=k2");
     const sheet = await screen.findByRole("dialog", { name: "12기 데이터 멘토 계약" });
@@ -466,7 +486,15 @@ describe("계약 패널 (F96)", () => {
     await user.click(within(sheet).getByRole("button", { name: "진행" }));
     const step = await screen.findByRole("dialog", { name: "계약을 진행할까요?" });
     await user.click(within(step).getByRole("button", { name: "진행" }));
+    expect(await within(step).findByText("계약서 원본을 올려 주세요.")).toBeInTheDocument();
+    await user.upload(
+      within(step).getByLabelText("계약서 원본 (서명 전)"),
+      new File(["%PDF"], "원본.pdf", { type: "application/pdf" }),
+    );
+    expect(await within(step).findByText(/서명.pdf/)).toBeInTheDocument();
+    await user.click(within(step).getByRole("button", { name: "진행" }));
     await waitFor(() => expect(calls.find((c) => c.path === "progress")).toBeTruthy());
+    expect(calls.find((c) => c.path === "progress")?.body).toEqual({ id: "k2", contract_file_id: "f-new" });
 
     await user.click(within(sheet).getByRole("button", { name: "더보기" }));
     await user.click(await screen.findByRole("menuitem", { name: "취소" }));
@@ -495,6 +523,13 @@ describe("계약 패널 (F96)", () => {
     await user.click(within(again).getByRole("button", { name: "계약 완료" }));
     const step = await screen.findByRole("dialog", { name: "계약 완료로 바꿀까요?" });
     await user.click(within(step).getByRole("button", { name: "계약 완료" }));
+    expect(await within(step).findByText("서명된 계약서를 올려 주세요.")).toBeInTheDocument();
+    await user.upload(
+      within(step).getByLabelText("서명된 계약서"),
+      new File(["%PDF"], "서명.pdf", { type: "application/pdf" }),
+    );
+    await user.click(within(step).getByRole("button", { name: "계약 완료" }));
     await waitFor(() => expect(calls.find((c) => c.path === "sign")).toBeTruthy());
+    expect(calls.find((c) => c.path === "sign")?.body).toEqual({ id: "k3", signed_contract_file_id: "f-new" });
   });
 });

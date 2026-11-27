@@ -184,7 +184,7 @@ export function ContractWizard({
           {step === 3 ? (
             <>
               <PanelSection title="계약서" icon={FileText}>
-                <PanelRow label="파일" help={FILE_HELP}>
+                <PanelRow label="원본 (서명 전)" help={FILE_HELP}>
                   <FilePicker value={file} onChange={setFile} onUploading={setUploading} />
                 </PanelRow>
               </PanelSection>
@@ -223,7 +223,7 @@ export function ContractWizard({
                 <PanelRow label="기간">
                   {period({ start_date: values.start_date || null, end_date: values.end_date || null })}
                 </PanelRow>
-                <PanelRow label="계약서">{file ? file.file_name : "없음"}</PanelRow>
+                <PanelRow label="계약서 원본">{file ? file.file_name : "없음"}</PanelRow>
                 <PanelRow label="담당 직원">{manager?.name ?? "—"}</PanelRow>
               </PanelSection>
               <p className="text-body-sm text-muted-foreground">

@@ -16,10 +16,12 @@ import {
   useTerminateContract,
   useUpdateContract,
   type Contract,
+  type ContractFile,
   type StepAction,
   type TerminationReason,
 } from "../api";
 import { contractError, TERMINATION_LABELS } from "../labels";
+import { FilePicker } from "./file-picker";
 import { ManagerList, type ManagerChoice } from "./pickers";
 
 const NOTE_MAX = 500;
@@ -49,13 +51,13 @@ function Frame({
 const STEP_TEXT: Record<StepAction, { title: string; body: string; button: string; done: string }> = {
   progress: {
     title: "계약을 진행할까요?",
-    body: "'진행 중'이 되면 계약서가 꼭 있어야 하고, 서명을 마치면 [계약 완료]를 눌러요.",
+    body: "상대방에게 보낼 서명 전 계약서(원본)를 올리면 '진행 중'이 돼요. 서명을 받으면 [계약 완료]에서 서명된 계약서를 올려요.",
     button: "진행",
     done: "계약을 진행 중으로 바꿨어요",
   },
   sign: {
     title: "계약 완료로 바꿀까요?",
-    body: "서명을 마친 계약이에요. 시작일이 없거나 지났으면 바로 '이행 중'이 되고, 이후 내용은 변경 등록으로만 바꿔요.",
+    body: "서명된 계약서를 올리면 계약 완료가 돼요. 시작일이 없거나 지났으면 바로 '이행 중'이 되고, 이후 내용은 변경 등록으로만 바꿔요.",
     button: "계약 완료",
     done: "계약 완료로 바꿨어요",
   },
@@ -67,7 +69,20 @@ const STEP_TEXT: Record<StepAction, { title: string; body: string; button: strin
   },
 };
 
-/** 다음 단계 확인 창 (A109③) */
+const STEP_FILE: Partial<Record<StepAction, { label: string; help: string; missing: string }>> = {
+  progress: {
+    label: "계약서 원본 (서명 전)",
+    help: "이미 올린 원본이 있으면 그대로 써도 돼요.",
+    missing: "계약서 원본을 올려 주세요.",
+  },
+  sign: {
+    label: "서명된 계약서",
+    help: "원본과 다른, 서명을 마친 PDF를 올려 주세요.",
+    missing: "서명된 계약서를 올려 주세요.",
+  },
+};
+
+/** 다음 단계 창 (A109③·A113): 진행은 계약서 원본, 계약 완료는 서명된 계약서를 함께 올린다 */
 export function StepDialog({
   contract: c,
   action,
@@ -79,22 +94,48 @@ export function StepDialog({
 }) {
   const run = useStepContract(c.id);
   const text = STEP_TEXT[action];
+  const fileText = STEP_FILE[action];
+  const [file, setFile] = useState<ContractFile | null>(action === "progress" ? c.contract_file : null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const submit = async () => {
+    setError(null);
+    if (fileText && !file) {
+      setError(fileText.missing);
+      return;
+    }
     try {
-      await run.mutateAsync(action);
+      if (action === "progress")
+        await run.mutateAsync({ action, fileId: file && file.id !== c.contract_file?.id ? file.id : null });
+      else if (action === "sign" && file) await run.mutateAsync({ action, signedFileId: file.id });
+      else await run.mutateAsync({ action: "end" });
       toast.success(text.done);
       onClose();
     } catch (e) {
-      toast.error(contractError(e));
+      setError(contractError(e));
     }
   };
   return (
     <Frame title={text.title} description={text.body} onClose={onClose}>
+      {fileText ? (
+        <div className="flex flex-col gap-1.5 rounded-xl border border-border bg-muted/40 p-4">
+          <span className="text-body-strong text-foreground">{fileText.label}</span>
+          <FilePicker
+            value={file}
+            onChange={setFile}
+            onUploading={setUploading}
+            removable={false}
+            label={fileText.label}
+          />
+          <span className="text-caption text-muted-foreground">{fileText.help}</span>
+        </div>
+      ) : null}
+      {error ? <Alert variant="error" title={error} /> : null}
       <div className="flex justify-end gap-2">
         <Button variant="ghost" onClick={onClose}>
           돌아가기
         </Button>
-        <Button disabled={run.isPending} onClick={() => void submit()}>
+        <Button disabled={run.isPending || uploading} onClick={() => void submit()}>
           {text.button}
         </Button>
       </div>

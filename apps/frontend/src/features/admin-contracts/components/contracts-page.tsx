@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 import { contractsQuery, type Contract, type ContractType, type StatusGroup } from "../api";
 import { academyText, amountSub, amountText, period, periodHint, STATUS, TYPE_LABELS, TYPES } from "../labels";
 import { ContractSheet } from "./contract-sheet";
-import { ContractTypeBadge, PartyMark } from "./type-badge";
+import { ContractTypeBadge } from "./type-badge";
 
 export interface ContractsSearch {
   /** 과정 전체 */
@@ -293,12 +293,9 @@ function ContractRow({
       <span role="cell">
         <ContractTypeBadge type={c.contract_type} />
       </span>
-      <span role="cell" className="flex min-w-0 items-center gap-2.5">
-        <PartyMark type={c.contract_type} name={c.contractor_name} />
-        <span className="flex min-w-0 flex-col">
-          <span className="truncate text-body text-foreground">{c.contractor_name}</span>
-          {sub ? <span className="truncate text-caption text-muted-foreground">{sub}</span> : null}
-        </span>
+      <span role="cell" className="flex min-w-0 flex-col">
+        <span className="truncate text-body text-foreground">{c.contractor_name}</span>
+        {sub ? <span className="truncate text-caption text-muted-foreground">{sub}</span> : null}
       </span>
       <span role="cell" className="truncate text-body text-foreground" title={academyText(c)}>
         {academyText(c)}

@@ -200,20 +200,44 @@ export function useAmendContract(id: string) {
   });
 }
 
-/** 다음 단계 (A109③): 진행 · 계약 완료 · 종료 */
+/** 다음 단계 (A109③·A113): 진행(계약서 원본) · 계약 완료(서명된 계약서) · 종료 */
 export type StepAction = "progress" | "sign" | "end";
+export type StepInput =
+  { action: "progress"; fileId: string | null } | { action: "sign"; signedFileId: string } | { action: "end" };
 
 export function useStepContract(id: string) {
   const refresh = useRefresh();
   return useMutation({
-    mutationFn: (action: StepAction) => {
+    mutationFn: (input: StepInput) => {
       const params = { path: { contract_id: id } };
-      if (action === "progress") return unwrap(api.POST("/api/v1/admin/contracts/{contract_id}/progress", { params }));
-      if (action === "sign") return unwrap(api.POST("/api/v1/admin/contracts/{contract_id}/sign", { params }));
+      if (input.action === "progress")
+        return unwrap(
+          api.POST("/api/v1/admin/contracts/{contract_id}/progress", {
+            params,
+            body: input.fileId ? { contract_file_id: input.fileId } : {},
+          }),
+        );
+      if (input.action === "sign")
+        return unwrap(
+          api.POST("/api/v1/admin/contracts/{contract_id}/sign", {
+            params,
+            body: { signed_contract_file_id: input.signedFileId },
+          }),
+        );
       return unwrap(api.POST("/api/v1/admin/contracts/{contract_id}/end", { params }));
     },
     onSuccess: refresh,
   });
+}
+
+/** 서명된 계약서 다운로드 주소 (A113) */
+export async function signedContractFileUrl(id: string): Promise<string> {
+  const res = await unwrap(
+    api.GET("/api/v1/admin/contracts/{contract_id}/file-url", {
+      params: { path: { contract_id: id }, query: { signed: true } },
+    }),
+  );
+  return res.url;
 }
 
 export function useCancelContract(id: string) {
