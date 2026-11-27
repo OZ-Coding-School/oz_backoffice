@@ -81,6 +81,18 @@ const CONTRACT: MentorAssignment["contract"] & object = {
   mentoring_time_basis: "ACTUAL_DURATION",
 };
 
+/** 같은 기수의 재계약 (근거 계약 후보, F98) */
+const RENEWAL: MentorAssignment["contract"] & object = {
+  ...CONTRACT,
+  id: "k2",
+  title: "12기 재계약",
+  status: "SIGNED",
+  cohort_id: "c-a1",
+  start_date: "2026-12-01",
+  end_date: "2027-02-28",
+  unit_price: 35000,
+};
+
 function assignment(id: string, extra: Partial<MentorAssignment> = {}): MentorAssignment {
   return {
     id,
@@ -223,6 +235,9 @@ function mockApi({ codes, item = KIM }: { codes?: string[]; item?: MentorItem } 
     http.get(apiUrl("/api/v1/admin/mentors/{mentor_id}"), () => HttpResponse.json(item)),
     http.get(apiUrl("/api/v1/admin/mentors/{mentor_id}/profile"), () => HttpResponse.json(PROFILE)),
     http.get(apiUrl("/api/v1/admin/mentors/{mentor_id}/mentor-assignments"), () => HttpResponse.json(ASSIGNMENTS)),
+    http.get(apiUrl("/api/v1/admin/cohorts/{cohort_id}/mentor-assignments/contract-candidates"), ({ params }) =>
+      HttpResponse.json(params.cohort_id === "c-a1" ? [CONTRACT, RENEWAL] : [CONTRACT]),
+    ),
     http.post(apiUrl("/api/v1/admin/cohorts/{cohort_id}/mentor-assignments"), async ({ request, params }) => {
       calls.push({ path: `create:${String(params.cohort_id)}`, body: await request.json() });
       return HttpResponse.json(
@@ -474,7 +489,7 @@ describe("강사·멘토 > 멘토 (FE-18a)", () => {
     expect(screen.getByRole("switch", { name: "신청 받기" })).toBeDisabled();
   });
 
-  it("배정 패널: 기수·기간·근거 계약의 정산 조건 조회, [수정]은 기간만 저장 (A110)", async () => {
+  it("배정 패널: 기수·기간·근거 계약의 정산 조건 조회, [수정]은 기간·근거 계약 저장 (A110·F98)", async () => {
     const calls = mockApi();
     await renderRoute("/admin/educators/mentors/m1?tab=assignments&assignment=a1");
     const sheet = await screen.findByRole("dialog", { name: "백엔드 부트캠프 12기" });
@@ -488,12 +503,19 @@ describe("강사·멘토 > 멘토 (FE-18a)", () => {
     await user.click(within(sheet).getByRole("button", { name: "수정" }));
     const form = await within(sheet).findByRole("form", { name: "배정 수정" });
     expect(within(sheet).getByText("수정 중")).toBeInTheDocument();
-    await user.type(within(form).getByLabelText("종료일"), "2027-03-31");
+    const picker = await within(form).findByRole("radiogroup", { name: "근거 계약" });
+    expect(within(picker).getByRole("radio", { name: /2026 백엔드 멘토 계약/ })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    await user.click(within(picker).getByRole("radio", { name: /12기 재계약/ }));
+    expect(within(form).getByRole("region", { name: "정산 조건" })).toHaveTextContent("35,000원");
+    await user.type(within(form).getByLabelText("종료일"), "2027-02-28");
     await user.click(within(form).getByRole("button", { name: "저장" }));
     expect(await screen.findByText("백엔드 부트캠프 12기 배정을 저장했어요")).toBeInTheDocument();
     expect(calls).toContainEqual({
       path: "update:a1",
-      body: { start_date: "2026-11-02", end_date: "2027-03-31" },
+      body: { contract_id: "k2", start_date: "2026-11-02", end_date: "2027-02-28" },
     });
   });
 
@@ -519,7 +541,9 @@ describe("강사·멘토 > 멘토 (FE-18a)", () => {
     expect(calls).toContainEqual({ path: "reactivate:a3", body: null });
   });
 
-  it("배정 추가: 과정 → 기수(이미 배정 중인 기수는 막힘) → 기간 (근거 계약 고르기는 배정 패널 PR)", async () => {
+  it("배정 추가: 과정 → 기수(이미 배정 중인 기수는 막힘) → 근거 계약(하나면 미리 고름) → 기간 미리 채움 (F98)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-27T01:00:00Z"));
     const calls = mockApi();
     const { router } = await renderRoute("/admin/educators/mentors/m1?tab=assignments");
     const user = userEvent.setup();
@@ -534,19 +558,29 @@ describe("강사·멘토 > 멘토 (FE-18a)", () => {
       "true",
     );
     await user.click(screen.getByRole("option", { name: "4기 · 2027.05.01 ~ 2027.10.31" }));
-    await user.type(within(form).getByLabelText("시작일"), "2027-05-01");
+    const picker = await within(form).findByRole("radiogroup", { name: "근거 계약" });
+    await waitFor(() =>
+      expect(within(picker).getByRole("radio", { name: /2026 백엔드 멘토 계약/ })).toHaveAttribute(
+        "aria-checked",
+        "true",
+      ),
+    );
+    // 계약 기간이 없으면 시작일은 기수 시작일(오늘보다 뒤), 종료일은 비움
+    expect(within(form).getByLabelText("시작일")).toHaveValue("2027-05-01");
+    expect(within(form).getByLabelText("종료일")).toHaveValue("");
     await user.click(within(form).getByRole("button", { name: "추가" }));
     expect(await screen.findByText("데이터 분석 부트캠프 4기에 배정했어요")).toBeInTheDocument();
     expect(calls).toContainEqual({
       path: "create:c-d4",
       body: {
         mentor_id: "m1",
-        contract_id: "",
+        contract_id: "k1",
         start_date: "2027-05-01",
         end_date: null,
       },
     });
     await waitFor(() => expect(router.state.location.search).toEqual({ tab: "assignments", assignment: "a9" }));
+    vi.useRealTimers();
   });
 
   it("가입 전 멘토나 배정 관리 권한이 없으면 [배정 추가]가 없다", async () => {
