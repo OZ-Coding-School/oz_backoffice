@@ -41,9 +41,6 @@ class AssignmentContractListener:
             clock=self._clock,
         )
 
-    async def has_active_assignments(self, contract_id: uuid.UUID) -> bool:
-        return await self._sync().has_active_assignments(contract_id)
-
     async def contract_closed(self, contract_id: uuid.UUID, *, actor_id: uuid.UUID | None) -> None:
         await self._sync().contract_closed(contract_id, actor_id=actor_id)
 

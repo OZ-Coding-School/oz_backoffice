@@ -504,28 +504,17 @@ async def test_scope_limits_contracts(h: Harness) -> None:
         await h.service.update(other.contract.id, {"title": "변경"}, actor_id=h.actor_id)
 
 
-async def test_move_between_mentors_regardless_of_status(h: Harness) -> None:
-    mentor = Mentor(user_id=new_id())
+async def test_mentor_contract_cannot_move_to_other_mentor(h: Harness) -> None:
+    """멘토 계약은 만들 때 정한 멘토에 속하고 바꿀 수 없다 (A114)."""
     other = Mentor(user_id=new_id())
-    await h.mentors.save(mentor)
     await h.mentors.save(other)
     contract_id = await h.signed()
-    pending_id = h.contracts.items[contract_id].mentor_id
-    await h.service.terminate(  # 끝난 계약도 옮길 수 있다
-        contract_id,
-        reason=TerminationReason.TERMINATED_BY_UNILATERAL,
-        detail=None,
-        on=None,
-        actor_id=h.actor_id,
-    )
-
-    linked = await h.service.link(contract_id, mentor_id=mentor.id, actor_id=h.actor_id)
-    assert linked.contract.mentor_id == mentor.id
-    # 마지막 계약이 옮겨 간 가입 전 멘토는 지운다 (A104)
-    assert pending_id not in h.mentors.items
-    changed = await h.service.link(contract_id, mentor_id=other.id, actor_id=h.actor_id)
-    assert changed.contract.mentor_id == other.id
-    assert mentor.id in h.mentors.items  # 가입한 멘토는 남는다
+    mentor_id = h.contracts.items[contract_id].mentor_id
+    with pytest.raises(BusinessRuleViolation) as move:
+        await h.service.link(contract_id, mentor_id=other.id, actor_id=h.actor_id)
+    assert move.value.code == "mentor_contract_move_forbidden"
+    same = await h.service.link(contract_id, mentor_id=mentor_id, actor_id=h.actor_id)
+    assert same.contract.mentor_id == mentor_id
     with pytest.raises(BusinessRuleViolation) as unlink:
         await h.service.link(contract_id, actor_id=h.actor_id)
     assert unlink.value.code == "mentor_contract_unlink_forbidden"
@@ -593,9 +582,9 @@ async def test_link_requires_matching_existing_profile(h: Harness) -> None:
     with pytest.raises(BusinessRuleViolation) as kind:
         await h.service.link(contract_id, instructor_id=instructor_id, actor_id=h.actor_id)
     assert kind.value.code == "contract_type_mismatch"
-    with pytest.raises(NotFoundError) as missing:
+    with pytest.raises(BusinessRuleViolation) as move:  # 멘토 계약은 옮길 수 없다 (A114)
         await h.service.link(contract_id, mentor_id=new_id(), actor_id=h.actor_id)
-    assert missing.value.code == "mentor_not_found"
+    assert move.value.code == "mentor_contract_move_forbidden"
 
     instructor_contract = await h.service.create(
         h.values(

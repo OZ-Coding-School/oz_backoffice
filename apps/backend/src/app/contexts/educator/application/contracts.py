@@ -8,10 +8,10 @@
 - 계약서는 확정된 업로드(contract_files)만 붙일 수 있고, 다른 계약·변경 계약이 쓰는 파일은 붙일 수
   없다. 교체하거나 비우거나 계약을 지우면 이전 파일은 deleted_at만 채우고 객체는 남긴다(A25).
 - 멘토 계약은 항상 멘토에 속한다(A104): 만들 때 지정한 멘토, 없으면 이름·휴대폰이 같은 멘토
-  하나, 그것도 없으면 가입 전 멘토를 만든다. 연결 해제는 없고 다른 멘토로 옮길 수만 있다.
-  가입 전 멘토의 마지막 계약을 지우거나 옮기면 그 멘토도 지운다.
+  하나, 그것도 없으면 가입 전 멘토를 만든다. 연결 해제도, 다른 멘토로 옮기기도 없다(A114).
+  가입 전 멘토의 마지막 계약을 지우면 그 멘토도 지운다.
 - 기수 배정의 근거 계약(A110): 계약이 ENDED·TERMINATED가 되거나 기간이 바뀌면 listener가 같은
-  트랜잭션에서 배정을 정리한다. 활성 배정의 근거인 계약은 다른 멘토로 옮길 수 없다(409).
+  트랜잭션에서 배정을 정리한다.
 모든 변경은 감사 로그를 남긴다. 날짜에 따른 자동 처리의 행위자는 시스템(None)이다.
 """
 
@@ -401,17 +401,6 @@ class ContractService:
             contract = await self._manageable(contract_id, actor_id)
             before = dataclasses.replace(contract)
             contract.link(mentor_id=mentor_id, instructor_id=instructor_id)
-            moved = before.mentor_id is not None and before.mentor_id != contract.mentor_id
-            if (
-                moved
-                and self._listener
-                and await self._listener.has_active_assignments(contract.id)
-            ):
-                raise ConflictError(
-                    "기수 배정의 근거인 계약은 다른 멘토로 옮길 수 없습니다. "
-                    "배정을 먼저 끝내 주세요.",
-                    code="contract_in_use_by_assignment",
-                )
             if mentor_id is not None and await self._mentors.get(mentor_id) is None:
                 raise NotFoundError("멘토를 찾을 수 없습니다.", code="mentor_not_found")
             if instructor_id is not None and not await self._instructors.exists(instructor_id):
@@ -419,8 +408,6 @@ class ContractService:
             await self._contracts.save(contract)
             action = "unlink" if mentor_id is None and instructor_id is None else "link"
             await self._record(actor_id, action, contract, before=before)
-            if before.mentor_id is not None and before.mentor_id != contract.mentor_id:
-                await self._drop_empty_pending(before.mentor_id, actor_id=actor_id)
         return await self.get(contract_id, actor_id=actor_id)
 
     async def delete(self, contract_id: uuid.UUID, *, actor_id: uuid.UUID) -> None:
