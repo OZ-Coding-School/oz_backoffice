@@ -1,7 +1,7 @@
 # 109. 배정의 근거 계약 (BE-4b)
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #187
 - 관련 결정: `docs/decisions.md` A110 (A109⑨⑩, A111)
 - 이전 기록: [108. 계약 개편 (BE-4a)](108_contract_redesign.md)
 
