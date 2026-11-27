@@ -14,7 +14,7 @@ import { pendingRegistrationsQuery, type RegistrationTab } from "@/features/admi
 import { hasPermission, staffAccessQuery } from "@/features/staff/api";
 import { Spinner } from "@/components/ui/spinner";
 import { maskPhone } from "@/features/profile/mask";
-import { StaffCohortSelect } from "@/features/staff/components/staff-cohort-select";
+import { CohortChooser } from "@/features/staff/components/cohort-picker";
 import { cn } from "@/lib/utils";
 
 import { approvalCountQuery, approvalsQuery, type Applicant, type ApprovalTab } from "../api";
@@ -90,9 +90,13 @@ export function ApprovalsPage({
           </ul>
         </nav>
         {current === "student" ? (
-          <StaffCohortSelect
+          <CohortChooser
+            variant="field"
+            label="기수"
+            allLabel="전체 기수"
+            cohorts={access.data?.cohorts ?? []}
             value={cohortId}
-            onChange={(cohort) => void navigate({ to: "/admin/members/approvals", search: cohort ? { cohort } : {} })}
+            onPick={(c) => void navigate({ to: "/admin/members/approvals", search: c ? { cohort: c.id } : {} })}
           />
         ) : null}
       </div>

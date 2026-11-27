@@ -31,30 +31,33 @@ function bootcampsOf(cohorts: StaffCohort[]): { id: string; name: string; cohort
 }
 
 /**
- * 상단 막대의 현재 기수 선택기 (F59·F90, 모양은 F94).
- * 왼쪽 과정 · 오른쪽 그 과정의 기수, 위에 검색과 최근 고른 기수. 기본은 진행 중·개강 전만.
- * 기수 단위 화면(`/admin/cohorts/{id}/…`)에서만 보이고, 고르면 같은 화면의 그 기수 주소로 간다.
+ * 두 칸 기수 선택기 (F94): 왼쪽 과정 · 오른쪽 그 과정의 기수, 위에 검색과 최근 고른 기수.
+ * 기본은 진행 중·개강 전만, '종료된 기수도 보기'로 나머지도.
+ * `bar`는 상단 막대 모양, `field`는 화면 안 필터 모양. `allLabel`이 있으면 맨 위에 '전체' 항목(값 없음).
  */
-export function CohortPicker() {
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const navigate = useNavigate();
-  const access = useQuery(staffAccessQuery);
+export function CohortChooser({
+  cohorts,
+  value,
+  onPick,
+  variant,
+  label,
+  allLabel,
+}: {
+  cohorts: readonly StaffCohort[];
+  value: string | undefined;
+  onPick: (cohort: StaffCohort | null) => void;
+  variant: "bar" | "field";
+  label: string;
+  allLabel?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [showClosed, setShowClosed] = useState(false);
   const [bootcampId, setBootcampId] = useState<string | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
-  const cohortId = cohortIdOf(pathname);
-  const all = pickableCohorts(access.data?.cohorts ?? []);
-  const current = all.find((c) => c.id === cohortId);
-
-  // 주소로 들어와도 마지막으로 본 기수로 기억한다
-  useEffect(() => {
-    if (cohortId) rememberCohort(cohortId);
-  }, [cohortId]);
-
-  if (!cohortId) return null;
-  const visible = showClosed ? all : all.filter((c) => OPEN.includes(c.status) || c.id === cohortId);
+  const all = pickableCohorts(cohorts);
+  const current = all.find((c) => c.id === value);
+  const visible = showClosed ? all : all.filter((c) => OPEN.includes(c.status) || c.id === value);
   const bootcamps = bootcampsOf(visible);
   const selectedBootcamp =
     bootcamps.find((b) => b.id === bootcampId) ?? bootcamps.find((b) => b.id === current?.bootcamp_id) ?? bootcamps[0];
@@ -63,13 +66,13 @@ export function CohortPicker() {
   const found = term ? all.filter((c) => words.every((w) => nameOf(c).includes(w))) : [];
   const recentCohorts = recent
     .map((id) => all.find((c) => c.id === id))
-    .filter((c): c is StaffCohort => !!c && c.id !== cohortId);
+    .filter((c): c is StaffCohort => !!c && c.id !== value);
 
-  const pick = (c: StaffCohort) => {
+  const pick = (c: StaffCohort | null) => {
     setOpen(false);
     setQ("");
-    rememberCohort(c.id);
-    void navigate({ to: pathname.replace(`/admin/cohorts/${cohortId}/`, `/admin/cohorts/${c.id}/`) });
+    if (c) rememberCohort(c.id);
+    onPick(c);
   };
   const onOpenChange = (next: boolean) => {
     setOpen(next);
@@ -78,131 +81,188 @@ export function CohortPicker() {
       setBootcampId(null);
     }
   };
+  const shown = current ? nameOf(current) : (allLabel ?? "기수를 골라 주세요");
 
   return (
-    <>
-      <PopoverPrimitive.Root open={open} onOpenChange={onOpenChange}>
+    <PopoverPrimitive.Root open={open} onOpenChange={onOpenChange}>
+      {variant === "bar" ? (
         <PopoverPrimitive.Trigger
-          aria-label="현재 기수"
+          aria-label={label}
           className="flex items-center gap-2.5 rounded-lg bg-sidebar-accent py-1.5 pr-2.5 pl-3 text-left text-sidebar-accent-foreground outline-none hover:brightness-95 focus-visible:ring-2 focus-visible:ring-ring"
         >
           <BookOpen aria-hidden className="size-4 shrink-0" />
           <span className="flex flex-col">
-            <span className="text-caption">현재 기수</span>
-            <span className="text-body-strong">{current ? nameOf(current) : "기수를 골라 주세요"}</span>
+            <span className="text-caption">{label}</span>
+            <span className="text-body-strong">{shown}</span>
           </span>
           <ChevronDown aria-hidden className="size-4 shrink-0" />
         </PopoverPrimitive.Trigger>
-        <PopoverPrimitive.Portal>
-          <PopoverPrimitive.Content
-            align="start"
-            sideOffset={6}
-            aria-label="기수 고르기"
-            className="z-50 flex w-[36rem] flex-col overflow-hidden rounded-2xl border border-border bg-popover shadow-lg"
-          >
-            <div className="flex flex-col gap-2.5 border-b border-border p-3">
-              <label className="flex items-center gap-2 rounded-lg border border-border bg-background px-2.5 py-2 focus-within:ring-2 focus-within:ring-ring">
-                <Search aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-                <input
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  placeholder="과정·기수 검색 (예: 백엔드 12)"
-                  aria-label="과정·기수 검색"
-                  className="min-w-0 flex-1 bg-transparent text-body text-foreground outline-none placeholder:text-muted-foreground"
-                />
-              </label>
-              {recentCohorts.length > 0 && !term ? (
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="inline-flex items-center gap-1 text-caption text-muted-foreground">
+      ) : (
+        <PopoverPrimitive.Trigger
+          aria-label={label}
+          className="flex h-9 w-64 items-center gap-2 rounded-md border border-input bg-background px-3 text-left text-body text-foreground outline-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <BookOpen aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+          <span className="min-w-0 flex-1 truncate">{shown}</span>
+          <ChevronDown aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+        </PopoverPrimitive.Trigger>
+      )}
+      <PopoverPrimitive.Portal>
+        <PopoverPrimitive.Content
+          align="start"
+          sideOffset={6}
+          aria-label="기수 고르기"
+          className="z-50 flex w-[36rem] flex-col overflow-hidden rounded-2xl border border-border bg-popover shadow-lg"
+        >
+          <div className="flex flex-col gap-2.5 border-b border-border p-3">
+            <label className="flex items-center gap-2 rounded-lg border border-border bg-background px-2.5 py-2 focus-within:ring-2 focus-within:ring-ring">
+              <Search aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="과정·기수 검색 (예: 백엔드 12)"
+                aria-label="과정·기수 검색"
+                className="min-w-0 flex-1 bg-transparent text-body text-foreground outline-none placeholder:text-muted-foreground"
+              />
+            </label>
+            {!term && (allLabel || recentCohorts.length > 0) ? (
+              <div className="flex flex-wrap items-center gap-1.5">
+                {allLabel ? (
+                  <button
+                    type="button"
+                    aria-pressed={!value}
+                    onClick={() => pick(null)}
+                    className={cn(
+                      "rounded-full border px-2.5 py-0.5 text-caption outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      !value
+                        ? "border-primary/50 bg-sidebar-accent text-caption-strong text-sidebar-accent-foreground"
+                        : "border-border text-foreground hover:bg-sidebar-accent",
+                    )}
+                  >
+                    {allLabel}
+                  </button>
+                ) : null}
+                {recentCohorts.length > 0 ? (
+                  <span className="ml-1 inline-flex items-center gap-1 text-caption text-muted-foreground">
                     <Clock aria-hidden className="size-3.5" />
                     최근
                   </span>
-                  {recentCohorts.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      aria-label={`최근 ${nameOf(c)}`}
-                      onClick={() => pick(c)}
-                      className="rounded-full border border-border px-2.5 py-0.5 text-caption text-foreground outline-none hover:border-primary/40 hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      {nameOf(c)}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
+                ) : null}
+                {recentCohorts.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    aria-label={`최근 ${nameOf(c)}`}
+                    onClick={() => pick(c)}
+                    className="rounded-full border border-border px-2.5 py-0.5 text-caption text-foreground outline-none hover:border-primary/40 hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {nameOf(c)}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+          {term ? (
+            <div className="flex max-h-80 flex-col overflow-y-auto p-2">
+              {found.length === 0 ? (
+                <p className="px-2.5 py-6 text-center text-body-sm text-muted-foreground">맞는 기수가 없어요.</p>
+              ) : (
+                found.map((c) => (
+                  <CohortRow key={c.id} cohort={c} on={c.id === value} label={nameOf(c)} onPick={pick} />
+                ))
+              )}
             </div>
-
-            {term ? (
-              <div className="flex max-h-80 flex-col overflow-y-auto p-2">
-                {found.length === 0 ? (
-                  <p className="px-2.5 py-6 text-center text-body-sm text-muted-foreground">맞는 기수가 없어요.</p>
-                ) : (
-                  found.map((c) => (
-                    <CohortRow key={c.id} cohort={c} on={c.id === cohortId} label={nameOf(c)} onPick={pick} />
+          ) : (
+            <div className="grid h-80 grid-cols-[15rem_minmax(0,1fr)]">
+              <ul aria-label="과정" className="flex flex-col overflow-y-auto border-r border-border bg-muted/40 p-2">
+                {bootcamps.map((b) => {
+                  const on = b.id === selectedBootcamp?.id;
+                  const ongoing = b.cohorts.filter((c) => c.status === "ONGOING").length;
+                  return (
+                    <li key={b.id}>
+                      <button
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => setBootcampId(b.id)}
+                        className={cn(
+                          "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-body outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                          on
+                            ? "bg-card text-body-strong text-foreground shadow-sm"
+                            : "text-muted-foreground hover:bg-card/60 hover:text-foreground",
+                        )}
+                      >
+                        <span className="min-w-0 flex-1 truncate">{b.name}</span>
+                        {ongoing > 0 ? (
+                          <span className="rounded-full bg-success-subtle px-1.5 text-caption-strong text-success-text">
+                            {ongoing}
+                          </span>
+                        ) : null}
+                        <ChevronRight aria-hidden className="size-3.5 shrink-0 opacity-50" />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              <div
+                role="group"
+                aria-label={selectedBootcamp ? `${selectedBootcamp.name} 기수` : "기수"}
+                className="flex flex-col overflow-y-auto p-2"
+              >
+                {selectedBootcamp ? (
+                  selectedBootcamp.cohorts.map((c) => (
+                    <CohortRow key={c.id} cohort={c} on={c.id === value} label={nameOf(c)} onPick={pick} short />
                   ))
+                ) : (
+                  <p className="px-2.5 py-6 text-center text-body-sm text-muted-foreground">
+                    볼 수 있는 기수가 없어요.
+                  </p>
                 )}
               </div>
-            ) : (
-              <div className="grid h-80 grid-cols-[15rem_minmax(0,1fr)]">
-                <ul aria-label="과정" className="flex flex-col overflow-y-auto border-r border-border bg-muted/40 p-2">
-                  {bootcamps.map((b) => {
-                    const on = b.id === selectedBootcamp?.id;
-                    const ongoing = b.cohorts.filter((c) => c.status === "ONGOING").length;
-                    return (
-                      <li key={b.id}>
-                        <button
-                          type="button"
-                          aria-pressed={on}
-                          onClick={() => setBootcampId(b.id)}
-                          className={cn(
-                            "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-body outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                            on
-                              ? "bg-card text-body-strong text-foreground shadow-sm"
-                              : "text-muted-foreground hover:bg-card/60 hover:text-foreground",
-                          )}
-                        >
-                          <span className="min-w-0 flex-1 truncate">{b.name}</span>
-                          {ongoing > 0 ? (
-                            <span className="rounded-full bg-success-subtle px-1.5 text-caption-strong text-success-text">
-                              {ongoing}
-                            </span>
-                          ) : null}
-                          <ChevronRight aria-hidden className="size-3.5 shrink-0 opacity-50" />
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-                <div
-                  role="group"
-                  aria-label={selectedBootcamp ? `${selectedBootcamp.name} 기수` : "기수"}
-                  className="flex flex-col overflow-y-auto p-2"
-                >
-                  {selectedBootcamp ? (
-                    selectedBootcamp.cohorts.map((c) => (
-                      <CohortRow key={c.id} cohort={c} on={c.id === cohortId} label={nameOf(c)} onPick={pick} short />
-                    ))
-                  ) : (
-                    <p className="px-2.5 py-6 text-center text-body-sm text-muted-foreground">
-                      볼 수 있는 기수가 없어요.
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-center justify-between border-t border-border px-3 py-2.5">
-              <label className="inline-flex items-center gap-2 text-body-sm text-muted-foreground">
-                <Switch checked={showClosed} onCheckedChange={setShowClosed} aria-label="종료된 기수도 보기" />
-                종료된 기수도 보기
-              </label>
-              <span className="text-caption text-muted-foreground">
-                {visible.length} / {all.length}개 기수
-              </span>
             </div>
-          </PopoverPrimitive.Content>
-        </PopoverPrimitive.Portal>
-      </PopoverPrimitive.Root>
+          )}
+
+          <div className="flex items-center justify-between border-t border-border px-3 py-2.5">
+            <label className="inline-flex items-center gap-2 text-body-sm text-muted-foreground">
+              <Switch checked={showClosed} onCheckedChange={setShowClosed} aria-label="종료된 기수도 보기" />
+              종료된 기수도 보기
+            </label>
+            <span className="text-caption text-muted-foreground">
+              {visible.length} / {all.length}개 기수
+            </span>
+          </div>
+        </PopoverPrimitive.Content>
+      </PopoverPrimitive.Portal>
+    </PopoverPrimitive.Root>
+  );
+}
+
+/**
+ * 상단 막대의 현재 기수 선택기 (F59·F90·F94).
+ * 기수 단위 화면(`/admin/cohorts/{id}/…`)에서만 보이고, 고르면 같은 화면의 그 기수 주소로 간다.
+ */
+export function CohortPicker() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const navigate = useNavigate();
+  const access = useQuery(staffAccessQuery);
+  const cohortId = cohortIdOf(pathname);
+
+  // 주소로 들어와도 마지막으로 본 기수로 기억한다
+  useEffect(() => {
+    if (cohortId) rememberCohort(cohortId);
+  }, [cohortId]);
+
+  if (!cohortId) return null;
+  return (
+    <>
+      <CohortChooser
+        variant="bar"
+        label="현재 기수"
+        cohorts={access.data?.cohorts ?? []}
+        value={cohortId}
+        onPick={(c) => {
+          if (c) void navigate({ to: pathname.replace(`/admin/cohorts/${cohortId}/`, `/admin/cohorts/${c.id}/`) });
+        }}
+      />
       <span aria-hidden className="mx-2 h-6 w-px bg-border" />
     </>
   );
