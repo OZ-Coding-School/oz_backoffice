@@ -73,10 +73,31 @@ export function period(c: Pick<Contract, "start_date" | "end_date">): string {
   return `${dot(c.start_date)} ~ ${dot(c.end_date)}`.trim();
 }
 
-/** 과정 / 기수: "12기" · "과정 공통" (과정 이름을 붙이면 "백엔드 부트캠프 · 12기") */
-export function academyText(c: Pick<Contract, "bootcamp_name" | "cohort_number">, withBootcamp = false): string {
-  const cohort = c.cohort_number ? `${c.cohort_number}기` : "과정 공통";
-  return withBootcamp && c.bootcamp_name ? `${c.bootcamp_name} · ${cohort}` : cohort;
+/** 과정 / 기수 (F96): "백엔드 부트캠프 / 12기" · "백엔드 부트캠프 / 공통" */
+export function academyText(c: Pick<Contract, "bootcamp_name" | "cohort_number">): string {
+  const cohort = c.cohort_number ? `${c.cohort_number}기` : "공통";
+  return c.bootcamp_name ? `${c.bootcamp_name} / ${cohort}` : cohort;
+}
+
+/** 두 날짜("YYYY-MM-DD") 사이 일수 (to − from). 달력 날짜라 시간대와 무관하다 */
+function daysBetween(from: string, to: string): number {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
+}
+
+/** 기간 보조 문구: "시작까지 12일" · "종료까지 45일" · "오늘 종료". 끝난 계약·날짜 없음은 null */
+export function periodHint(
+  c: Pick<Contract, "status" | "start_date" | "end_date">,
+  today: string,
+): { text: string; soon: boolean } | null {
+  if (c.status === "SIGNED" && c.start_date && c.start_date > today) {
+    const d = daysBetween(today, c.start_date);
+    return { text: `시작까지 ${d}일`, soon: d <= 7 };
+  }
+  if ((c.status === "ACTIVE" || c.status === "SIGNED") && c.end_date && c.end_date >= today) {
+    const d = daysBetween(today, c.end_date);
+    return { text: d === 0 ? "오늘 종료" : `종료까지 ${d}일`, soon: d <= 30 };
+  }
+  return null;
 }
 
 export const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;

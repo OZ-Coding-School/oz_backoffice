@@ -11,6 +11,7 @@ import {
   ListChecks,
   Moon,
   Plus,
+  SlidersHorizontal,
   Sparkles,
   Sun,
   Timer,
@@ -25,7 +26,7 @@ import { toast } from "sonner";
 
 import { ApiError } from "@/api/errors";
 import { ErrorState } from "@/components/error-state";
-import { MetaChip, PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/page-header";
 import { SaveBar } from "@/components/save-bar";
 import { SectionCard, SettingRow } from "@/components/section-card";
 import { Alert } from "@/components/ui/alert";
@@ -118,10 +119,10 @@ function SettingsForm({
   return (
     <div className={cn("flex flex-col gap-6", canManage && (dirty || !settings) && "pb-4")}>
       <PageHeader
+        icon={SlidersHorizontal}
         title="멘토링 설정"
         meta={
           <>
-            <MetaChip>{title}</MetaChip>
             {settings?.updated_at ? (
               <span className="inline-flex items-center gap-1">
                 <CircleCheck aria-hidden className="size-3.5 text-success-text" />

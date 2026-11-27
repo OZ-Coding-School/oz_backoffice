@@ -249,6 +249,8 @@ describe("행정 업무 > 계약 목록 (F96)", () => {
     expect(list).toContain("include_bootcamp_common=true");
     expect(new URLSearchParams(list).getAll("status")).toEqual(["DRAFT", "IN_PROGRESS", "SIGNED", "ACTIVE"]);
     expect(screen.getByRole("button", { name: "과정 / 기수" })).toHaveTextContent("백엔드 부트캠프 12기");
+    // 상단 선택기와 겹치는 머리 칩·건수는 두지 않는다 (F96 보완)
+    expect(screen.queryByText(/^계약 \d+건$/)).not.toBeInTheDocument();
     const tabs = screen.getByRole("navigation", { name: "계약 종류" });
     expect(within(tabs).getByRole("link", { name: "전체 3" })).toHaveAttribute("aria-current", "page");
     expect(within(tabs).getByRole("link", { name: "멘토 2" })).toBeInTheDocument();
@@ -266,7 +268,7 @@ describe("행정 업무 > 계약 목록 (F96)", () => {
       "백엔드 과정 Zoom 라이선스",
       "SW",
       "줌코리아담당 최대리",
-      "과정 공통",
+      "백엔드 부트캠프 / 공통",
       "2026.09.01 ~ 2027.02.28",
       "정액 1,200,000원부가세 별도",
       "진행 중",
@@ -411,10 +413,10 @@ describe("계약 패널 (F96)", () => {
     const sheet = await screen.findByRole("dialog", { name: "12기 백엔드 멘토 계약" });
     const flow = within(sheet).getByRole("list", { name: "계약 단계" });
     expect(within(flow).getAllByRole("listitem")[3]).toHaveAttribute("aria-current", "step");
-    expect(within(sheet).getByRole("region", { name: "금액" })).toHaveTextContent("단가 · 시간당 50,000원");
+    expect(within(sheet).getByRole("region", { name: "금액" })).toHaveTextContent("단가 · 시간당50,000원");
     expect(within(sheet).getByRole("region", { name: "이름 또는 업체명" })).toHaveTextContent("010-****-1234");
     const history = await within(sheet).findByRole("list", { name: "변경 이력" });
-    expect(history).toHaveTextContent("단가 45,000원 → 50,000원");
+    expect(history).toHaveTextContent("단가45,000원→50,000원");
     expect(history).toHaveTextContent("사유: 운영 범위 확대");
     // 종료일이 있으면 다음 단계 버튼이 없다
     expect(within(sheet).queryByRole("button", { name: "종료" })).not.toBeInTheDocument();

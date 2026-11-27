@@ -1,6 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Check, Ellipsis } from "lucide-react";
+import {
+  ArrowRight,
+  Ban,
+  Check,
+  CircleSlash,
+  Ellipsis,
+  FileText,
+  History,
+  Info,
+  UserRound,
+  Wallet,
+} from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -32,7 +43,6 @@ import {
 } from "../api";
 import {
   academyText,
-  amountText,
   dotDate,
   FIELD_LABELS,
   fieldValue,
@@ -47,7 +57,6 @@ import {
   STATUS,
   TERMINATION_LABELS,
   TIME_BASIS_LABELS,
-  TYPE_LABELS,
   VAT_LABELS,
   won,
 } from "../labels";
@@ -55,6 +64,7 @@ import { ContractEditForm } from "./contract-form";
 import { ContractWizard } from "./contract-wizard";
 import { CancelDialog, DeleteDialog, ManagerDialog, StepDialog, TerminateDialog } from "./dialogs";
 import { MoveDialog } from "./pickers";
+import { ContractTypeBadge } from "./type-badge";
 
 /** 계약 패널 (F83·F96): 조회·상태 단계·수정·변경 등록, 추가는 `contractId === "new"`(위저드) */
 export function ContractSheet({
@@ -155,8 +165,13 @@ function ContractView({
     <>
       <PanelHead
         title={c.title}
-        description={`${TYPE_LABELS[c.contract_type]} · ${academyText(c, true)} · ${c.contractor_name}`}
-        badges={<Badge variant={status.badge}>{status.label}</Badge>}
+        description={`${academyText(c)} · ${c.contractor_name}`}
+        badges={
+          <>
+            <ContractTypeBadge type={c.contract_type} />
+            <Badge variant={status.badge}>{status.label}</Badge>
+          </>
+        }
         actions={
           canManage && (beforeSign || signed) ? (
             <div className="flex gap-2">
@@ -186,21 +201,25 @@ function ContractView({
         }
         onClose={onClose}
       />
-      <div className="flex flex-col gap-2 border-b border-border bg-card px-6 py-4">
-        <div className="flex items-center gap-3">
-          <StatusFlow contract={c} />
+      <div className="flex flex-col gap-3 border-b border-border bg-card px-6 pt-4 pb-3.5">
+        <StatusFlow contract={c} />
+        <div className="flex items-center gap-3 rounded-lg bg-muted/60 py-2 pr-2 pl-3">
+          <Info aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+          <p className="flex-1 text-caption text-muted-foreground">{flowHint(c)}</p>
           {step ? (
             <Button size="sm" onClick={() => setDialog("step")}>
               {step.label}
+              <ArrowRight aria-hidden />
             </Button>
           ) : null}
         </div>
-        <p className="text-caption text-muted-foreground">{flowHint(c)}</p>
       </div>
-      <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-6">
-        <PanelSection title="계약 정보">
-          <PanelRow label="종류">{TYPE_LABELS[c.contract_type]}</PanelRow>
-          <PanelRow label="과정 / 기수">{academyText(c, true)}</PanelRow>
+      <div className="flex flex-1 flex-col gap-4 overflow-y-auto bg-muted/30 p-6">
+        <PanelSection title="계약 정보" icon={FileText}>
+          <PanelRow label="종류">
+            <ContractTypeBadge type={c.contract_type} />
+          </PanelRow>
+          <PanelRow label="과정 / 기수">{academyText(c)}</PanelRow>
           <PanelRow label="기간">{period(c)}</PanelRow>
           <PanelRow label="등록">{c.created_at ? formatKst(c.created_at, "yyyy.MM.dd") : "—"}</PanelRow>
         </PanelSection>
@@ -210,7 +229,7 @@ function ContractView({
           canMove={canManage && canPickMentor && c.contract_type === "MENTOR"}
           onMove={() => setDialog("move")}
         />
-        <PanelSection title="계약서 · 담당">
+        <PanelSection title="계약서 · 담당" icon={FileText}>
           <PanelRow label="계약서">
             <FileRow contract={c} />
           </PanelRow>
@@ -226,7 +245,7 @@ function ContractView({
           </PanelRow>
         </PanelSection>
         {c.status === "CANCELED" ? (
-          <PanelSection title="취소">
+          <PanelSection title="취소" icon={CircleSlash}>
             <PanelRow label="취소 일자">{dotDate(c.canceled_on)}</PanelRow>
             <PanelRow label="사유" top>
               <span className="font-normal whitespace-pre-line">{c.cancel_reason ?? "—"}</span>
@@ -234,7 +253,7 @@ function ContractView({
           </PanelSection>
         ) : null}
         {c.status === "TERMINATED" ? (
-          <PanelSection title="해지">
+          <PanelSection title="해지" icon={Ban}>
             <PanelRow label="해지 일자">{dotDate(c.terminated_on)}</PanelRow>
             <PanelRow label="사유">{c.termination_reason ? TERMINATION_LABELS[c.termination_reason] : "—"}</PanelRow>
             {c.termination_detail ? (
@@ -258,7 +277,7 @@ function ContractView({
   );
 }
 
-/** 상태 단계 (F96): 초안 → 진행 중 → 계약 완료 → 이행 중 → 종료. 취소·해지면 그 자리에서 끝난 표시 */
+/** 상태 단계 (F96): 초안 → 진행 중 → 계약 완료 → 이행 중 → 종료. 연결선 스테퍼, 취소·해지면 그 자리에서 빨강 끝 */
 function StatusFlow({ contract: c }: { contract: Contract }) {
   const stopped = c.status === "CANCELED" || c.status === "TERMINATED";
   // 마지막으로 거친 단계: 취소는 초안·진행 중(계약서가 있으면 진행 중), 해지는 계약 완료·이행 중
@@ -273,30 +292,51 @@ function StatusFlow({ contract: c }: { contract: Contract }) {
     : FLOW.indexOf(c.status);
   const ended = c.status === "ENDED";
   return (
-    <ol aria-label="계약 단계" className="flex flex-1 items-center gap-1">
+    <ol aria-label="계약 단계" className="flex items-start">
       {FLOW.map((s, i) => {
         const done = ended || i < reached || (stopped && i === reached);
         const current = !stopped && !ended && i === reached;
         const stopHere = stopped && i === reached + 1;
+        const after = stopped && i > reached + 1;
         const label = stopHere ? STATUS[c.status].label : STATUS[s].label;
+        const lineOn = i > 0 && (ended || i <= reached || stopHere);
         return (
           <li
             key={s}
             aria-current={current ? "step" : undefined}
-            className="flex flex-1 flex-col items-center gap-1 text-center"
+            className="relative flex flex-1 flex-col items-center gap-1.5 text-center"
           >
+            {i > 0 ? (
+              <span
+                aria-hidden
+                className={cn(
+                  "absolute top-3.5 right-1/2 h-0.5 w-full -translate-y-1/2 rounded-full",
+                  stopHere ? "bg-destructive/50" : lineOn ? "bg-primary" : "bg-border",
+                )}
+              />
+            ) : null}
             <span
               className={cn(
-                "flex size-5 items-center justify-center rounded-full text-caption-strong",
-                done || current
-                  ? "bg-primary text-primary-foreground"
-                  : stopHere
-                    ? "bg-destructive-subtle text-destructive-text"
-                    : "bg-muted text-muted-foreground",
-                current && "ring-4 ring-primary/20",
+                "relative z-10 flex size-7 items-center justify-center rounded-full border-2 text-caption-strong transition-colors",
+                done
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : current
+                    ? "border-primary bg-card text-primary-text ring-4 ring-primary/15"
+                    : stopHere
+                      ? "border-destructive bg-destructive-subtle text-destructive-text"
+                      : "border-border bg-card text-muted-foreground",
+                after && "opacity-40",
               )}
             >
-              {done ? <Check aria-hidden className="size-3" /> : stopHere ? "×" : null}
+              {done ? (
+                <Check aria-hidden className="size-3.5" />
+              ) : stopHere ? (
+                <Ban aria-hidden className="size-3.5" />
+              ) : current ? (
+                <span aria-hidden className="size-2 rounded-full bg-primary" />
+              ) : (
+                i + 1
+              )}
             </span>
             <span
               className={cn(
@@ -304,8 +344,11 @@ function StatusFlow({ contract: c }: { contract: Contract }) {
                 current
                   ? "text-caption-strong text-primary-text"
                   : stopHere
-                    ? "text-destructive-text"
-                    : "text-muted-foreground",
+                    ? "text-caption-strong text-destructive-text"
+                    : done
+                      ? "text-foreground"
+                      : "text-muted-foreground",
+                after && "opacity-40",
               )}
             >
               {label}
@@ -317,17 +360,30 @@ function StatusFlow({ contract: c }: { contract: Contract }) {
   );
 }
 
+/** 금액 요약 타일: 큰 숫자 + 정산 유형 */
+function AmountTile({ contract: c }: { contract: Contract }) {
+  const main = c.settlement_type === "UNIT_PRICE" ? c.unit_price : c.total_amount;
+  const caption =
+    c.settlement_type === "UNIT_PRICE" && c.price_unit
+      ? `${SETTLEMENT_LABELS.UNIT_PRICE} · ${PRICE_UNIT_LABELS[c.price_unit]}`
+      : c.settlement_type === "ACTUAL_COST"
+        ? "실비 · 한도"
+        : SETTLEMENT_LABELS[c.settlement_type];
+  return (
+    <div className="flex items-end justify-between gap-3 rounded-lg bg-linear-to-br from-sidebar-accent/70 to-card px-4 py-3">
+      <div className="flex flex-col gap-0.5">
+        <span className="text-caption text-muted-foreground">{caption}</span>
+        <span className="text-h2 text-foreground tabular-nums">{main != null ? won(main) : "금액 없음"}</span>
+      </div>
+      <span className="text-caption text-muted-foreground">{VAT_LABELS[c.vat_type]}</span>
+    </div>
+  );
+}
+
 function AmountView({ contract: c }: { contract: Contract }) {
   return (
-    <PanelSection title="금액">
-      <PanelRow label="정산">
-        {SETTLEMENT_LABELS[c.settlement_type]}
-        {c.settlement_type === "UNIT_PRICE" && c.price_unit && c.unit_price != null
-          ? ` · ${PRICE_UNIT_LABELS[c.price_unit]} ${won(c.unit_price)}`
-          : c.settlement_type !== "UNIT_PRICE"
-            ? ` · ${amountText(c)}`
-            : ""}
-      </PanelRow>
+    <PanelSection title="금액" icon={Wallet}>
+      <AmountTile contract={c} />
       {c.settlement_type === "UNIT_PRICE" && c.total_amount != null ? (
         <PanelRow label="예상 총액">{won(c.total_amount)}</PanelRow>
       ) : null}
@@ -339,7 +395,6 @@ function AmountView({ contract: c }: { contract: Contract }) {
           </PanelRow>
         </>
       ) : null}
-      <PanelRow label="부가세">{VAT_LABELS[c.vat_type].replace("부가세 ", "")}</PanelRow>
       {c.amount_note ? (
         <PanelRow label="메모" top>
           <span className="font-normal whitespace-pre-line">{c.amount_note}</span>
@@ -353,7 +408,7 @@ function PartyView({ contract: c, canMove, onMove }: { contract: Contract; canMo
   const vendor = isVendor(c.contract_type);
   const linked = linkedText(c);
   return (
-    <PanelSection title="이름 또는 업체명">
+    <PanelSection title="이름 또는 업체명" icon={UserRound}>
       {c.contract_type === "MENTOR" ? (
         <PanelRow label="멘토" help={MENTOR_HELP}>
           <div className="flex items-center gap-2">
@@ -437,52 +492,73 @@ function FileRow({ contract: c }: { contract: Contract }) {
   );
 }
 
-/** 변경 이력 (A109⑨): 일자 · 바뀐 항목 전 → 후 · 사유 · 등록자 · 변경 계약서 */
+/** 변경 이력 (A109⑨): 타임라인(점·선) · 바뀐 항목 전 → 후 칩 · 사유 · 등록자 · 변경 계약서 */
 function AmendmentsView({ contract: c }: { contract: Contract }) {
   const list = useQuery(amendmentsQuery(c.id));
   const items = list.data ?? [];
   if (list.isPending || items.length === 0) return null;
   return (
-    <PanelSection title={`변경 이력 · ${items.length}건`}>
-      <ul aria-label="변경 이력" className="flex flex-col divide-y divide-border">
-        {items.map((a) => (
-          <AmendmentItem key={a.id} contractId={c.id} amendment={a} />
+    <PanelSection title={`변경 이력 · ${items.length}건`} icon={History}>
+      <ol aria-label="변경 이력" className="flex flex-col">
+        {items.map((a, i) => (
+          <AmendmentItem key={a.id} contractId={c.id} amendment={a} last={i === items.length - 1} />
         ))}
-      </ul>
+      </ol>
     </PanelSection>
   );
 }
 
-function AmendmentItem({ contractId, amendment: a }: { contractId: string; amendment: Amendment }) {
+function AmendmentItem({
+  contractId,
+  amendment: a,
+  last,
+}: {
+  contractId: string;
+  amendment: Amendment;
+  last: boolean;
+}) {
   const { opening, open } = useOpenUrl();
   const keys = Object.keys(a.after ?? {});
   return (
-    <li className="flex flex-col gap-1.5 py-2.5 first:pt-0 last:pb-0">
-      <div className="flex items-center gap-2">
-        <span className="text-body-strong text-foreground">{dotDate(a.amended_on)}</span>
-        <span className="text-caption text-muted-foreground">등록 {a.created_by_name ?? "—"}</span>
-        <div className="flex-1" />
-        {a.contract_file ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={opening}
-            onClick={() => void open(() => amendmentFileUrl(contractId, a.id))}
-          >
-            변경 계약서 보기
-          </Button>
-        ) : null}
+    <li className="relative flex gap-3 pb-4 last:pb-0">
+      {last ? null : <span aria-hidden className="absolute top-5 bottom-0 left-[7px] w-0.5 bg-border" />}
+      <span aria-hidden className="mt-1 size-4 shrink-0 rounded-full border-4 border-primary/25 bg-primary" />
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        <div className="flex items-center gap-2">
+          <span className="text-body-strong text-foreground tabular-nums">{dotDate(a.amended_on)}</span>
+          <span className="text-caption text-muted-foreground">등록 {a.created_by_name ?? "—"}</span>
+          <div className="flex-1" />
+          {a.contract_file ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={opening}
+              onClick={() => void open(() => amendmentFileUrl(contractId, a.id))}
+            >
+              <FileText aria-hidden />
+              변경 계약서
+            </Button>
+          ) : null}
+        </div>
+        <ul className="flex flex-col gap-1.5">
+          {keys.map((k) => (
+            <li key={k} className="flex flex-wrap items-center gap-1.5 text-body">
+              <span className="w-20 shrink-0 text-caption text-muted-foreground">{FIELD_LABELS[k] ?? k}</span>
+              <span className="rounded-md bg-muted px-1.5 py-0.5 text-caption text-muted-foreground line-through tabular-nums">
+                {fieldValue(k, (a.before as Record<string, unknown>)[k])}
+              </span>
+              <ArrowRight aria-hidden className="size-3.5 text-muted-foreground" />
+              <span className="sr-only">→</span>
+              <span className="rounded-md bg-primary/12 px-1.5 py-0.5 text-caption-strong text-primary-text tabular-nums">
+                {fieldValue(k, (a.after as Record<string, unknown>)[k])}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <p className="rounded-md bg-muted/60 px-2.5 py-1.5 text-caption whitespace-pre-line text-muted-foreground">
+          사유: {a.reason}
+        </p>
       </div>
-      <ul className="flex flex-col gap-0.5">
-        {keys.map((k) => (
-          <li key={k} className="text-body text-foreground">
-            <span className="text-muted-foreground">{FIELD_LABELS[k] ?? k}</span>{" "}
-            {fieldValue(k, (a.before as Record<string, unknown>)[k])} →{" "}
-            {fieldValue(k, (a.after as Record<string, unknown>)[k])}
-          </li>
-        ))}
-      </ul>
-      <p className="text-caption whitespace-pre-line text-muted-foreground">사유: {a.reason}</p>
     </li>
   );
 }

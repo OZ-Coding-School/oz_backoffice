@@ -1,5 +1,5 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { Search } from "lucide-react";
+import { CalendarRange, Layers, Search, UserRound, Wallet } from "lucide-react";
 import { useId, useState, type InputHTMLAttributes } from "react";
 import { Controller, useWatch, type UseFormReturn } from "react-hook-form";
 
@@ -112,7 +112,7 @@ export function BasicsSection({
   const bootcamp = bootcamps.find((b) => b.id === bootcampId);
   const errors = form.formState.errors;
   return (
-    <PanelSection title="종류 · 과정 / 기수">
+    <PanelSection title="종류 · 과정 / 기수" icon={Layers}>
       <PanelRow label="종류">
         {lockType ? (
           TYPE_LABELS[type]
@@ -286,7 +286,7 @@ export function PartySection({
   const vendor = isVendor(type);
   const picking = mode === "create" && type === "MENTOR" && canPickMentor && choice === "existing";
   return (
-    <PanelSection title="이름 또는 업체명">
+    <PanelSection title="이름 또는 업체명" icon={UserRound}>
       {mode === "create" && type === "MENTOR" && canPickMentor ? (
         <PanelRow label="멘토">
           <Controller
@@ -380,7 +380,7 @@ export function AmountSection({ form }: { form: Form }) {
   const mentor = type === "MENTOR";
   const effective = mentor ? "UNIT_PRICE" : settlement;
   return (
-    <PanelSection title="금액">
+    <PanelSection title="금액" icon={Wallet}>
       <PanelRow label="정산 유형" help={mentor ? "멘토 계약은 시간당·회당 단가만 고를 수 있어요." : undefined}>
         {mentor ? (
           "단가"
@@ -479,7 +479,7 @@ export function PeriodSection({ form }: { form: Form }) {
   const id = useId();
   const errors = form.formState.errors;
   return (
-    <PanelSection title="기간">
+    <PanelSection title="기간" icon={CalendarRange}>
       <PanelRow
         label="계약 기간"
         help="둘 다 선택이에요. 시작일이 오면 '이행 중'으로, 종료일이 지나면 '종료'로 바뀌어요."

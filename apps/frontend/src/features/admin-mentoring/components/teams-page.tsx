@@ -5,7 +5,7 @@ import { useState } from "react";
 
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
-import { MetaChip, PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/page-header";
 import { Alert } from "@/components/ui/alert";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -39,7 +39,6 @@ export function TeamsPage({ cohortId }: { cohortId: string }) {
   const [picked, setPicked] = useState<string[]>([]);
   const title = cohort ? `${cohort.bootcamp_name} ${cohort.cohort_number}기` : "";
   const items = teams.data ?? [];
-  const memberCount = items.reduce((n, t) => n + t.members.length, 0);
   const teamAllowed = settings.data?.allow_team_mentoring ?? false;
   const toggle = (id: string) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
 
@@ -48,16 +47,7 @@ export function TeamsPage({ cohortId }: { cohortId: string }) {
       <PageHeader
         icon={Users}
         title="팀 관리"
-        meta={
-          <>
-            <MetaChip>{title}</MetaChip>
-            {teams.data ? (
-              <span>
-                팀 {items.length}개 · 팀원 {memberCount}명
-              </span>
-            ) : null}
-          </>
-        }
+        description="팀을 만들고 팀 멘토링 시간을 지급해요."
         actions={
           teamAllowed ? (
             <>

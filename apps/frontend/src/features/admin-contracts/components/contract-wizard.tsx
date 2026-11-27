@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import { useBlocker } from "@tanstack/react-router";
-import { Check } from "lucide-react";
+import { Check, ClipboardCheck, FileText, UserRound } from "lucide-react";
 import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
@@ -16,10 +16,11 @@ import { cn } from "@/lib/utils";
 
 import { managerCandidatesQuery, useCreateContract, type Contract, type ContractFile } from "../api";
 import { contractSchema, emptyValues, fieldsOf, STEP_FIELDS, type ContractValues } from "../contract-values";
-import { amountSub, amountText, contractError, FILE_HELP, isVendor, period, TYPE_LABELS } from "../labels";
+import { amountSub, amountText, contractError, FILE_HELP, isVendor, period } from "../labels";
 import { AmountSection, BasicsSection, PartySection, PeriodSection } from "./contract-fields";
 import { FilePicker } from "./file-picker";
 import { ManagerList, type ManagerChoice } from "./pickers";
+import { ContractTypeBadge } from "./type-badge";
 
 const STEPS = ["종류·과정 / 기수", "이름 또는 업체명", "금액·기간", "계약서·담당", "확인"] as const;
 
@@ -60,7 +61,7 @@ export function ContractWizard({
   const cohorts = access.data?.cohorts ?? [];
   const bootcampName = cohorts.find((c) => c.bootcamp_id === values.bootcamp_id)?.bootcamp_name;
   const cohortNumber = cohorts.find((c) => c.id === values.cohort_id)?.cohort_number;
-  const academy = bootcampName ? `${bootcampName} · ${cohortNumber ? `${cohortNumber}기` : "과정 공통"}` : "";
+  const academy = bootcampName ? `${bootcampName} / ${cohortNumber ? `${cohortNumber}기` : "공통"}` : "";
 
   const next = async () => {
     setError(null);
@@ -115,7 +116,7 @@ export function ContractWizard({
   return (
     <>
       <PanelHead title="계약 추가" description={academy || "종류와 과정 / 기수부터 골라요"} onClose={() => onDone()} />
-      <ol aria-label="단계" className="grid grid-cols-5 border-b border-border bg-card px-4 py-3">
+      <ol aria-label="단계" className="grid grid-cols-5 border-b border-border bg-card px-4 pt-4 pb-3.5">
         {STEPS.map((label, i) => {
           const done = i < step;
           const current = i === step;
@@ -128,14 +129,20 @@ export function ContractWizard({
               {i > 0 ? (
                 <span
                   aria-hidden
-                  className={cn("absolute top-2.5 right-1/2 h-0.5 w-full", i <= step ? "bg-primary" : "bg-border")}
+                  className={cn(
+                    "absolute top-3.5 right-1/2 h-0.5 w-full -translate-y-1/2 rounded-full",
+                    i <= step ? "bg-primary" : "bg-border",
+                  )}
                 />
               ) : null}
               <span
                 className={cn(
-                  "relative z-10 flex size-5.5 items-center justify-center rounded-full text-caption-strong",
-                  done || current ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
-                  current && "ring-4 ring-primary/20",
+                  "relative z-10 flex size-7 items-center justify-center rounded-full border-2 text-caption-strong transition-colors",
+                  done
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : current
+                      ? "border-primary bg-card text-primary-text ring-4 ring-primary/15"
+                      : "border-border bg-card text-muted-foreground",
                 )}
               >
                 {done ? <Check aria-hidden className="size-3.5" /> : i + 1}
@@ -143,7 +150,11 @@ export function ContractWizard({
               <span
                 className={cn(
                   "text-caption whitespace-nowrap",
-                  current ? "text-caption-strong text-foreground" : "text-muted-foreground",
+                  current
+                    ? "text-caption-strong text-primary-text"
+                    : done
+                      ? "text-foreground"
+                      : "text-muted-foreground",
                 )}
               >
                 {label}
@@ -172,12 +183,12 @@ export function ContractWizard({
           ) : null}
           {step === 3 ? (
             <>
-              <PanelSection title="계약서">
+              <PanelSection title="계약서" icon={FileText}>
                 <PanelRow label="파일" help={FILE_HELP}>
                   <FilePicker value={file} onChange={setFile} onUploading={setUploading} />
                 </PanelRow>
               </PanelSection>
-              <PanelSection title="담당">
+              <PanelSection title="담당" icon={UserRound}>
                 <PanelRow label="담당 직원" top>
                   <div className="flex flex-col gap-2">
                     <span>{manager ? manager.name : "고르지 않음"}</span>
@@ -189,8 +200,10 @@ export function ContractWizard({
           ) : null}
           {step === 4 ? (
             <>
-              <PanelSection title="확인">
-                <PanelRow label="종류">{values.contract_type ? TYPE_LABELS[values.contract_type] : "—"}</PanelRow>
+              <PanelSection title="확인" icon={ClipboardCheck}>
+                <PanelRow label="종류">
+                  {values.contract_type ? <ContractTypeBadge type={values.contract_type} /> : "—"}
+                </PanelRow>
                 <PanelRow label="과정 / 기수">{academy}</PanelRow>
                 <PanelRow label="계약 명칭">{values.title}</PanelRow>
                 <PanelRow label={vendor ? "업체명" : "이름"}>

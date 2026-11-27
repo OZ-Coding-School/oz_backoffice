@@ -306,7 +306,7 @@ function ContractsTab({ mentorId }: { mentorId: string }) {
                 </span>
                 <dl className="grid grid-cols-[72px_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-body">
                   <dt className="text-muted-foreground">과정 / 기수</dt>
-                  <dd className="text-foreground">{academyText(c, true)}</dd>
+                  <dd className="text-foreground">{academyText(c)}</dd>
                   <dt className="text-muted-foreground">기간</dt>
                   <dd className="text-foreground">{period(c)}</dd>
                   <dt className="text-muted-foreground">단가</dt>

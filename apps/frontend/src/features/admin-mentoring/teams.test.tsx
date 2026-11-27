@@ -149,7 +149,8 @@ describe("멘토링 > 팀 관리 (FE-19b)", () => {
     const { router } = await renderRoute("/admin/mentoring/teams");
     await waitFor(() => expect(router.state.location.pathname).toBe("/admin/cohorts/c12/mentoring/teams"));
     expect(await screen.findByRole("heading", { level: 1, name: "팀 관리" })).toBeInTheDocument();
-    expect(screen.getByText("팀 2개 · 팀원 3명")).toBeInTheDocument();
+    // 상단 선택기가 기수를 보여 주므로 머리에는 기수·건수를 두지 않는다 (F96 보완)
+    expect(screen.queryByText("팀 2개 · 팀원 3명")).not.toBeInTheDocument();
     const alpha = await screen.findByRole("row", { name: "알파" });
     expect(within(alpha).getByText("3시간")).toBeInTheDocument();
     expect(within(alpha).getByText("1건")).toBeInTheDocument();

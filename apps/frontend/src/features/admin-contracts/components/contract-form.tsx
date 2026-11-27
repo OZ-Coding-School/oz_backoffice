@@ -1,5 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
+import { FileText, History } from "lucide-react";
 import { useBlocker } from "@tanstack/react-router";
 import { useId, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -17,9 +18,10 @@ import { staffAccessQuery } from "@/features/staff/api";
 
 import { useAmendContract, useUpdateContract, type Contract, type ContractFile } from "../api";
 import { amendmentOf, contractSchema, updateOf, valuesOf, type ContractValues } from "../contract-values";
-import { academyText, contractError, FILE_HELP, STATUS, TYPE_LABELS } from "../labels";
+import { academyText, contractError, FILE_HELP, STATUS } from "../labels";
 import { AmountSection, BasicsSection, PartySection, PeriodSection } from "./contract-fields";
 import { FilePicker } from "./file-picker";
+import { ContractTypeBadge } from "./type-badge";
 
 const REASON_MAX = 500;
 
@@ -100,9 +102,10 @@ export function ContractEditForm({
     <>
       <PanelHead
         title={c.title}
-        description={`${TYPE_LABELS[c.contract_type]} · ${academyText(c, true)}`}
+        description={academyText(c)}
         badges={
           <>
+            <ContractTypeBadge type={c.contract_type} />
             <Badge variant={status.badge}>{status.label}</Badge>
             <Badge variant="warning">{mode === "edit" ? "수정 중" : "변경 등록 중"}</Badge>
           </>
@@ -115,9 +118,9 @@ export function ContractEditForm({
         onSubmit={(e) => void onSubmit(e)}
         className="flex min-h-0 flex-1 flex-col"
       >
-        <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-6">
+        <div className="flex flex-1 flex-col gap-4 overflow-y-auto bg-muted/30 p-6">
           {mode === "amend" ? (
-            <PanelSection title="변경 계약">
+            <PanelSection title="변경 계약" icon={History}>
               <PanelRow label="변경 일자" htmlFor={`${id}-on`}>
                 <Input
                   id={`${id}-on`}
@@ -146,10 +149,12 @@ export function ContractEditForm({
             <BasicsSection form={form} cohorts={access.data?.cohorts ?? []} lockType />
           )}
           {mode === "amend" ? (
-            <PanelSection title="계약 정보">
-              <PanelRow label="종류">{TYPE_LABELS[c.contract_type]}</PanelRow>
+            <PanelSection title="계약 정보" icon={FileText}>
+              <PanelRow label="종류">
+                <ContractTypeBadge type={c.contract_type} />
+              </PanelRow>
               <PanelRow label="과정 / 기수" help="종류·과정 / 기수는 변경 계약으로 바꿀 수 없어요.">
-                {academyText(c, true)}
+                {academyText(c)}
               </PanelRow>
               <PanelRow label="계약 명칭" htmlFor={`${id}-title`}>
                 <Input id={`${id}-title`} maxLength={100} className="font-normal" {...form.register("title")} />
@@ -160,7 +165,7 @@ export function ContractEditForm({
           <AmountSection form={form} />
           <PeriodSection form={form} />
           {mode === "edit" ? (
-            <PanelSection title="계약서">
+            <PanelSection title="계약서" icon={FileText}>
               <PanelRow label="파일" help={FILE_HELP}>
                 <FilePicker
                   value={file}

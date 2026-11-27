@@ -149,5 +149,5 @@ test("행정 업무 > 계약: 위저드로 과정 공통 SW 계약을 초안으�
   await expect(panel.getByRole("list", { name: "계약 단계" })).toBeVisible();
   await expect(panel.getByRole("button", { name: "진행" })).toBeVisible();
   await panel.getByRole("button", { name: "닫기" }).click();
-  await expect(page.getByRole("table", { name: "계약" })).toContainText("과정 공통");
+  await expect(page.getByRole("table", { name: "계약" })).toContainText("백엔드 부트캠프 / 공통");
 });
