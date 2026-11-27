@@ -1,7 +1,7 @@
 # 59. 멘토링 > 팀 관리 (FE-19b)
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #184
 - 관련 결정: `docs/decisions.md` F93·A108 (F90·F91·F92, A39·A40)
 - 이전 기록: [58. 디자인 다듬기 ⑧ 멘토 화면](58_design_refresh_mentor.md)
 
