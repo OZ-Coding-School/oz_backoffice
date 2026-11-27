@@ -228,6 +228,20 @@ async def test_draft_delete_and_list(client: AsyncClient, admin: dict[str, str])
         f"{API}/contracts", params={"contract_type": ["INSTRUCTOR", "SW"]}, headers=admin
     )
     assert [c["id"] for c in by_type.json()["items"]] == [second.json()["id"]]
+    # 종류별 건수는 종류 필터를 무시한다 (A112)
+    assert by_type.json()["counts"] == {
+        "MENTOR": 1,
+        "INSTRUCTOR": 1,
+        "SW": 0,
+        "EQUIPMENT": 0,
+        "OTHER": 0,
+    }
+    with_common = await client.get(
+        f"{API}/contracts",
+        params={"cohort_id": first["cohort_id"], "include_bootcamp_common": "true"},
+        headers=admin,
+    )
+    assert with_common.status_code == 200
     by_cohort = await client.get(
         f"{API}/contracts", params={"cohort_id": first["cohort_id"]}, headers=admin
     )

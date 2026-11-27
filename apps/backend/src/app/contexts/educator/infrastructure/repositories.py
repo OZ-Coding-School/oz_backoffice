@@ -7,6 +7,7 @@ from typing import cast
 
 from tortoise.expressions import Q
 from tortoise.functions import Count
+from tortoise.queryset import QuerySet
 
 from app.contexts.educator.domain.entities import (
     ContractAmendment,
@@ -93,30 +94,26 @@ class TortoiseEducatorContractRepository(
     async def list_page(
         self, contract_filter: ContractFilter, *, limit: int, offset: int
     ) -> tuple[list[EducatorContract], int]:
-        query = EducatorContractModel.all()
-        if contract_filter.statuses:
-            query = query.filter(status__in=list(contract_filter.statuses))
-        if contract_filter.contract_types:
-            query = query.filter(contract_type__in=list(contract_filter.contract_types))
-        if contract_filter.bootcamp_id is not None:
-            query = query.filter(bootcamp_id=contract_filter.bootcamp_id)
-        if contract_filter.cohort_id is not None:
-            query = query.filter(cohort_id=contract_filter.cohort_id)
-        if contract_filter.visible is not None:
-            visible = contract_filter.visible
-            if not (visible.bootcamp_ids or visible.cohort_ids):
-                return [], 0
-            query = query.filter(
-                Q(bootcamp_id__in=list(visible.bootcamp_ids))
-                | Q(cohort_id__in=list(visible.cohort_ids))
-            )
-        if contract_filter.query:
-            query = query.filter(_search(contract_filter.query))
-        if contract_filter.mentor_id is not None:
-            query = query.filter(mentor_id=contract_filter.mentor_id)
+        query = _filtered(contract_filter, with_types=True)
+        if query is None:
+            return [], 0
         total = await query.count()
         rows = await query.order_by("-created_at", "-id").offset(offset).limit(limit)
         return [self.to_entity(row) for row in rows], total
+
+    async def count_by_types(self, contract_filter: ContractFilter) -> dict[ContractType, int]:
+        counts = dict.fromkeys(ContractType, 0)
+        query = _filtered(contract_filter, with_types=False)
+        if query is None:
+            return counts
+        rows = (
+            await query.annotate(n=Count("id"))
+            .group_by("contract_type")
+            .values("contract_type", "n")
+        )
+        for row in rows:
+            counts[ContractType(row["contract_type"])] = row["n"]
+        return counts
 
     async def list_by_ids(self, contract_ids: list[uuid.UUID]) -> list[EducatorContract]:
         if not contract_ids:
@@ -326,3 +323,38 @@ def _search(text: str) -> Q:
     if digits:
         condition |= Q(contractor_phone__contains=digits)
     return condition
+
+
+def _filtered(
+    contract_filter: ContractFilter, *, with_types: bool
+) -> "QuerySet[EducatorContractModel] | None":
+    """목록 조건을 건 쿼리. 담당 범위가 비어 있으면 None (보이는 계약이 없음)."""
+    query = EducatorContractModel.all()
+    if contract_filter.statuses:
+        query = query.filter(status__in=list(contract_filter.statuses))
+    if with_types and contract_filter.contract_types:
+        query = query.filter(contract_type__in=list(contract_filter.contract_types))
+    if contract_filter.bootcamp_id is not None:
+        query = query.filter(bootcamp_id=contract_filter.bootcamp_id)
+    if contract_filter.cohort_id is not None:
+        if contract_filter.common_bootcamp_id is not None:
+            # 그 기수의 계약 + 같은 과정의 과정 공통 계약 (A112)
+            query = query.filter(
+                Q(cohort_id=contract_filter.cohort_id)
+                | Q(cohort_id__isnull=True, bootcamp_id=contract_filter.common_bootcamp_id)
+            )
+        else:
+            query = query.filter(cohort_id=contract_filter.cohort_id)
+    if contract_filter.visible is not None:
+        visible = contract_filter.visible
+        if not (visible.bootcamp_ids or visible.cohort_ids):
+            return None
+        query = query.filter(
+            Q(bootcamp_id__in=list(visible.bootcamp_ids))
+            | Q(cohort_id__in=list(visible.cohort_ids))
+        )
+    if contract_filter.query:
+        query = query.filter(_search(contract_filter.query))
+    if contract_filter.mentor_id is not None:
+        query = query.filter(mentor_id=contract_filter.mentor_id)
+    return query

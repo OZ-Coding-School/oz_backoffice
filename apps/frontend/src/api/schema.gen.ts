@@ -1453,6 +1453,8 @@ export interface paths {
         /**
          * List Contracts
          * @description 담당 범위 안의 계약만 (A109⑦). 최근에 만든 계약이 먼저.
+         *
+         *     `counts`는 종류 필터만 빼고 같은 조건의 종류별 건수다 (A112).
          */
         get: operations["list_contracts_api_v1_admin_contracts_get"];
         put?: never;
@@ -5124,6 +5126,18 @@ export interface components {
             /** Instructor Id */
             instructor_id?: string | null;
         };
+        /** ContractListPage */
+        ContractListPage: {
+            /** Items */
+            items: components["schemas"]["ContractResponse"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            counts: components["schemas"]["ContractTypeCounts"];
+        };
         /** ContractResponse */
         ContractResponse: {
             /**
@@ -5221,6 +5235,22 @@ export interface components {
          * @enum {string}
          */
         ContractType: "MENTOR" | "INSTRUCTOR" | "SW" | "EQUIPMENT" | "OTHER";
+        /**
+         * ContractTypeCounts
+         * @description 종류 필터와 무관한 그 목록 대상 전체의 종류별 건수 (A112).
+         */
+        ContractTypeCounts: {
+            /** Mentor */
+            MENTOR: number;
+            /** Instructor */
+            INSTRUCTOR: number;
+            /** Sw */
+            SW: number;
+            /** Equipment */
+            EQUIPMENT: number;
+            /** Other */
+            OTHER: number;
+        };
         /**
          * ContractUpdate
          * @description 보낸 필드만 바꾼다. 서명 전(DRAFT·IN_PROGRESS)은 모든 항목, 서명 후는 담당 직원만.
@@ -6667,17 +6697,6 @@ export interface components {
         Page_ApplicantResponse_: {
             /** Items */
             items: components["schemas"]["ApplicantResponse"][];
-            /** Total */
-            total: number;
-            /** Limit */
-            limit: number;
-            /** Offset */
-            offset: number;
-        };
-        /** Page[ContractResponse] */
-        Page_ContractResponse_: {
-            /** Items */
-            items: components["schemas"]["ContractResponse"][];
             /** Total */
             total: number;
             /** Limit */
@@ -11755,6 +11774,8 @@ export interface operations {
                 q?: string | null;
                 /** @description 연결된 멘토 (A103) */
                 mentor_id?: string | null;
+                /** @description cohort_id와 함께: 그 기수가 속한 과정의 과정 공통 계약도 함께 (A112) */
+                include_bootcamp_common?: boolean;
                 limit?: number;
                 offset?: number;
             };
@@ -11770,7 +11791,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Page_ContractResponse_"];
+                    "application/json": components["schemas"]["ContractListPage"];
                 };
             };
             /** @description Validation Error */

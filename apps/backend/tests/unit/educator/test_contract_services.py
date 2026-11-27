@@ -444,12 +444,12 @@ async def test_list_returns_files(h: Harness) -> None:
     await h.service.create(h.values(contract_file_id=file.id), actor_id=h.actor_id)
     await h.service.create(h.values(), actor_id=h.actor_id)
 
-    views, total = await h.service.list_contracts(
+    listed = await h.service.list_contracts(
         ContractFilter(), actor_id=h.actor_id, limit=20, offset=0
     )
 
-    assert total == 2
-    assert {v.file.id if v.file else None for v in views} == {file.id, None}
+    assert listed.total == 2
+    assert {v.file.id if v.file else None for v in listed.views} == {file.id, None}
 
 
 async def test_scope_limits_contracts(h: Harness) -> None:
@@ -459,10 +459,10 @@ async def test_scope_limits_contracts(h: Harness) -> None:
     other = await h.service.create(h.vendor(bootcamp_id=h.other_bootcamp_id), actor_id=h.actor_id)
 
     async def visible() -> set[uuid.UUID]:
-        views, _ = await h.service.list_contracts(
+        listed = await h.service.list_contracts(
             ContractFilter(), actor_id=h.actor_id, limit=20, offset=0
         )
-        return {v.contract.id for v in views}
+        return {v.contract.id for v in listed.views}
 
     # 과정 담당: 그 과정의 공통 계약과 기수 계약
     h.permissions.scopes = {
@@ -597,3 +597,27 @@ async def test_link_requires_matching_existing_profile(h: Harness) -> None:
             instructor_contract.contract.id, instructor_id=new_id(), actor_id=h.actor_id
         )
     assert no_instructor.value.code == "instructor_not_found"
+
+
+async def test_list_counts_by_type_and_bootcamp_common(h: Harness) -> None:
+    """A112: 종류별 건수는 종류 필터를 무시하고, 기수 필터는 과정 공통 계약을 함께 볼 수 있다."""
+    common = await h.service.create(h.vendor(), actor_id=h.actor_id)  # 과정 공통 SW
+    cohort = await h.service.create(h.values(), actor_id=h.actor_id)  # 기수 멘토 계약
+    await h.service.create(h.vendor(bootcamp_id=h.other_bootcamp_id), actor_id=h.actor_id)
+
+    only_cohort = await h.service.list_contracts(
+        ContractFilter(cohort_id=h.cohort_id), actor_id=h.actor_id, limit=20, offset=0
+    )
+    assert {v.contract.id for v in only_cohort.views} == {cohort.contract.id}
+
+    with_common = await h.service.list_contracts(
+        ContractFilter(cohort_id=h.cohort_id, contract_types=frozenset({ContractType.MENTOR})),
+        actor_id=h.actor_id,
+        limit=20,
+        offset=0,
+        include_bootcamp_common=True,
+    )
+    assert {v.contract.id for v in with_common.views} == {cohort.contract.id}
+    assert with_common.counts[ContractType.MENTOR] == 1
+    assert with_common.counts[common.contract.contract_type] == 1
+    assert sum(with_common.counts.values()) == 2
