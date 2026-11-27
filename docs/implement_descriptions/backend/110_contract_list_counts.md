@@ -1,7 +1,7 @@
 # 110. 계약 목록 종류별 건수·과정 공통 함께 보기 (BE-4c)
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #188
 - 관련 결정: `docs/decisions.md` A112 (A109·A111)
 - 이전 기록: [109. 배정의 근거 계약 (BE-4b)](109_assignment_contract_basis.md)
 
