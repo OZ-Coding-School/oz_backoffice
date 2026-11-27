@@ -1,7 +1,7 @@
 # 63. 배정 패널에서 근거 계약 고르기 (F98)
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #194
 - 관련 결정: `docs/decisions.md` F98 (A110·A115, F85)
 - 이전 기록: [62. 계약 화면: 새 사람의 멘토는 계약 완료 때](62_contract_mentor_on_sign.md), 백엔드 [109](../backend/109_assignment_contract_basis.md)
 
