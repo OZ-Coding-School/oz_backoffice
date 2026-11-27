@@ -232,7 +232,7 @@ describe("학사 > 수강생 (FE-17c)", () => {
     mockApi();
     await renderRoute("/admin/academy/students/s1?cohort=c12");
     expect(await screen.findByRole("heading", { name: "가수강" })).toBeInTheDocument();
-    const basic = screen.getByRole("region", { name: "기본·수강 정보" });
+    const basic = screen.getByRole("region", { name: "기본 · 수강 정보" });
     expect(basic).toHaveTextContent("휴대폰010-****-1234");
     expect(basic).toHaveTextContent("기수백엔드 부트캠프 12기");
     expect(basic).toHaveTextContent("HRD 상태수강 중");
