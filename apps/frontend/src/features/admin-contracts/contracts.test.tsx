@@ -86,8 +86,8 @@ const DRAFT = contract("k2", {
   status: "DRAFT",
   contractor_name: "박새멘토",
   title: "12기 데이터 멘토 계약",
-  mentor_id: "m3",
-  linked_profile: { name: "박새멘토", display_name: "박새멘토" },
+  mentor_id: null,
+  linked_profile: null,
   contract_file: null,
   signed_contract_file: null,
 });
@@ -483,6 +483,9 @@ describe("계약 패널 (F96)", () => {
     const sheet = await screen.findByRole("dialog", { name: "12기 데이터 멘토 계약" });
     const user = userEvent.setup();
     expect(within(sheet).getByRole("button", { name: "수정" })).toBeInTheDocument();
+    // 새 사람의 멘토 계약은 계약 완료 때 멘토가 정해진다 (A115)
+    expect(within(sheet).getByText("계약 완료 때 연결")).toBeInTheDocument();
+    expect(within(sheet).queryByRole("link", { name: "멘토 보기" })).not.toBeInTheDocument();
     await user.click(within(sheet).getByRole("button", { name: "진행" }));
     const step = await screen.findByRole("dialog", { name: "계약을 진행할까요?" });
     await user.click(within(step).getByRole("button", { name: "진행" }));
