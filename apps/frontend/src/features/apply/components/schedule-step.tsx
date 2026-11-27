@@ -75,7 +75,7 @@ export function ScheduleStep({
 
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-5">
-      <section className="flex min-w-0 flex-1 flex-col gap-4 rounded-xl border border-border bg-card p-4 md:p-6">
+      <section className="flex min-w-0 flex-1 flex-col gap-4 rounded-2xl border border-border bg-card shadow-sm p-4 md:p-6">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-body-strong text-foreground">진행 시간</h2>
           <div role="radiogroup" aria-label="진행 시간" className="flex gap-1 rounded-md bg-muted p-0.5">
@@ -166,7 +166,7 @@ export function ScheduleStep({
         </div>
       </section>
       <aside className="flex flex-col gap-4 lg:w-85 lg:shrink-0">
-        <section className="flex flex-col gap-2.5 rounded-xl border border-border bg-card p-5">
+        <section className="flex flex-col gap-2.5 rounded-2xl border border-border bg-card shadow-sm p-5">
           <div className="flex items-center justify-between">
             <h2 className="text-body-strong text-foreground">고른 희망 일시</h2>
             <span className="text-caption text-muted-foreground">
@@ -196,7 +196,7 @@ export function ScheduleStep({
           <p className="text-caption text-muted-foreground">1순위부터 멘토가 확인해요. 한 개만 골라도 돼요.</p>
         </section>
         {mentor ? (
-          <section className="flex items-center gap-3 rounded-xl border border-border bg-card p-5">
+          <section className="flex items-center gap-3 rounded-2xl border border-border bg-card shadow-sm p-5">
             <MentorAvatar mentor={mentor} size="md" />
             <div className="flex min-w-0 flex-col">
               <span className="text-body-strong text-foreground">{mentor.display_name}</span>

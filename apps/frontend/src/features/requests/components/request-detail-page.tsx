@@ -74,7 +74,7 @@ function Detail({ request }: { request: MentoringRequest }) {
 
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-6">
-      <article className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card">
+      <article className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
         <header className={cn("flex flex-col gap-3 px-4 py-6 md:px-7", style.card)}>
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1 rounded-full bg-background px-2 py-0.5 text-caption-strong text-accent-foreground">
@@ -126,7 +126,7 @@ function Detail({ request }: { request: MentoringRequest }) {
             leadHours={settings.data?.min_lead_hours}
           />
           {cancel.kind === "available" ? (
-            <section className="flex flex-col gap-2 rounded-xl border border-border bg-card p-5">
+            <section className="flex flex-col gap-2 rounded-2xl border border-border bg-card shadow-sm p-5">
               <h2 className="text-body-strong text-foreground">
                 {request.status === "APPROVED"
                   ? `시작 ${settings.data?.min_lead_hours ?? ""}시간 전까지 바꾸거나 취소할 수 있어요`
@@ -143,7 +143,7 @@ function Detail({ request }: { request: MentoringRequest }) {
               </Button>
             </section>
           ) : cancel.kind === "deadline_passed" ? (
-            <p className="rounded-xl border border-border bg-card p-5 text-body-sm text-muted-foreground">
+            <p className="rounded-2xl border border-border bg-card shadow-sm p-5 text-body-sm text-muted-foreground">
               취소 마감이 지났어요. 운영진에게 문의해 주세요.
             </p>
           ) : null}
@@ -228,7 +228,7 @@ function BalanceBox({
   );
   const held = request.balance.state === "HELD";
   return (
-    <section className="flex flex-col gap-2.5 rounded-xl border border-border bg-card p-5">
+    <section className="flex flex-col gap-2.5 rounded-2xl border border-border bg-card shadow-sm p-5">
       <h2 className="text-body-strong text-foreground">시간</h2>
       {account ? (
         <Line

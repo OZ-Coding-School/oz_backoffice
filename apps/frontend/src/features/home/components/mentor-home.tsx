@@ -97,7 +97,7 @@ export function MentorHome({ me }: { me: Me }) {
 }
 
 const SUMMARY =
-  "flex h-full flex-col justify-between gap-1.5 rounded-xl border border-border bg-card p-3 outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring md:gap-2 md:p-4";
+  "flex h-full flex-col justify-between gap-1.5 rounded-2xl border border-border bg-card shadow-sm p-3 outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring md:gap-2 md:p-4";
 
 function SummaryBody({
   icon: Icon,
@@ -159,7 +159,7 @@ function MissingWarning({ count }: { count: number }) {
   );
 }
 
-const CARD = "flex flex-col gap-3 rounded-xl border border-border bg-card p-4 md:p-5";
+const CARD = "flex flex-col gap-3 rounded-2xl border border-border bg-card shadow-sm p-4 md:p-5";
 const ITEM = "flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border py-3 last:border-b-0";
 const ITEM_LINK =
   "flex min-w-0 flex-1 basis-56 items-center gap-3 rounded-md outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring";

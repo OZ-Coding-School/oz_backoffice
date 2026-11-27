@@ -6,7 +6,7 @@ import { HelpTip } from "@/components/ui/help-tip";
 import { SheetDescription, SheetTitle } from "@/components/ui/sheet";
 
 /**
- * 운영진 슬라이드 패널 부품 (F68): 머리, 섹션(테두리 상자 + 회색 머리글), '라벨 | 값' 줄, 한 줄에 하나인 목록.
+ * 슬라이드 패널 부품 (F68, 모양은 F92): 머리, 섹션(둥근 카드 + 보라 띠 제목), '라벨 | 값' 줄, 한 줄에 하나인 목록.
  * `Sheet`/`SheetContent` 안에서 쓴다.
  */
 export function PanelHead({
@@ -23,7 +23,7 @@ export function PanelHead({
   onClose: () => void;
 }) {
   return (
-    <div className="flex items-start gap-3 border-b border-border py-5 pr-4 pl-6">
+    <div className="flex items-start gap-3 border-b border-border bg-linear-to-b from-sidebar-accent/50 to-card py-5 pr-4 pl-6">
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex flex-wrap items-center gap-2">
           <SheetTitle className="text-h2 text-foreground">{title}</SheetTitle>
@@ -42,11 +42,18 @@ export function PanelHead({
 export function PanelSection({ title, children }: { title: string; children: ReactNode }) {
   const id = useId();
   return (
-    <section aria-labelledby={id} className="shrink-0 overflow-hidden rounded-lg border border-border">
-      <h3 id={id} className="border-b border-border bg-muted px-3.5 py-2.5 text-body-strong text-foreground">
+    <section
+      aria-labelledby={id}
+      className="shrink-0 overflow-hidden rounded-xl border border-border bg-card shadow-sm"
+    >
+      <h3
+        id={id}
+        className="flex items-center gap-2 border-b border-border/70 px-4 pt-3 pb-2.5 text-body-strong text-foreground"
+      >
+        <span aria-hidden className="h-3.5 w-1 rounded-full bg-primary" />
         {title}
       </h3>
-      <div className="flex flex-col gap-2.5 p-3.5">{children}</div>
+      <div className="flex flex-col gap-3 px-4 py-3.5">{children}</div>
     </section>
   );
 }

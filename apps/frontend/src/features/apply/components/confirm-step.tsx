@@ -82,7 +82,7 @@ export function ConfirmStep({
         </Card>
       </div>
       <aside className="flex flex-col gap-4 lg:w-85 lg:shrink-0">
-        <section className="flex flex-col gap-2.5 rounded-xl border border-border bg-card p-5">
+        <section className="flex flex-col gap-2.5 rounded-2xl border border-border bg-card shadow-sm p-5">
           <h2 className="text-body-strong text-foreground">
             {kind === "team" ? `팀 계좌 (${teamLabel ?? "팀"})` : "내 1:1 계좌"}
           </h2>
@@ -114,7 +114,7 @@ export function ConfirmStep({
 
 function Card({ title, onEdit, children }: { title: string; onEdit?: () => void; children: React.ReactNode }) {
   return (
-    <section className="flex flex-col gap-3 rounded-xl border border-border bg-card p-5">
+    <section className="flex flex-col gap-3 rounded-2xl border border-border bg-card shadow-sm p-5">
       <div className="flex items-center justify-between">
         <h2 className="text-body-strong text-foreground">{title}</h2>
         {onEdit ? (

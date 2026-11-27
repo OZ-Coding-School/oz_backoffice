@@ -158,7 +158,7 @@ function MeetButton({ session, className }: { session: MentoringSession; classNa
 
 function SessionTable({ items, now }: { items: MentoringSession[]; now: number }) {
   return (
-    <div className="hidden overflow-hidden rounded-xl border border-border bg-card lg:block">
+    <div className="hidden overflow-hidden rounded-2xl border border-border bg-card shadow-sm lg:block">
       <table className="w-full text-left">
         <thead className="bg-muted text-caption text-muted-foreground">
           <tr>
@@ -226,7 +226,7 @@ function SessionCard({ session, now }: { session: MentoringSession; now: number 
   return (
     <article
       aria-label={session.title}
-      className="relative flex flex-col gap-1.5 rounded-xl border border-border bg-card px-4 py-3.5 hover:bg-muted"
+      className="relative flex flex-col gap-1.5 rounded-2xl border border-border bg-card shadow-sm px-4 py-3.5 hover:bg-muted"
     >
       <div className="flex items-center gap-2">
         <h2 className="min-w-0 flex-1 text-body-strong text-foreground">

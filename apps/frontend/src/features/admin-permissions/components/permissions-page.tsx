@@ -90,7 +90,7 @@ export function PermissionsPage({ positionId }: { positionId: string | undefined
         <div className="flex min-h-0 flex-1 gap-4">
           <nav
             aria-label="직위"
-            className="flex w-72 shrink-0 flex-col overflow-hidden rounded-xl border border-border bg-card"
+            className="flex w-72 shrink-0 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
           >
             <div className="flex items-center gap-1.5 border-b border-border px-4 py-3">
               <span className="text-body-strong text-foreground">직위</span>
@@ -171,7 +171,7 @@ function PositionPermissions({
   return (
     <section
       aria-label={`${position.name} 권한`}
-      className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card"
+      className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
     >
       <div className="flex flex-col gap-1 border-b border-border px-6 py-4">
         <div className="flex items-center gap-2">

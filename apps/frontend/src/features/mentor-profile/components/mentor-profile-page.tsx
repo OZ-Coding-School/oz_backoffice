@@ -80,7 +80,7 @@ function ProfileEditor({ me, profile }: { me: Me; profile: MentorProfile }) {
           aria-label="프로필 편집"
           noValidate
           onSubmit={(e) => void onSubmit(e)}
-          className="flex flex-col gap-5 rounded-xl border border-border bg-card p-4 md:p-6"
+          className="flex flex-col gap-5 rounded-2xl border border-border bg-card shadow-sm p-4 md:p-6"
         >
           <ProfileFields editor={editor} profile={profile} />
           {error ? <Alert variant="error" title={error} /> : null}
@@ -140,7 +140,7 @@ function AssignmentsCard() {
   return (
     <section
       aria-labelledby="assignments-title"
-      className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 md:p-5"
+      className="flex flex-col gap-3 rounded-2xl border border-border bg-card shadow-sm p-4 md:p-5"
     >
       <h2 id="assignments-title" className="text-h3 text-foreground">
         배정된 기수
@@ -183,7 +183,7 @@ function AccountCard({ me }: { me: Me }) {
   return (
     <section
       aria-labelledby="account-title"
-      className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 md:p-5"
+      className="flex flex-col gap-3 rounded-2xl border border-border bg-card shadow-sm p-4 md:p-5"
     >
       <h2 id="account-title" className="flex items-center gap-2 text-h3 text-foreground">
         <User aria-hidden className="size-4 text-muted-foreground" />

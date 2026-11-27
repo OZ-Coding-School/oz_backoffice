@@ -30,7 +30,7 @@ export function DoneStep({ requestId }: { requestId: string }) {
       <p className="text-body text-muted-foreground">
         {r.mentor_display_name}가 희망 일시 중 하나로 승인하면 세션이 만들어지고 채팅으로 알려 드려요.
       </p>
-      <dl className="flex w-full flex-col gap-2.5 rounded-xl border border-border bg-card p-5 text-left">
+      <dl className="flex w-full flex-col gap-2.5 rounded-2xl border border-border bg-card shadow-sm p-5 text-left">
         <Item label="멘토" value={`${r.mentor_display_name} · ${r.team_id ? "팀 멘토링" : "1:1 멘토링"}`} />
         <Item label="주제" value={r.topic} />
         <Item

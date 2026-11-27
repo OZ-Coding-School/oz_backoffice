@@ -64,7 +64,7 @@ export function ProfilePage() {
           </Button>
         </div>
       </div>
-      <section aria-label="계정" className="overflow-hidden rounded-xl border border-border bg-card">
+      <section aria-label="계정" className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
         <div className="flex items-center gap-4 bg-muted/60 px-4 py-6 md:px-5">
           <Avatar name={user.name} className="size-14 text-h3" />
           <div className="flex min-w-0 flex-col gap-1">

@@ -120,7 +120,10 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 function BasicTab({ student: s, cohort }: { student: StudentDetail; cohort: StaffCohort | undefined }) {
   const status = ENROLLMENT[s.status];
   return (
-    <section aria-label="기본·수강 정보" className="flex flex-col gap-4 rounded-xl border border-border bg-card p-6">
+    <section
+      aria-label="기본·수강 정보"
+      className="flex flex-col gap-4 rounded-2xl border border-border bg-card shadow-sm p-6"
+    >
       <h2 className="text-h3 text-foreground">기본 · 수강 정보</h2>
       <dl className="flex flex-col gap-3">
         <Row label="이름">{s.name}</Row>
@@ -152,7 +155,7 @@ function BasicTab({ student: s, cohort }: { student: StudentDetail; cohort: Staf
 
 function Stat({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
-    <div className="flex flex-col gap-1 rounded-xl border border-border bg-card p-4">
+    <div className="flex flex-col gap-1 rounded-2xl border border-border bg-card shadow-sm p-4">
       <span className="text-caption text-muted-foreground">{label}</span>
       <span className="text-h2 text-foreground">{value}</span>
       <span className="text-caption text-muted-foreground">{hint}</span>
@@ -193,7 +196,10 @@ function MentoringTab({
         <Stat label="팀" value={m.team_label ?? "없음"} hint={m.team_label ? "팀 멘토링 참여" : "1:1 멘토링만"} />
       </section>
       {canSeeRecent ? (
-        <section aria-label="최근 신청·세션" className="overflow-hidden rounded-xl border border-border bg-card">
+        <section
+          aria-label="최근 신청·세션"
+          className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
+        >
           <div className="flex items-center gap-2 px-4 py-3">
             <h2 className="text-body-strong text-foreground">최근 신청·세션</h2>
             <span className="text-caption text-muted-foreground">최근 3건</span>

@@ -161,7 +161,7 @@ function MonthCard({
   return (
     <section
       aria-label="월간 일정"
-      className="flex min-w-0 flex-col gap-3 rounded-xl border border-border bg-card p-4 md:p-5"
+      className="flex min-w-0 flex-col gap-3 rounded-2xl border border-border bg-card shadow-sm p-4 md:p-5"
     >
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-h3 text-foreground">{monthTitle(month)}</h2>
@@ -531,7 +531,7 @@ function PeriodList({ periods, editor, onAdd }: { periods: UnavailablePeriod[]; 
   return (
     <section
       aria-labelledby="periods-title"
-      className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 md:p-5"
+      className="flex flex-col gap-3 rounded-2xl border border-border bg-card shadow-sm p-4 md:p-5"
     >
       <div className="flex items-center gap-2">
         <h2 id="periods-title" className="flex-1 text-h3 text-foreground">

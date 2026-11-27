@@ -70,7 +70,7 @@ export function DepartmentsPage({ search }: { search: DepartmentsSearch }) {
 
   return (
     <Frame>
-      <section aria-label="부서 목록" className="overflow-hidden rounded-xl border border-border bg-card">
+      <section aria-label="부서 목록" className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
         <div className="flex items-center gap-3 border-b border-border px-4 py-3">
           <nav aria-label="보기" className="flex gap-0.5 rounded-lg bg-muted p-1">
             {(

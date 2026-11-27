@@ -27,7 +27,7 @@ export function TeamMentorStep({
   const chips = expertiseChips(mentor?.expertise);
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-5">
-      <section className="flex min-w-0 flex-1 flex-col gap-3 rounded-xl border border-border bg-card p-5">
+      <section className="flex min-w-0 flex-1 flex-col gap-3 rounded-2xl border border-border bg-card shadow-sm p-5">
         <div className="flex items-start gap-3">
           <MentorAvatar mentor={mentor ?? { display_name: team.mentor.display_name, profile_image_url: null }} />
           <div className="flex min-w-0 flex-1 flex-col">
@@ -57,7 +57,7 @@ export function TeamMentorStep({
           상세 소개 보기
         </button>
       </section>
-      <aside className="flex flex-col gap-2.5 rounded-xl border border-border bg-card p-5 lg:w-85 lg:shrink-0">
+      <aside className="flex flex-col gap-2.5 rounded-2xl border border-border bg-card shadow-sm p-5 lg:w-85 lg:shrink-0">
         <h2 className="text-body-strong text-foreground">{team.label}</h2>
         <Row
           label="팀원"

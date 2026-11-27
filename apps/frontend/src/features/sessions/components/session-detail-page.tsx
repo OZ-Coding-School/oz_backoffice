@@ -69,7 +69,7 @@ function Detail({ session }: { session: MentoringSession }) {
 
   return (
     <div className="flex flex-col gap-4 lg:gap-6">
-      <article className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card">
+      <article className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
         <header className={cn("flex flex-col gap-4 px-4 py-6 md:px-7", style.card)}>
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2">
@@ -184,7 +184,10 @@ function Fact({
 /** 멘토 기록 (A53): 기록이 있을 때만 전체 폭 (F34) */
 function MentorRecord({ session, recordedAt }: { session: MentoringSession; recordedAt: string }) {
   return (
-    <section aria-labelledby="mentor-record" className="flex flex-col rounded-xl border border-border bg-card">
+    <section
+      aria-labelledby="mentor-record"
+      className="flex flex-col rounded-2xl border border-border bg-card shadow-sm"
+    >
       <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-4 md:px-5">
         <h2 id="mentor-record" className="text-h3 text-foreground">
           멘토 기록

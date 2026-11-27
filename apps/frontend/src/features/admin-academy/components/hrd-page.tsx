@@ -44,7 +44,11 @@ export function HrdPage({ search }: { search: HrdSearch }) {
       ) : items.length === 0 ? (
         <EmptyState icon={FileText} title="HRD 과정이 없어요" description="명단 동기화가 HRD 과정을 만들어요." />
       ) : (
-        <div role="table" aria-label="HRD 과정" className="overflow-hidden rounded-xl border border-border bg-card">
+        <div
+          role="table"
+          aria-label="HRD 과정"
+          className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
+        >
           <div role="row" className={cn(COLUMNS, "bg-muted px-4 py-2.5 text-caption text-muted-foreground")}>
             {["HRD 과정", "훈련과정 ID", "훈련 유형", "회차", "연결 운영과정"].map((h) => (
               <span key={h} role="columnheader">

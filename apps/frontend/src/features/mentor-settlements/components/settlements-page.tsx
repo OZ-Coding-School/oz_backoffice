@@ -50,7 +50,10 @@ export function SettlementsPage({ cohortId }: { cohortId: string | undefined }) 
         <>
           <ul aria-label="정산 요약" className="grid gap-2.5 md:grid-cols-3 md:gap-4">
             {cards.map((c) => (
-              <li key={c.label} className="flex flex-col gap-1 rounded-xl border border-border bg-card p-4 md:p-5">
+              <li
+                key={c.label}
+                className="flex flex-col gap-1 rounded-2xl border border-border bg-card shadow-sm p-4 md:p-5"
+              >
                 <span className="text-caption text-muted-foreground">{c.label}</span>
                 <span className="text-h2 text-foreground">{won(c.amount)}</span>
                 <span className="text-caption text-muted-foreground">{c.note}</span>
@@ -80,7 +83,7 @@ function title(s: SettlementSummary): string {
 
 function SettlementTable({ items }: { items: SettlementSummary[] }) {
   return (
-    <div className="hidden overflow-hidden rounded-xl border border-border bg-card lg:block">
+    <div className="hidden overflow-hidden rounded-2xl border border-border bg-card shadow-sm lg:block">
       <table className="w-full text-left">
         <thead className="bg-muted text-caption text-muted-foreground">
           <tr>
@@ -140,7 +143,7 @@ function SettlementCard({ settlement: s }: { settlement: SettlementSummary }) {
   return (
     <article
       aria-label={name}
-      className="relative flex flex-col gap-1.5 rounded-xl border border-border bg-card px-4 py-3.5 hover:bg-muted"
+      className="relative flex flex-col gap-1.5 rounded-2xl border border-border bg-card shadow-sm px-4 py-3.5 hover:bg-muted"
     >
       <div className="flex items-start gap-2">
         <Link

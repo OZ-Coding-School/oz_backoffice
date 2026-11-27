@@ -69,7 +69,7 @@ function Detail({ request }: { request: MentoringRequest }) {
   return (
     // 데스크톱은 2단, 그 밖은 머리·요약 → 패널 → 신청 내용 순 (F45)
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_22.5rem] lg:items-start lg:gap-6">
-      <article className="flex flex-col overflow-hidden rounded-xl border border-border bg-card lg:row-span-2">
+      <article className="flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm lg:row-span-2">
         <Hero request={request} />
         <Facts request={request} />
         <Body request={request} className="hidden lg:flex" />
@@ -85,7 +85,7 @@ function Detail({ request }: { request: MentoringRequest }) {
         )}
         <ChatLink request={request} />
       </aside>
-      <section className="flex flex-col rounded-xl border border-border bg-card lg:hidden">
+      <section className="flex flex-col rounded-2xl border border-border bg-card shadow-sm lg:hidden">
         <Body request={request} />
       </section>
     </div>
@@ -203,7 +203,10 @@ function ResultCard({ request }: { request: MentoringRequest }) {
         ? "반려한 신청이에요"
         : "취소된 신청이에요";
   return (
-    <section aria-label="처리 결과" className="flex flex-col gap-3 rounded-xl border border-border bg-card p-5">
+    <section
+      aria-label="처리 결과"
+      className="flex flex-col gap-3 rounded-2xl border border-border bg-card shadow-sm p-5"
+    >
       <h2 className="text-h3 text-foreground">{title}</h2>
       <dl className="flex flex-col gap-2.5">
         {rows.map(([label, value]) => (
@@ -231,7 +234,7 @@ function ChatLink({ request }: { request: MentoringRequest }) {
     <Link
       to="/mentoring/chat/$threadId"
       params={{ threadId: thread.id }}
-      className="flex items-center gap-2.5 rounded-xl border border-border bg-card px-5 py-3.5 text-body text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+      className="flex items-center gap-2.5 rounded-2xl border border-border bg-card shadow-sm px-5 py-3.5 text-body text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
     >
       <MessageSquare aria-hidden className="size-4 text-muted-foreground" />
       <span className="flex-1">{who}과의 채팅에서 먼저 물어보기</span>

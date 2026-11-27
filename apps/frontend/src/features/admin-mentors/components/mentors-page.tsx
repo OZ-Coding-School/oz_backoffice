@@ -93,7 +93,11 @@ export function MentorsPage({ search }: { search: MentorsSearch }) {
         />
       ) : (
         <div className="flex flex-col gap-3">
-          <div role="table" aria-label="멘토" className="overflow-hidden rounded-xl border border-border bg-card">
+          <div
+            role="table"
+            aria-label="멘토"
+            className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
+          >
             <div role="row" className={cn(COLUMNS, "bg-muted px-4 py-2.5 text-caption text-muted-foreground")}>
               {["이름(닉네임)", "이메일", "휴대폰", "계약", "신청 받기", "상태"].map((h) => (
                 <span key={h} role="columnheader">

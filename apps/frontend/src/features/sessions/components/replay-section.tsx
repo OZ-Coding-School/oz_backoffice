@@ -38,7 +38,7 @@ export function ReplaySection({ session }: { session: MentoringSession }) {
   return (
     <section
       aria-labelledby="replay"
-      className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4 md:p-5"
+      className="flex flex-col gap-4 rounded-2xl border border-border bg-card shadow-sm p-4 md:p-5"
     >
       {artifacts.isPending ? (
         <>

@@ -36,7 +36,7 @@ export function ProfileTab({ mentor, canManage }: { mentor: MentorItem; canManag
     <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
       <section
         aria-labelledby="student-view-title"
-        className="flex flex-col gap-5 rounded-xl border border-border bg-card p-6"
+        className="flex flex-col gap-5 rounded-2xl border border-border bg-card shadow-sm p-6"
       >
         <div className="flex items-center justify-between gap-3">
           <h2 id="student-view-title" className="text-h3 text-foreground">
@@ -53,7 +53,7 @@ export function ProfileTab({ mentor, canManage }: { mentor: MentorItem; canManag
       <div className="flex flex-col gap-4">
         <section
           aria-labelledby="account-title"
-          className="flex flex-col gap-3 rounded-xl border border-border bg-card p-5"
+          className="flex flex-col gap-3 rounded-2xl border border-border bg-card shadow-sm p-5"
         >
           <h2 id="account-title" className="text-h3 text-foreground">
             계정
@@ -128,7 +128,7 @@ function ProfileEdit({ mentorId, profile, onDone }: { mentorId: string; profile:
         aria-label="프로필 수정"
         noValidate
         onSubmit={(e) => void onSubmit(e)}
-        className="flex flex-col gap-5 rounded-xl border border-border bg-card p-6"
+        className="flex flex-col gap-5 rounded-2xl border border-border bg-card shadow-sm p-6"
       >
         <h2 className="text-h3 text-foreground">프로필 수정</h2>
         <ProfileFields editor={editor} profile={profile} />
@@ -151,7 +151,7 @@ function ProfileEdit({ mentorId, profile, onDone }: { mentorId: string; profile:
       </form>
       <section
         aria-labelledby="preview-title"
-        className="sticky top-4 flex flex-col gap-4 rounded-xl border border-border bg-card p-6"
+        className="sticky top-4 flex flex-col gap-4 rounded-2xl border border-border bg-card shadow-sm p-6"
       >
         <h2 id="preview-title" className="text-label text-muted-foreground">
           수강생에게 보이는 모습
