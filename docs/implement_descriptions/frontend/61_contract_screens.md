@@ -63,3 +63,6 @@
 - 목록 이름 칸의 아이콘·첫 글자 원(`PartyMark`) 제거, 종류 배지 색을 종류마다 다르게.
 - 공용 `components/ui/badge.tsx`: 상태 색 변형을 진한 파스텔 바탕 + 같은 색 테두리로, `violet`·`dashed` 추가. 겹치던 상태 색 정리(계약 취소, 수강생 조기 취업, 세션 예정, 멘토 세션 예정, 시간 내역 차감 예정 취소, 받은 신청 취소). `badge.test.tsx` 기대값 갱신.
 - 검사: lint, format:check, typecheck, vitest 429개(UTC·Asia/Seoul), build, e2e 51개 통과.
+
+## 멘토 옮기기 제거 (2026-11-27, decisions A114)
+- 멘토 계약은 다른 멘토로 옮기지 않는다(BE-4e #191). 패널의 [다른 멘토로 옮기기]·`MoveDialog`·`useMoveContract`를 지우고 멘토 줄 설명을 바꿨다. 오류 문구 `mentor_contract_move_forbidden` 추가, `contract_in_use_by_assignment` 삭제.

@@ -28,7 +28,6 @@ import {
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
 import { maskPhone } from "@/features/profile/mask";
-import { hasPermission, staffAccessQuery } from "@/features/staff/api";
 import { formatKst } from "@/lib/datetime";
 import { cn } from "@/lib/utils";
 
@@ -64,7 +63,6 @@ import {
 import { ContractEditForm } from "./contract-form";
 import { ContractWizard } from "./contract-wizard";
 import { CancelDialog, DeleteDialog, ManagerDialog, StepDialog, TerminateDialog } from "./dialogs";
-import { MoveDialog } from "./pickers";
 import { ContractTypeBadge } from "./type-badge";
 
 /** 계약 패널 (F83·F96): 조회·상태 단계·수정·변경 등록, 추가는 `contractId === "new"`(위저드) */
@@ -126,7 +124,7 @@ function flowHint(c: Contract): string {
   }
 }
 
-type Dialog = "step" | "cancel" | "terminate" | "delete" | "manager" | "move" | null;
+type Dialog = "step" | "cancel" | "terminate" | "delete" | "manager" | null;
 
 function ContractView({
   contractId,
@@ -138,8 +136,6 @@ function ContractView({
   onClose: () => void;
 }) {
   const contract = useQuery(contractQuery(contractId));
-  const access = useQuery(staffAccessQuery);
-  const canPickMentor = !!access.data && hasPermission(access.data, "educator.mentor.read");
   const [editing, setEditing] = useState<"edit" | "amend" | null>(null);
   const [dialog, setDialog] = useState<Dialog>(null);
   const c = contract.data;
@@ -225,11 +221,7 @@ function ContractView({
           <PanelRow label="등록">{c.created_at ? formatKst(c.created_at, "yyyy.MM.dd") : "—"}</PanelRow>
         </PanelSection>
         <AmountView contract={c} />
-        <PartyView
-          contract={c}
-          canMove={canManage && canPickMentor && c.contract_type === "MENTOR"}
-          onMove={() => setDialog("move")}
-        />
+        <PartyView contract={c} />
         <PanelSection title="계약서 · 담당" icon={FileText}>
           <PanelRow label="계약서 원본">
             <FileRow file={c.contract_file} empty="없음 · [진행]에서 올려요" onOpen={() => contractFileUrl(c.id)} />
@@ -280,7 +272,6 @@ function ContractView({
       {dialog === "terminate" ? <TerminateDialog contract={c} onClose={() => setDialog(null)} /> : null}
       {dialog === "delete" ? <DeleteDialog contract={c} onCancel={() => setDialog(null)} onDeleted={onClose} /> : null}
       {dialog === "manager" ? <ManagerDialog contract={c} onClose={() => setDialog(null)} /> : null}
-      {dialog === "move" ? <MoveDialog contract={c} onClose={() => setDialog(null)} /> : null}
     </>
   );
 }
@@ -412,7 +403,7 @@ function AmountView({ contract: c }: { contract: Contract }) {
   );
 }
 
-function PartyView({ contract: c, canMove, onMove }: { contract: Contract; canMove: boolean; onMove: () => void }) {
+function PartyView({ contract: c }: { contract: Contract }) {
   const vendor = isVendor(c.contract_type);
   const linked = linkedText(c);
   return (
@@ -430,11 +421,6 @@ function PartyView({ contract: c, canMove, onMove }: { contract: Contract; canMo
                 >
                   멘토 보기
                 </Link>
-              </Button>
-            ) : null}
-            {canMove && c.mentor_id ? (
-              <Button variant="outline" size="sm" onClick={onMove}>
-                다른 멘토로 옮기기
               </Button>
             ) : null}
           </div>

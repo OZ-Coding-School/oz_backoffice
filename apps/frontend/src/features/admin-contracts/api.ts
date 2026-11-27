@@ -272,18 +272,3 @@ export function useDeleteContract(id: string) {
     },
   });
 }
-
-/** 다른 멘토로 옮기기 (A104) */
-export function useMoveContract(id: string) {
-  const refresh = useRefresh();
-  return useMutation({
-    mutationFn: (mentorId: string) =>
-      unwrap(
-        api.POST("/api/v1/admin/contracts/{contract_id}/link", {
-          params: { path: { contract_id: id } },
-          body: { mentor_id: mentorId },
-        }),
-      ),
-    onSuccess: refresh,
-  });
-}
