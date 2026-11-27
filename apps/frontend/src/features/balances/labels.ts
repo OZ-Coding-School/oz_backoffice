@@ -10,7 +10,7 @@ const TYPE: Record<TransactionType, { label: string; badge: Tone }> = {
   STAFF_GRANT: { label: "지급", badge: "success" },
   STAFF_ADJUST: { label: "조정", badge: "secondary" },
   HOLD: { label: "차감 예정", badge: "warning" },
-  RELEASE: { label: "차감 예정 취소", badge: "info" },
+  RELEASE: { label: "차감 예정 취소", badge: "outline" },
   USING: { label: "차감", badge: "default" },
   REFUND: { label: "돌려받음", badge: "info" },
   OVERTIME: { label: "추가 차감", badge: "destructive" },

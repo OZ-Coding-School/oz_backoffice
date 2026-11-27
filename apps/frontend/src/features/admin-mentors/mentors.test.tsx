@@ -441,12 +441,12 @@ describe("강사·멘토 > 멘토 (FE-18a)", () => {
     expect(calls).toContainEqual({ path: "reactivate", body: { assignment_ids: ["a1"] } });
   });
 
-  it("계약 탭: 그 멘토의 계약 카드, 누르면 행정 업무 › 계약 패널로", async () => {
+  it("계약 탭: 그 멘토의 계약 카드(과정 / 기수·단가), 누르면 행정 업무 › 계약 패널로", async () => {
     const calls = mockApi();
     const { router } = await renderRoute("/admin/educators/mentors/m1?tab=contracts");
     const list = await screen.findByRole("list", { name: "계약" });
     expect(within(list).getByRole("listitem")).toHaveTextContent(
-      "2026 백엔드 멘토 계약진행 중기간2026.11.01 ~ 2027.04.30계약서멘토 계약서.pdf담당김관리",
+      "2026 백엔드 멘토 계약이행 중과정 / 기수백엔드 부트캠프 / 12기기간2026.11.01 ~ 2027.04.30단가시간당 50,000원 · 노쇼 0원계약서멘토 계약서.pdf담당김관리",
     );
     expect(calls).toContainEqual({ path: "contracts", body: "m1" });
     await userEvent.setup().click(within(list).getByRole("link", { name: "2026 백엔드 멘토 계약" }));

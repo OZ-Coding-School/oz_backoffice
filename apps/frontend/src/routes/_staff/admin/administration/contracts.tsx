@@ -1,18 +1,26 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import type { ContractStatus, EducatorType } from "@/features/admin-contracts/api";
+import type { ContractType, StatusGroup } from "@/features/admin-contracts/api";
 import { ContractsPage, type ContractsSearch } from "@/features/admin-contracts/components/contracts-page";
+import { TYPES } from "@/features/admin-contracts/labels";
 
-const STATUSES: ContractStatus[] = ["DRAFT", "ACTIVE", "ENDED", "TERMINATED"];
-const TYPES: EducatorType[] = ["MENTOR", "INSTRUCTOR"];
+const GROUPS: StatusGroup[] = ["open", "closed", "all"];
 const text = (v: unknown) => (typeof v === "string" && v ? v : undefined);
 
-/** 행정 업무 > 계약 (F83). 상태 `status`, 유형 `type`, 검색 `q`, 패널 `contract`(id 또는 new) */
+/**
+ * 행정 업무 > 계약 (F83·F96). 과정 `bootcamp` 또는 기수 `cohort`(상단 선택기), 상태 묶음 `status`,
+ * 종류 `type`, 검색 `q`, 패널 `contract`(id 또는 new)
+ */
 export const Route = createFileRoute("/_staff/admin/administration/contracts")({
   validateSearch: (search: Record<string, unknown>): ContractsSearch => {
     const out: ContractsSearch = {};
-    if (STATUSES.includes(search.status as ContractStatus)) out.status = search.status as ContractStatus;
-    if (TYPES.includes(search.type as EducatorType)) out.type = search.type as EducatorType;
+    const cohort = text(search.cohort);
+    const bootcamp = text(search.bootcamp);
+    if (cohort) out.cohort = cohort;
+    else if (bootcamp) out.bootcamp = bootcamp;
+    if (GROUPS.includes(search.status as StatusGroup) && search.status !== "open")
+      out.status = search.status as StatusGroup;
+    if (TYPES.includes(search.type as ContractType)) out.type = search.type as ContractType;
     const q = text(search.q);
     if (q) out.q = q;
     const contract = text(search.contract);

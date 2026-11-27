@@ -17,7 +17,13 @@ import { ScheduleScopeContext } from "@/features/mentor-schedule/scope";
 import { hasPermission, staffAccessQuery } from "@/features/staff/api";
 import { cn } from "@/lib/utils";
 
-import { STATUS as CONTRACT_STATUS, period } from "@/features/admin-contracts/labels";
+import {
+  academyText,
+  amountSub,
+  amountText,
+  STATUS as CONTRACT_STATUS,
+  period,
+} from "@/features/admin-contracts/labels";
 
 import {
   mentorAssignmentsQuery,
@@ -240,7 +246,7 @@ function AssignmentCard({
           </h2>
           <Badge variant={a.is_active ? "success" : "secondary"}>{a.is_active ? "배정 중" : "종료"}</Badge>
         </div>
-        <dl className="grid grid-cols-[56px_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-body">
+        <dl className="grid grid-cols-[72px_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-body">
           <dt className="text-muted-foreground">기간</dt>
           <dd className="text-foreground">{assignmentPeriod(a)}</dd>
           <dt className="text-muted-foreground">정산</dt>
@@ -282,7 +288,7 @@ function ContractsTab({ mentorId }: { mentorId: string }) {
       <ul aria-label="계약" className="flex flex-col gap-3">
         {items.map((c) => {
           const status = CONTRACT_STATUS[c.status];
-          const closed = c.status === "ENDED" || c.status === "TERMINATED";
+          const closed = c.status === "ENDED" || c.status === "TERMINATED" || c.status === "CANCELED";
           return (
             <li key={c.id}>
               <Link
@@ -298,12 +304,18 @@ function ContractsTab({ mentorId }: { mentorId: string }) {
                   <span className={cn("text-h3", closed ? "text-muted-foreground" : "text-foreground")}>{c.title}</span>
                   <Badge variant={status.badge}>{status.label}</Badge>
                 </span>
-                <dl className="grid grid-cols-[56px_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-body">
+                <dl className="grid grid-cols-[72px_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-body">
+                  <dt className="text-muted-foreground">과정 / 기수</dt>
+                  <dd className="text-foreground">{academyText(c)}</dd>
                   <dt className="text-muted-foreground">기간</dt>
                   <dd className="text-foreground">{period(c)}</dd>
+                  <dt className="text-muted-foreground">단가</dt>
+                  <dd className="text-foreground">
+                    {amountText(c)} · {amountSub(c)}
+                  </dd>
                   <dt className="text-muted-foreground">계약서</dt>
                   <dd className="truncate text-foreground">
-                    {c.contract_file ? c.contract_file.file_name : "없음 · 확정하려면 계약서가 필요해요"}
+                    {c.contract_file ? c.contract_file.file_name : "없음 · 진행하려면 계약서가 필요해요"}
                   </dd>
                   <dt className="text-muted-foreground">담당</dt>
                   <dd className="text-foreground">{c.manager_name ?? "—"}</dd>

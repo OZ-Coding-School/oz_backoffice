@@ -9,7 +9,7 @@ export const RECEIVED_STATUS: Record<RequestStatus, { label: string; badge: Tone
   PENDING: { label: "대기", badge: "warning" },
   APPROVED: { label: "승인", badge: "success" },
   REJECTED: { label: "반려", badge: "destructive" },
-  CANCELED: { label: "취소", badge: "secondary" },
+  CANCELED: { label: "취소", badge: "dashed" },
 };
 
 /** "11/24(화) 19:00" */

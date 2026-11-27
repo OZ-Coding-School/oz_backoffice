@@ -11,7 +11,7 @@ export const STATUS_STYLE: Record<
   SessionStatus,
   { label: string; badge: Tone; card: string; side: string; bar: string }
 > = {
-  SCHEDULED: { label: "예정", badge: "primary", card: "bg-accent", side: "bg-primary/10", bar: "bg-primary" },
+  SCHEDULED: { label: "예정", badge: "violet", card: "bg-accent", side: "bg-primary/10", bar: "bg-primary" },
   IN_PROGRESS: { label: "진행 중", badge: "primary", card: "bg-accent", side: "bg-primary/10", bar: "bg-primary" },
   COMPLETED: {
     label: "완료",

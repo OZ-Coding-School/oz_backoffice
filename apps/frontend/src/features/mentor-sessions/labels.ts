@@ -29,7 +29,7 @@ export function mentorStatus(
   if (session.status === "IN_PROGRESS" || toEpochMs(session.starts_at) <= now)
     return { label: "진행 중", badge: "primary" };
   if (isKstToday(session.starts_at, now)) return { label: "오늘", badge: "info" };
-  return { label: "예정", badge: "secondary" };
+  return { label: "예정", badge: "violet" };
 }
 
 /** 기록 칸 (F47): 제출했으면 'MM/DD 제출', 시작이 지났는데 없으면 미제출, 그 밖은 없음 */

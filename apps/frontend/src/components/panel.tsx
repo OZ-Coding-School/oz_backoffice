@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { X, type LucideIcon } from "lucide-react";
 import { useId, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -39,7 +39,16 @@ export function PanelHead({
   );
 }
 
-export function PanelSection({ title, children }: { title: string; children: ReactNode }) {
+export function PanelSection({
+  title,
+  icon: Icon,
+  children,
+}: {
+  title: string;
+  /** 제목 앞 아이콘 (없으면 보라 띠) */
+  icon?: LucideIcon;
+  children: ReactNode;
+}) {
   const id = useId();
   return (
     <section
@@ -50,7 +59,16 @@ export function PanelSection({ title, children }: { title: string; children: Rea
         id={id}
         className="flex items-center gap-2 border-b border-border/70 px-4 pt-3 pb-2.5 text-body-strong text-foreground"
       >
-        <span aria-hidden className="h-3.5 w-1 rounded-full bg-primary" />
+        {Icon ? (
+          <span
+            aria-hidden
+            className="inline-flex size-6 items-center justify-center rounded-md bg-primary/12 text-primary-text"
+          >
+            <Icon className="size-3.5" />
+          </span>
+        ) : (
+          <span aria-hidden className="h-3.5 w-1 rounded-full bg-primary" />
+        )}
         {title}
       </h3>
       <div className="flex flex-col gap-3 px-4 py-3.5">{children}</div>
