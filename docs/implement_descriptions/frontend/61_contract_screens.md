@@ -1,8 +1,8 @@
 # 61. 행정 업무 › 계약 개편 화면 (F96)
 
-- 상태: PR 진행 중
+- 상태: 완료
 - 관련 PR: #189
-- 관련 결정: `docs/decisions.md` F96 (A109·A110·A111·A112, F83·F94)
+- 관련 결정: `docs/decisions.md` F96·F96-1·F97 (A109·A110·A111·A112·A113·A114, F83·F94)
 - 이전 기록: [60. 두 칸 기수 선택기를 수강생·가입 승인에도](60_cohort_chooser_reuse.md), 백엔드 [108](../backend/108_contract_redesign.md)·[109](../backend/109_assignment_contract_basis.md)·[110](../backend/110_contract_list_counts.md)
 
 ## 배경
@@ -66,3 +66,7 @@
 
 ## 멘토 옮기기 제거 (2026-11-27, decisions A114)
 - 멘토 계약은 다른 멘토로 옮기지 않는다(BE-4e #191). 패널의 [다른 멘토로 옮기기]·`MoveDialog`·`useMoveContract`를 지우고 멘토 줄 설명을 바꿨다. 오류 문구 `mentor_contract_move_forbidden` 추가, `contract_in_use_by_assignment` 삭제.
+
+## 완료 (2026-11-27)
+- 사용자가 로컬에서 확인하고 병합을 컨펌했다. develop(BE-4d #190, BE-4e #191) 위로 rebase 후 lint·format:check·typecheck·vitest 429개(UTC·Asia/Seoul)·build·e2e 51개 통과.
+- 남은 작업: 멘토 생성 시점을 계약 완료로 옮기기(다음 백엔드 작업), 배정 패널에서 근거 계약 고르기, 실제 화면 Figma 캡처.
