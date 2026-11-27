@@ -56,3 +56,4 @@
 | 52 | [디자인 다듬기 ② 학사 (F92)](52_design_refresh_academy.md) | 완료 (#182) |
 | 53 | [디자인 다듬기 ③ 강사·멘토·행정 (F92)](53_design_refresh_educators.md) | 완료 (#176) |
 | 54 | [디자인 다듬기 ④ 회원 관리 (F92)](54_design_refresh_members.md) | 완료 (#177) |
+| 55 | [디자인 다듬기 ⑤ 조직 설정 (F92)](55_design_refresh_org.md) | 완료 (#178) |
