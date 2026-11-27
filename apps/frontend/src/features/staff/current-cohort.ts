@@ -26,8 +26,45 @@ export function rememberedCohortId(): string | null {
 export function rememberCohort(id: string): void {
   try {
     localStorage.setItem(KEY, id);
+  } catch {
+    // 저장소를 못 쓰면 기억하지 않는다
+  }
+  pushRecentCohort(id);
+}
+
+/** 최근에 고른 기수에만 더한다 (현재 기수는 그대로) */
+export function pushRecentCohort(id: string): void {
+  try {
     const recent = [id, ...recentCohortIds().filter((x) => x !== id)].slice(0, RECENT_MAX);
     localStorage.setItem(RECENT_KEY, JSON.stringify(recent));
+  } catch {
+    // 저장소를 못 쓰면 기억하지 않는다
+  }
+}
+
+/** 행정 업무의 과정·기수 선택 (F96): 멘토링 현재 기수와 따로 기억한다 */
+export interface AdminScope {
+  bootcamp?: string;
+  cohort?: string;
+}
+const ADMIN_SCOPE_KEY = "oz.admin.administration-scope";
+
+export function rememberedAdminScope(): AdminScope | null {
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem(ADMIN_SCOPE_KEY) ?? "null");
+    if (!raw || typeof raw !== "object") return null;
+    const { bootcamp, cohort } = raw as Record<string, unknown>;
+    if (typeof cohort === "string") return { cohort };
+    if (typeof bootcamp === "string") return { bootcamp };
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function rememberAdminScope(scope: AdminScope): void {
+  try {
+    localStorage.setItem(ADMIN_SCOPE_KEY, JSON.stringify(scope));
   } catch {
     // 저장소를 못 쓰면 기억하지 않는다
   }

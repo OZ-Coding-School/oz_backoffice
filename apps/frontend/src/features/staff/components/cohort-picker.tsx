@@ -11,7 +11,14 @@ import { COHORT_STATUS } from "@/features/admin-academy/labels";
 import { cn } from "@/lib/utils";
 
 import { staffAccessQuery, type StaffCohort } from "../api";
-import { cohortIdOf, pickableCohorts, recentCohortIds, rememberCohort } from "../current-cohort";
+import {
+  cohortIdOf,
+  pickableCohorts,
+  pushRecentCohort,
+  recentCohortIds,
+  rememberAdminScope,
+  rememberCohort,
+} from "../current-cohort";
 
 /** 기본으로 보이는 상태: 진행 중·개강 전 (종료·비활성은 '종료된 기수도 보기') */
 const OPEN: readonly string[] = ["ONGOING", "PLANNED"];
@@ -34,6 +41,8 @@ function bootcampsOf(cohorts: StaffCohort[]): { id: string; name: string; cohort
  * 두 칸 기수 선택기 (F94): 왼쪽 과정 · 오른쪽 그 과정의 기수, 위에 검색과 최근 고른 기수.
  * 기본은 진행 중·개강 전만, '종료된 기수도 보기'로 나머지도.
  * `bar`는 상단 막대 모양, `field`는 화면 안 필터 모양. `allLabel`이 있으면 맨 위에 '전체' 항목(값 없음).
+ * `onPickBootcamp`가 있으면 기수 목록 맨 위에 '과정 전체' 줄을 둔다(F96, `bootcampValue`가 그 선택).
+ * `remember`가 false면 멘토링 현재 기수로 기억하지 않고 최근 목록에만 더한다(F96 행정 업무).
  */
 export function CohortChooser({
   cohorts,
@@ -42,6 +51,9 @@ export function CohortChooser({
   variant,
   label,
   allLabel,
+  bootcampValue,
+  onPickBootcamp,
+  remember = true,
 }: {
   cohorts: readonly StaffCohort[];
   value: string | undefined;
@@ -49,6 +61,9 @@ export function CohortChooser({
   variant: "bar" | "field";
   label: string;
   allLabel?: string;
+  bootcampValue?: string;
+  onPickBootcamp?: (bootcamp: { id: string; name: string }) => void;
+  remember?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -59,8 +74,10 @@ export function CohortChooser({
   const current = all.find((c) => c.id === value);
   const visible = showClosed ? all : all.filter((c) => OPEN.includes(c.status) || c.id === value);
   const bootcamps = bootcampsOf(visible);
+  const valueBootcampId = current?.bootcamp_id ?? (value ? undefined : bootcampValue);
   const selectedBootcamp =
-    bootcamps.find((b) => b.id === bootcampId) ?? bootcamps.find((b) => b.id === current?.bootcamp_id) ?? bootcamps[0];
+    bootcamps.find((b) => b.id === bootcampId) ?? bootcamps.find((b) => b.id === valueBootcampId) ?? bootcamps[0];
+  const wholeBootcamp = !value && bootcampValue ? bootcampsOf(all).find((b) => b.id === bootcampValue) : undefined;
   const term = q.trim();
   const words = term.split(/\s+/).filter(Boolean);
   const found = term ? all.filter((c) => words.every((w) => nameOf(c).includes(w))) : [];
@@ -71,8 +88,13 @@ export function CohortChooser({
   const pick = (c: StaffCohort | null) => {
     setOpen(false);
     setQ("");
-    if (c) rememberCohort(c.id);
+    if (c) (remember ? rememberCohort : pushRecentCohort)(c.id);
     onPick(c);
+  };
+  const pickBootcamp = (b: { id: string; name: string }) => {
+    setOpen(false);
+    setQ("");
+    onPickBootcamp?.(b);
   };
   const onOpenChange = (next: boolean) => {
     setOpen(next);
@@ -81,7 +103,11 @@ export function CohortChooser({
       setBootcampId(null);
     }
   };
-  const shown = current ? nameOf(current) : (allLabel ?? "기수를 골라 주세요");
+  const shown = current
+    ? nameOf(current)
+    : wholeBootcamp
+      ? `${wholeBootcamp.name} · 과정 전체`
+      : (allLabel ?? "기수를 골라 주세요");
 
   return (
     <PopoverPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -208,6 +234,26 @@ export function CohortChooser({
                 aria-label={selectedBootcamp ? `${selectedBootcamp.name} 기수` : "기수"}
                 className="flex flex-col overflow-y-auto p-2"
               >
+                {selectedBootcamp && onPickBootcamp ? (
+                  <button
+                    type="button"
+                    aria-pressed={!value && bootcampValue === selectedBootcamp.id}
+                    aria-label={`${selectedBootcamp.name} 과정 전체`}
+                    onClick={() => pickBootcamp({ id: selectedBootcamp.id, name: selectedBootcamp.name })}
+                    className={cn(
+                      "mb-1 flex items-center gap-2.5 rounded-lg border border-dashed border-border px-2.5 py-2 text-left outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
+                      !value &&
+                        bootcampValue === selectedBootcamp.id &&
+                        "border-solid border-primary/40 bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent",
+                    )}
+                  >
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="text-body-strong">과정 전체</span>
+                      <span className="text-caption text-muted-foreground">과정 공통 + 모든 기수</span>
+                    </span>
+                    {!value && bootcampValue === selectedBootcamp.id ? <Check aria-hidden className="size-4" /> : null}
+                  </button>
+                ) : null}
                 {selectedBootcamp ? (
                   selectedBootcamp.cohorts.map((c) => (
                     <CohortRow key={c.id} cohort={c} on={c.id === value} label={nameOf(c)} onPick={pick} short />
@@ -262,6 +308,42 @@ export function CohortPicker() {
         onPick={(c) => {
           if (c) void navigate({ to: pathname.replace(`/admin/cohorts/${cohortId}/`, `/admin/cohorts/${c.id}/`) });
         }}
+      />
+      <span aria-hidden className="mx-2 h-6 w-px bg-border" />
+    </>
+  );
+}
+
+/**
+ * 행정 업무의 과정·기수 선택기 (F96): 기수 또는 '과정 전체'. 주소 `?bootcamp=&cohort=`를 바꾸고,
+ * 멘토링 현재 기수와 따로 기억한다.
+ */
+export function AdminScopePicker() {
+  const location = useRouterState({ select: (s) => s.location });
+  const navigate = useNavigate();
+  const access = useQuery(staffAccessQuery);
+  if (!location.pathname.startsWith("/admin/administration/")) return null;
+  const search = location.search as Record<string, unknown>;
+  const cohort = typeof search.cohort === "string" ? search.cohort : undefined;
+  const bootcamp = typeof search.bootcamp === "string" ? search.bootcamp : undefined;
+  const go = (next: { bootcamp?: string; cohort?: string }) => {
+    rememberAdminScope(next);
+    // 행정 업무 메뉴는 아직 계약 하나 (F83)
+    void navigate({ to: "/admin/administration/contracts", search: next });
+  };
+  return (
+    <>
+      <CohortChooser
+        variant="bar"
+        label="과정 / 기수"
+        cohorts={access.data?.cohorts ?? []}
+        value={cohort}
+        bootcampValue={bootcamp}
+        remember={false}
+        onPick={(c) => {
+          if (c) go({ cohort: c.id });
+        }}
+        onPickBootcamp={(b) => go({ bootcamp: b.id })}
       />
       <span aria-hidden className="mx-2 h-6 w-px bg-border" />
     </>

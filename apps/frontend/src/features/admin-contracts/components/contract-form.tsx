@@ -1,339 +1,184 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import { useBlocker } from "@tanstack/react-router";
-import { useId, useRef, useState, type ChangeEvent, type ReactNode } from "react";
-import { Controller, useForm, useWatch } from "react-hook-form";
+import { useId, useState } from "react";
+import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { z } from "zod";
 
 import { PanelHead, PanelRow, PanelSection } from "@/components/panel";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Segmented } from "@/components/ui/segmented";
-import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
 import { DiscardDialog } from "@/features/admin-org/components/shared";
-import { maskPhone } from "@/features/profile/mask";
+import { kstDateKey } from "@/features/apply/slots";
+import { staffAccessQuery } from "@/features/staff/api";
 
-import {
-  managerCandidatesQuery,
-  uploadContractFile,
-  useCreateContract,
-  useUpdateContract,
-  type Contract,
-  type ContractFile,
-  type ContractUpdate,
-  type EducatorType,
-} from "../api";
-import { contractError, FILE_HELP, fileSize, linkedText, MENTOR_HELP, NEW_MENTOR_HELP } from "../labels";
-import { ManagerList, type ManagerChoice } from "./pickers";
+import { useAmendContract, useUpdateContract, type Contract, type ContractFile } from "../api";
+import { amendmentOf, contractSchema, updateOf, valuesOf, type ContractValues } from "../contract-values";
+import { academyText, contractError, FILE_HELP, STATUS, TYPE_LABELS } from "../labels";
+import { AmountSection, BasicsSection, PartySection, PeriodSection } from "./contract-fields";
+import { FilePicker } from "./file-picker";
 
-const MAX_BYTES = 10 * 1024 * 1024;
-const TYPES = [
-  { value: "MENTOR", label: "멘토" },
-  { value: "INSTRUCTOR", label: "강사" },
-] as const satisfies readonly { value: EducatorType; label: string }[];
-
-const schema = z
-  .object({
-    educator_type: z.enum(["MENTOR", "INSTRUCTOR"]),
-    contractor_name: z.string().trim().min(1, "계약자 이름을 적어 주세요").max(50, "50자까지 적을 수 있어요"),
-    contractor_phone: z
-      .string()
-      .trim()
-      .regex(/^01[0-9]-?\d{3,4}-?\d{4}$/, "휴대폰 번호를 확인해 주세요"),
-    contractor_email: z
-      .string()
-      .trim()
-      .max(255)
-      .refine((v) => !v || z.email().safeParse(v).success, "이메일을 확인해 주세요"),
-    title: z.string().trim().min(1, "제목을 적어 주세요").max(100, "100자까지 적을 수 있어요"),
-    start_date: z.string().min(1, "시작일을 골라 주세요"),
-    end_date: z.string().min(1, "종료일을 골라 주세요"),
-  })
-  .refine((v) => !v.start_date || !v.end_date || v.end_date >= v.start_date, {
-    path: ["end_date"],
-    message: "종료일은 시작일과 같거나 뒤여야 해요",
-  });
-type Values = z.infer<typeof schema>;
-
-const valuesOf = (c?: Contract): Values => ({
-  educator_type: c?.contract_type === "INSTRUCTOR" ? "INSTRUCTOR" : "MENTOR",
-  contractor_name: c?.contractor_name ?? "",
-  contractor_phone: c?.contractor_phone ?? "",
-  contractor_email: c?.contractor_email ?? "",
-  title: c?.title ?? "",
-  start_date: c?.start_date ?? "",
-  end_date: c?.end_date ?? "",
-});
-
-const dot = (d: string) => d.replaceAll("-", ".");
+const REASON_MAX = 500;
 
 /**
- * 계약 추가·수정 (F83·F68·F85): 조회와 같은 섹션·줄에서 값 자리만 입력 칸.
- * 작성 중이면 모든 항목, 확정한 계약은 담당 직원만 바꾼다(A25). 유형은 추가 때만(세그먼트).
+ * 계약 수정 (F96, 같은 패널 편집 모드).
+ * `edit`: 초안·진행 중은 모든 항목(종류는 그대로). `amend`: 계약 완료·이행 중은 변경 계약(A109⑨·A111⑤) —
+ * 명칭·금액·기간·연락처만 + 변경 일자·사유(필수)·변경 계약서(선택).
  */
-export function ContractForm({
-  contract,
-  title,
-  description,
-  badge,
+export function ContractEditForm({
+  contract: c,
+  mode,
   onDone,
 }: {
-  contract?: Contract;
-  /** 패널 머리 */
-  title: string;
-  description: string;
-  /** 머리의 상태 배지 (수정 모드면 '수정 중'을 더한다) */
-  badge?: ReactNode;
-  onDone: (saved?: Contract) => void;
+  contract: Contract;
+  mode: "edit" | "amend";
+  onDone: () => void;
 }) {
   const id = useId();
-  const isNew = !contract;
-  const editable = isNew || contract.status === "DRAFT";
-  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: valuesOf(contract) });
-  const create = useCreateContract();
-  const update = useUpdateContract(contract?.id ?? "");
-  const [file, setFile] = useState<ContractFile | null>(contract?.contract_file ?? null);
+  const access = useQuery(staffAccessQuery);
+  const form = useForm<ContractValues>({ resolver: zodResolver(contractSchema), defaultValues: valuesOf(c) });
+  const update = useUpdateContract(c.id);
+  const amend = useAmendContract(c.id);
+  const [file, setFile] = useState<ContractFile | null>(mode === "edit" ? c.contract_file : null);
   const [uploading, setUploading] = useState(false);
+  const [amendedOn, setAmendedOn] = useState(() => kstDateKey(new Date()));
+  const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const me = useQuery({ ...managerCandidatesQuery(""), enabled: isNew });
-  const [chosen, setChosen] = useState<ManagerChoice | null>(null);
-  const meChoice = me.data?.find((m) => m.is_me);
-  const current: ManagerChoice | null = contract
-    ? { id: contract.manager_employee_id, name: contract.manager_name ?? "—" }
-    : meChoice
-      ? { id: meChoice.employee_id, name: meChoice.name }
-      : null;
-  const manager = chosen ?? current;
-  const fileChanged = (file?.id ?? null) !== (contract?.contract_file?.id ?? null);
-  const managerChanged = chosen !== null && chosen.id !== contract?.manager_employee_id;
-  const dirty = form.formState.isDirty || fileChanged || managerChanged;
-  const saving = create.isPending || update.isPending;
+  const fileChanged = mode === "edit" ? (file?.id ?? null) !== (c.contract_file?.id ?? null) : !!file;
+  const dirty = form.formState.isDirty || fileChanged || !!reason;
+  const saving = update.isPending || amend.isPending;
   const blocker = useBlocker({
     shouldBlockFn: () => dirty && !saving,
     enableBeforeUnload: () => dirty,
     withResolver: true,
   });
-  const { errors } = form.formState;
-  const educatorType = useWatch({ control: form.control, name: "educator_type" });
-
-  const onPick = async (e: ChangeEvent<HTMLInputElement>) => {
-    const picked = e.target.files?.[0];
-    e.target.value = "";
-    if (!picked) return;
-    if (picked.type !== "application/pdf" && !picked.name.toLowerCase().endsWith(".pdf")) {
-      toast.error("PDF 파일만 올릴 수 있어요.");
-      return;
-    }
-    if (picked.size > MAX_BYTES) {
-      toast.error("10MB까지 올릴 수 있어요.");
-      return;
-    }
-    setUploading(true);
-    try {
-      setFile(await uploadContractFile(picked));
-    } catch (err) {
-      toast.error(contractError(err));
-    } finally {
-      setUploading(false);
-    }
-  };
+  const status = STATUS[c.status];
 
   const onSubmit = form.handleSubmit(async (v) => {
     setError(null);
-    const email = v.contractor_email.trim() || null;
     try {
-      if (isNew) {
-        if (!manager) {
-          setError("담당 직원을 골라 주세요.");
+      if (mode === "edit") {
+        const body = updateOf(c, v);
+        if (fileChanged) body.contract_file_id = file?.id ?? null;
+        if (Object.keys(body).length) await update.mutateAsync(body);
+        toast.success("계약을 저장했어요");
+      } else {
+        if (!reason.trim()) {
+          setError("변경 사유를 적어 주세요.");
           return;
         }
-        // A109 화면 개편 전 임시: 과정·기수·금액 입력이 없어 서버가 받지 않는다(다음 FE PR에서 입력 추가)
-        const saved = await create.mutateAsync({
-          contract_type: v.educator_type,
-          bootcamp_id: "",
-          settlement_type: "UNIT_PRICE",
-          unit_price: 0,
-          price_unit: "HOURLY",
-          vat_type: "NOT_APPLICABLE",
-          ...(v.educator_type === "MENTOR" ? { no_show_pay_amount: 0, mentoring_time_basis: "ACTUAL_DURATION" } : {}),
-          contractor_name: v.contractor_name.trim(),
-          contractor_phone: v.contractor_phone.trim(),
-          contractor_email: email,
-          title: v.title.trim(),
-          start_date: v.start_date,
-          end_date: v.end_date,
-          manager_employee_id: manager.id,
+        if (!amendedOn) {
+          setError("변경 일자를 골라 주세요.");
+          return;
+        }
+        const changes = amendmentOf(c, v);
+        if (!Object.keys(changes).length && !file) {
+          setError("바뀐 항목이 없어요.");
+          return;
+        }
+        await amend.mutateAsync({
+          amended_on: amendedOn,
+          reason: reason.trim(),
+          changes,
           contract_file_id: file?.id ?? null,
         });
-        form.reset(v);
-        toast.success("계약을 작성 중으로 저장했어요");
-        onDone(saved);
-        return;
+        toast.success("변경 계약을 등록했어요");
       }
-      const c = contract;
-      const body: ContractUpdate = {};
-      if (editable) {
-        if (v.contractor_name.trim() !== c.contractor_name) body.contractor_name = v.contractor_name.trim();
-        if (v.contractor_phone.trim() !== c.contractor_phone) body.contractor_phone = v.contractor_phone.trim();
-        if (email !== (c.contractor_email ?? null)) body.contractor_email = email;
-        if (v.title.trim() !== c.title) body.title = v.title.trim();
-        if (v.start_date !== c.start_date) body.start_date = v.start_date;
-        if (v.end_date !== c.end_date) body.end_date = v.end_date;
-        if (fileChanged) body.contract_file_id = file?.id ?? null;
-      }
-      if (managerChanged && chosen) body.manager_employee_id = chosen.id;
-      const saved = Object.keys(body).length ? await update.mutateAsync(body) : c;
       form.reset(v);
-      toast.success("계약을 저장했어요");
-      onDone(saved);
+      setReason("");
+      setFile(mode === "edit" ? file : null);
+      onDone();
     } catch (e) {
       setError(contractError(e));
     }
   });
 
-  const field = (name: keyof Values, label: string, text: string, props: Record<string, unknown> = {}) =>
-    editable ? (
-      <PanelRow label={label} htmlFor={`${id}-${name}`} top={!!errors[name]}>
-        <Input
-          id={`${id}-${name}`}
-          aria-invalid={!!errors[name]}
-          className="font-normal"
-          {...props}
-          {...form.register(name)}
-        />
-        {errors[name] ? (
-          <p className="mt-1 text-caption font-normal text-destructive-text">{errors[name]?.message}</p>
-        ) : null}
-      </PanelRow>
-    ) : (
-      <PanelRow label={label}>{text}</PanelRow>
-    );
-
-  const linked = contract ? linkedText(contract) : null;
   return (
     <>
       <PanelHead
-        title={title}
-        description={description}
+        title={c.title}
+        description={`${TYPE_LABELS[c.contract_type]} · ${academyText(c, true)}`}
         badges={
-          isNew ? null : (
-            <>
-              {badge}
-              <Badge variant="warning">수정 중</Badge>
-            </>
-          )
+          <>
+            <Badge variant={status.badge}>{status.label}</Badge>
+            <Badge variant="warning">{mode === "edit" ? "수정 중" : "변경 등록 중"}</Badge>
+          </>
         }
-        onClose={() => onDone()}
+        onClose={onDone}
       />
       <form
-        aria-label={isNew ? "계약 추가" : "계약 수정"}
+        aria-label={mode === "edit" ? "계약 수정" : "변경 등록"}
         noValidate
         onSubmit={(e) => void onSubmit(e)}
         className="flex min-h-0 flex-1 flex-col"
       >
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-6">
-          <PanelSection title="계약 정보">
-            {isNew ? (
-              <PanelRow label="유형">
-                <Controller
-                  control={form.control}
-                  name="educator_type"
-                  render={({ field: f }) => (
-                    <Segmented label="유형" value={f.value} onChange={f.onChange} options={TYPES} />
-                  )}
+          {mode === "amend" ? (
+            <PanelSection title="변경 계약">
+              <PanelRow label="변경 일자" htmlFor={`${id}-on`}>
+                <Input
+                  id={`${id}-on`}
+                  type="date"
+                  className="w-44 font-normal"
+                  value={amendedOn}
+                  onChange={(e) => setAmendedOn(e.target.value)}
                 />
               </PanelRow>
-            ) : null}
-            {field("contractor_name", "계약자", contract?.contractor_name ?? "", { maxLength: 50 })}
-            {field("contractor_phone", "휴대폰", maskPhone(contract?.contractor_phone) ?? "", {
-              inputMode: "tel",
-              placeholder: "010-0000-0000",
-            })}
-            {field("contractor_email", "이메일", contract?.contractor_email ?? "—", {
-              type: "email",
-              maxLength: 255,
-              placeholder: "선택",
-            })}
-            {field("title", "제목", contract?.title ?? "", { maxLength: 100 })}
-            {field("start_date", "시작일", dot(contract?.start_date ?? ""), { type: "date" })}
-            {field("end_date", "종료일", dot(contract?.end_date ?? ""), { type: "date" })}
-          </PanelSection>
-          <PanelSection title="계약서">
-            <PanelRow label="파일" help={FILE_HELP}>
-              {editable ? (
-                <div className="flex items-center gap-2">
-                  <span className="min-w-0 flex-1 truncate font-normal">
-                    {file ? (
-                      `${file.file_name} · ${fileSize(file.file_size)}`
-                    ) : (
-                      <span className="text-muted-foreground">없음</span>
-                    )}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={uploading}
-                    onClick={() => fileRef.current?.click()}
-                  >
-                    {uploading ? <Spinner className="size-4" /> : null}
-                    {file ? "다른 파일" : "파일 고르기"}
-                  </Button>
-                  {file ? (
-                    <Button type="button" variant="ghost" size="sm" onClick={() => setFile(null)}>
-                      빼기
-                    </Button>
-                  ) : null}
-                </div>
-              ) : (
-                (file?.file_name ?? "없음")
-              )}
-              <input
-                ref={fileRef}
-                type="file"
-                accept="application/pdf,.pdf"
-                className="sr-only"
-                tabIndex={-1}
-                aria-label="계약서 고르기"
-                onChange={(e) => void onPick(e)}
-              />
-            </PanelRow>
-          </PanelSection>
-          {isNew ? (
-            educatorType === "MENTOR" ? (
-              <PanelSection title="멘토">
-                <PanelRow label="멘토" help={NEW_MENTOR_HELP}>
-                  <span className="font-normal text-muted-foreground">계약자 이름·휴대폰으로 정해져요</span>
-                </PanelRow>
-              </PanelSection>
-            ) : null
-          ) : (
-            <PanelSection title={contract.contract_type === "MENTOR" ? "멘토" : "강사"}>
-              <PanelRow label={contract.contract_type === "MENTOR" ? "멘토" : "강사"} help={MENTOR_HELP}>
-                {linked?.text}
+              <PanelRow label="사유" htmlFor={`${id}-reason`} top>
+                <Textarea
+                  id={`${id}-reason`}
+                  rows={3}
+                  maxLength={REASON_MAX}
+                  placeholder="예: 12기 운영 범위 확대로 단가 조정"
+                  className="font-normal"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                />
+              </PanelRow>
+              <PanelRow label="변경 계약서" help="선택. 변경 계약서를 올리면 변경 이력에서 볼 수 있어요.">
+                <FilePicker value={file} onChange={setFile} onUploading={setUploading} label="변경 계약서 고르기" />
               </PanelRow>
             </PanelSection>
+          ) : (
+            <BasicsSection form={form} cohorts={access.data?.cohorts ?? []} lockType />
           )}
-          <PanelSection title="담당">
-            <PanelRow label="담당 직원" top>
-              <div className="flex flex-col gap-2">
-                <span>{manager ? manager.name : "고르지 않음"}</span>
-                <ManagerList value={manager} onChange={setChosen} />
-              </div>
-            </PanelRow>
-          </PanelSection>
+          {mode === "amend" ? (
+            <PanelSection title="계약 정보">
+              <PanelRow label="종류">{TYPE_LABELS[c.contract_type]}</PanelRow>
+              <PanelRow label="과정 / 기수" help="종류·과정 / 기수는 변경 계약으로 바꿀 수 없어요.">
+                {academyText(c, true)}
+              </PanelRow>
+              <PanelRow label="계약 명칭" htmlFor={`${id}-title`}>
+                <Input id={`${id}-title`} maxLength={100} className="font-normal" {...form.register("title")} />
+              </PanelRow>
+            </PanelSection>
+          ) : null}
+          <PartySection form={form} mode={mode} canPickMentor={false} />
+          <AmountSection form={form} />
+          <PeriodSection form={form} />
+          {mode === "edit" ? (
+            <PanelSection title="계약서">
+              <PanelRow label="파일" help={FILE_HELP}>
+                <FilePicker
+                  value={file}
+                  onChange={setFile}
+                  onUploading={setUploading}
+                  removable={c.status === "DRAFT"}
+                />
+              </PanelRow>
+            </PanelSection>
+          ) : null}
           {error ? <Alert variant="error" title={error} /> : null}
         </div>
         <div className="flex justify-end gap-2 border-t border-border px-6 py-3">
-          <Button type="button" variant="outline" onClick={() => onDone()}>
+          <Button type="button" variant="outline" onClick={onDone}>
             취소
           </Button>
           <Button type="submit" disabled={saving || uploading}>
-            {isNew ? "추가" : "저장"}
+            {mode === "edit" ? "저장" : "변경 등록"}
           </Button>
         </div>
         <DiscardDialog blocker={blocker} />
