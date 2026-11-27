@@ -1,7 +1,7 @@
 # 61. 행정 업무 › 계약 개편 화면 (F96)
 
 - 상태: PR 진행 중
-- 관련 PR: (PR 생성 후 기록)
+- 관련 PR: #189
 - 관련 결정: `docs/decisions.md` F96 (A109·A110·A111·A112, F83·F94)
 - 이전 기록: [60. 두 칸 기수 선택기를 수강생·가입 승인에도](60_cohort_chooser_reuse.md), 백엔드 [108](../backend/108_contract_redesign.md)·[109](../backend/109_assignment_contract_basis.md)·[110](../backend/110_contract_list_counts.md)
 
