@@ -3,6 +3,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { Search, UserRound } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
 import { LoadMore } from "@/components/load-more";
@@ -43,10 +44,7 @@ export function MentorsPage({ search }: { search: MentorsSearch }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-h1 text-foreground">멘토</h1>
-        <p className="text-body text-muted-foreground">가입한 멘토의 프로필·배정·계약을 관리해요.</p>
-      </div>
+      <PageHeader icon={UserRound} title="멘토" description="가입한 멘토의 프로필·배정·계약을 관리해요." />
       <div className="flex items-center justify-between gap-3">
         <Select
           value={search.status ?? ALL_STATUS}

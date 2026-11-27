@@ -85,3 +85,25 @@ export function SettingRow({
     </div>
   );
 }
+
+/** 직접 꾸민 카드 안의 제목 (F92): 아이콘 칩 + 제목. `SectionCard`를 못 쓰는 카드에 쓴다 */
+export function CardTitle({
+  icon: Icon,
+  id,
+  className,
+  children,
+}: {
+  icon: LucideIcon;
+  id?: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <h2 id={id} className={cn("flex items-center gap-2.5 text-h3 text-foreground", className)}>
+      <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-accent text-sidebar-accent-foreground">
+        <Icon aria-hidden className="size-4" />
+      </span>
+      {children}
+    </h2>
+  );
+}

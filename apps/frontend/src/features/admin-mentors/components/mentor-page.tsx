@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { ArrowLeft, Plus } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { ProfileHero } from "@/components/profile-hero";
 import { ErrorState } from "@/components/error-state";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -126,22 +127,22 @@ export function MentorPage({
 
 function Head({ mentor: m, actions }: { mentor: MentorItem; actions: ReactNode }) {
   return (
-    <div className="flex items-center gap-3">
-      <Avatar name={m.display_name || m.name} />
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <div className="flex items-center gap-2">
-          <h1 className="text-h1 text-foreground">{m.name}</h1>
+    <ProfileHero
+      name={m.name}
+      avatar={<Avatar name={m.display_name || m.name} className="size-14 text-h2 ring-4 ring-card" />}
+      badges={
+        <>
           <StatusBadge mentor={m} />
           {m.is_registered ? <AcceptingBadge on={m.accepting_requests} /> : null}
-        </div>
-        <p className="truncate text-body text-muted-foreground">
-          {m.is_registered
-            ? [m.display_name !== m.name ? m.display_name : null, m.email].filter(Boolean).join(" · ")
-            : "가입 전 · 계약을 먼저 만든 멘토예요"}
-        </p>
-      </div>
-      {actions}
-    </div>
+        </>
+      }
+      description={
+        m.is_registered
+          ? [m.display_name !== m.name ? m.display_name : null, m.email].filter(Boolean).join(" · ")
+          : "가입 전 · 계약을 먼저 만든 멘토예요"
+      }
+      actions={actions}
+    />
   );
 }
 

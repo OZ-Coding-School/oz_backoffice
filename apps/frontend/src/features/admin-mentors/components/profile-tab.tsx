@@ -3,6 +3,8 @@ import { useBlocker } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { Eye, Pencil, UserCog } from "lucide-react";
+import { CardTitle } from "@/components/section-card";
 import { ErrorState } from "@/components/error-state";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -39,9 +41,9 @@ export function ProfileTab({ mentor, canManage }: { mentor: MentorItem; canManag
         className="flex flex-col gap-5 rounded-2xl border border-border bg-card shadow-sm p-6"
       >
         <div className="flex items-center justify-between gap-3">
-          <h2 id="student-view-title" className="text-h3 text-foreground">
+          <CardTitle icon={Eye} id="student-view-title">
             수강생에게 보이는 모습
-          </h2>
+          </CardTitle>
           {canManage ? (
             <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
               프로필 수정
@@ -55,9 +57,9 @@ export function ProfileTab({ mentor, canManage }: { mentor: MentorItem; canManag
           aria-labelledby="account-title"
           className="flex flex-col gap-3 rounded-2xl border border-border bg-card shadow-sm p-5"
         >
-          <h2 id="account-title" className="text-h3 text-foreground">
+          <CardTitle icon={UserCog} id="account-title">
             계정
-          </h2>
+          </CardTitle>
           {mentor.is_registered ? (
             <dl className="grid grid-cols-[56px_minmax(0,1fr)] gap-x-4 gap-y-2.5 text-body">
               <dt className="text-muted-foreground">실명</dt>
@@ -130,7 +132,7 @@ function ProfileEdit({ mentorId, profile, onDone }: { mentorId: string; profile:
         onSubmit={(e) => void onSubmit(e)}
         className="flex flex-col gap-5 rounded-2xl border border-border bg-card shadow-sm p-6"
       >
-        <h2 className="text-h3 text-foreground">프로필 수정</h2>
+        <CardTitle icon={Pencil}>프로필 수정</CardTitle>
         <ProfileFields editor={editor} profile={profile} />
         {error ? <Alert variant="error" title={error} /> : null}
         <div className="flex justify-end gap-2">
