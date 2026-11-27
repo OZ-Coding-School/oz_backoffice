@@ -59,44 +59,51 @@ export function ContractEditForm({
   });
   const status = STATUS[c.status];
 
-  const onSubmit = form.handleSubmit(async (v) => {
-    setError(null);
-    try {
-      if (mode === "edit") {
-        const body = updateOf(c, v);
-        if (fileChanged) body.contract_file_id = file?.id ?? null;
-        if (Object.keys(body).length) await update.mutateAsync(body);
-        toast.success("계약을 저장했어요");
-      } else {
-        if (!reason.trim()) {
-          setError("변경 사유를 적어 주세요.");
-          return;
+  const onSubmit = form.handleSubmit(
+    async (v) => {
+      setError(null);
+      try {
+        if (mode === "edit") {
+          const body = updateOf(c, v);
+          if (fileChanged) body.contract_file_id = file?.id ?? null;
+          if (Object.keys(body).length) await update.mutateAsync(body);
+          toast.success("계약을 저장했어요");
+        } else {
+          if (!reason.trim()) {
+            setError("변경 사유를 적어 주세요.");
+            return;
+          }
+          if (!amendedOn) {
+            setError("변경 일자를 골라 주세요.");
+            return;
+          }
+          const changes = amendmentOf(c, v);
+          if (!Object.keys(changes).length && !file) {
+            setError("바뀐 항목이 없어요.");
+            return;
+          }
+          await amend.mutateAsync({
+            amended_on: amendedOn,
+            reason: reason.trim(),
+            changes,
+            contract_file_id: file?.id ?? null,
+          });
+          toast.success("변경 계약을 등록했어요");
         }
-        if (!amendedOn) {
-          setError("변경 일자를 골라 주세요.");
-          return;
-        }
-        const changes = amendmentOf(c, v);
-        if (!Object.keys(changes).length && !file) {
-          setError("바뀐 항목이 없어요.");
-          return;
-        }
-        await amend.mutateAsync({
-          amended_on: amendedOn,
-          reason: reason.trim(),
-          changes,
-          contract_file_id: file?.id ?? null,
-        });
-        toast.success("변경 계약을 등록했어요");
+        form.reset(v);
+        setReason("");
+        setFile(mode === "edit" ? file : null);
+        onDone();
+      } catch (e) {
+        setError(contractError(e));
       }
-      form.reset(v);
-      setReason("");
-      setFile(mode === "edit" ? file : null);
-      onDone();
-    } catch (e) {
-      setError(contractError(e));
-    }
-  });
+    },
+    (errors) => {
+      // 화면에 없는 칸의 검사 오류도 놓치지 않게 맨 아래에 알린다
+      const first = Object.values(errors).find((err) => err?.message);
+      setError(first?.message ? `${first.message}` : "입력값을 다시 확인해 주세요.");
+    },
+  );
 
   return (
     <>

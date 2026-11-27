@@ -477,6 +477,19 @@ describe("계약 패널 (F96)", () => {
     });
   });
 
+  it("멘토 없는 새 사람 초안도 [수정]에서 저장된다 (A115)", async () => {
+    const calls = mockApi();
+    await renderRoute("/admin/administration/contracts?cohort=c12&contract=k2");
+    const sheet = await screen.findByRole("dialog", { name: "12기 데이터 멘토 계약" });
+    const user = userEvent.setup();
+    await user.click(within(sheet).getByRole("button", { name: "수정" }));
+    const form = await screen.findByRole("form", { name: "계약 수정" });
+    await user.type(within(form).getByLabelText("계약 명칭"), " 2");
+    await user.click(within(form).getByRole("button", { name: "저장" }));
+    await waitFor(() => expect(calls.find((c) => c.path === "update")).toBeTruthy());
+    expect(calls.find((c) => c.path === "update")?.body).toEqual({ title: "12기 데이터 멘토 계약 2" });
+  });
+
   it("초안: [진행]은 계약서 원본을 올려야 하고, ⋯에서 취소(사유 필수)·삭제", async () => {
     const calls = mockApi();
     await renderRoute("/admin/administration/contracts?cohort=c12&contract=k2");
