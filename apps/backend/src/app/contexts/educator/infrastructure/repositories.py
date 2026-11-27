@@ -118,6 +118,18 @@ class TortoiseEducatorContractRepository(
         rows = await query.order_by("-created_at", "-id").offset(offset).limit(limit)
         return [self.to_entity(row) for row in rows], total
 
+    async def list_by_ids(self, contract_ids: list[uuid.UUID]) -> list[EducatorContract]:
+        if not contract_ids:
+            return []
+        rows = await EducatorContractModel.filter(id__in=contract_ids)
+        return [self.to_entity(row) for row in rows]
+
+    async def list_mentor_contracts(self, mentor_id: uuid.UUID) -> list[EducatorContract]:
+        rows = await EducatorContractModel.filter(
+            mentor_id=mentor_id, contract_type=ContractType.MENTOR
+        ).order_by("-created_at", "-id")
+        return [self.to_entity(row) for row in rows]
+
     async def list_due(self, today: date) -> list[EducatorContract]:
         rows = await EducatorContractModel.filter(
             Q(status=ContractStatus.SIGNED, start_date__isnull=True)

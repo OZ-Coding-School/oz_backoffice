@@ -51,10 +51,8 @@ const ASSIGNMENTS = [
   is_active: i === 0,
   deactivated_at: null,
   deactivation_reason: null,
-  cost_settlement_policy: "PAID" as const,
-  pay_unit: "HOURLY" as const,
-  pay_rate: 50000,
-  no_show_pay_amount: null,
+  contract_id: "k1",
+  contract: null,
 }));
 
 /** status·cohort_id로 거르고 counts는 기수만 따른다 (A76) */

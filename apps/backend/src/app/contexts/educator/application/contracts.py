@@ -10,6 +10,8 @@
 - 멘토 계약은 항상 멘토에 속한다(A104): 만들 때 지정한 멘토, 없으면 이름·휴대폰이 같은 멘토
   하나, 그것도 없으면 가입 전 멘토를 만든다. 연결 해제는 없고 다른 멘토로 옮길 수만 있다.
   가입 전 멘토의 마지막 계약을 지우거나 옮기면 그 멘토도 지운다.
+- 기수 배정의 근거 계약(A110): 계약이 ENDED·TERMINATED가 되거나 기간이 바뀌면 listener가 같은
+  트랜잭션에서 배정을 정리한다. 활성 배정의 근거인 계약은 다른 멘토로 옮길 수 없다(409).
 모든 변경은 감사 로그를 남긴다. 날짜에 따른 자동 처리의 행위자는 시스템(None)이다.
 """
 
@@ -24,6 +26,7 @@ from app.contexts.access.application.permissions import PermissionTarget
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.educator.application.ports import (
     AcademyDirectory,
+    ContractLifecycleListener,
     ContractPermissions,
     EmployeeDirectory,
     FileStorage,
@@ -33,7 +36,7 @@ from app.contexts.educator.domain.entities import (
     ContractFile,
     EducatorContract,
 )
-from app.contexts.educator.domain.enums import ContractType, TerminationReason
+from app.contexts.educator.domain.enums import ContractStatus, ContractType, TerminationReason
 from app.contexts.educator.domain.profiles import Mentor
 from app.contexts.educator.domain.repositories import (
     ContractAmendmentRepository,
@@ -55,6 +58,7 @@ from app.shared.errors import (
 from app.shared.time import business_date
 
 TARGET = "educator_contract"
+CLOSED = frozenset({ContractStatus.ENDED, ContractStatus.TERMINATED})
 READ = "educator.contract.read"
 MANAGE = "educator.contract.manage"
 
@@ -117,6 +121,7 @@ class ContractService:
         uow: UnitOfWork,
         clock: Clock,
         permissions: ContractPermissions | None = None,
+        listener: ContractLifecycleListener | None = None,
     ) -> None:
         """permissions가 없으면(매일 작업) 범위 검사를 하지 않는다."""
         self._contracts = contracts
@@ -131,6 +136,7 @@ class ContractService:
         self._uow = uow
         self._clock = clock
         self._permissions = permissions
+        self._listener = listener
 
     # ------------------------------------------------------------------ 조회
     async def list_contracts(
@@ -281,6 +287,7 @@ class ContractService:
             await self._contracts.save(updated)
             await self._amendments.add(amendment)
             await self._record(actor_id, "amend", updated, before=current)
+            await self._notify(current, updated, actor_id)
         return AmendmentView(amendment, file)
 
     async def start_progress(self, contract_id: uuid.UUID, *, actor_id: uuid.UUID) -> ContractView:
@@ -331,6 +338,17 @@ class ContractService:
             contract = await self._manageable(contract_id, actor_id)
             before = dataclasses.replace(contract)
             contract.link(mentor_id=mentor_id, instructor_id=instructor_id)
+            moved = before.mentor_id is not None and before.mentor_id != contract.mentor_id
+            if (
+                moved
+                and self._listener
+                and await self._listener.has_active_assignments(contract.id)
+            ):
+                raise ConflictError(
+                    "기수 배정의 근거인 계약은 다른 멘토로 옮길 수 없습니다. "
+                    "배정을 먼저 끝내 주세요.",
+                    code="contract_in_use_by_assignment",
+                )
             if mentor_id is not None and await self._mentors.get(mentor_id) is None:
                 raise NotFoundError("멘토를 찾을 수 없습니다.", code="mentor_not_found")
             if instructor_id is not None and not await self._instructors.exists(instructor_id):
@@ -369,6 +387,7 @@ class ContractService:
                 if contract.advance(today=today):
                     await self._contracts.save(contract)
                     await self._record(None, "advance", contract, before=before)
+                    await self._notify(before, contract, None)
                     changed += 1
         return changed
 
@@ -480,7 +499,21 @@ class ContractService:
             change(contract)
             await self._contracts.save(contract)
             await self._record(actor_id, action, contract, before=before)
+            await self._notify(before, contract, actor_id)
         return await self.get(contract_id, actor_id=actor_id)
+
+    async def _notify(
+        self, before: EducatorContract, after: EducatorContract, actor_id: uuid.UUID | None
+    ) -> None:
+        """멘토 계약이 끝나거나 기간이 바뀌면 기수 배정을 정리한다 (A110)."""
+        if self._listener is None or after.contract_type is not ContractType.MENTOR:
+            return
+        if after.status in CLOSED and before.status not in CLOSED:
+            await self._listener.contract_closed(after.id, actor_id=actor_id)
+        elif (before.start_date, before.end_date) != (after.start_date, after.end_date):
+            await self._listener.contract_period_changed(
+                after.id, start_date=after.start_date, end_date=after.end_date, actor_id=actor_id
+            )
 
     async def _get(self, contract_id: uuid.UUID) -> EducatorContract:
         contract = await self._contracts.get(contract_id)

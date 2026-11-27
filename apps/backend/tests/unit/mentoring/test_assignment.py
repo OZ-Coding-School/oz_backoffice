@@ -4,11 +4,7 @@ from typing import Any
 import pytest
 
 from app.contexts.mentoring.domain.assignment import CohortMentor
-from app.contexts.mentoring.domain.enums import (
-    CohortMentorDeactivationReason,
-    MentoringSettlementPolicy,
-    PayUnit,
-)
+from app.contexts.mentoring.domain.enums import CohortMentorDeactivationReason
 from app.shared.errors import BusinessRuleViolation
 from app.shared.ids import new_id
 
@@ -24,27 +20,49 @@ def assignment(**overrides: Any) -> CohortMentor:
         "mentor_id": new_id(),
         "start_date": date(2026, 11, 1),
         "end_date": date(2027, 4, 30),
-        "cost_settlement_policy": MentoringSettlementPolicy.ACTUAL_DURATION,
-        "pay_unit": PayUnit.HOURLY,
-        "pay_rate": 30000,
+        "contract_id": new_id(),
     }
     values.update(overrides)
     return CohortMentor(**values)
 
 
+def test_validation() -> None:
+    with pytest.raises(BusinessRuleViolation) as exc:
+        assignment(end_date=date(2026, 10, 1))
+    assert exc.value.code == "invalid_assignment_period"
+
+
 @pytest.mark.parametrize(
-    ("overrides", "code"),
+    ("start", "end", "contract", "inside"),
     [
-        ({"end_date": date(2026, 10, 1)}, "invalid_assignment_period"),
-        ({"pay_unit": PayUnit.MONTHLY}, "invalid_pay_unit"),
-        ({"pay_rate": -1}, "invalid_pay_amount"),
-        ({"no_show_pay_amount": -1}, "invalid_pay_amount"),
+        (date(2026, 11, 1), None, (None, None), True),
+        (date(2026, 11, 1), None, (date(2026, 11, 1), date(2027, 1, 31)), True),
+        (date(2026, 11, 1), date(2027, 1, 31), (date(2026, 11, 1), date(2027, 1, 31)), True),
+        (date(2026, 10, 31), None, (date(2026, 11, 1), None), False),
+        (date(2026, 11, 1), date(2027, 2, 1), (None, date(2027, 1, 31)), False),
+        (date(2027, 2, 1), None, (None, date(2027, 1, 31)), False),
     ],
 )
-def test_validation(overrides: dict[str, Any], code: str) -> None:
-    with pytest.raises(BusinessRuleViolation) as exc:
-        assignment(**overrides)
-    assert exc.value.code == code
+def test_within_contract(
+    start: date, end: date | None, contract: tuple[date | None, date | None], inside: bool
+) -> None:
+    """배정 기간은 근거 계약 기간 안 (A110). 배정 종료일이 없으면 계약이 끝날 때까지다."""
+    a = assignment(start_date=start, end_date=end)
+    if inside:
+        a.ensure_within_contract(*contract)
+    else:
+        with pytest.raises(BusinessRuleViolation) as exc:
+            a.ensure_within_contract(*contract)
+        assert exc.value.code == "assignment_outside_contract_period"
+
+
+def test_trimmed_to_contract() -> None:
+    a = assignment(start_date=date(2026, 11, 1), end_date=None)
+    assert a.trimmed_to(date(2026, 11, 10), date(2026, 12, 31))
+    assert (a.start_date, a.end_date) == (date(2026, 11, 10), date(2026, 12, 31))
+    assert not assignment(start_date=date(2027, 1, 5), end_date=None).trimmed_to(
+        None, date(2026, 12, 31)
+    )
 
 
 def test_open_ended_and_start_within_cohort() -> None:
@@ -58,10 +76,11 @@ def test_open_ended_and_start_within_cohort() -> None:
     assert exc.value.code == "assignment_start_outside_cohort"
 
 
-def test_revise_only_period_and_pay() -> None:
+def test_revise_only_period_and_contract() -> None:
     current = assignment()
-    revised = current.revised({"pay_rate": 40000, "end_date": None})
-    assert (revised.id, revised.pay_rate, revised.end_date) == (current.id, 40000, None)
+    contract_id = new_id()
+    revised = current.revised({"contract_id": contract_id, "end_date": None})
+    assert (revised.id, revised.contract_id, revised.end_date) == (current.id, contract_id, None)
     with pytest.raises(BusinessRuleViolation) as exc:
         current.revised({"mentor_id": new_id()})
     assert exc.value.code == "invalid_assignment_field"

@@ -19,6 +19,7 @@ from app.contexts.identity.infrastructure.repositories import TortoiseUserReposi
 from tests.factories.identity import make_user
 
 if TYPE_CHECKING:
+    from app.contexts.educator.domain.entities import EducatorContract
     from app.contexts.identity.domain.enums import MemberSignupType
     from app.contexts.identity.domain.signup import MemberSignup
 
@@ -96,3 +97,72 @@ async def mentor_contract_json(**overrides: Any) -> dict[str, Any]:
     """API 요청 본문용 계약 칸 (UUID·enum을 문자열로)."""
     fields = await mentor_contract_fields(**overrides)
     return {k: (str(v) if isinstance(v, uuid.UUID | StrEnum) else v) for k, v in fields.items()}
+
+
+def make_mentor_contract(
+    mentor_id: uuid.UUID,
+    *,
+    bootcamp_id: uuid.UUID,
+    cohort_id: uuid.UUID | None = None,
+    **overrides: Any,
+) -> "EducatorContract":
+    """저장하지 않는 멘토 계약 (단위 테스트용, A110). 기본은 이행 중·기간 없음·시급 30,000원."""
+    from app.contexts.educator.domain.entities import EducatorContract
+    from app.contexts.educator.domain.enums import ContractStatus
+    from app.shared.ids import new_id
+
+    values: dict[str, Any] = {
+        **MENTOR_TERMS,
+        "unit_price": 30000,
+        "manager_employee_id": new_id(),
+        "bootcamp_id": bootcamp_id,
+        "cohort_id": cohort_id,
+        "contractor_name": "김멘토",
+        "contractor_phone": "01012345678",
+        "title": "멘토 계약",
+        "mentor_id": mentor_id,
+        "status": ContractStatus.ACTIVE,
+        "contract_file_id": new_id(),
+    }
+    values.update(overrides)
+    return EducatorContract(**values)
+
+
+async def create_mentor_contract(
+    mentor_id: uuid.UUID,
+    *,
+    bootcamp_id: uuid.UUID,
+    cohort_id: uuid.UUID | None = None,
+    **overrides: Any,
+) -> "EducatorContract":
+    """배정의 근거가 되는 멘토 계약 (A110). 기본은 이행 중(ACTIVE)·기간 없음·시급 30,000원."""
+    from app.contexts.educator.domain.entities import EducatorContract
+    from app.contexts.educator.domain.enums import ContractStatus
+    from app.contexts.educator.infrastructure.models import ContractFileModel
+    from app.contexts.educator.infrastructure.repositories import (
+        TortoiseEducatorContractRepository,
+    )
+    from app.shared.ids import new_id
+    from tests.factories.organization import create_employee
+
+    values: dict[str, Any] = {
+        **MENTOR_TERMS,
+        "unit_price": 30000,
+        "manager_employee_id": (await create_employee()).id,
+        "bootcamp_id": bootcamp_id,
+        "cohort_id": cohort_id,
+        "contractor_name": "김멘토",
+        "contractor_phone": "01012345678",
+        "title": "멘토 계약",
+        "mentor_id": mentor_id,
+        "status": ContractStatus.ACTIVE,
+    }
+    values.update(overrides)
+    if values["status"] is not ContractStatus.DRAFT:
+        file = await ContractFileModel.create(
+            file_name="a.pdf", file_ext="pdf", file_size=1, storage_key=f"contracts/{new_id()}"
+        )
+        values["contract_file_id"] = file.id
+    contract = EducatorContract(**values)
+    await TortoiseEducatorContractRepository().add(contract)
+    return contract

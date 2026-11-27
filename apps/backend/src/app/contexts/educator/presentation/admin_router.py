@@ -31,7 +31,11 @@ from app.contexts.educator.application.contracts import (
     ContractService,
     ContractView,
 )
-from app.contexts.educator.application.ports import AcademyDirectory, EmployeeDirectory
+from app.contexts.educator.application.ports import (
+    AcademyDirectory,
+    ContractLifecycleListener,
+    EmployeeDirectory,
+)
 from app.contexts.educator.application.uploads import DirectUploads
 from app.contexts.educator.domain.entities import ContractFile
 from app.contexts.educator.domain.enums import (
@@ -86,6 +90,7 @@ def get_contract_service(
         uow=UnitOfWork(),
         clock=clock,
         permissions=checker,
+        listener=cast("ContractLifecycleListener", request.app.state.contract_listener),
     )
 
 

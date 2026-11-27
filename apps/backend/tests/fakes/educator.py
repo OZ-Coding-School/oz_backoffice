@@ -43,6 +43,16 @@ class InMemoryContractRepository:
     async def get_by_file(self, file_id: uuid.UUID) -> EducatorContract | None:
         return next((c for c in self.items.values() if c.contract_file_id == file_id), None)
 
+    async def list_by_ids(self, contract_ids: list[uuid.UUID]) -> list[EducatorContract]:
+        return [dataclasses.replace(self.items[i]) for i in contract_ids if i in self.items]
+
+    async def list_mentor_contracts(self, mentor_id: uuid.UUID) -> list[EducatorContract]:
+        return [
+            dataclasses.replace(c)
+            for c in self.items.values()
+            if c.mentor_id == mentor_id and c.contract_type is ContractType.MENTOR
+        ]
+
     async def list_page(
         self, contract_filter: ContractFilter, *, limit: int, offset: int
     ) -> tuple[list[EducatorContract], int]:

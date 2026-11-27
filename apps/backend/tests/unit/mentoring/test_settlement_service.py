@@ -6,14 +6,15 @@ from typing import Any
 import pytest
 
 from app.contexts.audit.application.recorder import AuditRecorder
+from app.contexts.educator.application.mentor_contracts import MentorContractQueries
 from app.contexts.educator.application.mentor_queries import MentorQueries
+from app.contexts.educator.domain.enums import MentoringTimeBasis
 from app.contexts.educator.domain.profiles import Mentor
 from app.contexts.mentoring.application.settlement_service import SettlementService
 from app.contexts.mentoring.domain.assignment import CohortMentor
 from app.contexts.mentoring.domain.enums import (
     MentoringSettlementPolicy,
     MentoringSettlementStatus,
-    PayUnit,
     SettlementItemType,
 )
 from app.contexts.mentoring.domain.request import MentoringRequest
@@ -22,8 +23,9 @@ from app.core.clock import FixedClock
 from app.shared.errors import BusinessRuleViolation, NotFoundError
 from app.shared.ids import new_id
 from app.shared.time import KST
+from tests.factories.educator import make_mentor_contract
 from tests.fakes.audit import InMemoryAuditLogRepository
-from tests.fakes.educator import InMemoryMentorRepository
+from tests.fakes.educator import InMemoryContractRepository, InMemoryMentorRepository
 from tests.fakes.mentoring import (
     InMemoryCohortMentorRepository,
     InMemoryRequestRepository,
@@ -49,14 +51,22 @@ class Harness:
         self.sessions = InMemorySessionRepository(self.requests)
         self.sessions.cohort_of_student = {self.student_id: self.cohort_id}
         self.settlements = InMemorySettlementRepository()
+        # 정산 조건은 근거 계약에서 읽는다 (A110)
+        self.contract = make_mentor_contract(
+            self.mentor_id,
+            bootcamp_id=new_id(),
+            cohort_id=self.cohort_id,
+            unit_price=30000,
+            no_show_pay_amount=10000,
+            mentoring_time_basis=MentoringTimeBasis(policy.value),
+        )
+        self.contracts = InMemoryContractRepository()
+        self.contracts.items = {self.contract.id: self.contract}
         self.assignment = CohortMentor(
             cohort_id=self.cohort_id,
             mentor_id=self.mentor_id,
+            contract_id=self.contract.id,
             start_date=date(2026, 11, 1),
-            cost_settlement_policy=policy,
-            pay_unit=PayUnit.HOURLY,
-            pay_rate=30000,
-            no_show_pay_amount=10000,
         )
         self.audit_logs = InMemoryAuditLogRepository()
         self.clock = FixedClock(datetime(2026, 12, 2, tzinfo=UTC))
@@ -65,6 +75,7 @@ class Harness:
             sessions=self.sessions,
             requests=self.requests,
             assignments=InMemoryCohortMentorRepository(self.assignment),
+            contracts=MentorContractQueries(self.contracts),
             mentors=MentorQueries(InMemoryMentorRepository(self.mentor)),
             audit=AuditRecorder(self.audit_logs, self.clock),
             uow=FakeUnitOfWork(),
@@ -189,3 +200,22 @@ async def test_mentor_sees_only_closed_own() -> None:
     assert len(detail.items) == 1
     with pytest.raises(NotFoundError):
         await h.service.list_for_mentor(new_id())  # 멘토 프로필 없음
+
+
+async def test_uses_current_contract_terms_and_skips_missing_terms() -> None:
+    """마감 전 정산은 다시 집계할 때 변경된 계약 단가를 쓴다 (A109⑨·A110)."""
+    import dataclasses
+
+    h = Harness()
+    await h.session(1)
+    first = await h.service.aggregate(h.cohort_id, NOV, actor_id=new_id())
+    assert first.settlements[0].items[0].pay_rate == 30000
+    h.contracts.items[h.contract.id] = dataclasses.replace(h.contract, unit_price=45000)
+    again = await h.service.aggregate(h.cohort_id, NOV, actor_id=new_id())
+    assert (again.settlements[0].items[0].pay_rate, again.settlements[0].items[0].amount) == (
+        45000,
+        45000,
+    )
+    h.contracts.items.clear()
+    gone = await h.service.aggregate(h.cohort_id, NOV, actor_id=new_id())
+    assert [s.code for s in gone.skipped] == ["contract_terms_not_found"]

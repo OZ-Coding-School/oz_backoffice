@@ -1,14 +1,13 @@
-"""기수 멘토 배정 모델 (decisions A35). check·부분 유니크·기본값은 마이그레이션 raw SQL로 건다."""
+"""기수 멘토 배정 모델 (decisions A35·A110: 근거 계약).
+
+check·부분 유니크·기본값은 마이그레이션 raw SQL로 건다.
+"""
 
 from typing import Any
 
 from tortoise import fields, models
 
-from app.contexts.mentoring.domain.enums import (
-    CohortMentorDeactivationReason,
-    MentoringSettlementPolicy,
-    PayUnit,
-)
+from app.contexts.mentoring.domain.enums import CohortMentorDeactivationReason
 from app.shared.ids import new_id
 
 
@@ -20,12 +19,11 @@ class CohortMentorModel(models.Model):
     mentor: fields.ForeignKeyRelation[Any] = fields.ForeignKeyField(
         "models.MentorModel", related_name=False, on_delete=fields.RESTRICT
     )
+    contract: fields.ForeignKeyRelation[Any] = fields.ForeignKeyField(
+        "models.EducatorContractModel", related_name=False, on_delete=fields.RESTRICT
+    )
     start_date = fields.DateField()
     end_date = fields.DateField(null=True)
-    cost_settlement_policy = fields.CharEnumField(MentoringSettlementPolicy, max_length=30)
-    pay_unit = fields.CharEnumField(PayUnit, max_length=20)
-    pay_rate = fields.IntField()
-    no_show_pay_amount = fields.IntField(default=0)
     is_active = fields.BooleanField(default=True)
     deactivated_at = fields.DatetimeField(null=True)
     deactivation_reason = fields.CharEnumField(
@@ -36,4 +34,9 @@ class CohortMentorModel(models.Model):
 
     class Meta:
         table = "cohort_mentors"
-        indexes = (("cohort", "is_active"), ("is_active", "end_date"), ("mentor", "is_active"))
+        indexes = (
+            ("cohort", "is_active"),
+            ("is_active", "end_date"),
+            ("mentor", "is_active"),
+            ("contract", "is_active"),
+        )

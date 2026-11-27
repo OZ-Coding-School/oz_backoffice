@@ -24,6 +24,7 @@ from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.identity.application.auth_service import UserQueries
 from app.contexts.identity.domain.entities import User
 from app.contexts.mentoring.application.assignment_service import MentorDirectory
+from app.contexts.mentoring.application.contract_basis import ContractLookup
 from app.contexts.mentoring.application.settlement_export import (
     OPTIONAL_COLUMNS,
     CohortLabels,
@@ -83,6 +84,7 @@ def get_settlement_service(
         sessions=TortoiseMentoringSessionRepository(),
         requests=TortoiseMentoringRequestRepository(),
         assignments=TortoiseCohortMentorRepository(),
+        contracts=cast("ContractLookup", request.app.state.mentor_contracts),
         mentors=cast("MentorDirectory", request.app.state.mentor_queries),
         audit=cast("AuditRecorder", request.app.state.audit_recorder),
         uow=UnitOfWork(),

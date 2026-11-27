@@ -2,13 +2,14 @@
 
 - `educator.contracts.expire`: 매일 00:05 KST, 시작일이 된 SIGNED 계약을 ACTIVE로, 종료일이 지난
   ACTIVE 계약을 ENDED로 바꾼다 (decisions A109③). 멱등이라 워커가 멈췄다가 다시 돌아도 밀린 계약을
-  모두 처리한다.
+  모두 처리한다. 끝난 계약을 근거로 한 기수 배정도 함께 끈다(A110).
 
 이 모듈은 composition root라 여러 컨텍스트의 infrastructure를 직접 조립한다.
 """
 
 import logging
 
+from app.composition.assignment_contracts import AssignmentContractListener
 from app.contexts.academy.application.catalog import AcademyCatalog
 from app.contexts.academy.infrastructure.repositories import (
     TortoiseBootcampRepository,
@@ -51,6 +52,9 @@ def build_contract_service() -> ContractService:
         audit=AuditRecorder(TortoiseAuditLogRepository(), clock),
         uow=UnitOfWork(),
         clock=clock,
+        listener=AssignmentContractListener(
+            audit=AuditRecorder(TortoiseAuditLogRepository(), clock), clock=clock
+        ),
     )
 
 

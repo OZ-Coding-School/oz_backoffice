@@ -7,16 +7,12 @@ import pytest
 from tortoise.exceptions import IntegrityError
 
 from app.contexts.mentoring.domain.assignment import CohortMentor
-from app.contexts.mentoring.domain.enums import (
-    CohortMentorDeactivationReason,
-    MentoringSettlementPolicy,
-    PayUnit,
-)
+from app.contexts.mentoring.domain.enums import CohortMentorDeactivationReason
 from app.contexts.mentoring.infrastructure.models import CohortMentorModel
 from app.contexts.mentoring.infrastructure.repositories import TortoiseCohortMentorRepository
 from app.shared.errors import ConflictError
 from tests.factories.academy import create_cohort
-from tests.factories.educator import create_mentor
+from tests.factories.educator import create_mentor, create_mentor_contract
 
 pytestmark = pytest.mark.integration
 
@@ -28,15 +24,16 @@ async def _assignment(**overrides: Any) -> CohortMentor:
     values: dict[str, Any] = {
         "start_date": date(2026, 11, 1),
         "end_date": date(2026, 12, 31),
-        "cost_settlement_policy": MentoringSettlementPolicy.ACTUAL_DURATION,
-        "pay_unit": PayUnit.HOURLY,
-        "pay_rate": 30000,
     }
     values.update(overrides)
+    cohort = await create_cohort()
     if "cohort_id" not in values:
-        values["cohort_id"] = (await create_cohort()).id
+        values["cohort_id"] = cohort.id
     if "mentor_id" not in values:
         values["mentor_id"] = (await create_mentor()).id
+    if "contract_id" not in values:
+        contract = await create_mentor_contract(values["mentor_id"], bootcamp_id=cohort.bootcamp_id)
+        values["contract_id"] = contract.id
     entity = CohortMentor(**values)
     await repo.add(entity)
     return entity
@@ -69,26 +66,26 @@ async def test_open_ended_and_expired_listing() -> None:
     assert loaded is not None
     assert loaded.end_date is None
     assert [a.id for a in await repo.list_expired(date(2026, 11, 10))] == [ended.id]
+    assert {a.id for a in await repo.list_active_by_contract(ended.contract_id)} == {ended.id}
 
 
 @pytest.mark.parametrize(
     "values",
     [
-        {"pay_unit": "MONTHLY"},
         {"end_date": date(2026, 10, 1)},
-        {"pay_rate": -1},
         {"is_active": False},  # 비활성 시각·사유 없음
         {"deactivation_reason": "MANUAL"},  # 활성인데 사유
     ],
 )
 async def test_db_checks(values: dict[str, Any]) -> None:
+    cohort = await create_cohort()
+    mentor = await create_mentor()
+    contract = await create_mentor_contract(mentor.id, bootcamp_id=cohort.bootcamp_id)
     data: dict[str, Any] = {
-        "cohort_id": (await create_cohort()).id,
-        "mentor_id": (await create_mentor()).id,
+        "cohort_id": cohort.id,
+        "mentor_id": mentor.id,
+        "contract_id": contract.id,
         "start_date": date(2026, 11, 1),
-        "cost_settlement_policy": "ACTUAL_DURATION",
-        "pay_unit": "HOURLY",
-        "pay_rate": 0,
     }
     data.update(values)
     with pytest.raises(IntegrityError):

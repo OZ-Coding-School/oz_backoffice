@@ -1,6 +1,9 @@
 import type { MyAssignment } from "@/features/mentor-requests/api";
 
-export const POLICY_LABELS: Record<MyAssignment["cost_settlement_policy"], string> = {
+type TimeBasis = NonNullable<NonNullable<MyAssignment["contract"]>["mentoring_time_basis"]>;
+
+/** 정산 시간 기준은 근거 계약에서 읽는다 (A110) */
+export const POLICY_LABELS: Record<TimeBasis, string> = {
   ACTUAL_DURATION: "실제 진행 시간 정산",
   STUDENT_REQUEST: "신청 시간 정산",
 };

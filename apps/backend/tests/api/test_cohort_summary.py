@@ -11,13 +11,12 @@ from app.contexts.identity.domain.entities import User
 from app.contexts.identity.domain.enums import AccountType
 from app.contexts.identity.infrastructure.repositories import TortoiseUserRepository
 from app.contexts.mentoring.domain.assignment import CohortMentor
-from app.contexts.mentoring.domain.enums import MentoringSettlementPolicy, PayUnit
 from app.contexts.mentoring.infrastructure.repositories import TortoiseCohortMentorRepository
 from app.core.config import Settings
 from app.core.security import JWTService
 from tests.factories.academy import create_cohort, make_student
 from tests.factories.access import assign, give_permissions
-from tests.factories.educator import create_mentor, create_user
+from tests.factories.educator import create_mentor, create_mentor_contract, create_user
 from tests.factories.organization import create_employee
 
 pytestmark = pytest.mark.api
@@ -38,14 +37,15 @@ async def test_summary_counts_mentors_and_staff(client: AsyncClient, settings: S
     await students.add(make_student(cohort_id=other.id))
 
     mentor = await create_mentor(await create_user(name="이멘토", account_type=AccountType.MENTOR))
+    contract = await create_mentor_contract(
+        mentor.id, bootcamp_id=cohort.bootcamp_id, cohort_id=cohort.id
+    )
     await TortoiseCohortMentorRepository().add(
         CohortMentor(
             cohort_id=cohort.id,
             mentor_id=mentor.id,
+            contract_id=contract.id,
             start_date=date(2026, 11, 2),
-            cost_settlement_policy=MentoringSettlementPolicy.ACTUAL_DURATION,
-            pay_unit=PayUnit.HOURLY,
-            pay_rate=30000,
         )
     )
     reader = await create_user(name="박매니저", account_type=AccountType.STAFF)

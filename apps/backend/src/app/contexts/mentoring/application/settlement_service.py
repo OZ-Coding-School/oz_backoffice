@@ -3,8 +3,9 @@
 - 운영진이 기수·월을 골라 수동으로 집계한다. 멘토마다 DRAFT 정산서를 만들거나 새로 계산한다.
 - 대상: 그 기수에서 그 달(KST) 말까지 시작했고 기록(완료·노쇼)이 끝난 세션 중 다른 정산에 들어가지
   않은 것. 그래서 마감 뒤 늦게 기록된 지난달 세션은 다음 정산에 들어간다.
-- 명세: 세션 시작일에 유효한 기수 배정의 정산 기준·단가를 스냅샷한다. 배정을 못 찾은 세션은 건너뛰고
-  알린다.
+- 명세: 세션 시작일에 유효한 기수 배정의 **근거 계약**에서 정산 기준·단가·노쇼 금액을 읽어
+  스냅샷한다(A110). 마감되지 않은 정산은 다시 집계할 때 그때의 계약 값(변경 계약 반영)을 쓴다.
+  배정이나 계약 조건을 못 찾은 세션은 건너뛰고 알린다.
 - 마감: 기록 미제출 세션이 있으면 목록을 돌려주고, 확인(confirm)하면 마감한다. 마감한 정산은 다시
   집계하지 않는다.
 """
@@ -17,7 +18,8 @@ from typing import Protocol
 
 from app.contexts.audit.application.recorder import AuditRecorder
 from app.contexts.educator.domain.profiles import Mentor
-from app.contexts.mentoring.domain.assignment import CohortMentor
+from app.contexts.mentoring.application.contract_basis import ContractLookup, terms_of
+from app.contexts.mentoring.domain.assignment import AssignmentTerms, CohortMentor
 from app.contexts.mentoring.domain.enums import MentoringSessionStatus, SettlementItemType
 from app.contexts.mentoring.domain.repositories import (
     CohortMentorRepository,
@@ -99,6 +101,7 @@ class SettlementService:
         sessions: MentoringSessionRepository,
         requests: MentoringRequestRepository,
         assignments: CohortMentorRepository,
+        contracts: ContractLookup,
         mentors: MentorLookup,
         audit: AuditRecorder,
         uow: UnitOfWork,
@@ -108,6 +111,7 @@ class SettlementService:
         self._sessions = sessions
         self._requests = requests
         self._assignments = assignments
+        self._contracts = contracts
         self._mentors = mentors
         self._audit = audit
         self._uow = uow
@@ -143,13 +147,20 @@ class SettlementService:
                 assignments = await self._assignments.list_by_mentor(
                     mentor_id, include_inactive=True
                 )
+                contracts = await self._contracts.get_many([a.contract_id for a in assignments])
+                terms = {
+                    a.id: t
+                    for a in assignments
+                    if (c := contracts.get(a.contract_id)) is not None
+                    and (t := terms_of(c)) is not None
+                }
                 items: list[SettlementItem] = []
                 for session in sessions:
                     if session.id in taken:
                         continue
-                    item = self._item(session, cohort_id, assignments, requests)
-                    if item is None:
-                        result.skipped.append(SkippedSession(session.id, "assignment_not_found"))
+                    item = self._item(session, cohort_id, assignments, terms, requests)
+                    if isinstance(item, str):
+                        result.skipped.append(SkippedSession(session.id, item))
                     else:
                         items.append(item)
                 if not items and is_new:
@@ -165,26 +176,31 @@ class SettlementService:
         session: MentoringSession,
         cohort_id: uuid.UUID,
         assignments: list[CohortMentor],
+        terms: dict[uuid.UUID, AssignmentTerms],
         requests: dict[uuid.UUID, MentoringRequest],
-    ) -> SettlementItem | None:
+    ) -> SettlementItem | str:
+        """명세 한 줄, 못 만들면 건너뛴 사유 코드."""
         assignment = _assignment_for(assignments, cohort_id, business_date(session.starts_at))
         request = requests.get(session.request_id)
         if assignment is None or request is None:
-            return None
+            return "assignment_not_found"
+        term = terms.get(assignment.id)
+        if term is None:
+            return "contract_terms_not_found"
         if session.status is MentoringSessionStatus.NO_SHOW:
             return SettlementItem(
                 session_id=session.id,
                 cohort_id=cohort_id,
                 item_type=SettlementItemType.NO_SHOW,
-                settlement_policy=assignment.cost_settlement_policy,
+                settlement_policy=term.settlement_policy,
                 billable_minutes=0,
-                pay_unit=assignment.pay_unit,
-                pay_rate=assignment.no_show_pay_amount,
-                amount=assignment.no_show_pay_amount,
+                pay_unit=term.pay_unit,
+                pay_rate=term.no_show_pay_amount,
+                amount=term.no_show_pay_amount,
                 session_starts_at=session.starts_at,
             )
         minutes = billable_minutes(
-            assignment.cost_settlement_policy,
+            term.settlement_policy,
             requested=request.duration,
             recorded=session.record_duration_minutes,
         )
@@ -192,11 +208,11 @@ class SettlementService:
             session_id=session.id,
             cohort_id=cohort_id,
             item_type=SettlementItemType.SESSION,
-            settlement_policy=assignment.cost_settlement_policy,
+            settlement_policy=term.settlement_policy,
             billable_minutes=minutes,
-            pay_unit=assignment.pay_unit,
-            pay_rate=assignment.pay_rate,
-            amount=session_amount(assignment.pay_unit, assignment.pay_rate, minutes),
+            pay_unit=term.pay_unit,
+            pay_rate=term.pay_rate,
+            amount=session_amount(term.pay_unit, term.pay_rate, minutes),
             session_starts_at=session.starts_at,
         )
 

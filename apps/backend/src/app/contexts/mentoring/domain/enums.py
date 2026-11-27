@@ -17,6 +17,7 @@ class CohortMentorDeactivationReason(StrEnum):
     EXPIRED = "EXPIRED"  # 종료일 경과 (매일 작업)
     MANUAL = "MANUAL"  # 운영진 비활성화(삭제)
     MENTOR_DEACTIVATED = "MENTOR_DEACTIVATED"  # 멘토 비활성화로 함께 비활성화
+    CONTRACT_ENDED = "CONTRACT_ENDED"  # 근거 계약 종료·해지·기간 축소 (A110)
 
 
 class UnavailableRepeat(StrEnum):

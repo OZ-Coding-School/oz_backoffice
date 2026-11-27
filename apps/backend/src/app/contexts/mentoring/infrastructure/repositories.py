@@ -203,11 +203,8 @@ class TortoiseCohortMentorRepository(TortoiseRepository[CohortMentor, CohortMent
         "cohort_id",
         "mentor_id",
         "start_date",
+        "contract_id",
         "end_date",
-        "cost_settlement_policy",
-        "pay_unit",
-        "pay_rate",
-        "no_show_pay_amount",
         "is_active",
         "deactivated_at",
         "deactivation_reason",
@@ -272,6 +269,12 @@ class TortoiseCohortMentorRepository(TortoiseRepository[CohortMentor, CohortMent
             return []
         rows = await CohortMentorModel.filter(mentor_id__in=mentor_ids, is_active=True).order_by(
             "-start_date", "id"
+        )
+        return [self.to_entity(row) for row in rows]
+
+    async def list_active_by_contract(self, contract_id: uuid.UUID) -> list[CohortMentor]:
+        rows = await CohortMentorModel.filter(contract_id=contract_id, is_active=True).order_by(
+            "start_date", "id"
         )
         return [self.to_entity(row) for row in rows]
 

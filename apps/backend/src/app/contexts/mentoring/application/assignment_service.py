@@ -1,6 +1,8 @@
-"""기수 멘토 배정 관리 (decisions A35, 권한 mentoring.assignment.manage).
+"""기수 멘토 배정 관리 (decisions A35·A110, 권한 mentoring.assignment.manage).
 
-- 계약과 별개로 운영진이 등록·수정·비활성화(삭제)·재활성화한다.
+- 운영진이 등록·수정·비활성화(삭제)·재활성화한다. 배정은 근거 계약(그 멘토의 SIGNED·ACTIVE 멘토
+  계약, 그 기수 또는 같은 과정 공통)을 가리키고 배정 기간은 계약 기간 안이어야 한다(A110).
+  정산 조건은 근거 계약에서 읽는다.
 - 활성 배정은 (멘토, 기수)당 하나 → 409 `assignment_already_exists` (유형 구분 없음, A41).
 - 시작일은 기수 기간 안, 종료일은 선택. 비활성 멘토는 새 배정·재활성화 불가 → 422 `mentor_inactive`.
 - 배정 생성·재활성화는 멘토 행을 잠가 멘토 비활성화와 겹치지 않게 한다.
@@ -16,7 +18,13 @@ from typing import Any, Protocol
 
 from app.contexts.academy.domain.entities import Cohort
 from app.contexts.audit.application.recorder import AuditRecorder
+from app.contexts.educator.domain.entities import EducatorContract
 from app.contexts.educator.domain.profiles import Mentor
+from app.contexts.mentoring.application.contract_basis import (
+    ContractLookup,
+    ensure_basis,
+    is_candidate,
+)
 from app.contexts.mentoring.application.request_cleanup import (
     ASSIGNMENT_DEACTIVATED,
     RequestCleanup,
@@ -111,6 +119,7 @@ class CohortMentorService:
         assignments: CohortMentorRepository,
         mentors: MentorDirectory,
         cohorts: CohortLookup,
+        contracts: ContractLookup,
         cleanup: RequestCleanup,
         audit: AuditRecorder,
         uow: UnitOfWork,
@@ -119,6 +128,7 @@ class CohortMentorService:
         self._assignments = assignments
         self._mentors = mentors
         self._cohorts = cohorts
+        self._contracts = contracts
         self._cleanup = cleanup
         self._audit = audit
         self._uow = uow
@@ -143,6 +153,18 @@ class CohortMentorService:
             raise NotFoundError("멘토를 찾을 수 없습니다.", code="mentor_not_found")
         return await self._assignments.list_by_mentor(mentor_id, include_inactive=True)
 
+    async def contract_candidates(
+        self, cohort_id: uuid.UUID, mentor_id: uuid.UUID
+    ) -> list[EducatorContract]:
+        """배정의 근거 계약 후보 (A110).
+
+        그 멘토의 SIGNED·ACTIVE 멘토 계약 중 이 기수의 계약 또는 같은 과정 공통 계약."""
+        cohort = await self._cohort(cohort_id)
+        if await self._mentors.get(mentor_id) is None:
+            raise NotFoundError("멘토를 찾을 수 없습니다.", code="mentor_not_found")
+        contracts = await self._contracts.list_by_mentor(mentor_id)
+        return [c for c in contracts if is_candidate(c, mentor_id, cohort)]
+
     # ------------------------------------------------------------------ 변경
     async def create(
         self, cohort_id: uuid.UUID, values: dict[str, Any], *, actor_id: uuid.UUID
@@ -152,6 +174,7 @@ class CohortMentorService:
         assignment.ensure_starts_within(cohort.start_date, cohort.end_date)
         async with self._uow:
             ensure_mentor_active(await self._mentors.lock(assignment.mentor_id))
+            ensure_basis(assignment, await self._contracts.get(assignment.contract_id), cohort)
             await ensure_no_active_duplicate(self._assignments, assignment)
             await self._assignments.add(assignment)
             await record_change(self._audit, actor_id, "create", assignment, None)
@@ -165,12 +188,13 @@ class CohortMentorService:
         *,
         actor_id: uuid.UUID,
     ) -> CohortMentor:
-        """기간·정산 조건만 바꾼다. 정산은 마감 때 값을 저장하므로 지난 정산에 영향이 없다."""
+        """기간·근거 계약만 바꾼다. 정산은 마감 때 값을 저장하므로 지난 정산에 영향이 없다."""
         cohort = await self._cohort(cohort_id)
         async with self._uow:
             current = await self._get(cohort_id, assignment_id)
             updated = current.revised(values)
             updated.ensure_starts_within(cohort.start_date, cohort.end_date)
+            ensure_basis(updated, await self._contracts.get(updated.contract_id), cohort)
             await self._assignments.save(updated)
             await record_change(self._audit, actor_id, "update", updated, snapshot(current))
         return await self._get(cohort_id, assignment_id)
@@ -201,6 +225,8 @@ class CohortMentorService:
             ensure_mentor_active(await self._mentors.lock(assignment.mentor_id))
             before = snapshot(assignment)
             assignment.reactivate(today=business_date(self._clock.now()))
+            cohort = await self._cohort(cohort_id)
+            ensure_basis(assignment, await self._contracts.get(assignment.contract_id), cohort)
             await ensure_no_active_duplicate(self._assignments, assignment)
             await self._assignments.save(assignment)
             await record_change(self._audit, actor_id, "reactivate", assignment, before)

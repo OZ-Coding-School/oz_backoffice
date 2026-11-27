@@ -1,12 +1,13 @@
 """기수 멘토 배정·멘토 활성화 API (실제 DB)."""
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 
 import pytest
 from httpx import AsyncClient
 
 from app.cli import create_super_admin
+from app.contexts.academy.domain.entities import Cohort
 from app.contexts.educator.domain.enums import DisplayNamePreference
 from app.contexts.educator.domain.profiles import Mentor
 from app.contexts.identity.domain.entities import User
@@ -15,7 +16,7 @@ from app.core.config import Settings
 from app.core.security import JWTService
 from tests.factories.academy import create_cohort
 from tests.factories.access import ASSISTANT, MANAGER, give_role
-from tests.factories.educator import create_mentor, create_user
+from tests.factories.educator import create_mentor, create_mentor_contract, create_user
 from tests.factories.staff_review import create_applicant
 
 pytestmark = pytest.mark.api
@@ -51,13 +52,18 @@ async def _mentor(**overrides: Any) -> Mentor:
     return await create_mentor(user, **overrides)
 
 
-def _body(mentor: Mentor, **overrides: Any) -> dict[str, Any]:
+async def _body(mentor: Mentor, cohort: Cohort, **overrides: Any) -> dict[str, Any]:
+    """근거 계약(A110)을 그 기수에 새로 만들어 붙인다. 계약 칸은 `contract`로 바꾼다."""
+    contract = await create_mentor_contract(
+        mentor.id,
+        bootcamp_id=cohort.bootcamp_id,
+        cohort_id=cohort.id,
+        **overrides.pop("contract", {}),
+    )
     body: dict[str, Any] = {
         "mentor_id": str(mentor.id),
+        "contract_id": str(contract.id),
         "start_date": "2026-11-01",
-        "cost_settlement_policy": "ACTUAL_DURATION",
-        "pay_unit": "HOURLY",
-        "pay_rate": 30000,
     }
     body.update(overrides)
     return body
@@ -68,29 +74,34 @@ async def test_assignment_crud(client: AsyncClient, admin: dict[str, str]) -> No
     mentor = await _mentor(nickname="멘토K", display_name_preference=DisplayNamePreference.NICKNAME)
     path = f"{API}/cohorts/{cohort.id}/mentor-assignments"
 
-    created = await client.post(path, json=_body(mentor), headers=admin)
+    body = await _body(mentor, cohort)
+    created = await client.post(path, json=body, headers=admin)
     assert created.status_code == 201, created.text
     data = created.json()
     assert (data["mentor_name"], data["mentor_display_name"]) == ("김멘토", "멘토K")
     assert data["end_date"] is None
+    assert (data["contract_id"], data["contract"]["unit_price"]) == (body["contract_id"], 30000)
+    assert data["contract"]["mentoring_time_basis"] == "ACTUAL_DURATION"
     item = f"{path}/{data['id']}"
 
-    duplicate = await client.post(path, json=_body(mentor), headers=admin)
+    duplicate = await client.post(path, json=await _body(mentor, cohort), headers=admin)
     assert duplicate.status_code == 409
     assert duplicate.json()["error"]["code"] == "assignment_already_exists"
     outside = await client.post(
         path,
-        json=_body(mentor, start_date="2026-10-31"),
+        json=await _body(mentor, cohort, start_date="2026-10-31"),
         headers=admin,
     )
     assert outside.json()["error"]["code"] == "assignment_start_outside_cohort"
-    monthly = await client.post(path, json=_body(mentor, pay_unit="MONTHLY"), headers=admin)
-    assert monthly.status_code == 422
-
-    updated = await client.patch(
-        item, json={"end_date": "2027-08-31", "pay_rate": 50000}, headers=admin
+    short = await client.post(
+        path,
+        json=await _body(mentor, cohort, contract={"end_date": date(2026, 10, 31)}),
+        headers=admin,
     )
-    assert (updated.json()["end_date"], updated.json()["pay_rate"]) == ("2027-08-31", 50000)
+    assert short.json()["error"]["code"] == "assignment_outside_contract_period"
+
+    updated = await client.patch(item, json={"end_date": "2027-08-31"}, headers=admin)
+    assert updated.json()["end_date"] == "2027-08-31"
     cleared = await client.patch(item, json={"end_date": None}, headers=admin)
     assert cleared.json()["end_date"] is None
 
@@ -115,7 +126,9 @@ async def test_assignment_permissions(
     assistant = await _staff(settings, ASSISTANT, cohort.id)
 
     assert (await client.get(path)).status_code == 401
-    assert (await client.post(path, json=_body(mentor), headers=manager)).status_code == 201
+    assert (
+        await client.post(path, json=await _body(mentor, cohort), headers=manager)
+    ).status_code == 201
     assert (await client.get(path, headers=assistant)).status_code == 403
     other_path = f"{API}/cohorts/{other.id}/mentor-assignments"
     assert (await client.get(other_path, headers=manager)).status_code == 403
@@ -131,9 +144,12 @@ async def test_mentor_deactivation_flow(
     cohort = await create_cohort()
     mentor = await _mentor()
     path = f"{API}/cohorts/{cohort.id}/mentor-assignments"
-    regular = (await client.post(path, json=_body(mentor), headers=admin)).json()
-    other_path = f"{API}/cohorts/{(await create_cohort()).id}/mentor-assignments"
-    project = (await client.post(other_path, json=_body(mentor), headers=admin)).json()
+    regular = (await client.post(path, json=await _body(mentor, cohort), headers=admin)).json()
+    second = await create_cohort()
+    other_path = f"{API}/cohorts/{second.id}/mentor-assignments"
+    project = (
+        await client.post(other_path, json=await _body(mentor, second), headers=admin)
+    ).json()
 
     preview = await client.post(f"{API}/mentors/{mentor.id}/deactivate", json={}, headers=admin)
     assert preview.status_code == 200
@@ -149,9 +165,10 @@ async def test_mentor_deactivation_flow(
     assert (await client.get(path, headers=admin)).json() == []
     blocked = await client.post(f"{path}/{regular['id']}/reactivate", headers=admin)
     assert blocked.json()["error"]["code"] == "mentor_inactive"
+    third = await create_cohort()
     new = await client.post(
-        f"{API}/cohorts/{(await create_cohort()).id}/mentor-assignments",
-        json=_body(mentor),
+        f"{API}/cohorts/{third.id}/mentor-assignments",
+        json=await _body(mentor, third),
         headers=admin,
     )
     assert new.json()["error"]["code"] == "mentor_inactive"
@@ -185,7 +202,11 @@ async def test_mentor_sees_own_assignments(
     mentor = await _mentor()
     path = f"{API}/cohorts/{cohort.id}/mentor-assignments"
     created = (
-        await client.post(path, json=_body(mentor, no_show_pay_amount=10000), headers=admin)
+        await client.post(
+            path,
+            json=await _body(mentor, cohort, contract={"no_show_pay_amount": 10000}),
+            headers=admin,
+        )
     ).json()
     user = await TortoiseUserRepository().get(mentor.account_id)
     assert user is not None
@@ -194,12 +215,9 @@ async def test_mentor_sees_own_assignments(
     mine = await client.get("/api/v1/me/mentor-assignments", headers=me)
     assert mine.status_code == 200
     (item,) = mine.json()
-    assert (item["id"], item["cohort_number"], item["pay_rate"], item["no_show_pay_amount"]) == (
-        created["id"],
-        3,
-        30000,
-        10000,
-    )
+    contract = item["contract"]
+    assert (item["id"], item["cohort_number"], contract["unit_price"]) == (created["id"], 3, 30000)
+    assert contract["no_show_pay_amount"] == 10000
     assert item["bootcamp_name"].startswith("운영과정")
     await client.delete(f"{path}/{created['id']}", headers=admin)
     assert (await client.get("/api/v1/me/mentor-assignments", headers=me)).json() == []
@@ -221,13 +239,17 @@ async def test_admin_lists_assignments_of_mentor(
     mentor = await _mentor()
     ended = (
         await client.post(
-            f"{API}/cohorts/{old.id}/mentor-assignments", json=_body(mentor), headers=admin
+            f"{API}/cohorts/{old.id}/mentor-assignments",
+            json=await _body(mentor, old),
+            headers=admin,
         )
     ).json()
     await client.delete(f"{API}/cohorts/{old.id}/mentor-assignments/{ended['id']}", headers=admin)
     active = (
         await client.post(
-            f"{API}/cohorts/{now.id}/mentor-assignments", json=_body(mentor), headers=admin
+            f"{API}/cohorts/{now.id}/mentor-assignments",
+            json=await _body(mentor, now),
+            headers=admin,
         )
     ).json()
 
@@ -243,3 +265,63 @@ async def test_admin_lists_assignments_of_mentor(
         f"{API}/mentors/{active['cohort_id']}/mentor-assignments", headers=admin
     )
     assert (missing.status_code, missing.json()["error"]["code"]) == (404, "mentor_not_found")
+
+
+async def test_contract_candidates_and_contract_end(
+    client: AsyncClient, admin: dict[str, str]
+) -> None:
+    """근거 계약 후보 (A110), 계약을 해지하면 그 계약을 근거로 한 배정이 꺼진다."""
+    cohort = await create_cohort()
+    mentor = await _mentor()
+    path = f"{API}/cohorts/{cohort.id}/mentor-assignments"
+    common = await create_mentor_contract(mentor.id, bootcamp_id=cohort.bootcamp_id)
+    await create_mentor_contract(  # 다른 과정 계약은 후보가 아니다
+        mentor.id, bootcamp_id=(await create_cohort()).bootcamp_id
+    )
+    listed = await client.get(
+        f"{path}/contract-candidates", params={"mentor_id": str(mentor.id)}, headers=admin
+    )
+    assert listed.status_code == 200, listed.text
+    assert [c["id"] for c in listed.json()] == [str(common.id)]
+
+    created = await client.post(
+        path,
+        json={
+            "mentor_id": str(mentor.id),
+            "contract_id": str(common.id),
+            "start_date": "2026-11-01",
+        },
+        headers=admin,
+    )
+    assert created.status_code == 201, created.text
+    # 변경 계약으로 기간이 줄면 배정 기간도 줄인다
+    amended = await client.post(
+        f"{API}/contracts/{common.id}/amendments",
+        json={
+            "amended_on": "2026-11-20",
+            "reason": "기간 단축",
+            "changes": {"end_date": "2027-01-31"},
+        },
+        headers=admin,
+    )
+    assert amended.status_code in (200, 201), amended.text
+    trimmed = (await client.get(path, headers=admin)).json()
+    assert [(a["end_date"], a["contract"]["end_date"]) for a in trimmed] == [
+        ("2027-01-31", "2027-01-31")
+    ]
+    moved = await client.post(
+        f"{API}/contracts/{common.id}/link",
+        json={"mentor_id": str((await _mentor()).id)},
+        headers=admin,
+    )
+    assert moved.json()["error"]["code"] == "contract_in_use_by_assignment"
+    ended = await client.post(
+        f"{API}/contracts/{common.id}/terminate",
+        json={"reason": "TERMINATED_BY_MUTUAL_AGREEMENT"},
+        headers=admin,
+    )
+    assert ended.status_code == 200, ended.text
+    after = (await client.get(path, params={"include_inactive": "true"}, headers=admin)).json()
+    assert [(a["is_active"], a["deactivation_reason"]) for a in after] == [
+        (False, "CONTRACT_ENDED")
+    ]

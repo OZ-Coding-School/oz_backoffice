@@ -13,7 +13,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Segmented } from "@/components/ui/segmented";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
@@ -23,27 +22,14 @@ import { staffAccessQuery, type StaffCohort } from "@/features/staff/api";
 import { formatKst } from "@/lib/datetime";
 
 import { mentorAssignmentsQuery, type MentorAssignment, type MentorItem } from "../api";
-import {
-  assignmentError,
-  useAssignmentActive,
-  useCreateAssignment,
-  useUpdateAssignment,
-  type PayUnit,
-  type SettlementPolicy,
-} from "../assignment-api";
+import { assignmentError, useAssignmentActive, useCreateAssignment, useUpdateAssignment } from "../assignment-api";
 import { endText } from "../labels";
 
 const dot = (d: string) => d.replaceAll("-", ".");
 const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
 
-const POLICIES = [
-  { value: "ACTUAL_DURATION", label: "실제 진행 시간" },
-  { value: "STUDENT_REQUEST", label: "신청 시간" },
-] as const satisfies readonly { value: SettlementPolicy; label: string }[];
-const UNITS = [
-  { value: "HOURLY", label: "시간당" },
-  { value: "PER_SESSION", label: "세션당" },
-] as const satisfies readonly { value: PayUnit; label: string }[];
+const POLICIES = { ACTUAL_DURATION: "실제 진행 시간", STUDENT_REQUEST: "신청 시간" } as const;
+const UNITS: Record<string, string> = { HOURLY: "시간당", PER_SESSION: "세션당" };
 
 const HELP = {
   start: "기수 기간 안의 날짜여야 해요.",
@@ -209,16 +195,7 @@ function AssignmentView({
             {a.end_date ? dot(a.end_date) : "종료일 없음"}
           </PanelRow>
         </PanelSection>
-        <PanelSection title="정산 조건">
-          <PanelRow label="정산 기준" help={HELP.policy}>
-            {POLICIES.find((p) => p.value === a.cost_settlement_policy)?.label}
-          </PanelRow>
-          <PanelRow label="단가 기준">{UNITS.find((u) => u.value === a.pay_unit)?.label}</PanelRow>
-          <PanelRow label="단가">{won(a.pay_rate)}</PanelRow>
-          <PanelRow label="노쇼 단가" help={HELP.noShow}>
-            {a.no_show_pay_amount > 0 ? won(a.no_show_pay_amount) : "없음"}
-          </PanelRow>
-        </PanelSection>
+        <ContractTerms assignment={a} />
         {end ? (
           <PanelSection title="종료">
             <PanelRow label="사유">{end.split(" · ")[0]}</PanelRow>
@@ -280,28 +257,40 @@ function EndDialog({
 }
 
 // ------------------------------------------------------------------ 폼
-const amount = z
-  .string()
-  .trim()
-  .regex(/^[0-9,]+$/, "숫자로 적어 주세요")
-  .refine((v) => Number(v.replaceAll(",", "")) <= 100_000_000, "금액을 확인해 주세요");
 const schema = z
   .object({
     bootcamp: z.string(),
     cohort: z.string(),
     start_date: z.string().min(1, "시작일을 골라 주세요"),
     end_date: z.string(),
-    policy: z.enum(["ACTUAL_DURATION", "STUDENT_REQUEST"]),
-    unit: z.enum(["HOURLY", "PER_SESSION"]),
-    rate: amount,
-    no_show: amount,
   })
   .refine((v) => !v.end_date || v.end_date >= v.start_date, {
     path: ["end_date"],
     message: "종료일은 시작일과 같거나 뒤여야 해요",
   });
 type Values = z.infer<typeof schema>;
-const num = (v: string) => Number(v.replaceAll(",", ""));
+
+/** 정산 조건은 근거 계약에서 읽는다 (A110) */
+function ContractTerms({ assignment: a }: { assignment: MentorAssignment }) {
+  const c = a.contract;
+  return (
+    <PanelSection title="정산 조건">
+      <PanelRow label="근거 계약">{c?.title ?? "—"}</PanelRow>
+      {c ? (
+        <>
+          <PanelRow label="정산 기준" help={HELP.policy}>
+            {c.mentoring_time_basis ? POLICIES[c.mentoring_time_basis] : "—"}
+          </PanelRow>
+          <PanelRow label="단가 기준">{c.price_unit ? (UNITS[c.price_unit] ?? c.price_unit) : "—"}</PanelRow>
+          <PanelRow label="단가">{c.unit_price != null ? won(c.unit_price) : "—"}</PanelRow>
+          <PanelRow label="노쇼 단가" help={HELP.noShow}>
+            {c.no_show_pay_amount ? won(c.no_show_pay_amount) : "없음"}
+          </PanelRow>
+        </>
+      ) : null}
+    </PanelSection>
+  );
+}
 
 function Fields({ form, id }: { form: ReturnType<typeof useForm<Values>>; id: string }) {
   const { errors } = form.formState;
@@ -331,46 +320,6 @@ function Fields({ form, id }: { form: ReturnType<typeof useForm<Values>>; id: st
             {...form.register("end_date")}
           />
           {err("end_date")}
-        </PanelRow>
-      </PanelSection>
-      <PanelSection title="정산 조건">
-        <PanelRow label="정산 기준" help={HELP.policy}>
-          <Controller
-            control={form.control}
-            name="policy"
-            render={({ field }) => (
-              <Segmented label="정산 기준" value={field.value} onChange={field.onChange} options={POLICIES} />
-            )}
-          />
-        </PanelRow>
-        <PanelRow label="단가 기준">
-          <Controller
-            control={form.control}
-            name="unit"
-            render={({ field }) => (
-              <Segmented label="단가 기준" value={field.value} onChange={field.onChange} options={UNITS} />
-            )}
-          />
-        </PanelRow>
-        <PanelRow label="단가" htmlFor={`${id}-rate`} top={!!errors.rate}>
-          <Input
-            id={`${id}-rate`}
-            inputMode="numeric"
-            className="font-normal"
-            aria-invalid={!!errors.rate}
-            {...form.register("rate")}
-          />
-          {err("rate")}
-        </PanelRow>
-        <PanelRow label="노쇼 단가" htmlFor={`${id}-noshow`} help={HELP.noShow} top={!!errors.no_show}>
-          <Input
-            id={`${id}-noshow`}
-            inputMode="numeric"
-            className="font-normal"
-            aria-invalid={!!errors.no_show}
-            {...form.register("no_show")}
-          />
-          {err("no_show")}
         </PanelRow>
       </PanelSection>
     </>
@@ -413,10 +362,6 @@ function AssignmentEdit({
       cohort: a.cohort_id,
       start_date: a.start_date,
       end_date: a.end_date ?? "",
-      policy: a.cost_settlement_policy,
-      unit: a.pay_unit,
-      rate: a.pay_rate.toLocaleString("ko-KR"),
-      no_show: a.no_show_pay_amount.toLocaleString("ko-KR"),
     },
   });
   const save = useUpdateAssignment(mentor.id, a.cohort_id, a.id);
@@ -433,10 +378,6 @@ function AssignmentEdit({
       await save.mutateAsync({
         start_date: v.start_date,
         end_date: v.end_date || null,
-        cost_settlement_policy: v.policy,
-        pay_unit: v.unit,
-        pay_rate: num(v.rate),
-        no_show_pay_amount: num(v.no_show),
       });
       form.reset(v);
       toast.success(`${title} 배정을 저장했어요`);
@@ -467,6 +408,7 @@ function AssignmentEdit({
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-6">
           <CohortRows assignment={a} cohort={cohort} />
           <Fields form={form} id={id} />
+          <ContractTerms assignment={a} />
           {error ? <Alert variant="error" title={error} /> : null}
         </div>
         <Footer onCancel={onDone} submitLabel="저장" pending={save.isPending} />
@@ -497,10 +439,6 @@ function AssignmentForm({
       cohort: "",
       start_date: "",
       end_date: "",
-      policy: "ACTUAL_DURATION",
-      unit: "HOURLY",
-      rate: "",
-      no_show: "0",
     },
   });
   const create = useCreateAssignment(mentor.id);
@@ -525,12 +463,10 @@ function AssignmentForm({
         cohortId: v.cohort,
         body: {
           mentor_id: mentor.id,
+          // 근거 계약 고르기는 배정 패널 PR에서 더한다 (A110). 지금은 서버가 받지 않는다
+          contract_id: "",
           start_date: v.start_date,
           end_date: v.end_date || null,
-          cost_settlement_policy: v.policy,
-          pay_unit: v.unit,
-          pay_rate: num(v.rate),
-          no_show_pay_amount: num(v.no_show),
         },
       });
       form.reset(v);

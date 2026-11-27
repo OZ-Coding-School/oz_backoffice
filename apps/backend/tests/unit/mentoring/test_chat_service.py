@@ -15,8 +15,6 @@ from app.contexts.mentoring.domain.chat import ChatEvent, ChatEventKind, ChatMes
 from app.contexts.mentoring.domain.enums import (
     CohortMentorDeactivationReason,
     MentoringRequestStatus,
-    MentoringSettlementPolicy,
-    PayUnit,
 )
 from app.contexts.mentoring.domain.request import MentoringRequest
 from app.contexts.mentoring.domain.team import MentoringTeam
@@ -66,9 +64,7 @@ def _assignment(mentor: Mentor, cohort_id: uuid.UUID) -> CohortMentor:
         cohort_id=cohort_id,
         mentor_id=mentor.id,
         start_date=date(2026, 11, 1),
-        cost_settlement_policy=MentoringSettlementPolicy.ACTUAL_DURATION,
-        pay_unit=PayUnit.HOURLY,
-        pay_rate=30000,
+        contract_id=new_id(),
     )
 
 

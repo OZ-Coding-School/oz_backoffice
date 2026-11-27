@@ -161,7 +161,8 @@ function AssignmentsCard() {
                   {a.bootcamp_name} {a.cohort_number}기
                 </span>
                 <span className="text-caption text-muted-foreground">
-                  {assignmentPeriod(a)} · {POLICY_LABELS[a.cost_settlement_policy]}
+                  {assignmentPeriod(a)}
+                  {a.contract?.mentoring_time_basis ? ` · ${POLICY_LABELS[a.contract.mentoring_time_basis]}` : ""}
                 </span>
               </div>
               <Badge variant={a.is_active ? "success" : "secondary"}>{a.is_active ? "활성" : "종료"}</Badge>

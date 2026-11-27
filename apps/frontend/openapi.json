@@ -6950,6 +6950,69 @@
         }
       }
     },
+    "/api/v1/admin/cohorts/{cohort_id}/mentor-assignments/contract-candidates": {
+      "get": {
+        "tags": [
+          "admin-mentor-assignments"
+        ],
+        "summary": "List Contract Candidates",
+        "description": "배정의 근거 계약 후보 (A110): 그 멘토의 계약 완료·이행 중 멘토 계약 중 이 기수의 계약 또는\n같은 과정의 과정 공통 계약. 기간은 저장할 때 확인한다.",
+        "operationId": "list_contract_candidates_api_v1_admin_cohorts__cohort_id__mentor_assignments_contract_candidates_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cohort_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Cohort Id"
+            }
+          },
+          {
+            "name": "mentor_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Mentor Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AssignmentContract"
+                  },
+                  "title": "Response List Contract Candidates Api V1 Admin Cohorts  Cohort Id  Mentor Assignments Contract Candidates Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/cohorts/{cohort_id}/mentor-assignments/{assignment_id}": {
       "patch": {
         "tags": [
@@ -7357,7 +7420,7 @@
           "mentor-assignments"
         ],
         "summary": "List My Assignments",
-        "description": "본인 배정 (정산 조건 포함, A35). 기본은 활성 배정만.",
+        "description": "본인 배정 (근거 계약의 정산 조건 포함, A35·A110). 기본은 활성 배정만.",
         "operationId": "list_my_assignments_api_v1_me_mentor_assignments_get",
         "security": [
           {
@@ -14689,43 +14752,144 @@
         ],
         "title": "AssignStaffRequest"
       },
-      "AssignmentCreate": {
+      "AssignmentContract": {
         "properties": {
-          "cost_settlement_policy": {
-            "$ref": "#/components/schemas/MentoringSettlementPolicy"
-          },
-          "pay_unit": {
+          "id": {
             "type": "string",
-            "enum": [
-              "HOURLY",
-              "PER_SESSION"
-            ],
-            "title": "Pay Unit",
-            "description": "HOURLY / PER_SESSION"
+            "format": "uuid",
+            "title": "Id"
           },
-          "pay_rate": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "Pay Rate",
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ContractStatus"
+          },
+          "bootcamp_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Bootcamp Id"
+          },
+          "cohort_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cohort Id",
+            "description": "없으면 과정 공통 계약"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "unit_price": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit Price",
             "description": "단가 (원)"
           },
-          "no_show_pay_amount": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "No Show Pay Amount",
-            "description": "노쇼 1건당 정산 금액 (원)",
-            "default": 0
+          "price_unit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PriceUnit"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "멘토 계약은 HOURLY / PER_SESSION"
           },
+          "no_show_pay_amount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "No Show Pay Amount",
+            "description": "노쇼 1건당 정산 금액 (원)"
+          },
+          "mentoring_time_basis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MentoringTimeBasis"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "정산 시간 기준: 신청 시간 / 실제 진행 시간"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "status",
+          "bootcamp_id",
+          "cohort_id",
+          "start_date",
+          "end_date",
+          "unit_price",
+          "price_unit",
+          "no_show_pay_amount",
+          "mentoring_time_basis"
+        ],
+        "title": "AssignmentContract",
+        "description": "근거 계약 요약 (A110). 정산은 이 값으로 계산한다."
+      },
+      "AssignmentCreate": {
+        "properties": {
           "mentor_id": {
             "type": "string",
             "format": "uuid",
             "title": "Mentor Id"
           },
+          "contract_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Contract Id",
+            "description": "근거 계약 (그 멘토의 계약 완료·이행 중 멘토 계약)"
+          },
           "start_date": {
             "type": "string",
             "format": "date",
             "title": "Start Date",
-            "description": "기수 기간 안"
+            "description": "기수 기간 안, 계약 기간 안"
           },
           "end_date": {
             "anyOf": [
@@ -14738,46 +14902,19 @@
               }
             ],
             "title": "End Date",
-            "description": "없으면 기한 없음, 기수 밖도 가능"
+            "description": "없으면 기한 없음(계약이 끝나면 비활성), 기수 밖도 가능"
           }
         },
         "type": "object",
         "required": [
-          "cost_settlement_policy",
-          "pay_unit",
-          "pay_rate",
           "mentor_id",
+          "contract_id",
           "start_date"
         ],
         "title": "AssignmentCreate"
       },
       "AssignmentDeactivateResponse": {
         "properties": {
-          "cost_settlement_policy": {
-            "$ref": "#/components/schemas/MentoringSettlementPolicy"
-          },
-          "pay_unit": {
-            "type": "string",
-            "enum": [
-              "HOURLY",
-              "PER_SESSION"
-            ],
-            "title": "Pay Unit",
-            "description": "HOURLY / PER_SESSION"
-          },
-          "pay_rate": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "Pay Rate",
-            "description": "단가 (원)"
-          },
-          "no_show_pay_amount": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "No Show Pay Amount",
-            "description": "노쇼 1건당 정산 금액 (원)",
-            "default": 0
-          },
           "id": {
             "type": "string",
             "format": "uuid",
@@ -14787,6 +14924,22 @@
             "type": "string",
             "format": "uuid",
             "title": "Cohort Id"
+          },
+          "contract_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Contract Id"
+          },
+          "contract": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssignmentContract"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "근거 계약 요약"
           },
           "start_date": {
             "type": "string",
@@ -14879,11 +15032,10 @@
         },
         "type": "object",
         "required": [
-          "cost_settlement_policy",
-          "pay_unit",
-          "pay_rate",
           "id",
           "cohort_id",
+          "contract_id",
+          "contract",
           "start_date",
           "end_date",
           "is_active",
@@ -14953,31 +15105,6 @@
       },
       "AssignmentResponse": {
         "properties": {
-          "cost_settlement_policy": {
-            "$ref": "#/components/schemas/MentoringSettlementPolicy"
-          },
-          "pay_unit": {
-            "type": "string",
-            "enum": [
-              "HOURLY",
-              "PER_SESSION"
-            ],
-            "title": "Pay Unit",
-            "description": "HOURLY / PER_SESSION"
-          },
-          "pay_rate": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "Pay Rate",
-            "description": "단가 (원)"
-          },
-          "no_show_pay_amount": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "No Show Pay Amount",
-            "description": "노쇼 1건당 정산 금액 (원)",
-            "default": 0
-          },
           "id": {
             "type": "string",
             "format": "uuid",
@@ -14987,6 +15114,22 @@
             "type": "string",
             "format": "uuid",
             "title": "Cohort Id"
+          },
+          "contract_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Contract Id"
+          },
+          "contract": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssignmentContract"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "근거 계약 요약"
           },
           "start_date": {
             "type": "string",
@@ -15073,11 +15216,10 @@
         },
         "type": "object",
         "required": [
-          "cost_settlement_policy",
-          "pay_unit",
-          "pay_rate",
           "id",
           "cohort_id",
+          "contract_id",
+          "contract",
           "start_date",
           "end_date",
           "is_active",
@@ -15102,6 +15244,18 @@
       },
       "AssignmentUpdate": {
         "properties": {
+          "contract_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contract Id"
+          },
           "start_date": {
             "anyOf": [
               {
@@ -15125,55 +15279,6 @@
               }
             ],
             "title": "End Date"
-          },
-          "cost_settlement_policy": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/MentoringSettlementPolicy"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "pay_unit": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "HOURLY",
-                  "PER_SESSION"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Pay Unit"
-          },
-          "pay_rate": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "minimum": 0.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Pay Rate"
-          },
-          "no_show_pay_amount": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "minimum": 0.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "No Show Pay Amount"
           }
         },
         "type": "object",
@@ -15994,7 +16099,8 @@
         "enum": [
           "EXPIRED",
           "MANUAL",
-          "MENTOR_DEACTIVATED"
+          "MENTOR_DEACTIVATED",
+          "CONTRACT_ENDED"
         ],
         "title": "CohortMentorDeactivationReason"
       },
@@ -20540,31 +20646,6 @@
       },
       "MyAssignmentResponse": {
         "properties": {
-          "cost_settlement_policy": {
-            "$ref": "#/components/schemas/MentoringSettlementPolicy"
-          },
-          "pay_unit": {
-            "type": "string",
-            "enum": [
-              "HOURLY",
-              "PER_SESSION"
-            ],
-            "title": "Pay Unit",
-            "description": "HOURLY / PER_SESSION"
-          },
-          "pay_rate": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "Pay Rate",
-            "description": "단가 (원)"
-          },
-          "no_show_pay_amount": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "No Show Pay Amount",
-            "description": "노쇼 1건당 정산 금액 (원)",
-            "default": 0
-          },
           "id": {
             "type": "string",
             "format": "uuid",
@@ -20574,6 +20655,22 @@
             "type": "string",
             "format": "uuid",
             "title": "Cohort Id"
+          },
+          "contract_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Contract Id"
+          },
+          "contract": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssignmentContract"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "근거 계약 요약"
           },
           "start_date": {
             "type": "string",
@@ -20629,11 +20726,10 @@
         },
         "type": "object",
         "required": [
-          "cost_settlement_policy",
-          "pay_unit",
-          "pay_rate",
           "id",
           "cohort_id",
+          "contract_id",
+          "contract",
           "start_date",
           "end_date",
           "is_active",
