@@ -122,7 +122,7 @@ export type ContractAction = "confirm" | "terminate";
 export function useContractAction(id: string) {
   const refresh = useRefresh();
   return useMutation({
-    // A109 화면 개편 전 임시: 확정 = 진행 → 완료, 해지는 합의 해지
+    // A109 화면 개편 전 임시: 확정 = 진행(계약 완료는 서명본이 필요해 개편 화면에서, A113), 해지는 합의 해지
     mutationFn: async (action: ContractAction) => {
       const params = { path: { contract_id: id } };
       if (action === "terminate")
@@ -132,8 +132,7 @@ export function useContractAction(id: string) {
             body: { reason: "TERMINATED_BY_MUTUAL_AGREEMENT" },
           }),
         );
-      await unwrap(api.POST("/api/v1/admin/contracts/{contract_id}/progress", { params }));
-      return unwrap(api.POST("/api/v1/admin/contracts/{contract_id}/sign", { params }));
+      return unwrap(api.POST("/api/v1/admin/contracts/{contract_id}/progress", { params }));
     },
     onSuccess: refresh,
   });

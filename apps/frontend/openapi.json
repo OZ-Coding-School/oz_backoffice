@@ -5083,7 +5083,7 @@
           "admin-contracts"
         ],
         "summary": "Start Contract Progress",
-        "description": "DRAFT → IN_PROGRESS (계약서 필요).",
+        "description": "DRAFT → IN_PROGRESS. 계약서 원본(미서명)이 필요하다 — 본문으로 올린 파일을 함께 주거나\n이미 붙은 계약서를 쓴다 (A113).",
         "operationId": "start_contract_progress_api_v1_admin_contracts__contract_id__progress_post",
         "security": [
           {
@@ -5102,6 +5102,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ProgressRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -5132,7 +5149,7 @@
           "admin-contracts"
         ],
         "summary": "Sign Contract",
-        "description": "IN_PROGRESS → 계약 완료. 시작일이 없거나 지났으면 ACTIVE, 아니면 SIGNED\n(종료일이 이미 지났으면 ENDED).",
+        "description": "IN_PROGRESS → 계약 완료. 서명된 계약서를 함께 받는다(A113). 시작일이 없거나 지났으면\nACTIVE, 아니면 SIGNED (종료일이 이미 지났으면 ENDED).",
         "operationId": "sign_contract_api_v1_admin_contracts__contract_id__sign_post",
         "security": [
           {
@@ -5151,6 +5168,16 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -5639,6 +5666,18 @@
               "format": "uuid",
               "title": "Contract Id"
             }
+          },
+          {
+            "name": "signed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "서명된 계약서(A113)면 true",
+              "default": false,
+              "title": "Signed"
+            },
+            "description": "서명된 계약서(A113)면 true"
           }
         ],
         "responses": {
@@ -17173,7 +17212,19 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "계약서 원본(미서명)"
+          },
+          "signed_contract_file": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ContractFileResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "서명된 계약서 (A113, 계약 완료부터)"
           },
           "cancel_reason": {
             "anyOf": [
@@ -17287,6 +17338,7 @@
           "instructor_id",
           "linked_profile",
           "contract_file",
+          "signed_contract_file",
           "cancel_reason",
           "canceled_on",
           "termination_reason",
@@ -21808,6 +21860,25 @@
         "title": "ProfileUpdate",
         "description": "보낸 필드만 바꾼다. 닉네임·한 줄 소개·소개·전문 분야는 null(또는 빈 값)로 비운다."
       },
+      "ProgressRequest": {
+        "properties": {
+          "contract_file_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contract File Id",
+            "description": "계약서 원본(미서명). 없으면 이미 붙은 계약서를 쓴다 (A113)"
+          }
+        },
+        "type": "object",
+        "title": "ProgressRequest"
+      },
       "ReactivationFailureResponse": {
         "properties": {
           "assignment_id": {
@@ -23809,6 +23880,21 @@
         ],
         "title": "SettlementType",
         "description": "계약 정산 유형 (A109④)."
+      },
+      "SignRequest": {
+        "properties": {
+          "signed_contract_file_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Signed Contract File Id",
+            "description": "서명된 계약서 (A113)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "signed_contract_file_id"
+        ],
+        "title": "SignRequest"
       },
       "SignupCohortResponse": {
         "properties": {

@@ -123,6 +123,7 @@ def make_mentor_contract(
         "mentor_id": mentor_id,
         "status": ContractStatus.ACTIVE,
         "contract_file_id": new_id(),
+        "signed_contract_file_id": new_id(),
     }
     values.update(overrides)
     return EducatorContract(**values)
@@ -136,6 +137,7 @@ async def create_mentor_contract(
     **overrides: Any,
 ) -> "EducatorContract":
     """배정의 근거가 되는 멘토 계약 (A110). 기본은 이행 중(ACTIVE)·기간 없음·시급 30,000원."""
+    from app.contexts.educator.domain.entities import SIGNED_FILE_STATUSES as SIGNED_STATUSES
     from app.contexts.educator.domain.entities import EducatorContract
     from app.contexts.educator.domain.enums import ContractStatus
     from app.contexts.educator.infrastructure.models import ContractFileModel
@@ -163,6 +165,11 @@ async def create_mentor_contract(
             file_name="a.pdf", file_ext="pdf", file_size=1, storage_key=f"contracts/{new_id()}"
         )
         values["contract_file_id"] = file.id
+    if values["status"] in SIGNED_STATUSES:
+        signed = await ContractFileModel.create(
+            file_name="s.pdf", file_ext="pdf", file_size=1, storage_key=f"contracts/{new_id()}"
+        )
+        values["signed_contract_file_id"] = signed.id
     contract = EducatorContract(**values)
     await TortoiseEducatorContractRepository().add(contract)
     return contract

@@ -273,6 +273,16 @@ class AmendmentRequest(BaseModel):
     contract_file_id: uuid.UUID | None = Field(default=None, description="변경 계약서 (선택)")
 
 
+class ProgressRequest(BaseModel):
+    contract_file_id: uuid.UUID | None = Field(
+        default=None, description="계약서 원본(미서명). 없으면 이미 붙은 계약서를 쓴다 (A113)"
+    )
+
+
+class SignRequest(BaseModel):
+    signed_contract_file_id: uuid.UUID = Field(description="서명된 계약서 (A113)")
+
+
 class CancelRequest(BaseModel):
     reason: str = Field(min_length=1, max_length=500, description="취소 사유")
     canceled_on: date | None = Field(default=None, description="없으면 오늘")
@@ -324,7 +334,10 @@ class ContractResponse(BaseModel):
     linked_profile: LinkedProfileResponse | None = Field(
         description="연결된 멘토·강사 프로필 이름 (A103)"
     )
-    contract_file: ContractFileResponse | None
+    contract_file: ContractFileResponse | None = Field(description="계약서 원본(미서명)")
+    signed_contract_file: ContractFileResponse | None = Field(
+        description="서명된 계약서 (A113, 계약 완료부터)"
+    )
     cancel_reason: str | None
     canceled_on: date | None
     termination_reason: TerminationReason | None
@@ -373,6 +386,9 @@ class ContractResponse(BaseModel):
             instructor_id=c.instructor_id,
             linked_profile=LinkedProfileResponse.of(linked),
             contract_file=ContractFileResponse.of(view.file) if view.file else None,
+            signed_contract_file=(
+                ContractFileResponse.of(view.signed_file) if view.signed_file else None
+            ),
             cancel_reason=c.cancel_reason,
             canceled_on=c.canceled_on,
             termination_reason=c.termination_reason,
@@ -596,19 +612,34 @@ async def delete_contract(
 
 @router.post("/contracts/{contract_id}/progress", response_model=ContractResponse)
 async def start_contract_progress(
-    contract_id: uuid.UUID, user: Manager, contracts: ContractsDep, people: PeopleDep
+    contract_id: uuid.UUID,
+    user: Manager,
+    contracts: ContractsDep,
+    people: PeopleDep,
+    body: ProgressRequest | None = None,
 ) -> ContractResponse:
-    """DRAFT → IN_PROGRESS (계약서 필요)."""
-    return await _one(await contracts.start_progress(contract_id, actor_id=user.id), people)
+    """DRAFT → IN_PROGRESS. 계약서 원본(미서명)이 필요하다 — 본문으로 올린 파일을 함께 주거나
+    이미 붙은 계약서를 쓴다 (A113)."""
+    view = await contracts.start_progress(
+        contract_id, actor_id=user.id, contract_file_id=body.contract_file_id if body else None
+    )
+    return await _one(view, people)
 
 
 @router.post("/contracts/{contract_id}/sign", response_model=ContractResponse)
 async def sign_contract(
-    contract_id: uuid.UUID, user: Manager, contracts: ContractsDep, people: PeopleDep
+    contract_id: uuid.UUID,
+    body: SignRequest,
+    user: Manager,
+    contracts: ContractsDep,
+    people: PeopleDep,
 ) -> ContractResponse:
-    """IN_PROGRESS → 계약 완료. 시작일이 없거나 지났으면 ACTIVE, 아니면 SIGNED
-    (종료일이 이미 지났으면 ENDED)."""
-    return await _one(await contracts.sign(contract_id, actor_id=user.id), people)
+    """IN_PROGRESS → 계약 완료. 서명된 계약서를 함께 받는다(A113). 시작일이 없거나 지났으면
+    ACTIVE, 아니면 SIGNED (종료일이 이미 지났으면 ENDED)."""
+    view = await contracts.sign(
+        contract_id, actor_id=user.id, signed_contract_file_id=body.signed_contract_file_id
+    )
+    return await _one(view, people)
 
 
 @router.post("/contracts/{contract_id}/end", response_model=ContractResponse)
@@ -728,8 +759,11 @@ async def unlink_contract(
 
 @router.get("/contracts/{contract_id}/file-url", response_model=FileUrlResponse)
 async def contract_file_url(
-    contract_id: uuid.UUID, user: Reader, contracts: ContractsDep
+    contract_id: uuid.UUID,
+    user: Reader,
+    contracts: ContractsDep,
+    signed: Annotated[bool, Query(description="서명된 계약서(A113)면 true")] = False,
 ) -> FileUrlResponse:
     """계약서 다운로드 presigned GET URL (만료 10분, 원본 파일 이름으로 저장)."""
-    url, file = await contracts.file_url(contract_id, actor_id=user.id)
+    url, file = await contracts.file_url(contract_id, actor_id=user.id, signed=signed)
     return FileUrlResponse(url=url, file=ContractFileResponse.of(file))

@@ -60,7 +60,7 @@ def make_vendor(**overrides: Any) -> EducatorContract:
 def signed(**overrides: Any) -> EducatorContract:
     contract = make_contract(contract_file_id=new_id(), **overrides)
     contract.start_progress()
-    contract.sign(today=TODAY)
+    contract.sign(today=TODAY, signed_contract_file_id=new_id())
     return contract
 
 
@@ -179,7 +179,9 @@ def test_editable_until_signed() -> None:
     [ContractStatus.SIGNED, ContractStatus.ACTIVE, ContractStatus.ENDED, ContractStatus.TERMINATED],
 )
 def test_signed_contract_only_changes_manager(status: ContractStatus) -> None:
-    contract = make_contract(contract_file_id=new_id(), status=status)
+    contract = make_contract(
+        contract_file_id=new_id(), signed_contract_file_id=new_id(), status=status
+    )
     manager = new_id()
 
     assert contract.revised({"manager_employee_id": manager}).manager_employee_id == manager
@@ -188,13 +190,26 @@ def test_signed_contract_only_changes_manager(status: ContractStatus) -> None:
     assert exc.value.code == "contract_not_editable"
 
 
+def test_progress_attaches_original_and_sign_requires_other_file() -> None:
+    contract = make_contract()
+    original = new_id()
+    contract.start_progress(contract_file_id=original)
+    assert (contract.status, contract.contract_file_id) == (ContractStatus.IN_PROGRESS, original)
+    with pytest.raises(BusinessRuleViolation) as same:
+        contract.sign(today=TODAY, signed_contract_file_id=original)
+    assert same.value.code == "signed_contract_file_same"
+    signed_file = new_id()
+    contract.sign(today=TODAY, signed_contract_file_id=signed_file)
+    assert (contract.contract_file_id, contract.signed_contract_file_id) == (original, signed_file)
+
+
 def test_progress_requires_file() -> None:
     contract = make_contract()
     with pytest.raises(BusinessRuleViolation) as exc:
         contract.start_progress()
     assert exc.value.code == "contract_file_required"
     with pytest.raises(BusinessRuleViolation) as skip:  # 진행을 건너뛰고 완료할 수 없다
-        make_contract(contract_file_id=new_id()).sign(today=TODAY)
+        make_contract(contract_file_id=new_id()).sign(today=TODAY, signed_contract_file_id=new_id())
     assert skip.value.code == "invalid_contract_transition"
 
 

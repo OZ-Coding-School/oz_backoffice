@@ -103,6 +103,13 @@ class EducatorContractModel(models.Model):
     contract_file: fields.OneToOneNullableRelation[ContractFileModel] = fields.OneToOneField(
         "models.ContractFileModel", related_name="contract", null=True, on_delete=fields.RESTRICT
     )
+    # 서명된 계약서, SIGNED부터 필수 (A113, check_contract_signed_file_required)
+    signed_contract_file: fields.OneToOneNullableRelation[ContractFileModel] = fields.OneToOneField(
+        "models.ContractFileModel",
+        related_name="signed_contract",
+        null=True,
+        on_delete=fields.RESTRICT,
+    )
     contract_type = fields.CharEnumField(ContractType, max_length=20)
     title = fields.CharField(max_length=100)
     contractor_name = fields.CharField(max_length=50)

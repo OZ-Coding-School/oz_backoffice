@@ -1520,7 +1520,8 @@ export interface paths {
         put?: never;
         /**
          * Start Contract Progress
-         * @description DRAFT → IN_PROGRESS (계약서 필요).
+         * @description DRAFT → IN_PROGRESS. 계약서 원본(미서명)이 필요하다 — 본문으로 올린 파일을 함께 주거나
+         *     이미 붙은 계약서를 쓴다 (A113).
          */
         post: operations["start_contract_progress_api_v1_admin_contracts__contract_id__progress_post"];
         delete?: never;
@@ -1540,8 +1541,8 @@ export interface paths {
         put?: never;
         /**
          * Sign Contract
-         * @description IN_PROGRESS → 계약 완료. 시작일이 없거나 지났으면 ACTIVE, 아니면 SIGNED
-         *     (종료일이 이미 지났으면 ENDED).
+         * @description IN_PROGRESS → 계약 완료. 서명된 계약서를 함께 받는다(A113). 시작일이 없거나 지났으면
+         *     ACTIVE, 아니면 SIGNED (종료일이 이미 지났으면 ENDED).
          */
         post: operations["sign_contract_api_v1_admin_contracts__contract_id__sign_post"];
         delete?: never;
@@ -5208,7 +5209,10 @@ export interface components {
             instructor_id: string | null;
             /** @description 연결된 멘토·강사 프로필 이름 (A103) */
             linked_profile: components["schemas"]["LinkedProfileResponse"] | null;
+            /** @description 계약서 원본(미서명) */
             contract_file: components["schemas"]["ContractFileResponse"] | null;
+            /** @description 서명된 계약서 (A113, 계약 완료부터) */
+            signed_contract_file: components["schemas"]["ContractFileResponse"] | null;
             /** Cancel Reason */
             cancel_reason: string | null;
             /** Canceled On */
@@ -6964,6 +6968,14 @@ export interface components {
             /** Expertise */
             expertise?: string | null;
         };
+        /** ProgressRequest */
+        ProgressRequest: {
+            /**
+             * Contract File Id
+             * @description 계약서 원본(미서명). 없으면 이미 붙은 계약서를 쓴다 (A113)
+             */
+            contract_file_id?: string | null;
+        };
         /** ReactivationFailureResponse */
         ReactivationFailureResponse: {
             /**
@@ -7765,6 +7777,15 @@ export interface components {
          * @enum {string}
          */
         SettlementType: "FIXED" | "UNIT_PRICE" | "ACTUAL_COST";
+        /** SignRequest */
+        SignRequest: {
+            /**
+             * Signed Contract File Id
+             * Format: uuid
+             * @description 서명된 계약서 (A113)
+             */
+            signed_contract_file_id: string;
+        };
         /** SignupCohortResponse */
         SignupCohortResponse: {
             /**
@@ -11974,7 +11995,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ProgressRequest"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -12005,7 +12030,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -12294,7 +12323,10 @@ export interface operations {
     };
     contract_file_url_api_v1_admin_contracts__contract_id__file_url_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 서명된 계약서(A113)면 true */
+                signed?: boolean;
+            };
             header?: never;
             path: {
                 contract_id: string;

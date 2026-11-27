@@ -44,6 +44,13 @@ async def _contract(**overrides: Any) -> EducatorContract:
     values.update(overrides)
     if values.get("status", ContractStatus.DRAFT) is not ContractStatus.DRAFT:
         values.setdefault("contract_file_id", (await _file()).id)
+    if values.get("status") in (
+        ContractStatus.SIGNED,
+        ContractStatus.ACTIVE,
+        ContractStatus.ENDED,
+        ContractStatus.TERMINATED,
+    ):
+        values.setdefault("signed_contract_file_id", (await _file()).id)
     contract = EducatorContract(**values)
     await contracts.add(contract)
     return contract

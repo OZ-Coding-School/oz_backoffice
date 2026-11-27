@@ -128,8 +128,17 @@ async def test_contract_lifecycle(client: AsyncClient, admin: dict[str, str]) ->
 
     progressing = await client.post(f"{path}/progress", headers=admin)
     assert progressing.json()["status"] == "IN_PROGRESS"
-    signed = await client.post(f"{path}/sign", headers=admin)
+    no_signed = await client.post(f"{path}/sign", headers=admin)
+    assert no_signed.status_code == 422  # 서명된 계약서가 필요하다 (A113)
+    signed_file = await _upload(client, admin)
+    signed = await client.post(
+        f"{path}/sign", json={"signed_contract_file_id": signed_file.json()["id"]}, headers=admin
+    )
     assert signed.json()["status"] == "ACTIVE"
+    assert signed.json()["signed_contract_file"]["id"] == signed_file.json()["id"]
+    assert signed.json()["contract_file"]["id"] == file.json()["id"]
+    signed_url = await client.get(f"{path}/file-url", params={"signed": "true"}, headers=admin)
+    assert signed_url.json()["file"]["id"] == signed_file.json()["id"]
     locked = await client.patch(path, json={"title": "변경"}, headers=admin)
     assert locked.status_code == 422
     assert locked.json()["error"]["code"] == "contract_not_editable"

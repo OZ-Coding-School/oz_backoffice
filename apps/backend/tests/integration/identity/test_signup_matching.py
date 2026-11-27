@@ -92,6 +92,11 @@ async def _mentor_contract(
             file_name="a.pdf", file_ext="pdf", file_size=1, storage_key=f"contracts/{new_id()}"
         )
         values["contract_file_id"] = file.id
+    if values.get("status") in (ContractStatus.SIGNED, ContractStatus.ACTIVE):
+        signed = await ContractFileModel.create(
+            file_name="s.pdf", file_ext="pdf", file_size=1, storage_key=f"contracts/{new_id()}"
+        )
+        values["signed_contract_file_id"] = signed.id
     entity = EducatorContract(**values)
     await TortoiseEducatorContractRepository().add(entity)
     return entity

@@ -48,6 +48,7 @@ function contract(id: string, extra: Partial<Contract> = {}): Contract {
     instructor_id: null,
     linked_profile: { name: "김멘토", display_name: "멘토K" },
     contract_file: { id: "f1", file_name: "멘토 계약서.pdf", file_size: 186_000, created_at: "2026-10-28T01:00:00Z" },
+    signed_contract_file: null,
     created_at: "2026-10-28T01:00:00Z",
     updated_at: null,
     ...extra,
@@ -62,6 +63,7 @@ const DRAFT = contract("k2", {
   mentor_id: "m3",
   linked_profile: { name: "박새멘토", display_name: "박새멘토" },
   contract_file: null,
+  signed_contract_file: null,
 });
 const INSTRUCTOR = contract("k3", {
   contract_type: "INSTRUCTOR",
@@ -125,12 +127,9 @@ function mockApi({ codes }: { codes?: string[] } = {}) {
     http.get(apiUrl("/api/v1/admin/contracts/{contract_id}"), ({ params }) =>
       HttpResponse.json(byId(params.contract_id)),
     ),
-    http.post(apiUrl("/api/v1/admin/contracts/{contract_id}/progress"), ({ params }) =>
-      HttpResponse.json({ ...byId(params.contract_id), status: "IN_PROGRESS" }),
-    ),
-    http.post(apiUrl("/api/v1/admin/contracts/{contract_id}/sign"), ({ params }) => {
+    http.post(apiUrl("/api/v1/admin/contracts/{contract_id}/progress"), ({ params }) => {
       calls.push({ path: "confirm", body: params.contract_id });
-      return HttpResponse.json({ ...byId(params.contract_id), status: "ACTIVE" });
+      return HttpResponse.json({ ...byId(params.contract_id), status: "IN_PROGRESS" });
     }),
     http.post(apiUrl("/api/v1/admin/contracts/{contract_id}/terminate"), ({ params }) => {
       calls.push({ path: "terminate", body: params.contract_id });

@@ -112,7 +112,13 @@ async def test_file_required_from_in_progress() -> None:
     await _contract(
         status=ContractStatus.CANCELED, cancel_reason="취소", canceled_on=date(2026, 1, 2)
     )
-    active = await _contract(status=ContractStatus.ACTIVE, contract_file_id=(await _file()).id)
+    with pytest.raises(IntegrityError):  # 서명된 계약서는 계약 완료부터 필수 (A113)
+        await _contract(status=ContractStatus.ACTIVE, contract_file_id=(await _file()).id)
+    active = await _contract(
+        status=ContractStatus.ACTIVE,
+        contract_file_id=(await _file()).id,
+        signed_contract_file_id=(await _file()).id,
+    )
     assert active.status is ContractStatus.ACTIVE
 
 
@@ -160,7 +166,11 @@ _VENDOR: dict[str, Any] = {
 )
 async def test_contract_checks(overrides: dict[str, Any]) -> None:
     if overrides.get("status") in (ContractStatus.TERMINATED,):
-        overrides = {**overrides, "contract_file_id": (await _file()).id}
+        overrides = {
+            **overrides,
+            "contract_file_id": (await _file()).id,
+            "signed_contract_file_id": (await _file()).id,
+        }
     with pytest.raises(IntegrityError):
         await _contract(**overrides)
 
